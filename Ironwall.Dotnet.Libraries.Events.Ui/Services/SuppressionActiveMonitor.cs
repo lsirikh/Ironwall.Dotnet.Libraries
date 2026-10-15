@@ -23,7 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /// <summary>활성 억제 창 폴링 모니터. 배너 등 소비자는 <see cref="ActiveChanged"/> 구독 + <see cref="Active"/> 읽기.</summary>
 public interface ISuppressionActiveMonitor : IService
 {
-    /// <summary>현재 활성(진행 중) 억제 창 목록(읽기 전용 스냅샷).</summary>
+    /// <summary>현재 활성(진행 중) 억제 창 목록(읽기 전용 스냅샷). <see cref="IsStale"/> 이면 '모름' 이라 빈 목록이다.</summary>
     IReadOnlyList<EventSuppressionScheduleDto> Active { get; }
 
     /// <summary>활성 목록 갱신 시 발화(UI 스레드).</summary>
@@ -34,8 +34,8 @@ public interface ISuppressionActiveMonitor : IService
 
     /// <summary>
     /// 마지막 성공 이후 TTL(폴링주기 × 3 = 90초)을 넘겼는가.
-    /// <para>⚠ stale 이어도 <see cref="Active"/> 를 <b>버리지 않는다</b> — 조용한 소멸은
-    /// 이 모니터의 존재 이유(억제 은폐 방지)를 정면으로 배반한다. UI 는 목록과 stale 을 <b>병기</b>한다.</para>
+    /// <para>stale 이면 활성 목록은 '모름' 이다(G7-3 캐시 TTL) — <see cref="Active"/> 는 빈 목록을 주고
+    /// UI 는 오래된 억제 대신 '모름' 배너를 띄운다(0건으로 조용히 보이면 안 된다).</para>
     /// </summary>
     bool IsStale { get; }
 
@@ -77,8 +77,17 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
 
         _timer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
         { Interval = TimeSpan.FromSeconds(POLL_SECONDS) };
-        _timer.Tick += async (_, _) => await PollAsync();
+        _timer.Tick += async (_, _) =>
+        {
+            // 폴링이 아예 못 도는 경우(미인증 · 응답 대기)에도 TTL 전이를 알린다.
+            RaiseIfBecameStale();
+            await PollAsync();
+        };
         _timer.Start();
+
+        // 해제 타이머(G7-3) — 가장 이른 occurrence_end(단발 window_end)에 그 일정을 내리고 /active 를 다시 읽는다.
+        _release = new DispatcherTimer(DispatcherPriority.Background, _dispatcher);
+        _release.Tick += (_, _) => OnReleaseDue();
 
         // 트레일링 발화 타이머 — 쿨다운 중 접힌 요청 1건을 뒤늦게 흘려보낸다.
         _trailing = new DispatcherTimer(DispatcherPriority.Background, _dispatcher);
@@ -100,6 +109,8 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
         _timer = null;
         _trailing?.Stop();
         _trailing = null;
+        _release?.Stop();
+        _release = null;
         _hasPending = false;
         return Task.CompletedTask;
     }
@@ -137,10 +148,12 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
     {
         void Commit()
         {
-            _active = data;
+            // 응답 사이에 이미 끝난 일정은 바로 뺀다(서버 시계와 몇 초 어긋나도 다음 폴링이 바로잡는다).
+            _active = SuppressionPollThrottle.WithoutReleased(data, DateTime.Now);
             _lastSuccessAt = stamp;
             _lastPollAt = stamp;
             _wasStale = false;
+            ArmRelease();
             ActiveChanged?.Invoke();
         }
 
@@ -154,6 +167,12 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
     private void NotifyStaleIfNeeded()
     {
         _lastPollAt = DateTime.Now;
+        RaiseIfBecameStale();
+    }
+
+    /// <summary>TTL 을 막 넘겼으면 한 번 통지한다(목록이 '모름' 으로 바뀐다).</summary>
+    private void RaiseIfBecameStale()
+    {
         if (!IsStale || _wasStale) return;
         _wasStale = true;
         if (_dispatcher is { } d && !d.CheckAccess()) d.InvokeAsync(() => ActiveChanged?.Invoke());
@@ -161,8 +180,36 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
     }
     #endregion
 
+    #region - Release Timer -
+    /// <summary>가장 이른 해제 시각에 맞춰 해제 타이머를 다시 건다(UI 스레드).</summary>
+    private void ArmRelease()
+    {
+        if (_release is not { } t) return;
+        t.Stop();
+        if (SuppressionPollThrottle.NextRelease(_active) is not { } at) return;
+        var wait = at - DateTime.Now;
+        // DispatcherTimer 간격 상한(int ms)을 넘지 않게 — 먼 시각이면 하루 뒤 다시 계산한다.
+        if (wait > TimeSpan.FromDays(1)) wait = TimeSpan.FromDays(1);
+        t.Interval = wait <= TimeSpan.Zero ? TimeSpan.FromMilliseconds(1) : wait;
+        t.Start();
+    }
+
+    private void OnReleaseDue()
+    {
+        var remaining = SuppressionPollThrottle.WithoutReleased(_active, DateTime.Now);
+        if (remaining.Count != _active.Count)
+        {
+            _log?.Info($"[{nameof(SuppressionActiveMonitor)}] 해제 시각 도달 — {_active.Count - remaining.Count}건 내림");
+            _active = remaining;
+            ActiveChanged?.Invoke();
+            RequestImmediatePoll("release-timer");   // 권위(/active)로 확인
+        }
+        ArmRelease();
+    }
+    #endregion
+
     #region - ISuppressionActiveMonitor -
-    public IReadOnlyList<EventSuppressionScheduleDto> Active => _active;
+    public IReadOnlyList<EventSuppressionScheduleDto> Active => IsStale ? Array.Empty<EventSuppressionScheduleDto>() : _active;
     public event Action? ActiveChanged;
 
     public DateTime? LastSuccessAt => _lastSuccessAt;
@@ -218,6 +265,8 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
         _timer = null;
         _trailing?.Stop();
         _trailing = null;
+        _release?.Stop();
+        _release = null;
         _hasPending = false;
         ActiveChanged = null;
         GC.SuppressFinalize(this);
@@ -235,6 +284,7 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
 
     private DispatcherTimer? _timer;
     private DispatcherTimer? _trailing;
+    private DispatcherTimer? _release;
     private Dispatcher? _dispatcher;
 
     private IReadOnlyList<EventSuppressionScheduleDto> _active = new List<EventSuppressionScheduleDto>();

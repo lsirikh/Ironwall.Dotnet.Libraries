@@ -1021,15 +1021,14 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     /// <summary>폴링이 TTL(90초)을 넘겨 실패 중인가.</summary>
     public bool IsActiveStale => _monitor?.IsStale ?? false;
 
-    /// <summary>stale 병기 문구 — 목록을 버리지 않고 "언제 기준인지"를 밝힌다.</summary>
+    /// <summary>stale 문구 — TTL 을 넘기면 활성 목록은 '모름' 이다(오래된 억제를 계속 보이지 않는다).</summary>
     public string ActiveStaleText => IsActiveStale
-        ? $"⚠ 갱신 실패 — {_monitor?.LastSuccessAgeText ?? "확인 안 됨"} 기준"
+        ? $"⚠ 억제 상태 모름 — 마지막 확인 {_monitor?.LastSuccessAgeText ?? "확인 안 됨"}"
         : string.Empty;
-    /// <summary>상단 활성 억제 요약 — 은폐 방지(정비 중임을 상시 인지).</summary>
+    /// <summary>상단 활성 억제 요약 — 은폐 방지(정비 중임을 상시 인지). stale 이면 목록이 비어 빈 문자열.</summary>
     public string ActiveCountText => ActiveWindows.Count == 0
         ? string.Empty
-        : $"⚠ 현재 억제 중인 스케줄 {ActiveWindows.Count}건"
-          + (IsActiveStale ? $" · {ActiveStaleText}" : string.Empty);
+        : $"⚠ 현재 억제 중인 스케줄 {ActiveWindows.Count}건";
 
     /// <summary>정리할 취소/종료 항목이 있는가('모두 정리' 버튼 활성).</summary>
     public bool CanCleanupAll => CanDelEvents() && Schedules.Any(s => s.IsDeletable);
