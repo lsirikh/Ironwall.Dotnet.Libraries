@@ -230,4 +230,56 @@ public class SuppressionPollThrottleTests
     [Fact]
     public void should_describe_unknown_when_never_succeeded()
         => Assert.Equal("확인 안 됨", SuppressionPollThrottle.DescribeAge(T0, null));
+
+    // ══════ 해제 타이머(G7-3) — occurrence_end, 단발은 window_end ══════
+
+    private static Ironwall.Dotnet.Libraries.Messages.Dto.Events.EventSuppressionScheduleDto Dto(
+        string? occurrenceEnd, string? windowEnd, string? recurrence = "none")
+        => new() { OccurrenceEnd = occurrenceEnd, WindowEnd = windowEnd, RecurrenceType = recurrence };
+
+    private static System.DateTime Local(string iso) => System.DateTimeOffset.Parse(iso).LocalDateTime;
+
+    [Fact]
+    public void should_release_at_occurrence_end_first()
+        => Assert.Equal(Local("2026-09-08T13:00:00+09:00"),
+            SuppressionPollThrottle.ReleaseAt(Dto("2026-09-08T13:00:00+09:00", "2026-09-30T00:00:00+09:00")));
+
+    [Fact]
+    public void should_fall_back_to_window_end_for_one_shot()
+        => Assert.Equal(Local("2026-09-08T18:00:00+09:00"),
+            SuppressionPollThrottle.ReleaseAt(Dto(null, "2026-09-08T18:00:00+09:00")));
+
+    [Fact]
+    public void should_not_use_window_end_for_weekly()
+        // 반복 창의 window_end 는 유효기간 끝이지 이번 회차 끝이 아니다.
+        => Assert.Null(SuppressionPollThrottle.ReleaseAt(Dto(null, "2026-09-30T00:00:00+09:00", "weekly")));
+
+    [Fact]
+    public void should_have_no_release_for_unlimited()
+        => Assert.Null(SuppressionPollThrottle.ReleaseAt(Dto(null, null)));
+
+    [Fact]
+    public void should_drop_released_and_keep_unlimited()
+    {
+        var past = Dto(System.DateTimeOffset.Now.AddMinutes(-1).ToString("o"), null);
+        var future = Dto(System.DateTimeOffset.Now.AddMinutes(10).ToString("o"), null);
+        var unlimited = Dto(null, null);
+
+        var left = SuppressionPollThrottle.WithoutReleased(new[] { past, future, unlimited }, System.DateTime.Now);
+
+        Assert.Equal(new[] { future, unlimited }, left);
+    }
+
+    [Fact]
+    public void should_pick_earliest_release()
+    {
+        var a = Dto("2026-09-08T15:00:00+09:00", null);
+        var b = Dto("2026-09-08T13:00:00+09:00", null);
+        Assert.Equal(Local("2026-09-08T13:00:00+09:00"),
+            SuppressionPollThrottle.NextRelease(new[] { a, b, Dto(null, null) }));
+    }
+
+    [Fact]
+    public void should_have_no_next_release_when_all_unlimited()
+        => Assert.Null(SuppressionPollThrottle.NextRelease(new[] { Dto(null, null) }));
 }
