@@ -204,7 +204,7 @@ internal sealed class HostCameraServices
                 Observe(provider.StopAsync(cameraId, ct), cameraId, "stop");
                 break;
             case PtzOperation.DragMove:
-                ObserveDrag(provider.DragMoveAsync(cameraId, ptz.ViewX, ptz.ViewY, ptz.ViewAspect, ct), cameraId, Environment.TickCount64);
+                ObserveDrag(provider.DragMoveAsync(cameraId, ptz.ViewX, ptz.ViewY, ptz.ViewAspect, ptz.Speed, ct), cameraId, Environment.TickCount64);
                 break;
             case PtzOperation.GotoPreset when !string.IsNullOrWhiteSpace(ptz.PresetToken):
                 Observe(provider.GotoPresetAsync(cameraId, ptz.PresetToken!, ct), cameraId, "goto-preset");
@@ -375,8 +375,17 @@ internal sealed class HostCameraServices
         {
             var readiness = await p.PrepareAsync(cam, info, ct).ConfigureAwait(false);
             if (r.Kind == CameraRequestKind.PreparePtz)
-                return Result(r, readiness.Connected, readiness.Connected ? null : CameraErrorCodes.Failed,
+            {
+                var (ptSpeed, zSpeed) = p.GetDefaultSpeeds(cam);
+                var prepared = Result(r, readiness.Connected, readiness.Connected ? null : CameraErrorCodes.Failed,
                     ptzCapable: readiness.PtzCapable, imagingCapable: readiness.ImagingCapable);
+                return new CameraResponse
+                {
+                    RequestId = prepared.RequestId, Kind = prepared.Kind, CameraId = prepared.CameraId, Success = prepared.Success,
+                    ErrorCode = prepared.ErrorCode, PtzCapable = prepared.PtzCapable, ImagingCapable = prepared.ImagingCapable,
+                    DefaultPanTiltSpeed = ptSpeed, DefaultZoomSpeed = zSpeed,
+                };
+            }
             if (!readiness.Connected) return CameraResponse.Fail(r, CameraErrorCodes.Failed, "not connected");
         }
 
@@ -428,6 +437,12 @@ internal sealed class HostCameraServices
                         RequestId = r.RequestId, Kind = r.Kind, CameraId = cam, Success = true,
                         VideoWidth = resolution.Width, VideoHeight = resolution.Height,
                     };
+            case CameraRequestKind.GetPtzMoveStatus:
+                return new CameraResponse
+                {
+                    RequestId = r.RequestId, Kind = r.Kind, CameraId = cam, Success = true,
+                    PtzMoving = await p.GetMoveStatusAsync(cam, ct).ConfigureAwait(false),
+                };
             default:
                 return CameraResponse.Fail(r, CameraErrorCodes.BadRequest, $"unknown kind {r.Kind}");
         }

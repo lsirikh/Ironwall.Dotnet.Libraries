@@ -119,6 +119,25 @@ public sealed class SensorRowViewModel : PropertyChangedBase
         }
     }
 
+    /// <summary>
+    /// 결선된 제어기 포트(부품 key · 서버 8.0.8 이상) — 고르면 바뀐 줄이 된다. 비우기는 받지 않는다
+    /// (서버 병합에서 지울 길이 없어 "저장됨"이 거짓이 된다).
+    /// </summary>
+    public string? PortKey
+    {
+        get => Row.Facts.PortKey;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value) || string.Equals(value, Row.Facts.PortKey, StringComparison.Ordinal)) return;
+            Row.Facts = Row.Facts with { PortKey = value };
+            Edited();
+            NotifyOfPropertyChange(nameof(PortText));
+        }
+    }
+
+    /// <summary>포트 칸의 글자(고를 포트가 없는 서버 · 줄은 이것만 보인다).</summary>
+    public string PortText => Row.Facts.PortKey ?? "—";
+
     /// <summary>버스 주소 — 결선 순번과 다를 수 있어 둘 다 보인다(WS L478).</summary>
     public string ChannelText => Row.Channel is { } channel ? $"주소 {channel}" : "—";
 
@@ -151,6 +170,8 @@ public sealed class SensorRowViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(TypeText));
         NotifyOfPropertyChange(nameof(TypeDisplayText));
         NotifyOfPropertyChange(nameof(Zone));
+        NotifyOfPropertyChange(nameof(PortKey));
+        NotifyOfPropertyChange(nameof(PortText));
         NotifyOfPropertyChange(nameof(ChannelText));
         NotifyOfPropertyChange(nameof(PlacementText));
         NotifyOfPropertyChange(nameof(IsDraft));

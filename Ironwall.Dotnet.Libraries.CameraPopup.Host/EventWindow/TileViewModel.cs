@@ -2,6 +2,7 @@
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Ptz;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow;
 
@@ -31,6 +32,9 @@ internal sealed class TileViewModel : ObservableObject
     private string? _notice;
     private IReadOnlyList<TilePreset> _presets = Array.Empty<TilePreset>();
     private string? _presetsStatus;
+    private readonly PtzMotionTracker _motion;
+    private PtzMotionState _ptzMotion;
+    private CancellationTokenSource? _wheel;
 
     private TileViewModel(string eventKey, EventWindowCamera? camera, ITileCameraControl? control, IHostClock clock, Action onInteraction, HostLog? log, int emptySlot)
     {
@@ -44,6 +48,7 @@ internal sealed class TileViewModel : ObservableObject
         PtzDisabledReason = camera is null
             ? null
             : PtzAvailability.DisabledReason(camera.IsPtz, camera.PtzAllowed, control?.PtzUnavailableReason);
+        _motion = new PtzMotionTracker(ProbeMotionAsync, state => PtzMotion = state);
     }
 
     public static TileViewModel ForCamera(string eventKey, EventWindowCamera camera, ITileCameraControl control, IHostClock clock, Action onInteraction, HostLog? log)
@@ -254,7 +259,71 @@ internal sealed class TileViewModel : ObservableObject
     /// 영상 위 드래그 → 드래그 길이만큼 상대 이동 한 번(떼는 순간). 비율은 타일 영상 크기 기준(오른쪽 +, 아래 +).
     /// </summary>
     public Task PtzDragAsync(double viewX, double viewY, double viewAspect)
-        => RunPtzAsync(ct => _control!.DragMoveAsync(viewX, viewY, viewAspect, ct), "PTZ 이동 실패");
+    {
+        if (IsPtzEnabled && _control is not null) _ = _motion.Begin(PtzMotionTracker.DragEstimate);
+        return RunPtzAsync(ct => _control!.DragMoveAsync(viewX, viewY, viewAspect, ct), "PTZ 이동 실패");
+    }
+
+    /// <summary>휠 한 칸 줌 펄스 길이(지도 팝업과 같은 250 ms). 시험이 줄일 수 있다.</summary>
+    internal TimeSpan WheelZoomPulse { get; set; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>패드 · 휠 속도 — 카메라 기본 속도(ONVIF DefaultPTZSpeed), 모르면 0.5(이벤트 창에는 속도 설정 화면이 없다).</summary>
+    public double PanTiltSpeed => _control?.DefaultPanTiltSpeed ?? 0.5;
+    public double ZoomSpeed => _control?.DefaultZoomSpeed ?? 0.5;
+
+    /// <summary>
+    /// 영상 위 휠 한 칸 → 줌 연속 이동(<see cref="ZoomSpeed"/>) → <see cref="WheelZoomPulse"/> 뒤 정지(지도 팝업과 같은 규칙).
+    /// 연달아 굴리면 앞 칸의 정지를 취소하고 이어 간다(정지는 마지막 칸 뒤 한 번). PTZ 못 하는 타일은 이유 알림.
+    /// </summary>
+    public async Task PtzWheelZoomAsync(int direction)
+    {
+        if (direction == 0 || !IsCamera) return;
+        if (!IsPtzEnabled || _control is null)
+        {
+            NotePtzUnavailable();
+            return;
+        }
+        var mine = new CancellationTokenSource();
+        Interlocked.Exchange(ref _wheel, mine)?.Cancel();
+        _ = _motion.Begin(PtzMotionTracker.ZoomEstimate);
+        await PtzMoveAsync(0, 0, Math.Sign(direction) * ZoomSpeed).ConfigureAwait(true);
+        try { await Task.Delay(WheelZoomPulse, mine.Token).ConfigureAwait(true); }
+        catch (OperationCanceledException) { return; }   // 다음 칸이 이어 간다
+        if (ReferenceEquals(Interlocked.CompareExchange(ref _wheel, null, mine), mine)) await PtzStopAsync().ConfigureAwait(true);
+    }
+
+    // ───────── 이동 중 표시(영상 오른쪽 아래) ─────────
+
+    public PtzMotionState PtzMotion
+    {
+        get => _ptzMotion;
+        private set
+        {
+            if (!Set(ref _ptzMotion, value)) return;
+            Raise(nameof(IsPtzMotionVisible));
+            Raise(nameof(IsPtzMotionMoving));
+            Raise(nameof(IsPtzMotionDone));
+            Raise(nameof(PtzMotionText));
+        }
+    }
+
+    public bool IsPtzMotionVisible => _ptzMotion != PtzMotionState.Idle;
+    public bool IsPtzMotionMoving => _ptzMotion == PtzMotionState.Moving;
+    public bool IsPtzMotionDone => _ptzMotion == PtzMotionState.Done;
+    public string PtzMotionText => _ptzMotion switch
+    {
+        PtzMotionState.Moving => "이동 중",
+        PtzMotionState.Done => "이동 완료",
+        _ => string.Empty,
+    };
+
+    private async Task<bool?> ProbeMotionAsync(CancellationToken ct)
+    {
+        if (_control is null) return null;
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(CallTimeout);
+        return await _control.GetMoveStatusAsync(cts.Token).ConfigureAwait(true);
+    }
 
     /// <summary>PTZ 를 못 하는 타일에서 영상을 끌었다 — 이유(고정 · 권한 · 제공자)를 알림 한 줄로 보인다.</summary>
     public void NotePtzUnavailable()

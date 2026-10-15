@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -37,6 +37,7 @@ public class LogoutPanelViewModel : BasePanelViewModel
         // 창이 열릴 때마다 SSO 세션인지 다시 본다(단일 인스턴스 VM) — 단추 구성이 바뀐다
         NotifyOfPropertyChange(nameof(IsSsoSession));
         NotifyOfPropertyChange(nameof(OkText));
+        NotifyOfPropertyChange(nameof(HintText));
     }
     #endregion
     #region - Binding Methods -
@@ -70,6 +71,8 @@ public class LogoutPanelViewModel : BasePanelViewModel
     /// <summary>SSO 로 로그인한 세션인가 — 그때만 [이 앱만 로그아웃] · [전체 로그아웃] 둘을 낸다.</summary>
     public bool IsSsoSession => _sso?.IsEnabled == true;
     public string OkText => IsSsoSession ? "이 앱만 로그아웃" : "로그아웃";
+    /// <summary>확인 문구 아래 한 줄 — SSO 면 범위를 고르라는 행동 안내, 아니면 결과. 범위 설명은 "?"(Accounts.Logout).</summary>
+    public string HintText => IsSsoSession ? "SSO 로 로그인한 상태입니다. 로그아웃 범위를 고르세요." : "로그인 화면으로 돌아갑니다.";
     #endregion
     #region - Attributes -
     private readonly IAuthGateway _gateway;

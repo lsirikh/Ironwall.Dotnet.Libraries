@@ -37,4 +37,13 @@ public static class PtzMotionPolicy
     /// 줌을 바꿨어도 다음 드래그부터는 맞는 화각을 쓴다. 드래그를 보내기 전에는 절대 읽지 않는다(지연 없음).
     /// </summary>
     public static readonly TimeSpan StatusMaxAge = TimeSpan.FromSeconds(3);
+
+    /// <summary>나눠 보내는 끌기(화각 상대 공간)에서 앞 이동이 멈췄는지 묻는 간격.</summary>
+    public static readonly TimeSpan StepPollInterval = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>앞 이동이 이 시간 안에 안 멈추면 다음 몫을 그냥 보낸다(카메라가 MOVING 을 계속 말하는 경우의 상한).</summary>
+    public static readonly TimeSpan StepIdleTimeout = TimeSpan.FromSeconds(4);
+
+    /// <summary>MoveStatus 를 안 주는 카메라에서 한 몫(반 화면)이 끝났다고 보는 어림 시간.</summary>
+    public static readonly TimeSpan StepEstimate = TimeSpan.FromMilliseconds(900);
 }

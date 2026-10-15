@@ -1,4 +1,8 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 /****************************************************************************
@@ -71,8 +75,8 @@ public static class SuppressionPollThrottle
 
     /// <summary>
     /// 폴링 결과가 stale 인가 — 마지막 <b>성공</b> 이후 TTL(폴링주기 × 3)을 넘겼는가.
-    /// <para>stale 이어도 목록을 버리지 않는다. 이 배너의 존재 이유가 <b>억제 은폐 방지</b>이므로
-    /// 조용한 소멸은 목적을 배반하고, 조용한 유지는 거짓말이다 — <b>병기</b>가 정답이다.</para>
+    /// <para>stale 이면 활성 목록은 '모름' 이다(G7-3 캐시 TTL) — 오래된 억제를 계속 보이지 않고,
+    /// 조용히 0건으로 보이지도 않게 배너가 '모름' 을 알린다.</para>
     /// </summary>
     public static bool IsStale(DateTime now, DateTime? lastSuccessAt, double ttlSeconds)
     {
@@ -91,4 +95,26 @@ public static class SuppressionPollThrottle
         if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes}분 전";
         return $"{(int)elapsed.TotalHours}시간 전";
     }
+
+    /// <summary>
+    /// 억제가 풀리는 시각(G7-3 해제 타이머) — <c>occurrence_end</c>, 없으면 단발 창의 <c>window_end</c>.
+    /// 반복 창은 <c>window_end</c> 가 유효기간 끝이라 쓰지 않는다. 둘 다 없으면(무제한) null.
+    /// </summary>
+    public static DateTime? ReleaseAt(EventSuppressionScheduleDto dto)
+    {
+        var iso = dto.OccurrenceEnd;
+        if (iso is null && !string.Equals(dto.RecurrenceType, "weekly", StringComparison.OrdinalIgnoreCase))
+            iso = dto.WindowEnd;
+        return iso is not null && DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.None, out var end)
+            ? end.LocalDateTime
+            : null;
+    }
+
+    /// <summary>해제 시각이 지난 일정을 뺀 목록.</summary>
+    public static List<EventSuppressionScheduleDto> WithoutReleased(IEnumerable<EventSuppressionScheduleDto> active, DateTime now)
+        => active.Where(a => ReleaseAt(a) is not { } end || end > now).ToList();
+
+    /// <summary>목록에서 가장 이른 해제 시각(없으면 null).</summary>
+    public static DateTime? NextRelease(IEnumerable<EventSuppressionScheduleDto> active)
+        => active.Select(ReleaseAt).Where(t => t is not null).Min();
 }

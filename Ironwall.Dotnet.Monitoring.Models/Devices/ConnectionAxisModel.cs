@@ -14,5 +14,6 @@ public class ConnectionAxisModel : IConnectionAxisModel
     public int? ParentDeviceId { get; set; }
     public int? Channel { get; set; }
     public string? Protocol { get; set; }
+    public string? PortKey { get; set; }
     public IDictionary<string, string?> Urls { get; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 }

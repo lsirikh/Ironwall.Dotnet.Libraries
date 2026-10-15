@@ -1,0 +1,43 @@
+# Ironwall.Dotnet.Libraries CI - Gitea Actions
+#
+# Runner: gis-build (Windows host-mode runner on the GIS build PC). The shared script lives in the host repo
+#   (Dotnet.Monitoring.Solution tools/ci/gis-ci.ps1 - one copy for both repos); it checks out this commit
+#   in the CI clone C:\gis-ci\Ironwall.Dotnet.Libraries and runs the solution tests without window/sound/remote-DB tests.
+# The run block is ASCII only (Windows PowerShell 5.1 reads the generated BOM-less .ps1 as CP949).
+name: CI
+
+on:
+  push:
+    branches: [v2.6, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: lib-ci-${{ gitea.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: library solution tests
+    runs-on: gis-build
+    timeout-minutes: 60
+    steps:
+      - name: test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = if ($env:GIS_CI_ROOT) { $env:GIS_CI_ROOT } else { "C:\gis-ci" }
+          $gitea = if ($env:GIS_CI_GITEA) { $env:GIS_CI_GITEA } else { "http://192.168.202.160:3000" }
+          $hostBranch = if ($env:GIS_CI_HOST_BRANCH) { $env:GIS_CI_HOST_BRANCH } else { "v0.5" }
+          $dir = Join-Path $root "Dotnet.Monitoring.Solution"
+          $env:GIT_TERMINAL_PROMPT = "0"
+          if (-not (Test-Path (Join-Path $dir ".git"))) { git clone --quiet "$gitea/Sensorway_SW/Dotnet.Monitoring.Solution.git" $dir; if ($LASTEXITCODE -ne 0) { throw "clone failed" } }
+          git -C $dir fetch --quiet origin
+          if ($LASTEXITCODE -ne 0) { throw "fetch failed" }
+          $script = Join-Path $env:TEMP "lib-ci-${{ gitea.sha }}.ps1"
+          cmd /c "git -C `"$dir`" show origin/${hostBranch}:tools/ci/gis-ci.ps1 > `"$script`""
+          if ($LASTEXITCODE -ne 0) { throw "cannot extract tools/ci/gis-ci.ps1 from host origin/$hostBranch" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File $script -Repo lib -Sha "${{ gitea.sha }}" -Mode test
+          $code = $LASTEXITCODE
+          Remove-Item $script -Force
+          exit $code

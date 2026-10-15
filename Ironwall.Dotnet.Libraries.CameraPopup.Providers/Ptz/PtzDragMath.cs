@@ -1,4 +1,5 @@
 ﻿using System;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Ptz;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
@@ -50,23 +51,29 @@ public readonly record struct PtzKnownPosition(double Pan, double Tilt, double Z
     public static readonly PtzKnownPosition Unknown = new(0, 0, 0, false, false);
 }
 
-/// <summary>드래그 환산 결과. <see cref="Kind"/> 에 따라 Pan/Tilt 의 뜻이 다르다(상대 이동량 · 절대 위치 · 속도).</summary>
-public readonly record struct PtzDragPlan(PtzDragMoveKind Kind, double Pan, double Tilt, int PulseMs = 0);
+/// <summary>
+/// 드래그 환산 결과. <see cref="Kind"/> 에 따라 Pan/Tilt 의 뜻이 다르다(상대 이동량 · 절대 위치 · 속도).
+/// <see cref="Steps"/> = 같은 상대 이동을 몇 번 보내는가(화각 상대 공간 범위가 한 폭보다 좁을 때 나눠 보낸다 — Pan/Tilt 는 한 번 몫).
+/// </summary>
+public readonly record struct PtzDragPlan(PtzDragMoveKind Kind, double Pan, double Tilt, int PulseMs = 0, int Steps = 1);
 
 /// <summary>
 /// 드래그 벡터(영상 상자 크기에 대한 비율: 오른쪽 +, 아래 +) → 카메라 이동. WPF · ONVIF 인스턴스 비의존.
 /// <para>계약: 드래그 방향으로 카메라가 돈다(오른쪽으로 끌면 오른쪽을 본다 · 위로 끌면 위를 본다). 크기는
-/// "화면 중심에서 그 벡터만큼 떨어진 점이 중심으로 온다" — 줌이 깊을수록 같은 드래그가 더 적게 움직인다.</para>
+/// 화면 비율 기준(사용자 결정 2026-10-16, <see cref="PtzDragGesture.WidthVector"/>): 화살표가 화면 끝까지(폭 전체) = 화면 한 폭(수평 화각 1개),
+/// 높이 전체 = 수직 화각 1개, 화면 밖은 거기서 멈춘다 · 짧으면 비례. 각도/픽셀은 가로 · 세로가 같다. 줌이 깊을수록 같은 화살표가 더 적게 움직인다.</para>
 /// </summary>
 public static class PtzDragMath
 {
     public const double DefaultAspect = 16d / 9d;
 
-    // 옛 시간 제한 연속 이동(드래그 길이 비례) 상수 — 위치 · 줌을 모를 때의 대체 수단으로만 남긴다.
+    // 시간 제한 연속 이동 상수 — 위치 · 줌을 모를 때의 대체 수단. 화살표 크기(폭 전체 = 1)에 비례한 시간만큼 설정 속도로 돈다.
     public const int PulseMaxMs = 700;
     public const int PulseMinMs = 120;
     public const double PulseSpeed = 0.6;
-    private const double PulseSaturation = 0.65;   // 영상 짧은 변의 65% 를 끌면 최대
+
+    /// <summary>화각 상대 공간으로 한 번 끌기를 나눠 보내는 최대 횟수(세로로 한 폭 = 16:9 에서 화면 높이 약 1.8개 → ±1 공간이면 4번).</summary>
+    public const int MaxFovSteps = 8;
 
     /// <summary>방식 고르기 — 화각 상대 → 일반 상대(줌을 알 때) → 절대(위치를 알 때) → 시간 제한 연속 → 일반 상대(줌 모름 = 광각 가정).</summary>
     /// <param name="hasAbsoluteWithPosition">절대 공간이 있고 팬 · 틸트 위치를 안다.</param>
@@ -83,7 +90,9 @@ public static class PtzDragMath
     /// <summary>
     /// 드래그 한 번의 계획(순수): 방식 고르기 + 이동량 환산 + 한계 자르기. 벡터가 0 이면 <see cref="PtzDragMoveKind.None"/>.
     /// </summary>
-    public static PtzDragPlan Plan(PtzDragSpaces spaces, PtzKnownPosition position, double viewX, double viewY, double viewAspect, PtzLensModel? lens = null)
+    /// <param name="pulseSpeed">시간 제한 연속 이동의 속도 크기(0.1..1 — 팝업 설정 속도 · 카메라 기본 속도).</param>
+    public static PtzDragPlan Plan(PtzDragSpaces spaces, PtzKnownPosition position, double viewX, double viewY, double viewAspect, PtzLensModel? lens = null,
+        double pulseSpeed = PulseSpeed)
     {
         lens ??= PtzLensModel.Default;
         double fx = SanitizeFraction(viewX), fy = SanitizeFraction(viewY);
@@ -95,8 +104,8 @@ public static class PtzDragMath
         {
             case PtzDragMoveKind.RelativeFov:
             {
-                var (pan, tilt) = FovTranslation(fx, fy, spaces.FovXMin, spaces.FovXMax, spaces.FovYMin, spaces.FovYMax);
-                return new PtzDragPlan(kind, pan, tilt);
+                var (pan, tilt, steps) = FovSteps(fx, fy, viewAspect, spaces.FovXMin, spaces.FovXMax, spaces.FovYMin, spaces.FovYMax);
+                return new PtzDragPlan(kind, pan, tilt, 0, steps);
             }
             case PtzDragMoveKind.RelativeGeneric:
             case PtzDragMoveKind.Absolute:
@@ -120,7 +129,7 @@ public static class PtzDragMath
                 return new PtzDragPlan(kind, pan, tilt);
             }
             case PtzDragMoveKind.ContinuousPulse:
-                return ContinuousPulse(fx, fy, viewAspect);
+                return ContinuousPulse(fx, fy, viewAspect, pulseSpeed);
             default:
                 return new PtzDragPlan(PtzDragMoveKind.None, 0, 0);
         }
@@ -152,30 +161,50 @@ public static class PtzDragMath
     }
 
     /// <summary>
-    /// 화각 상대 공간 이동량: ±1 = 화면 가장자리(중심에서 반 너비). 드래그 비율 f 는 상자 전체 기준이므로 2f.
-    /// 화면 아래(+)로 끌면 틸트 내림(−).
+    /// 화각 상대 공간 이동량(한 번 몫): <see cref="FovSteps"/> 의 Pan/Tilt. 공간 범위가 한 폭보다 좁으면 이 값을 여러 번 보내야 한다.
     /// </summary>
     public static (double Pan, double Tilt) FovTranslation(double viewX, double viewY,
-        double xMin, double xMax, double yMin, double yMax)
+        double xMin, double xMax, double yMin, double yMax, double viewAspect = DefaultAspect)
     {
-        double pan = PtzCoordinateMath.Clamp(2d * SanitizeFraction(viewX), xMin, xMax);
-        double tilt = PtzCoordinateMath.Clamp(-2d * SanitizeFraction(viewY), yMin, yMax);
+        var (pan, tilt, _) = FovSteps(viewX, viewY, viewAspect, xMin, xMax, yMin, yMax);
         return (pan, tilt);
     }
 
     /// <summary>
-    /// 일반 상대 공간 이동량: 드래그 비율 × 지금 화각(도) ÷ 좌표 1 단위가 덮는 각도. 절대 공간 폭(기본 2 = −1..1)이
-    /// <see cref="PtzLensModel.PanSpanDeg"/> · <see cref="PtzLensModel.TiltSpanDeg"/> 를 덮는다고 본다. 결과는 상대 공간 범위로 자른다.
+    /// 화각 상대 공간 이동: ±1 = 화면 가장자리(반 화각)라 한 폭(화각 1개) = 2. 폭 전체 화살표(<see cref="PtzDragGesture.WidthVector"/> x = 1)면
+    /// 팬 2, 높이 전체면 틸트 2(틸트 1 = 반 높이). 화면 아래(+)로 끌면 틸트 내림(−).
+    /// 카메라 범위(보통 ±1)를 넘으면 같은 몫으로 <c>Steps</c> 번 나눈다(한 번에 자르면 반 폭밖에 못 간다). 움직일 수 없는 축(범위 0)은 0.
+    /// </summary>
+    public static (double Pan, double Tilt, int Steps) FovSteps(double viewX, double viewY, double viewAspect,
+        double xMin, double xMax, double yMin, double yMax)
+    {
+        double aspect = SanitizeAspect(viewAspect);
+        var (mx, my) = PtzDragGesture.WidthVector(viewX, viewY, aspect);
+        double pan = 2d * mx, tilt = -2d * my * aspect;
+        double xLimit = pan >= 0 ? xMax : -xMin, yLimit = tilt >= 0 ? yMax : -yMin;
+        if (!(xLimit > 0)) pan = 0;
+        if (!(yLimit > 0)) tilt = 0;
+        double need = Math.Max(pan == 0 ? 0 : Math.Abs(pan) / xLimit, tilt == 0 ? 0 : Math.Abs(tilt) / yLimit);
+        int steps = Math.Clamp((int)Math.Ceiling(need - 1e-9), 1, MaxFovSteps);
+        pan /= steps;
+        tilt /= steps;
+        return (PtzCoordinateMath.Clamp(pan, xMin, xMax), PtzCoordinateMath.Clamp(tilt, yMin, yMax), steps);
+    }
+
+    /// <summary>
+    /// 일반 상대 공간 이동량: 끈 크기 m × 지금 수평 화각(도) ÷ 좌표 1 단위가 덮는 각도(세로도 수평 화각 기준 — 같은 각도/픽셀).
+    /// 절대 공간 폭(기본 2 = −1..1)이 <see cref="PtzLensModel.PanSpanDeg"/> · <see cref="PtzLensModel.TiltSpanDeg"/> 를 덮는다고 본다.
+    /// 결과는 상대 공간 범위로 자른다.
     /// </summary>
     public static (double Pan, double Tilt) GenericTranslation(double viewX, double viewY, double viewAspect, double zoomNormalized,
         PtzLensModel lens, double absXSpan, double absYSpan, double relXMin, double relXMax, double relYMin, double relYMax)
     {
         double hfov = HorizontalFovDeg(zoomNormalized, lens);
-        double vfov = VerticalFovDeg(hfov, viewAspect);
+        var (mx, my) = PtzDragGesture.WidthVector(SanitizeFraction(viewX), SanitizeFraction(viewY), SanitizeAspect(viewAspect));
         double xSpan = absXSpan > 0 ? absXSpan : 2d;
         double ySpan = absYSpan > 0 ? absYSpan : 2d;
-        double pan = SanitizeFraction(viewX) * hfov / Math.Max(1d, lens.PanSpanDeg) * xSpan;
-        double tilt = -SanitizeFraction(viewY) * vfov / Math.Max(1d, lens.TiltSpanDeg) * ySpan;
+        double pan = mx * hfov / Math.Max(1d, lens.PanSpanDeg) * xSpan;
+        double tilt = -my * hfov / Math.Max(1d, lens.TiltSpanDeg) * ySpan;
         return (PtzCoordinateMath.Clamp(pan, relXMin, relXMax), PtzCoordinateMath.Clamp(tilt, relYMin, relYMax));
     }
 
@@ -211,20 +240,18 @@ public static class PtzDragMath
     }
 
     /// <summary>
-    /// 시간 제한 연속 이동(옛 방식): 방향 = 드래그 방향, 속도 · 시간 = 드래그 길이 비례(짧은 변의 65% 에서 최대).
-    /// 아주 짧은 드래그도 <see cref="PulseMinMs"/> 는 움직인다.
+    /// 시간 제한 연속 이동(위치 · 줌을 모를 때): 방향 = 드래그 방향, 속도 = 설정 속도(<paramref name="speed"/>),
+    /// 시간 = 화살표 크기 m(폭 전체 = 1, <see cref="PtzDragGesture.WidthVector"/>) × <see cref="PulseMaxMs"/>, 대각선도 최대 시간에서 자른다.
+    /// 화각을 모르므로 "한 폭"은 속도 × 시간의 어림이다. 아주 짧은 드래그도 <see cref="PulseMinMs"/> 는 움직인다.
     /// </summary>
     public static PtzDragPlan ContinuousPulse(double viewX, double viewY, double viewAspect, double speed = PulseSpeed)
     {
-        double aspect = SanitizeAspect(viewAspect);
-        double px = SanitizeFraction(viewX) * aspect;   // 세로 = 1 로 둔 길이
-        double py = SanitizeFraction(viewY);
-        double length = Math.Sqrt((px * px) + (py * py));
-        if (length < 1e-6) return new PtzDragPlan(PtzDragMoveKind.None, 0, 0);
-        double magnitude = Math.Min(1d, length / (PulseSaturation * Math.Min(aspect, 1d)));
-        double velocity = Math.Clamp(speed, 0.1, 1d) * (0.3 + (0.7 * magnitude));
-        int ms = Math.Max(PulseMinMs, (int)(magnitude * PulseMaxMs));
-        return new PtzDragPlan(PtzDragMoveKind.ContinuousPulse, px / length * velocity, -(py / length) * velocity, ms);
+        var (mx, my) = PtzDragGesture.WidthVector(SanitizeFraction(viewX), SanitizeFraction(viewY), SanitizeAspect(viewAspect));
+        double magnitude = Math.Sqrt((mx * mx) + (my * my));
+        if (magnitude < 1e-6) return new PtzDragPlan(PtzDragMoveKind.None, 0, 0);
+        double velocity = Math.Clamp(double.IsFinite(speed) ? speed : PulseSpeed, 0.1, 1d);
+        int ms = Math.Max(PulseMinMs, (int)(Math.Min(1d, magnitude) * PulseMaxMs));
+        return new PtzDragPlan(PtzDragMoveKind.ContinuousPulse, mx / magnitude * velocity, -(my / magnitude) * velocity, ms);
     }
 
     private static double DegToRad(double deg) => deg * Math.PI / 180d;

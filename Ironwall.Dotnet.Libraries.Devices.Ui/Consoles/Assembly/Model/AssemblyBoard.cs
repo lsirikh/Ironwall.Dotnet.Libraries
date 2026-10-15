@@ -127,7 +127,7 @@ public sealed class AssemblyBoard
     public AssemblySlot? Add(string typeCode, int index = -1)
     {
         var info = Lookup(typeCode);
-        if (info is null || !info.AppliesToCategory(Category)) return null;
+        if (info is null || !info.CanAttachTo(Category)) return null;
 
         var code = (info.Code ?? typeCode).Trim().ToUpperInvariant();
         var slot = new AssemblySlot(code, AssemblyKeyRules.Suggest(code, Slots.Select(s => s.Key)));
@@ -158,7 +158,7 @@ public sealed class AssemblyBoard
         if (spec is null || RepeatExpand.Validate(spec) is not null) return nothing;
 
         var info = Lookup(spec.TypeCode);
-        if (info is null || !info.AppliesToCategory(Category)) return nothing;
+        if (info is null || !info.CanAttachTo(Category)) return nothing;
 
         var rows = RepeatExpand.Preview(spec, Slots.Select(s => s.Key));
         if (rows.Count == 0 || rows.Any(r => r.IsConflict)) return nothing;
@@ -346,7 +346,7 @@ public sealed class AssemblyBoard
             {
                 var info = Lookup(code);
                 if (info is null) problems.Add($"'{code}'은(는) 목록에 없는 부품 유형입니다.");
-                else if (!info.AppliesToCategory(Category)) problems.Add($"'{code}'은(는) 이 카테고리에 달 수 없습니다.");
+                else if (!info.CanAttachTo(Category)) problems.Add($"'{code}'은(는) 이 카테고리에 달 수 없습니다.");
             }
 
             return problems;
@@ -458,7 +458,7 @@ public sealed class AssemblyBoard
     private bool TypeIsUsable(string typeCode)
     {
         var info = Lookup(typeCode);
-        return info is not null && info.AppliesToCategory(Category);
+        return info is not null && info.CanAttachTo(Category);
     }
 
     /// <summary>형식이 먼저, 그 다음 중복. 같은 key 를 쓰는 슬롯은 <b>모두</b> 표시한다.</summary>

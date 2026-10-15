@@ -40,6 +40,10 @@ public interface ICameraPopupControl : IDisposable
     /// </summary>
     bool DragMove(string cameraId, VideoProviderInfo provider, double viewX, double viewY, double viewAspect);
 
+    /// <summary>속도를 실은 드래그(<paramref name="speed"/> = 팝업 설정 속도 0.1..1, 0 = 카메라 기본). 기본 구현은 속도를 버린다.</summary>
+    bool DragMove(string cameraId, VideoProviderInfo provider, double viewX, double viewY, double viewAspect, double speed)
+        => DragMove(cameraId, provider, viewX, viewY, viewAspect);
+
     /// <summary>수동 포커스(+1 원경 · -1 근경 · 0 정지).</summary>
     bool Focus(string cameraId, VideoProviderInfo provider, int direction);
 }
@@ -100,6 +104,9 @@ public sealed class CameraPopupControl : ICameraPopupControl
         => SendPtz(new PtzCommand { CameraId = cameraId, Operation = PtzOperation.Stop, Provider = provider });
 
     public bool DragMove(string cameraId, VideoProviderInfo provider, double viewX, double viewY, double viewAspect)
+        => DragMove(cameraId, provider, viewX, viewY, viewAspect, 0d);
+
+    public bool DragMove(string cameraId, VideoProviderInfo provider, double viewX, double viewY, double viewAspect, double speed)
     {
         if (!double.IsFinite(viewX) || !double.IsFinite(viewY)) return false;
         return SendPtz(new PtzCommand
@@ -109,6 +116,7 @@ public sealed class CameraPopupControl : ICameraPopupControl
             ViewX = Math.Clamp(viewX, -1d, 1d),
             ViewY = Math.Clamp(viewY, -1d, 1d),
             ViewAspect = double.IsFinite(viewAspect) && viewAspect > 0 ? viewAspect : 0d,
+            Speed = double.IsFinite(speed) && speed > 0 ? Math.Clamp(speed, 0.1, 1d) : 0d,
             Provider = provider,
         });
     }

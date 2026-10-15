@@ -14,13 +14,14 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow;
 /// 모두 단일 <see cref="FinishPress"/> 로 모여 정지를 한 번 보낸다(FR-14, NFR-01).
 /// 패드가 열린 타일에 포커스가 있으면 방향키(누르는 동안) · +/−(줌) · Esc(패드 닫기)도 되고, 패드 단추에 포커스가 있으면
 /// Space/Enter 도 누르는 동안 이동이다(자동 반복은 무시).
-/// 영상 위 좌드래그 = 드래그 길이만큼 PTZ 상대 이동(떼는 순간 한 번) — 8 DIU 미만은 클릭(선택), Esc · 캡처 잃음은 취소.
+/// 영상 위 누르고 움직이면 누른 점 → 마우스 화살표, 놓는 순간 화살표 방향 · 길이(화면 비율)로 PTZ 상대 이동 한 번(누르는 동안은 0건)
+/// — 8 DIU 미만은 클릭(선택), Esc · 캡처 잃음 · 창 비활성 · 닫힘은 취소.
 /// 타일 순서 바꾸기는 손잡이에서만 시작하므로(창 뷰) 서로 부딪치지 않는다.
 /// 우클릭 메뉴는 열 때마다 새로 만든다 — 권한 · 제공자 · 크게 보기 상태를 그때그때 반영.
 /// </summary>
 internal partial class TileView : UserControl
 {
-    private const double DragTargetSize = 28;
+    private const double ArrowHeadInset = 12;   // 몸통이 끝나는 자리 = 촉 끝에서 이만큼 안쪽(촉 길이 20 · 오목 15 사이)
 
     private TileViewModel? _subscribed;
     private readonly PtzHoldPress _hold = new();
@@ -42,11 +43,14 @@ internal partial class TileView : UserControl
             button.LostMouseCapture += (_, _) => FinishPress();
         }
         MouseMove += OnTileMouseMove;
+        MouseWheel += OnTileMouseWheel;
         MouseLeftButtonUp += (_, _) => FinishDrag(commit: true);
         LostMouseCapture += (_, _) => FinishDrag(commit: false);
         IsKeyboardFocusWithinChanged += (_, e) =>
         {
-            if (e.NewValue is false) FinishPress();   // 포커스가 타일을 떠나면 키 뗌을 못 받는다
+            if (e.NewValue is not false) return;
+            FinishPress();                  // 포커스가 타일을 떠나면 키 뗌을 못 받는다
+            FinishDrag(commit: false);      // 화살표도 취소(이동을 보내지 않는다)
         };
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -169,21 +173,38 @@ internal partial class TileView : UserControl
         DrawDragTarget();
     }
 
-    /// <summary>끈 길이(선)와 떼면 화면 중심으로 올 점(과녁)을 그린다.</summary>
+    /// <summary>
+    /// 영상 위 휠 한 칸 = 줌 펄스(<see cref="TileViewModel.PtzWheelZoomAsync"/>). 영상 밖(패드 · 손잡이 · 검은 여백)은 흘려보낸다(처리 안 함).
+    /// </summary>
+    private void OnTileMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Delta == 0 || !ReferenceEquals(e.OriginalSource, VideoImage) || Tile is not { IsCamera: true } tile) return;
+        e.Handled = true;
+        _ = tile.PtzWheelZoomAsync(Math.Sign(e.Delta));
+    }
+
+    /// <summary>화살표(누른 점 → 지금 마우스: 몸통 + 촉)와 화살표 크기(화면 비율)를 그린다.</summary>
     private void DrawDragTarget()
     {
         double sx = _dragView.X + _drag.StartX, sy = _dragView.Y + _drag.StartY;
         double cx = _dragView.X + _drag.CurrentX, cy = _dragView.Y + _drag.CurrentY;
+        var arrow = PtzDragGesture.Arrow(sx, sy, cx, cy, ArrowHeadInset);
         foreach (var line in new[] { DragShaftHalo, DragShaft })
         {
             line.X1 = sx;
             line.Y1 = sy;
-            line.X2 = cx;
-            line.Y2 = cy;
+            line.X2 = arrow.ShaftEndX;
+            line.Y2 = arrow.ShaftEndY;
         }
-        var (tx, ty) = PtzDragGesture.TargetPoint(_dragView.Width, _dragView.Height, _drag.CurrentX - _drag.StartX, _drag.CurrentY - _drag.StartY);
-        Canvas.SetLeft(DragTarget, _dragView.X + tx - (DragTargetSize / 2));
-        Canvas.SetTop(DragTarget, _dragView.Y + ty - (DragTargetSize / 2));
+        // 촉 끝(20,10)을 마우스 자리에 놓고 그 점을 중심으로 돌린다(XAML 의 RotateTransform 중심 = 촉 끝)
+        var rotate = (RotateTransform)DragTarget.RenderTransform;
+        rotate.Angle = arrow.AngleDeg;
+        Canvas.SetLeft(DragTarget, cx - rotate.CenterX);
+        Canvas.SetTop(DragTarget, cy - rotate.CenterY);
+        DragAmountText.Text = PtzDragGesture.AmountText(
+            PtzDragGesture.DragMagnitude(_dragView.Width, _dragView.Height, _drag.CurrentX - _drag.StartX, _drag.CurrentY - _drag.StartY));
+        Canvas.SetLeft(DragAmount, ((sx + cx) / 2) + 8);   // 선 가운데 옆 — 영상 안에 머문다
+        Canvas.SetTop(DragAmount, ((sy + cy) / 2) + 8);
         if (PtzDragOverlay.Visibility != Visibility.Visible)
         {
             PtzDragOverlay.Visibility = Visibility.Visible;
@@ -214,14 +235,15 @@ internal partial class TileView : UserControl
 
     // ───────── PTZ 패드 ─────────
 
+    /// <summary>단추 → 방향(±1). 크기는 타일 속도(카메라 기본 속도, 모르면 0.5)를 곱한다.</summary>
     private static (double Pan, double Tilt, double Zoom) Vector(string? tag) => tag switch
     {
-        "up" => (0, 0.5, 0),
-        "down" => (0, -0.5, 0),
-        "left" => (-0.5, 0, 0),
-        "right" => (0.5, 0, 0),
-        "zoom-in" => (0, 0, 0.5),
-        "zoom-out" => (0, 0, -0.5),
+        "up" => (0, 1, 0),
+        "down" => (0, -1, 0),
+        "left" => (-1, 0, 0),
+        "right" => (1, 0, 0),
+        "zoom-in" => (0, 0, 1),
+        "zoom-out" => (0, 0, -1),
         _ => (0, 0, 0),
     };
 
@@ -237,7 +259,7 @@ internal partial class TileView : UserControl
         var (pan, tilt, zoom) = Vector(tag);
         if (pan == 0 && tilt == 0 && zoom == 0) return;
         if (!_hold.Press(tag, isRepeat)) return;
-        _ = tile.PtzMoveAsync(pan, tilt, zoom);
+        _ = tile.PtzMoveAsync(pan * tile.PanTiltSpeed, tilt * tile.PanTiltSpeed, zoom * tile.ZoomSpeed);
     }
 
     /// <summary>

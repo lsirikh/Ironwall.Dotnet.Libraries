@@ -6,6 +6,9 @@
 /// </summary>
 public readonly record struct PtzDragVector(double ViewX, double ViewY, double ViewAspect);
 
+/// <summary>화살표 그림 한 장 — 몸통 끝(촉 안쪽) 좌표와 촉 방향(도, 화면 좌표: 0 = 오른쪽 · 90 = 아래).</summary>
+public readonly record struct PtzArrow(double ShaftEndX, double ShaftEndY, double AngleDeg);
+
 /// <summary>
 /// 영상 위 PTZ 드래그 제스처(순수 · WPF 무의존) — 지도 오버레이(GIS)와 이벤트 창 타일(호스트)이 같은 판정을 쓴다.
 /// 캡처 드래그 계약(drag-first-ux): 눌림(<see cref="IsPressed"/>)과 데드존 통과(<see cref="IsDragging"/>)를 분리하고,
@@ -22,7 +25,7 @@ public sealed class PtzDragGesture
 
     public bool IsPressed { get; private set; }
 
-    /// <summary>데드존을 넘었다 — 이때부터 목표 표시를 그리고, 떼면 이동을 보낸다.</summary>
+    /// <summary>데드존을 넘었다 — 이때부터 화살표를 그리고, 떼면 이동을 보낸다(누르는 동안은 보내지 않는다).</summary>
     public bool IsDragging { get; private set; }
 
     public double StartX => _startX;
@@ -77,13 +80,57 @@ public sealed class PtzDragGesture
     public static bool IsBeyondDeadZone(double dx, double dy) => (dx * dx) + (dy * dy) > DeadZone * DeadZone;
 
     /// <summary>
-    /// 목표 표시 자리(순수) — 드래그 벡터만큼 화면 중심에서 떨어진 점. 떼면 <b>이 점이 화면 중심으로 온다</b>.
-    /// 상자 밖으로 나가면 가장자리에 붙인다(카메라도 그만큼만 간다 — 한 번에 화면 반 너비까지).
+    /// 화살표 길이 기준(사용자 결정 2026-10-16 — 10-15 의 "가로 1/2 = 한 폭"을 대체) — 화면 비율: 가로 성분 ÷ 영상 폭, 세로 성분 ÷ 영상 높이,
+    /// 성분마다 ±1(화면 하나)에서 자른다. <b>화살표가 화면 끝까지(폭 전체) = 화면 한 폭(수평 화각 1개)만큼 돈다</b>, 높이 전체 = 수직 화각 1개.
+    /// 돌려주는 값은 폭 단위(세로 = 높이 비율 ÷ 가로세로비) — 각도/픽셀이 가로와 같다.
+    /// 입력은 영상 상자 비율(<see cref="PtzDragVector"/> 와 같은 꼴). 유한하지 않은 값은 0.
+    /// </summary>
+    public static (double X, double Y) WidthVector(double viewX, double viewY, double viewAspect)
+    {
+        double aspect = double.IsFinite(viewAspect) && viewAspect > 0.1 && viewAspect < 10 ? viewAspect : 16d / 9d;
+        double x = double.IsFinite(viewX) ? Math.Clamp(viewX, -1d, 1d) : 0d;
+        double y = double.IsFinite(viewY) ? Math.Clamp(viewY, -1d, 1d) / aspect : 0d;
+        return (x, y);
+    }
+
+    /// <summary>화살표 크기 = 화면 비율 벡터(가로 ÷ 폭, 세로 ÷ 높이, 성분마다 ±1 에서 자름)의 길이. 1 = 화면 하나만큼. 화살표 옆 글자에 쓴다.</summary>
+    public static double DragMagnitude(double viewWidth, double viewHeight, double dx, double dy)
+    {
+        if (!(viewWidth > 0) || !(viewHeight > 0)) return 0d;
+        double x = Math.Clamp(dx / viewWidth, -1d, 1d), y = Math.Clamp(dy / viewHeight, -1d, 1d);
+        return double.IsFinite(x) && double.IsFinite(y) ? Math.Sqrt((x * x) + (y * y)) : 0d;
+    }
+
+    /// <summary>화살표 크기 글자 — "0.6화면"(지금 보이는 화면의 0.6배만큼 돈다).</summary>
+    public static string AmountText(double magnitude)
+        => Math.Max(0, magnitude).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "화면";
+
+    /// <summary>
+    /// 화살표 그림(순수) — 시작점(누른 곳) → 끝점(지금 마우스). 몸통은 끝점에서 촉 길이(<paramref name="headLength"/>)만큼 물러난 자리에서 끝나
+    /// 둥근 끝이 촉 끝을 뚫고 나오지 않는다(화살표가 촉보다 짧으면 몸통 없음 = 시작점). 각도 = 화면 좌표(아래 +)의 도, 0 = 오른쪽.
+    /// </summary>
+    public static PtzArrow Arrow(double startX, double startY, double endX, double endY, double headLength)
+    {
+        double dx = endX - startX, dy = endY - startY;
+        double length = Math.Sqrt((dx * dx) + (dy * dy));
+        double angle = length > 0 ? Math.Atan2(dy, dx) * 180d / Math.PI : 0d;
+        if (!(length > headLength)) return new PtzArrow(startX, startY, angle);
+        return new PtzArrow(endX - (dx / length * headLength), endY - (dy / length * headLength), angle);
+    }
+
+    /// <summary>
+    /// 목표 자리(순수) — 떼면 <b>화면 중심으로 올 점</b> = 중심 + 화살표(<see cref="WidthVector"/> × 화면 가로).
+    /// 화면 밖이면 중심에서 그 방향으로 가장자리에 붙인다(방향은 유지).
     /// </summary>
     public static (double X, double Y) TargetPoint(double viewWidth, double viewHeight, double dx, double dy)
     {
-        double x = Math.Clamp((viewWidth / 2) + dx, 0, Math.Max(0, viewWidth));
-        double y = Math.Clamp((viewHeight / 2) + dy, 0, Math.Max(0, viewHeight));
-        return (x, y);
+        double w = Math.Max(0, viewWidth), h = Math.Max(0, viewHeight);
+        if (!(w > 0) || !(h > 0)) return (w / 2, h / 2);
+        var (mx, my) = WidthVector(dx / w, dy / h, w / h);
+        double tx = mx * w, ty = my * w;
+        double scale = 1d;
+        if (Math.Abs(tx) > w / 2) scale = Math.Min(scale, (w / 2) / Math.Abs(tx));
+        if (Math.Abs(ty) > h / 2) scale = Math.Min(scale, (h / 2) / Math.Abs(ty));
+        return ((w / 2) + (tx * scale), (h / 2) + (ty * scale));
     }
 }

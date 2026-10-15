@@ -21,19 +21,28 @@
         <Grid Visibility="{Binding IsCamera, Converter={StaticResource CameraPopup.BoolToVis}}">
             <Image x:Name="VideoImage" Source="{Binding Video}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
 
-            <!-- 영상 위 드래그 PTZ 목표 표시 — 모양으로 알린다: 끈 길이(선) + 떼면 화면 중심으로 올 점(과녁 = 원 + 십자).
-                 밝은 선 아래에 어두운 선을 깔아 어떤 영상 위에서도 보인다. 입력은 타일이 처리하므로 히트테스트 제외. -->
-            <Canvas x:Name="PtzDragOverlay" IsHitTestVisible="False" Visibility="Collapsed">
-                <Line x:Name="DragShaftHalo" Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="5"
+            <!-- 영상 위 PTZ 화살표 — 누른 점 → 지금 마우스. 놓는 순간 이 방향 · 길이(화면 비율)로 한 번 돈다(누르는 동안은 안 움직인다).
+                 모양으로 알린다: 둥근 끝 몸통 + 오목한 화살촉. 밝은 선 아래에 어두운 테두리를 깔아 어떤 영상 위에서도 보이고, 전체를 반투명으로.
+                 입력은 타일이 처리하므로 히트테스트 제외. -->
+            <Canvas x:Name="PtzDragOverlay" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0.8">
+                <Line x:Name="DragShaftHalo" Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="7"
                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                <Line x:Name="DragShaft" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2"
+                <Line x:Name="DragShaft" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="3"
                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                <Grid x:Name="DragTarget" Width="28" Height="28">
-                    <Ellipse Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="5" />
-                    <Path Data="M14,5 V23 M5,14 H23" Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="5" />
-                    <Ellipse Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2" />
-                    <Path Data="M14,5 V23 M5,14 H23" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2" />
+                <!-- 화살촉(끝 = 오른쪽 가운데 (20,10)) — 코드가 끝을 마우스 자리에 놓고 그 점을 중심으로 돌린다 -->
+                <Grid x:Name="DragTarget" Width="20" Height="20">
+                    <Grid.RenderTransform>
+                        <RotateTransform CenterX="20" CenterY="10" />
+                    </Grid.RenderTransform>
+                    <Path Data="M0,0 L20,10 L0,20 L5,10 Z" Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="3"
+                          StrokeLineJoin="Round" />
+                    <Path Data="M0,0 L20,10 L0,20 L5,10 Z" Fill="{DynamicResource CameraPopup.VideoTextBrush}" />
                 </Grid>
+                <!-- 화살표 크기("0.5화면" — 지금 보이는 화면의 몇 배만큼 도는지) -->
+                <Border x:Name="DragAmount" Style="{StaticResource CameraPopup.VideoChip}">
+                    <TextBlock x:Name="DragAmountText" Style="{StaticResource CameraPopup.VideoText}" FontSize="10"
+                               AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.DragAmount}" />
+                </Border>
             </Canvas>
 
             <!-- 위: 손잡이 · 이름 · 태그 -->
@@ -80,7 +89,37 @@
                 </Border>
             </StackPanel>
 
-            <!-- 아래 오른쪽: PTZ 패드(누르는 동안 이동 · 떼면 정지) -->
+            <!-- 아래 오른쪽: 이동 중 표시(작게 — 회전 아이콘 → '이동 완료' 뒤 사라짐) · PTZ 패드(누르는 동안 이동 · 떼면 정지) -->
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom">
+            <Border x:Name="PtzMotionChip" Style="{StaticResource CameraPopup.VideoChip}" HorizontalAlignment="Right" Margin="0,0,6,6"
+                    IsHitTestVisible="False"
+                    AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzMoving}"
+                    AutomationProperties.Name="{Binding PtzMotionText}"
+                    Visibility="{Binding IsPtzMotionVisible, Converter={StaticResource CameraPopup.BoolToVis}}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Width="10" Height="10" Margin="0,0,4,0" VerticalAlignment="Center" Stretch="None"
+                          Data="M5,1 A4,4 0 1 1 1,5" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="1.5"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" RenderTransformOrigin="0.5,0.5"
+                          Visibility="{Binding IsPtzMotionMoving, Converter={StaticResource CameraPopup.BoolToVis}}">
+                        <Path.RenderTransform>
+                            <RotateTransform />
+                        </Path.RenderTransform>
+                        <Path.Triggers>
+                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                         From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Path.Triggers>
+                    </Path>
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontSize="10" Margin="0,0,4,0" Text="✓"
+                               Visibility="{Binding IsPtzMotionDone, Converter={StaticResource CameraPopup.BoolToVis}}" />
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontSize="10" Text="{Binding PtzMotionText}" />
+                </StackPanel>
+            </Border>
             <Border x:Name="PtzPad" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6"
                     Background="{DynamicResource CameraPopup.VideoChipBrush}" CornerRadius="{DynamicResource RadiusMedium}" Padding="3"
                     AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad}"
@@ -106,6 +145,7 @@
                             AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Down}" />
                 </UniformGrid>
             </Border>
+            </StackPanel>
         </Grid>
 
         <!-- 선택(누른 타일) = 2px 테두리 — 끌기 삽입 표시(세로 막대)와 모양이 다르다 -->

@@ -272,6 +272,12 @@ public interface IUnitMapSurface
     /// <summary>전체 보기 — 여백 16 DIU, 최소 배율에서 멈춘다(FR-15).</summary>
     void Fit();
 
+    /// <summary>
+    /// 첫 화면의 내 부대 가운데 두기 — 편제 전체가 카드(L2)로 한 화면에 들면 전체 보기로 대신한다
+    /// (2026-10-15 사용자 캡처: 부대 2개를 50% 기호로 열었다). 기본 구현은 <see cref="CenterOn"/> 그대로.
+    /// </summary>
+    void CenterOnUnlessSmall(int unitId, double scale) => CenterOn(unitId, scale);
+
     /// <summary>그 부대 노드가 지금 뷰 안에 보이는가(화살표 선택 이동 뒤 팬 여부 — FR-36).</summary>
     bool IsInView(int unitId);
 }

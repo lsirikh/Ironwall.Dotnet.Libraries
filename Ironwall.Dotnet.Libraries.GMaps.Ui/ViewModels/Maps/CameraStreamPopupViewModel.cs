@@ -8,6 +8,7 @@ using GMap.NET;
 using Ironwall.Dotnet.Libraries.CameraPopup;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Ptz;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.SharedMemory;
 using Ironwall.Dotnet.Libraries.CameraPopup.Frames;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
@@ -509,15 +510,68 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public double PanTiltSpeed
     {
         get => _panTiltSpeed;
-        set { var v = Math.Round(Math.Clamp(value, 0.1, 1.0), 1, MidpointRounding.AwayFromZero); if (Math.Abs(_panTiltSpeed - v) < 1e-6) return; _panTiltSpeed = v; NotifyOfPropertyChange(nameof(PanTiltSpeed)); }
+        set { _panTiltSpeedSet = true; var v = Math.Round(Math.Clamp(value, 0.1, 1.0), 1, MidpointRounding.AwayFromZero); if (Math.Abs(_panTiltSpeed - v) < 1e-6) return; _panTiltSpeed = v; NotifyOfPropertyChange(nameof(PanTiltSpeed)); }
     }
 
     /// <summary>휠 줌 속도(ContinuousMove 줌 속도 크기 [0.1,1.0]). MapViewModel이 ContinuousMove(zoomVel)에 전달. 슬라이더+직접입력.</summary>
     public double ZoomSpeed
     {
         get => _zoomSpeed;
-        set { var v = Math.Round(Math.Clamp(value, 0.1, 1.0), 1, MidpointRounding.AwayFromZero); if (Math.Abs(_zoomSpeed - v) < 1e-6) return; _zoomSpeed = v; NotifyOfPropertyChange(nameof(ZoomSpeed)); }
+        set { _zoomSpeedSet = true; var v = Math.Round(Math.Clamp(value, 0.1, 1.0), 1, MidpointRounding.AwayFromZero); if (Math.Abs(_zoomSpeed - v) < 1e-6) return; _zoomSpeed = v; NotifyOfPropertyChange(nameof(ZoomSpeed)); }
     }
+
+    private bool _panTiltSpeedSet, _zoomSpeedSet;   // 사용자가 PTZ 탭에서 속도를 정했다(카메라 기본 속도보다 우선)
+
+    /// <summary>
+    /// PTZ 준비 응답의 카메라 기본 속도(ONVIF DefaultPTZSpeed, 0.1..1) 적용 — 우선순위: 사용자가 정한 속도 → 카메라 기본 속도 → 0.6.
+    /// 사용자가 이미 정한 축은 건드리지 않는다. 값은 슬라이더와 같은 0.1 단위로 맞춘다.
+    /// </summary>
+    internal void ApplyCameraDefaultSpeeds(double? panTilt, double? zoom)
+    {
+        if (!_panTiltSpeedSet && panTilt is { } pt && double.IsFinite(pt)) { PanTiltSpeed = pt; _panTiltSpeedSet = false; }
+        if (!_zoomSpeedSet && zoom is { } z && double.IsFinite(z)) { ZoomSpeed = z; _zoomSpeedSet = false; }
+    }
+
+    // ── 영상 오른쪽 아래 이동 중 표시(회전 아이콘 → '이동 완료' → 사라짐) ──
+    private PtzMotionTracker? _motion;
+    private PtzMotionState _ptzMotion;
+
+    /// <summary>이동 중 판정 한 번(MapViewModel 이 호스트 GetPtzMoveStatus 로 채운다). 없으면 예상 시간으로 어림.</summary>
+    internal Func<System.Threading.CancellationToken, Task<bool?>>? PtzMotionProbe { get; set; }
+
+    /// <summary>이동 명령을 보냈다 — 이동 중 표시를 켜고 멈출 때까지(이동 중에만) 묻는다. UI 스레드에서 부른다.</summary>
+    internal void BeginPtzMotion(TimeSpan estimate)
+    {
+        _motion ??= new PtzMotionTracker(ct => PtzMotionProbe?.Invoke(ct) ?? Task.FromResult<bool?>(null), s => PtzMotion = s);
+        _ = _motion.Begin(estimate);
+    }
+
+    internal void CancelPtzMotion() => _motion?.Cancel();
+
+    public PtzMotionState PtzMotion
+    {
+        get => _ptzMotion;
+        private set
+        {
+            if (_ptzMotion == value) return;
+            _ptzMotion = value;
+            NotifyOfPropertyChange(nameof(PtzMotion));
+            NotifyOfPropertyChange(nameof(IsPtzMotionVisible));
+            NotifyOfPropertyChange(nameof(IsPtzMotionMoving));
+            NotifyOfPropertyChange(nameof(IsPtzMotionDone));
+            NotifyOfPropertyChange(nameof(PtzMotionText));
+        }
+    }
+
+    public bool IsPtzMotionVisible => _ptzMotion != PtzMotionState.Idle;
+    public bool IsPtzMotionMoving => _ptzMotion == PtzMotionState.Moving;
+    public bool IsPtzMotionDone => _ptzMotion == PtzMotionState.Done;
+    public string PtzMotionText => _ptzMotion switch
+    {
+        PtzMotionState.Moving => "이동 중",
+        PtzMotionState.Done => "이동 완료",
+        _ => string.Empty,
+    };
 
     /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
     public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); NotifyOfPropertyChange(nameof(ControlHeight)); } }

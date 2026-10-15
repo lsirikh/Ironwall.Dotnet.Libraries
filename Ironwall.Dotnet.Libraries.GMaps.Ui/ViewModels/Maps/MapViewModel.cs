@@ -25,6 +25,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.CameraPopup;                       // 팝업 호스트 감시자 · 조작 창구(T-02 — GIS 는 LibVLC/ONVIF 를 부르지 않는다)
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.CameraPopup;
 using CameraRequestKind = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol.CameraRequestKind;
 using CameraErrorCodes = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol.CameraErrorCodes;
@@ -221,6 +222,9 @@ public partial class MapViewModel : BasePanelViewModel,
             // BROADCAST_STATUS 구독 시작(FR-24) — 다른 자리에서 시작한 방송·방송서버 마이크 송출도 심볼에 반영.
             StartBroadcastStatusSync();
 
+            // ENCLOSURE_METRICS 구독 시작(이슈 #7-20) — 함체 심볼 툴팁 · 상세 창에 최신 계측.
+            StartEnclosureMetricsSync();
+
             // 툴바 우측 CPU/GPU/RAM 사용률 표시 시작(UI DispatcherTimer로 Sample 구동)
             StartResourceMonitor();
 
@@ -306,6 +310,7 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
             StopBroadcastStatusSync();      // BROADCAST_STATUS 구독 해제(FR-24)
+            StopEnclosureMetricsSync();     // ENCLOSURE_METRICS 구독 · 오래된 값 타이머 해제(이슈 #7-20)
             StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
             StopCameraPopupHostNotice();    // 팝업 호스트 상태 구독 해제(다시 활성화되면 다시 구독 · 현재 상태 반영)
 
@@ -453,12 +458,10 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void RestoreDoorStateFromDevice(IBaseDeviceModel device)
     {
-        var status = device switch
-        {
-            IEnclosureDeviceModel enclosure => enclosure.DoorStatus,
-            IGateDeviceModel gate => gate.GateStatus,
-            _ => null,
-        };
+        // 문 위치 = 관측 축(구동부 → 문 센서) → 옛 스칼라. 7.0+ 서버에는 스칼라가 없어 축을 먼저 본다(이슈 #7 Q-4b).
+        var status = device is IEnclosureDeviceModel or IGateDeviceModel
+            ? Ironwall.Dotnet.Monitoring.Models.Helpers.DoorPosition.Of(device)
+            : null;
         if (status is null) return;
 
         var state = Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.FromServer(status);
@@ -1959,7 +1962,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 deviceId, deviceType, dev?.DeviceName, dev?.DeviceNumber ?? 0);
 
             var ok = await door.PublishDoorCommandAsync(deviceId, deviceType, command,
-                                                        description, CurrentRequestedBy(),
+                                                        description, CurrentOperatorAccount(),
                                                         _cts?.Token ?? CancellationToken.None);
             _log?.Info($"[개폐] {deviceType}({deviceId}) {command} 명령 {(ok ? "발행" : "실패")} — 상태는 OPERATION_EVENT 로만 전이");
             return ok;
@@ -2136,14 +2139,18 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[CameraAim] TokenStorage 미해석(requested_by 폴백): {ex.Message}"); _tokenStorage = null; }
         return _tokenStorage;
     }
-    /// <summary>회전요청 requested_by — 로그인 계정 표시이름(user.name) 우선 → login_id(JWT sub) → Windows 사용자명 폴백.</summary>
-    private string CurrentRequestedBy()
+    /// <summary>
+    /// 운영자 계정(브로커 v2.0.12 §7 머리 · 이슈 #7 G7-4) — login_id → JWT sub(= login_id) → 표시이름. 모두 없으면 null.
+    /// 문 개폐는 이 값을 그대로 싣는다(없으면 칸 생략).
+    /// </summary>
+    private string? CurrentOperatorAccount()
     {
-        var name = ResolvePermissionService()?.Name;          // 표시이름(로그인 응답 user.name) 우선
-        if (!string.IsNullOrWhiteSpace(name)) return name;
-        var loginId = ResolveTokenStorage()?.UserId;          // JWT sub=login_id 폴백
-        return string.IsNullOrWhiteSpace(loginId) ? Environment.UserName : loginId;
+        var permission = ResolvePermissionService();
+        return Services.Brokers.CommandRequester.ResolveRequestedBy(permission?.LoginId, ResolveTokenStorage()?.UserId, permission?.Name);
     }
+
+    /// <summary>회전요청 · 카메라 팝업 requested_by — <see cref="CurrentOperatorAccount"/>, 없으면 종전대로 Windows 사용자명 폴백.</summary>
+    private string CurrentRequestedBy() => CurrentOperatorAccount() ?? Environment.UserName;
 
     /// <summary>강제 로그아웃 콜백(배경스레드 가능). 진행 중 PTZ 제스처 즉시 취소 + 열린 카메라 팝업 닫기(스트림 해제).</summary>
     private void OnForceLogoutRequested(EnumRevokeReason reason)
@@ -2179,6 +2186,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 vm.PtzUnavailableReason = CameraStreamPopupViewModel.PtzReason(r.Success, r.PtzCapable, permitted);   // 막혔으면 왜 막혔는지(배지)
                 vm.IsPtzCapable = r.Success && r.PtzCapable && permitted;
                 vm.IsImagingCapable = r.Success && r.ImagingCapable;
+                vm.ApplyCameraDefaultSpeeds(r.DefaultPanTiltSpeed, r.DefaultZoomSpeed);   // 사용자가 속도를 안 바꿨으면 카메라 기본 속도로
                 vm.IsPtzLoading = false;
             }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} ok={r.Success} capable={r.PtzCapable} err={r.ErrorCode} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
@@ -2262,8 +2270,10 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             // 직전 제스처의 대기(휠 줌 펄스의 뒤늦은 정지)를 LWW 취소 — 그 정지가 이 이동을 끊지 않게.
             BeginPtzGesture(vm.CameraId);
-            if (ResolveCameraControl()?.DragMove(vm.CameraId.ToString(), vm.Provider, viewX, viewY, viewAspect) != true)
+            if (ResolveCameraControl()?.DragMove(vm.CameraId.ToString(), vm.Provider, viewX, viewY, viewAspect, vm.PanTiltSpeed) != true)
                 _log?.Warning($"[CameraPopup] PTZ 드래그 이동 미전송 cam={vm.CameraId} — 팝업 호스트 없음.");
+            else
+                vm.BeginPtzMotion(PtzMotionTracker.DragEstimate);
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
@@ -2298,11 +2308,24 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (!SendPtzMove(vm, 0, 0, direction * vm.ZoomSpeed)) return;
+            await OnUiAsync(() => vm.BeginPtzMotion(PtzMotionTracker.ZoomEstimate)).ConfigureAwait(false);
             await Task.Delay(PtzZoomPulseMs, ct).ConfigureAwait(false);
             if (!ct.IsCancellationRequested) SendPtzStop(vm);
         }
         catch (OperationCanceledException) { /* 새 제스처가 인계 */ }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    /// <summary>이동 중 표시의 판정 한 번 — 호스트에 GetPtzMoveStatus(ONVIF MoveStatus). 호스트 없음 · 실패 · 카메라가 안 알려줌 = null(어림).</summary>
+    private async Task<bool?> ProbePtzMotionAsync(CameraStreamPopupViewModel vm, System.Threading.CancellationToken ct)
+    {
+        var control = ResolveCameraControl();
+        if (control is not { IsAvailable: true }) return null;
+        var r = await control.RequestAsync(new CameraRequest
+        {
+            Kind = CameraRequestKind.GetPtzMoveStatus, CameraId = vm.CameraId.ToString(), Provider = vm.Provider, TimeoutMs = 3000,
+        }, ct).ConfigureAwait(false);
+        return r.Success ? r.PtzMoving : null;
     }
 
     /// <summary>줌 버튼 누름 → 방향 연속 줌 시작(뗄 때까지 계속). 뗌은 OnCameraPopupPtzStop. (FR-PH-01)</summary>
@@ -2714,6 +2737,7 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
             vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // 좌버튼 PTZ 드래그 → IPtzController
+            vm.PtzMotionProbe = ct => ProbePtzMotionAsync(vm, ct);  // 이동 중 표시 — 이동 중에만 호스트에 MoveStatus 를 묻는다
             vm.PtzZoomRequested += OnCameraPopupPtzZoom;            // 휠 → 상대 줌(펄스)
             vm.ZoomHoldRequested += OnCameraPopupZoomHold;          // 줌 +/- 누름 → 연속 줌(뗌=PtzStop)
             vm.FocusHoldRequested += OnCameraPopupFocusHold;        // 포커스 +/- 누름 → 연속 포커스
@@ -2776,6 +2800,7 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.CloseRequested -= OnCameraPopupCloseRequested;
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
+            vm.CancelPtzMotion();
             vm.PtzZoomRequested -= OnCameraPopupPtzZoom;
             vm.ZoomHoldRequested -= OnCameraPopupZoomHold;
             vm.FocusHoldRequested -= OnCameraPopupFocusHold;
@@ -6435,6 +6460,73 @@ public partial class MapViewModel : BasePanelViewModel,
             }
         }
         catch (Exception ex) { _log?.Error($"[방송] 마이크 발행 예외: {ex.Message}"); }
+    }
+
+    #endregion
+
+    #region - 함체 계측(ENCLOSURE_METRICS · 이슈 #7-20) -
+
+    private Services.Enclosure.IEnclosureMetricsNatsSyncService? _enclosureMetricsSync;
+    private System.Windows.Threading.DispatcherTimer? _enclosureMetricsStaleTimer;
+
+    /// <summary>ENCLOSURE_METRICS 구독 시작 — 함체 심볼 툴팁 · 상세 창에 최신 계측을 싣는다.</summary>
+    private void StartEnclosureMetricsSync()
+    {
+        try
+        {
+            _enclosureMetricsSync ??= IoC.Get<Services.Enclosure.IEnclosureMetricsNatsSyncService>();
+            if (_enclosureMetricsSync == null) return;
+            _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
+            _enclosureMetricsSync.MetricsReceived += OnEnclosureMetricsReceived;
+            _enclosureMetricsSync.AlertsChanged -= OnEnclosureAlertsChanged;
+            _enclosureMetricsSync.AlertsChanged += OnEnclosureAlertsChanged;
+            _ = _enclosureMetricsSync.StartService();
+
+            // 새 계측이 끊기면 '오래된 값' 으로 바꾸고, 나중에 생긴 함체 심볼에도 보관해 둔 계측을 싣는다.
+            _enclosureMetricsStaleTimer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _enclosureMetricsStaleTimer.Tick -= OnEnclosureMetricsTimerTick;
+            _enclosureMetricsStaleTimer.Tick += OnEnclosureMetricsTimerTick;
+            _enclosureMetricsStaleTimer.Start();
+        }
+        catch (Exception ex) { _log?.Warning($"[함체 계측] 구독 시작 실패(미등록 가능): {ex.Message}"); }
+    }
+
+    private void StopEnclosureMetricsSync()
+    {
+        _enclosureMetricsStaleTimer?.Stop();
+        if (_enclosureMetricsSync == null) return;
+        _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
+        _enclosureMetricsSync.AlertsChanged -= OnEnclosureAlertsChanged;
+        _ = _enclosureMetricsSync.StopAsync();
+    }
+
+    /// <summary>함체 환경 경고가 걸리거나 풀렸다(이슈 #7 Q-4a) — NATS 스레드에서 온다.</summary>
+    private void OnEnclosureAlertsChanged(int enclosureId)
+        => Execute.OnUIThread(() => ApplyEnclosureMetrics(enclosureId));
+
+    private void OnEnclosureMetricsTimerTick(object? sender, EventArgs e) => ApplyEnclosureMetrics(null);
+
+    /// <summary>NATS 스레드에서 온다 — 마커는 UI 스레드에서만 만진다.</summary>
+    private void OnEnclosureMetricsReceived(Services.Enclosure.EnclosureMetricsReading reading)
+        => Execute.OnUIThread(() => ApplyEnclosureMetrics(reading.EnclosureId));
+
+    /// <summary>보관된 최신 계측 · 환경 경고를 함체 심볼에 싣는다(<paramref name="enclosureId"/>=null 이면 전부). 호출 스레드: UI.</summary>
+    private void ApplyEnclosureMetrics(int? enclosureId)
+    {
+        try
+        {
+            if (MainMap == null || _enclosureMetricsSync == null) return;
+            var now = DateTime.Now;
+            foreach (var marker in MainMap.Markers.OfType<GMapPidsMarker>())
+            {
+                if (marker.DeviceType != EnumDeviceType.Enclosure || marker.LinkedDeviceId <= 0) continue;
+                if (enclosureId is { } id && marker.LinkedDeviceId != id) continue;
+                marker.EnclosureAlert = _enclosureMetricsSync.GetAlert(marker.LinkedDeviceId);
+                if (!_enclosureMetricsSync.TryGetLatest(marker.LinkedDeviceId, out var reading)) continue;
+                marker.EnclosureMetrics = reading with { IsStale = Helpers.Components.EnclosureMetricsText.IsStale(reading.ReceivedAt, now) };
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[함체 계측] 반영 실패: {ex.Message}"); }
     }
 
     #endregion

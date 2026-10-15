@@ -92,10 +92,10 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
         if (deviceModel.Status == EnumDeviceStatus.ACTIVATED)
             RefreshDeviceSymbol(deviceModel.Id, deviceModel.DeviceType);
 
-        // FR-13 부팅 초기화: 함체는 장비정보 door_status 로 개폐 형태를 시작한다(통문 gate_status 는 클라 장비모델 미수용 → Unknown=닫힘 표시).
-        if (deviceModel is IEnclosureDeviceModel enclosure && symbolModel is IPidsSymbolModel doorSymbol)
+        // FR-13 부팅 초기화: 통문 · 함체의 문 위치(관측 축 구동부 → 문 센서 → 옛 스칼라)로 개폐 형태를 시작한다.
+        if (deviceModel is IEnclosureDeviceModel or IGateDeviceModel && symbolModel is IPidsSymbolModel)
         {
-            var initial = DoorStateMachine.FromServer(enclosure.DoorStatus);
+            var initial = DoorStateMachine.FromServer(DoorPosition.Of(deviceModel));
             if (initial != EnumDoorState.Unknown) lookup.ApplyDoorState(initial);
         }
 

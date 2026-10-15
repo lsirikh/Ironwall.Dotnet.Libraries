@@ -213,12 +213,12 @@ public class EventConsoleFourKindsTests : IDisposable
         Assert.Equal(3, rows.Count);
         Assert.Equal("통문 열림", rows[704].ReasonText);
         Assert.Equal("경고", rows[704].SeverityText);
-        Assert.Equal("previous=CLOSED · gate_status=OPEN", rows[704].DetailText);
+        Assert.Equal("닫힘 → 열림", rows[704].DetailText);
         Assert.Contains("북문 통문", rows[704].DeviceLabel);          // 지워진 장비는 서버 스냅샷 이름으로
 
         Assert.Equal("함체 고온", rows[705].ReasonText);
         Assert.Equal("정보", rows[705].SeverityText);
-        Assert.Equal("field=temp · value=61.5 · threshold=60", rows[705].DetailText);
+        Assert.Equal("temp 61.5 — 기준 60 초과", rows[705].DetailText);
 
         Assert.Equal("ENCLOSURE_SMOKE", rows[706].ReasonText);       // 모르는 사유는 원문
         Assert.Equal("심각", rows[706].SeverityText);
@@ -241,7 +241,7 @@ public class EventConsoleFourKindsTests : IDisposable
         Assert.Equal("통문 열림 (GATE_OPEN)", FieldText(console, "사유"));
         Assert.Equal("경고", FieldText(console, "심각도"));
         Assert.Equal("미조치", FieldText(console, "조치"));
-        Assert.Equal("previous=CLOSED · gate_status=OPEN", FieldText(console, "상세"));
+        Assert.Equal("닫힘 → 열림", FieldText(console, "상세"));
         Assert.All(console.DetailView.Sections.SelectMany(s => s.Fields), f => Assert.False(f.IsEditable));
 
         // 기록은 고치지도 지우지도 않는다. 조치보고 · 트레이 끌기는 켜져 있다(operation-event-card PRD v1.1 — 서버 FR-07).
@@ -376,6 +376,17 @@ public class EventConsoleFourKindsTests : IDisposable
         Assert.Null(OperationEventText.DetailText(new JObject()));
         Assert.Equal("a=null · b={\"c\":1}", OperationEventText.DetailText(JObject.Parse("""{ "a": null, "b": { "c": 1 } }""")));
     }
+
+    [Theory]
+    [InlineData("""{ "state": "OPEN", "previous": "CLOSED", "component": "door", "device_status": "ACTIVATED" }""", "닫힘 → 열림")]
+    [InlineData("""{ "state": "OPEN", "previous": null, "component": "actuator", "device_status": "DEACTIVATED" }""", "열림 · 장비 점검 중")]
+    [InlineData("""{ "previous": "OPEN", "gate_status": "CLOSED", "device_status": "ACTIVATED" }""", "열림 → 닫힘")]
+    [InlineData("""{ "field": "temperature", "value": 65, "threshold": 60, "direction": "HIGH", "metric_id": 12 }""", "온도 65℃ — 기준 60℃ 초과")]
+    [InlineData("""{ "field": "voltage", "value": 10.5, "threshold": 11, "direction": "LOW", "metric_id": 3, "suppressed_schedule_id": 7 }""", "전압 10.5V — 기준 11V 미만 · 억제 시간 중 발생")]
+    [InlineData("""{ "display": { "title": "함체 앞문 열림", "message": ["잠금 안 풀었는데 열림"], "tags": ["door"] }, "state": "OPEN" }""", "함체 앞문 열림 · 잠금 안 풀었는데 열림 · 열림")]
+    [InlineData("""{ "state": "OPEN", "extra": 1 }""", "열림 · extra=1")]
+    public void should_spell_out_known_operation_detail_keys_for_people(string json, string expected)
+        => Assert.Equal(expected, OperationEventText.DetailText(JObject.Parse(json)));
 
     private sealed class PopupSink : IHandle<OpenInfoPopupMessageModel>
     {

@@ -402,10 +402,36 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         }
     }
 
+    /// <summary>함체 최신 계측(ENCLOSURE_METRICS) — <b>런타임 전용</b>. 값이 바뀔 때만 통지한다. 호출 스레드: UI.</summary>
+    public Services.Enclosure.EnclosureMetricsReading? EnclosureMetrics
+    {
+        get => _enclosureMetrics;
+        set
+        {
+            if (Equals(_enclosureMetrics, value)) return;
+            _enclosureMetrics = value;
+            OnPropertyChanged(nameof(EnclosureMetrics));
+        }
+    }
+
+    /// <summary>함체 환경 · 부품 판정 경고(운영 이벤트 · 이슈 #7 Q-4a) — <b>런타임 전용</b>. 값이 바뀔 때만 통지한다. 호출 스레드: UI.</summary>
+    public Services.Enclosure.EnclosureAlertSummary? EnclosureAlert
+    {
+        get => _enclosureAlert;
+        set
+        {
+            if (Equals(_enclosureAlert, value)) return;
+            _enclosureAlert = value;
+            OnPropertyChanged(nameof(EnclosureAlert));
+        }
+    }
+
     #endregion
 
     #region - Attributes -
     private bool _isBroadcasting;
+    private Services.Enclosure.EnclosureMetricsReading? _enclosureMetrics;
+    private Services.Enclosure.EnclosureAlertSummary? _enclosureAlert;
     private int _updatePending;   // 0=없음, 1=UI 스레드로 넘긴 갱신 대기 중(Interlocked)
     private Helpers.Components.ComponentHealthSummary _componentSummary = Helpers.Components.ComponentHealthSummary.None;
     private Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceAxesModel? _summarySource;

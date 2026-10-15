@@ -46,6 +46,15 @@ public static class DevicePresetSeeds
         EnclosureStandard(), ControllerStandard(), GateSliding(), CameraPtzCold(), SensorFence(),
     };
 
+    /// <summary>
+    /// 서버에 맞는 본보기 다섯 — <paramref name="serialPorts"/>(서버 8.0.8 이상)면 표준 제어기가 RS485 2 단자까지 담는다.
+    /// 아니면 <see cref="All"/> 그대로(그 전 서버 카탈로그에는 <c>RS485_PORT</c> 가 없어 등록이 막힌다).
+    /// </summary>
+    public static IReadOnlyList<DevicePreset> AllFor(bool serialPorts) => !serialPorts ? All : new[]
+    {
+        EnclosureStandard(), ControllerWithSerialPorts(), GateSliding(), CameraPtzCold(), SensorFence(),
+    };
+
     /// <summary>표준 옥외 함체 — 도어 · 온습도 · 히터 · 팬 · UPS.</summary>
     private static DevicePreset EnclosureStandard() => new()
     {
@@ -80,10 +89,10 @@ public static class DevicePresetSeeds
     /// <remarks>
     /// <para>예전 씨앗은 "IO 제어기 16채널"(접점 16 + NIC)이었는데 실제 제어기와 맞지 않았다 — 사용자 확인(2026-10-02):
     /// "제어기에는 2개의 RS485 와 1개의 이더넷, 2개의 접점이 있다".</para>
-    /// <para><b>RS485 두 포트는 아직 담지 못한다</b> — 서버 부품 카탈로그에 RS485 포트 부품 유형이 없다
-    /// (서버에서 RS485 는 센서의 <c>connection.type</c> 일 뿐이고, 제어기에 달 수 있는 부품은 CONTACT_INPUT ·
-    /// NETWORK_INTERFACE 둘뿐). 유형이 생기면 여기에 더한다. Id 는 그대로 둔다 — 손대지 않은 옛 씨앗이
-    /// <see cref="RefreshIfUntouched"/> 로 이 판으로 바뀐다.</para>
+    /// <para><b>RS485 두 포트는 서버 8.0.8 부터 담는다</b>(<see cref="ControllerWithSerialPorts"/>) — 그 전 서버 부품 카탈로그에는
+    /// RS485 포트 부품 유형이 없다(서버에서 RS485 는 센서의 <c>connection.type</c> 일 뿐이고, 제어기에 달 수 있는 부품은
+    /// CONTACT_INPUT · NETWORK_INTERFACE 둘뿐). Id 는 그대로 둔다 — 손대지 않은 옛 씨앗이
+    /// <see cref="RefreshIfUntouched(DevicePreset, bool)"/> 로 서버에 맞는 판으로 바뀐다.</para>
     /// </remarks>
     private static DevicePreset ControllerStandard() => new()
     {
@@ -99,6 +108,27 @@ public static class DevicePresetSeeds
             Component("CONTACT_INPUT", "ci_1", "접점 단자 1", 1),
             Component("CONTACT_INPUT", "ci_2", "접점 단자 2", 2),
             Component("NETWORK_INTERFACE", "nic", "이더넷 포트"),
+        },
+    };
+
+    /// <summary>
+    /// 표준 제어기(서버 8.0.8 이상) — 실물 그대로 RS485 2 · 이더넷 1 · 접점 2. 단자 차례는 GIS 가 서버에 보낸 요청 그대로다.
+    /// </summary>
+    /// <remarks>
+    /// Id · 심은 시각이 <see cref="ControllerStandard"/> 와 같다 — 손대지 않은 씨앗은 서버 판본에 따라 두 판 사이를 오간다.
+    /// 포트 번호는 <c>channel</c>, 보레이트 등은 부품 <c>spec</c> 자리다(재정의 아님) — 현장마다 달라 씨앗에는 싣지 않는다.
+    /// </remarks>
+    private static DevicePreset ControllerWithSerialPorts() => ControllerStandard() with
+    {
+        Name = "표준 제어기 (RS485 2 · 접점 2 · 이더넷)",
+        Description = "RS485 2 + 이더넷 1 + 접점 2",
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("RS485_PORT", "rs485_1", "RS485 단자 1", 1),
+            Component("RS485_PORT", "rs485_2", "RS485 단자 2", 2),
+            Component("NETWORK_INTERFACE", "nic", "이더넷 포트"),
+            Component("CONTACT_INPUT", "ci_1", "접점 단자 1", 1),
+            Component("CONTACT_INPUT", "ci_2", "접점 단자 2", 2),
         },
     };
 
@@ -168,8 +198,11 @@ public static class DevicePresetSeeds
     };
 
     /// <summary>Id 로 지금 판의 씨앗을 새로 만든다. 씨앗이 아니면 null.</summary>
-    public static DevicePreset? Find(string? id)
-        => string.IsNullOrWhiteSpace(id) ? null : All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
+    public static DevicePreset? Find(string? id) => Find(id, serialPorts: false);
+
+    /// <summary>Id 로 서버에 맞는 판의 씨앗을 새로 만든다(<see cref="AllFor"/>). 씨앗이 아니면 null.</summary>
+    public static DevicePreset? Find(string? id, bool serialPorts)
+        => string.IsNullOrWhiteSpace(id) ? null : AllFor(serialPorts).FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// 파일에서 읽은 씨앗이 <b>손대지 않은 그대로</b>면(씨앗 표시 + 심은 시각 그대로) 지금 판의 씨앗으로 바꾼다.
@@ -179,10 +212,13 @@ public static class DevicePresetSeeds
     /// 서버 422) 고쳐도 이미 쓰인 파일에는 옛 값이 남는다. 이름을 바꾸거나 저장한 적이 있으면 <see cref="DevicePreset.UpdatedAt"/> 이
     /// 바뀌거나 씨앗 표시가 꺼지므로 사용자의 손이 닿은 줄은 건드리지 않는다.
     /// </remarks>
-    public static DevicePreset RefreshIfUntouched(DevicePreset preset)
+    public static DevicePreset RefreshIfUntouched(DevicePreset preset) => RefreshIfUntouched(preset, serialPorts: false);
+
+    /// <summary><see cref="RefreshIfUntouched(DevicePreset)"/> 의 서버 판본 판 — <paramref name="serialPorts"/> 면 8.0.8 씨앗으로.</summary>
+    public static DevicePreset RefreshIfUntouched(DevicePreset preset, bool serialPorts)
     {
         if (preset is null || !preset.IsSeed || preset.UpdatedAt != SeededAt) return preset!;
-        var current = Find(preset.Id);
+        var current = Find(preset.Id, serialPorts);
         return current is null || current.Category != preset.Category ? preset : current;
     }
 

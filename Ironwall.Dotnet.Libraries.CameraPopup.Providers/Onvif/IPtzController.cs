@@ -80,6 +80,21 @@ public interface IPtzController
     Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct = default)
         => Task.FromResult(PtzDragOutcome.NotSent("not-supported"));
 
+    /// <summary>
+    /// 속도를 실은 드래그. <paramref name="speed"/> = 0.1..1(팝업 설정 속도), 0 이하 = 카메라 기본 속도. 기본 구현은 속도를 버리고 위 멤버로.
+    /// </summary>
+    Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, double speed, CancellationToken ct = default)
+        => DragMoveAsync(cameraId, viewX, viewY, viewAspect, ct);
+
+    /// <summary>
+    /// 지금 움직이는 중인가(GetStatus 의 MoveStatus — 팬틸트 · 줌 중 하나라도 MOVING 이면 true, 둘 다 IDLE 이면 false).
+    /// 카메라가 MoveStatus 를 안 주거나 읽기 실패면 null(부르는 쪽이 명령 종류별 예상 시간으로 어림). 기본 구현은 null.
+    /// </summary>
+    Task<bool?> GetMoveStatusAsync(string cameraId, CancellationToken ct = default) => Task.FromResult<bool?>(null);
+
+    /// <summary>카메라 기본 PTZ 속도(프로파일 PTZConfiguration.DefaultPTZSpeed ÷ 속도 공간, 0.1..1). 모르면 null. 기본 구현은 null.</summary>
+    (double? PanTilt, double? Zoom) GetDefaultSpeeds(string cameraId) => (null, null);
+
     /// <summary>상대 줌(휠) — RelativeZoomTranslationSpace로 클램프. zoomDelta +=줌인/-=줌아웃. (FR-PTZCTL-03)</summary>
     Task<bool> RelativeZoomAsync(string cameraId, double zoomDelta, CancellationToken ct = default);
 

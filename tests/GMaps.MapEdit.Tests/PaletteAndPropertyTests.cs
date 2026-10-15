@@ -112,8 +112,8 @@ public class PaletteAndPropertyTests
     [Trait("Scenario", "MAP-097")]
     public void should_write_symbol3d_key_and_say_restart_needed_when_3d_housing_is_toggled() => Scenario.StaAsync(async () =>
     {
-        // 저장 위치는 AppDomain.BaseDirectory/appsettings.json(이 시험 bin) — 원본을 떠 두고 끝나면 되돌린다.
-        var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+        // 저장 위치는 AppDomain.BaseDirectory/Config/appsettings.json(이 시험 bin) — 원본을 떠 두고 끝나면 되돌린다.
+        var file = Ironwall.Dotnet.Libraries.Base.Services.AppSettingsLocation.PrepareAppSettingsWrite();
         var backup = File.Exists(file) ? File.ReadAllText(file) : null;
         try
         {

@@ -49,6 +49,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     private AssemblyBoard _board;
     private EnumDeviceCategory _category;
     private string _paletteSearch = string.Empty;
+    private bool _showAllComponents;
     private string _statusText = string.Empty;
     private bool _isBusy;
     private BoardSlotViewModel? _inspected;
@@ -181,15 +182,49 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
 
     public string PaletteEmptyText => !_catalog.IsLoaded
         ? "부품 목록을 불러오지 못했습니다. 서버 연결을 확인하세요."
-        : "이 카테고리에 달 수 있는 부품이 없습니다.";
+        : CanShowAllComponents && !ShowAllComponents
+            ? "즐겨찾기 부품이 없습니다. [전체]에서 고르세요."
+            : "이 카테고리에 달 수 있는 부품이 없습니다.";
+
+    /// <summary>
+    /// 팔레트 [즐겨찾기 | 전체] 를 보일까 — 서버 8.0.8 이상(부품은 어느 장비에나 · <c>applies_to</c> = 즐겨찾기)에서만.
+    /// 그 전 서버는 종전 목록(카테고리에 달 수 있는 것) 하나뿐이다.
+    /// </summary>
+    public bool CanShowAllComponents => _catalog.AllComponentTypes().Any(t => t.AttachesAnywhere);
+
+    /// <summary>팔레트가 전체 유형을 보이는가. 기본은 즐겨찾기(이 카테고리의 <c>applies_to</c>).</summary>
+    public bool ShowAllComponents
+    {
+        get => _showAllComponents;
+        set
+        {
+            if (_showAllComponents == value) return;
+            _showAllComponents = value;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(ShowFavoriteComponents));
+            RebuildPalette();
+        }
+    }
+
+    /// <summary>[즐겨찾기] 단추의 켜짐 — <see cref="ShowAllComponents"/> 의 반대.</summary>
+    public bool ShowFavoriteComponents
+    {
+        get => !ShowAllComponents;
+        set { if (value) ShowAllComponents = false; }
+    }
+
+    /// <summary>팔레트 · 반복 펼치기가 고르는 목록 — 8.0.8 의 [전체]면 전체, 아니면 이 카테고리 목록(종전).</summary>
+    private IReadOnlyList<ComponentTypeInfo> PaletteSource()
+        => ShowAllComponents && CanShowAllComponents ? _catalog.AllComponentTypes() : _catalog.ComponentTypes(_category);
 
     private void RebuildPalette()
     {
         Palette.Clear();
-        foreach (var info in _catalog.ComponentTypes(_category).Where(i => AssemblyPalette.Matches(i, _paletteSearch)))
+        foreach (var info in PaletteSource().Where(i => AssemblyPalette.Matches(i, _paletteSearch)))
             Palette.Add(new PaletteItemViewModel(info));
         NotifyOfPropertyChange(nameof(IsPaletteEmpty));
         NotifyOfPropertyChange(nameof(PaletteEmptyText));
+        NotifyOfPropertyChange(nameof(CanShowAllComponents));
     }
     #endregion
 
@@ -330,7 +365,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     public async Task RepeatExpandAsync()
     {
         if (IsBusy) return;
-        var all = _catalog.ComponentTypes(_category).Select(i => new PaletteItemViewModel(i)).ToList();
+        var all = PaletteSource().Select(i => new PaletteItemViewModel(i)).ToList();
         var preselected = _inspected is null ? null : all.FirstOrDefault(p => p.Code == _inspected.Slot.TypeCode);
         var spec = await _dialogs.AskRepeatExpandAsync(all, preselected, _board.Slots.Select(s => s.Key).ToList());
         if (spec is null) return;

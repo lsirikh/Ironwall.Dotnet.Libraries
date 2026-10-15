@@ -61,6 +61,14 @@ public sealed class ConnectionWatchdog : IConnectionWatchdog
             _heartbeat = new HeartbeatWriter(_clock, _log, _opt.HeartbeatIntervalMs);
             _heartbeat.Start();
 
+            // 진단: UI 스레드 정지를 즉시 기록되는 ERROR 로 남긴다(감시 프로그램 강제 종료 전 원인 추적용).
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null)
+            {
+                _stallWatch = new UiStallWatch(dispatcher, _log);
+                _stallWatch.Start();
+            }
+
             _launcher = new WatchdogLauncher(_log, _opt);
             _launcher.EnsureRunning();
             // 상호감시 — 와치독이 죽으면 앱이 재기동(뮤텍스 확인, 30초 주기 백그라운드 점검)
@@ -104,6 +112,7 @@ public sealed class ConnectionWatchdog : IConnectionWatchdog
         try { _shutdown?.SignalGraceful(); } catch { }           // 실행 중 와치독 → graceful 종료
         try { _shutdown?.Dispose(); _shutdown = null; } catch { }
         try { _heartbeat?.Dispose(); _heartbeat = null; } catch { }
+        try { _stallWatch?.Dispose(); _stallWatch = null; } catch { }
         try { _statusClient = null; } catch { }
         _started = false;                                        // 재활성(Start) 가능하게
         _log?.Info("[Watchdog] 런타임 감시 중지(사용자 비활성) — 와치독 종료 유도 + 재기동 차단.");
@@ -129,6 +138,7 @@ public sealed class ConnectionWatchdog : IConnectionWatchdog
         try { _relaunchTimer?.Dispose(); } catch { }
         try { _shutdown?.Dispose(); } catch { }   // 정상종료 신호 Set
         try { _heartbeat?.Dispose(); } catch { }  // UI 타이머 정지 + MMF 해제
+        try { _stallWatch?.Dispose(); } catch { }
         _log?.Info("[Watchdog] 인앱 감시 종료(정상).");
     }
     #endregion
@@ -138,6 +148,7 @@ public sealed class ConnectionWatchdog : IConnectionWatchdog
     private readonly ILogService? _log;
 
     private HeartbeatWriter? _heartbeat;
+    private UiStallWatch? _stallWatch;
     private ShutdownSignal? _shutdown;
     private WatchdogLauncher? _launcher;
     private WatchdogStatusClient? _statusClient;

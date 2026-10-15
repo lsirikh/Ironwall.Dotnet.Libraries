@@ -1,5 +1,7 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
+using Ironwall.Dotnet.Libraries.CameraPopup.Host.Diagnostics;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -18,6 +20,7 @@ internal sealed class BitmapFrameSink : IFrameSink, IDisposable
     private readonly byte[] _pending;
     private bool _scheduled;
     private bool _disposed;
+    private long _scheduledTicks; // 계측: 그리기 예약 시각(디스패처 넘김 대기)
 
     public BitmapFrameSink(int width, int height, Dispatcher dispatcher)
     {
@@ -35,6 +38,8 @@ internal sealed class BitmapFrameSink : IFrameSink, IDisposable
     public void Write(IntPtr bgra, int stride)
     {
         bool schedule;
+        bool trace = StreamTrace.IsOn;
+        long started = trace ? Stopwatch.GetTimestamp() : 0;
         lock (_gate)
         {
             if (_disposed) return;
@@ -43,7 +48,9 @@ internal sealed class BitmapFrameSink : IFrameSink, IDisposable
                 Marshal.Copy(bgra + y * stride, _pending, y * row, row);
             schedule = !_scheduled;
             _scheduled = true;
+            if (trace && schedule) _scheduledTicks = Stopwatch.GetTimestamp();
         }
+        if (trace) StreamTrace.SinkWrite(Stopwatch.GetTimestamp() - started, coalesced: !schedule);
         if (schedule) _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(Flush));
     }
 
@@ -53,7 +60,9 @@ internal sealed class BitmapFrameSink : IFrameSink, IDisposable
         {
             _scheduled = false;
             if (_disposed) return;
+            long started = StreamTrace.IsOn ? Stopwatch.GetTimestamp() : 0;
             Bitmap.WritePixels(new Int32Rect(0, 0, Width, Height), _pending, Width * 4, 0);
+            if (started != 0) StreamTrace.Rendered(started - _scheduledTicks, Stopwatch.GetTimestamp() - started);
         }
     }
 
