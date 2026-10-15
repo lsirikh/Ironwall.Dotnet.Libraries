@@ -10,7 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 /// 그래서 <c>BROADCAST_PLAY</c>·<c>BROADCAST_STOP</c> 과 <b>같은 모양</b>(speaker_ids)이며,
 /// 입력 장치·오디오 파라미터는 들어가지 않는다.</para>
 /// </summary>
-public class BroadcastMicBodyDto
+public class BroadcastMicBodyDto : ControlCommandBodyDto
 {
     [JsonProperty("speaker_ids")]
     public List<int> SpeakerIds { get; set; } = new();

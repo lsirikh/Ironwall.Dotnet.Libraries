@@ -5,7 +5,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 /// <summary>
 /// TTS 방송 Body
 /// </summary>
-public class TtsBodyDto
+public class TtsBodyDto : ControlCommandBodyDto
 {
     [JsonProperty("speaker_ids")]
     public List<int> SpeakerIds { get; set; } = new();

@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 
-public class WeatherModeSetBodyDto
+public class WeatherModeSetBodyDto : ControlCommandBodyDto
 {
     [JsonProperty("camera_id")]
     public int CameraId { get; set; }
