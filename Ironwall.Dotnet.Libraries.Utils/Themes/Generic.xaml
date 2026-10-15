@@ -487,7 +487,30 @@
 		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 		<Setter Property="FontSize" Value="13.5" />
 		<Setter Property="Cursor" Value="Hand" />
-		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<!--
+			2026-10-15 사용자 캡처(부대 관계도) — 포커스 고리를 IsKeyboardFocused 트리거로 그려 마우스로 눌러도 굵은 2px 사각이 떠
+			선택 막대를 덮었다(다른 콘솔 레일은 막대 + 바탕). 포커스 고리는 키보드로 왔을 때만 그리는 FocusVisualStyle 로 옮기고,
+			선택(실선 막대)과 형태로 가르도록 점선으로 그린다.
+		-->
+		<Setter Property="FocusVisualStyle">
+			<Setter.Value>
+				<Style>
+					<Setter Property="Control.Template">
+						<Setter.Value>
+							<ControlTemplate>
+								<Rectangle
+									Margin="8,1"
+									RadiusX="4"
+									RadiusY="4"
+									Stroke="{DynamicResource FocusRingBrush}"
+									StrokeDashArray="2 1.5"
+									StrokeThickness="1.4" />
+							</ControlTemplate>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</Setter.Value>
+		</Setter>
 		<Setter Property="HorizontalContentAlignment" Value="Stretch" />
 		<Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
 		<Setter Property="AutomationProperties.AutomationId">
@@ -522,12 +545,6 @@
 								HorizontalAlignment="Left"
 								Background="{DynamicResource PrimaryBrush}"
 								CornerRadius="4,0,0,4"
-								Visibility="Collapsed" />
-							<Border
-								x:Name="Focus"
-								BorderBrush="{DynamicResource FocusRingBrush}"
-								BorderThickness="2"
-								CornerRadius="4"
 								Visibility="Collapsed" />
 							<Grid x:Name="Row" Margin="12,9">
 								<Grid.ColumnDefinitions>
@@ -573,9 +590,6 @@
 							<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 							<Setter Property="FontWeight" Value="Bold" />
 							<Setter TargetName="Icon" Property="TextElement.Foreground" Value="{DynamicResource PrimaryBrush}" />
-						</Trigger>
-						<Trigger Property="IsKeyboardFocused" Value="True">
-							<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<DataTrigger Binding="{Binding HasBad}" Value="True">
 							<Setter TargetName="Cnt" Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />

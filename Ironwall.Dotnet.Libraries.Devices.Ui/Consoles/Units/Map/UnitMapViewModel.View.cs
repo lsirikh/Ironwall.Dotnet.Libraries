@@ -67,7 +67,7 @@ public sealed partial class UnitMapViewModel
         }
         if (MyUnitId is int mine && _tree.Find(mine) is not null)
         {
-            surface.CenterOn(mine, MyUnitScale);
+            surface.CenterOnUnlessSmall(mine, MyUnitScale);
             return;
         }
         surface.Fit();

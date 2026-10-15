@@ -569,19 +569,16 @@
 								Height="8"
 								Fill="{DynamicResource OnPrimaryBrush}"
 								Visibility="Collapsed" />
-							<Border
+							<!--
+								2026-10-15 사용자 캡처 — 고르지 않은 항목이 진한 청록 고리라 고른 것처럼 보였다(라이트 Primary = FocusRing = #0C6B89).
+								상태는 색이 아니라 형태로 가른다: 선택 = 채운 원 + 점 · 마우스 올림 = 옅은 바탕만 · 키보드 포커스 = 바깥 점선 고리.
+							-->
+							<Ellipse
 								x:Name="FocusOuter"
 								Margin="-4"
-								BorderBrush="{DynamicResource FocusRingBrush}"
-								BorderThickness="2"
-								CornerRadius="13"
-								Visibility="Collapsed" />
-							<Border
-								x:Name="FocusInner"
-								Margin="-2"
-								BorderBrush="{DynamicResource OnPrimaryBrush}"
-								BorderThickness="1"
-								CornerRadius="11"
+								Stroke="{DynamicResource FocusRingBrush}"
+								StrokeDashArray="2 1.5"
+								StrokeThickness="1.4"
 								Visibility="Collapsed" />
 						</Grid>
 						<ContentPresenter
@@ -592,17 +589,17 @@
 							RecognizesAccessKey="True" />
 					</Grid>
 					<ControlTemplate.Triggers>
+						<!--  마우스 올림은 선택보다 앞 — 고른 항목 위에서는 선택 모양이 이긴다  -->
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Fill" Value="{DynamicResource SurfaceHoverBrush}" />
+						</Trigger>
 						<Trigger Property="IsChecked" Value="True">
 							<Setter TargetName="Bd" Property="Fill" Value="{DynamicResource PrimaryBrush}" />
 							<Setter TargetName="Bd" Property="Stroke" Value="{DynamicResource PrimaryBrush}" />
 							<Setter TargetName="Dot" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Stroke" Value="{DynamicResource PrimaryHoverBrush}" />
-						</Trigger>
 						<Trigger Property="IsKeyboardFocused" Value="True">
 							<Setter TargetName="FocusOuter" Property="Visibility" Value="Visible" />
-							<Setter TargetName="FocusInner" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<!--  맨 뒤 — 꺼짐이 앞의 모든 상태를 이긴다  -->
 						<Trigger Property="IsEnabled" Value="False">
