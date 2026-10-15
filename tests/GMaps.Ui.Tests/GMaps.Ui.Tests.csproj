@@ -19,6 +19,9 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Detail\GeoFormat.cs" />
     <!-- BROADCAST_STATUS 페이로드 해석(FR-24) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Broadcast\BroadcastStatusPayload.cs" />
+    <!-- ENCLOSURE_METRICS 페이로드 해석 · 표시 글(이슈 #7-20) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Enclosure\EnclosureMetricsPayload.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Components\EnclosureMetricsText.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackingMath.cs" />
     <!-- Press-Hold(CameraPopup_PressHold_PtzZoomFocus) 순수 헬퍼 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzGestureTag.cs" />

@@ -222,6 +222,9 @@ public partial class MapViewModel : BasePanelViewModel,
             // BROADCAST_STATUS 구독 시작(FR-24) — 다른 자리에서 시작한 방송·방송서버 마이크 송출도 심볼에 반영.
             StartBroadcastStatusSync();
 
+            // ENCLOSURE_METRICS 구독 시작(이슈 #7-20) — 함체 심볼 툴팁 · 상세 창에 최신 계측.
+            StartEnclosureMetricsSync();
+
             // 툴바 우측 CPU/GPU/RAM 사용률 표시 시작(UI DispatcherTimer로 Sample 구동)
             StartResourceMonitor();
 
@@ -307,6 +310,7 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
             StopBroadcastStatusSync();      // BROADCAST_STATUS 구독 해제(FR-24)
+            StopEnclosureMetricsSync();     // ENCLOSURE_METRICS 구독 · 오래된 값 타이머 해제(이슈 #7-20)
             StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
             StopCameraPopupHostNotice();    // 팝업 호스트 상태 구독 해제(다시 활성화되면 다시 구독 · 현재 상태 반영)
 
@@ -6452,6 +6456,65 @@ public partial class MapViewModel : BasePanelViewModel,
             }
         }
         catch (Exception ex) { _log?.Error($"[방송] 마이크 발행 예외: {ex.Message}"); }
+    }
+
+    #endregion
+
+    #region - 함체 계측(ENCLOSURE_METRICS · 이슈 #7-20) -
+
+    private Services.Enclosure.IEnclosureMetricsNatsSyncService? _enclosureMetricsSync;
+    private System.Windows.Threading.DispatcherTimer? _enclosureMetricsStaleTimer;
+
+    /// <summary>ENCLOSURE_METRICS 구독 시작 — 함체 심볼 툴팁 · 상세 창에 최신 계측을 싣는다.</summary>
+    private void StartEnclosureMetricsSync()
+    {
+        try
+        {
+            _enclosureMetricsSync ??= IoC.Get<Services.Enclosure.IEnclosureMetricsNatsSyncService>();
+            if (_enclosureMetricsSync == null) return;
+            _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
+            _enclosureMetricsSync.MetricsReceived += OnEnclosureMetricsReceived;
+            _ = _enclosureMetricsSync.StartService();
+
+            // 새 계측이 끊기면 '오래된 값' 으로 바꾸고, 나중에 생긴 함체 심볼에도 보관해 둔 계측을 싣는다.
+            _enclosureMetricsStaleTimer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _enclosureMetricsStaleTimer.Tick -= OnEnclosureMetricsTimerTick;
+            _enclosureMetricsStaleTimer.Tick += OnEnclosureMetricsTimerTick;
+            _enclosureMetricsStaleTimer.Start();
+        }
+        catch (Exception ex) { _log?.Warning($"[함체 계측] 구독 시작 실패(미등록 가능): {ex.Message}"); }
+    }
+
+    private void StopEnclosureMetricsSync()
+    {
+        _enclosureMetricsStaleTimer?.Stop();
+        if (_enclosureMetricsSync == null) return;
+        _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
+        _ = _enclosureMetricsSync.StopAsync();
+    }
+
+    private void OnEnclosureMetricsTimerTick(object? sender, EventArgs e) => ApplyEnclosureMetrics(null);
+
+    /// <summary>NATS 스레드에서 온다 — 마커는 UI 스레드에서만 만진다.</summary>
+    private void OnEnclosureMetricsReceived(Services.Enclosure.EnclosureMetricsReading reading)
+        => Execute.OnUIThread(() => ApplyEnclosureMetrics(reading.EnclosureId));
+
+    /// <summary>보관된 최신 계측을 함체 심볼에 싣는다(<paramref name="enclosureId"/>=null 이면 전부). 호출 스레드: UI.</summary>
+    private void ApplyEnclosureMetrics(int? enclosureId)
+    {
+        try
+        {
+            if (MainMap == null || _enclosureMetricsSync == null) return;
+            var now = DateTime.Now;
+            foreach (var marker in MainMap.Markers.OfType<GMapPidsMarker>())
+            {
+                if (marker.DeviceType != EnumDeviceType.Enclosure || marker.LinkedDeviceId <= 0) continue;
+                if (enclosureId is { } id && marker.LinkedDeviceId != id) continue;
+                if (!_enclosureMetricsSync.TryGetLatest(marker.LinkedDeviceId, out var reading)) continue;
+                marker.EnclosureMetrics = reading with { IsStale = Helpers.Components.EnclosureMetricsText.IsStale(reading.ReceivedAt, now) };
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[함체 계측] 반영 실패: {ex.Message}"); }
     }
 
     #endregion
