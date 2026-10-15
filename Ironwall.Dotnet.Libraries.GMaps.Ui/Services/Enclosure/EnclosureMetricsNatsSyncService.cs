@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -10,6 +11,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Enclosure;
 
 /****************************************************************************
    Purpose      : NATS ENCLOSURE_METRICS 수신 → 함체별 최신 계측 보관 (이슈 #7-20)
+                  + 함체 환경 · 부품 판정 경고(OPERATION_EVENT → 걸림, ACTION_REPORT → 풀림 · 이슈 #7 Q-4a)
    Created By   : Claude Code
    Created On   : 2026-10-15
    Company      : Sensorway Co., Ltd.
@@ -33,6 +35,11 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
 
     public bool TryGetLatest(int enclosureId, out EnclosureMetricsReading reading)
         => _latest.TryGetValue(enclosureId, out reading!);
+
+    public event System.Action<int>? AlertsChanged;
+
+    public EnclosureAlertSummary? GetAlert(int enclosureId)
+        => EnclosureAlertSummary.Of(_alerts.Values.Where(a => a.EnclosureId == enclosureId));
 
     #region - IService -
     public Task StartService(CancellationToken token = default)
@@ -59,6 +66,7 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
     {
         try
         {
+            ApplyAlerts(e.Data);
             if (e.Subject?.Contains(EnclosureMetricsPayload.SubjectSuffix) != true) return Task.CompletedTask;
 
             var reading = EnclosureMetricsPayload.TryParse(e.Data, DateTime.Now);
@@ -74,12 +82,40 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
         }
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// 함체 환경 · 부품 판정 경고(이슈 #7 Q-4a) — 운영 이벤트가 걸고, 그 이벤트의 조치보고(카드 [X] 의 자동 조치 포함)가 푼다.
+    /// 운영 카드는 이벤트 큐에 들어가지 않으므로(operation-event-card PRD §4) 심볼 색 축이 아니라 따로 든다.
+    /// </summary>
+    private void ApplyAlerts(string? json)
+    {
+        // 계측(10초 × 함체 수)은 cmd 글자로 먼저 거른다 — 두 cmd 가 아니면 파싱하지 않는다.
+        if (json is null || (json.IndexOf(EnclosureAlertPayload.OperationCommand, StringComparison.Ordinal) < 0
+                          && json.IndexOf(EnclosureAlertPayload.ActionReportCommand, StringComparison.Ordinal) < 0)) return;
+
+        foreach (var envelope in EnclosureAlertPayload.Items(json))
+        {
+            if (EnclosureAlertPayload.TryParseAlert(envelope) is { } alert)
+            {
+                if (!_alerts.TryAdd(alert.EventId, alert)) continue;   // 같은 봉투 재배달
+                _log?.Info($"[함체 경고] 걸림 — 함체 {alert.EnclosureId} · {alert.Reason} · 운영 이벤트 {alert.EventId}");
+                AlertsChanged?.Invoke(alert.EnclosureId);
+            }
+            else if (EnclosureAlertPayload.TryParseReportedOperationId(envelope) is { } eventId
+                     && _alerts.TryRemove(eventId, out var released))
+            {
+                _log?.Info($"[함체 경고] 풀림 — 함체 {released.EnclosureId} · 운영 이벤트 {eventId} 조치됨");
+                AlertsChanged?.Invoke(released.EnclosureId);
+            }
+        }
+    }
     #endregion
 
     #region - Attributes -
     private readonly ILogService? _log;
     private readonly INatsService _natsService;
     private readonly ConcurrentDictionary<int, EnclosureMetricsReading> _latest = new();
+    private readonly ConcurrentDictionary<int, EnclosureAlert> _alerts = new();   // 운영 이벤트 id → 경고
     private bool _started;
     #endregion
 }
