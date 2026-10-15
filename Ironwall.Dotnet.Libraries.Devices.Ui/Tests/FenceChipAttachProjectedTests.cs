@@ -124,9 +124,10 @@ public class FenceChipAttachProjectedTests
             mountedCount++;
             var anchor = System.Windows.Controls.Canvas.GetLeft(chip) - chip.HitBounds.X;   // 칩 원점 x(그림 좌표 · 깊이 0 이면 세계 x 와 같다)
             var name = $"{label} · 센서 {vm.FenceSensors()[key].Number}(사슬 {vm.FenceChain.Keys.ToList().IndexOf(key) + 1}/{vm.FenceChain.Keys.Count}) {mark.Anchor}";
-            // 브래킷 고정점(물체 면 · 깊이 0) — 칩 그림 좌표에 칩 원점을 더한 그림 좌표
+            // 브래킷 고정점(물체 면 · 깊이 0) — 칩 그림 좌표에 칩 원점을 더한 그림 좌표(아래 단으로 비켜 선 칩은 원점도 그만큼 내려가 있다)
+            var down = System.Windows.Controls.Canvas.GetTop(chip) - chip.HitBounds.Y;
             var pin = chip.Picture?.Shapes.FirstOrDefault(s => s.Ink == FenceInk.MountBracket && s.Kind == FenceShapeKind.Ellipse)?.Points[0] is { } q
-                ? new Point(q.X + anchor, q.Y)
+                ? new Point(q.X + anchor, q.Y + down)
                 : p.P(anchor, mark.Height, 0);
             Rect area;
             if (SensorMountResolver.KindOf(mark.Anchor) == SensorAnchorKind.Post)
@@ -142,11 +143,11 @@ public class FenceChipAttachProjectedTests
                 var bay = geometry.Panels[vm.FencePresetBayOf(key)!.Value];
                 area = new Rect(p.P(bay.StartM * u - 0.5, world.TopHeight, 0), p.P(bay.EndM * u + 0.5, -0.5, 0));
             }
-            // 한 기둥을 나눠 쓰는 칩은 기둥 옆에 서고 고정점 → 몸까지 팔이 있어야 한다 · 그 밖은 칩 원점(붙는 점)이 곧 물체 위
+            // 한 기둥을 나눠 쓰는 칩 · 아래 단으로 비켜 선 칩은 고정점 → 몸까지 팔이 있어야 한다 · 그 밖은 칩 원점(붙는 점)이 곧 물체 위
             var origin = p.P(anchor, mark.Height, 0);
-            if (Math.Abs(pin.X - origin.X) > 0.5)
+            if (Math.Abs(pin.X - origin.X) > 0.5 || down > 0.5)
             {
-                var local = new Point(pin.X - anchor, pin.Y);
+                var local = new Point(pin.X - anchor, pin.Y - down);
                 var arm = chip.Picture!.Shapes.Any(s => s.Ink == FenceInk.MountBracket && s.Kind == FenceShapeKind.Line && s.Points.Length == 2
                                                        && (s.Points[0] - local).Length < 0.5 && Math.Abs(s.Points[1].X - p.P(0, mark.Height, 0).X) < 0.5);
                 if (!arm) bad.Add($"{name}: 고정점 {pin.X:0.0} 과 칩 {origin.X:0.0} 사이에 팔이 없다(허공)");
@@ -202,14 +203,16 @@ public class FenceChipAttachProjectedTests
         Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
     }
 
-    [Fact, Trait("Scenario", "FLT-003")]
-    public void should_still_spread_two_chips_sharing_one_bay_point_inside_that_bay()
+    [Theory, Trait("Scenario", "FLT-003")]
+    [InlineData(6.0)]
+    [InlineData(3.0)]
+    public void should_still_spread_two_chips_sharing_one_bay_point_inside_that_bay(double span)
     {
         // 벌리기를 칸 안으로 자르되 칸에 붙은 칩끼리는 계속 나란히 선다(MNT-R28-610 과 같은 처지) — 둘 다 그 칸 그림 안 · 겹치지 않음.
-        // 칩 둘이 들어갈 만한 6 m 칸(3 m 칸은 칩 둘보다 좁아 칸 양 끝까지만 벌리고 겹친다 — 허공보다 붙음이 먼저).
+        // 6 m 칸은 칩 둘이 들어간다. 3 m 칸은 칩 둘보다 좁다 — 예전엔 칸 양 끝까지만 벌리고 겹쳤으나(실창 8회차 MNT-R28-460) 이제 아래 단으로 비켜 서서 겹치지 않는다.
         var result = OnSta(() =>
         {
-            var vm = Seed(4, 3, FenceControllerEnd.Left, false, span: 6);
+            var vm = Seed(4, 3, FenceControllerEnd.Left, false, span: span);
             var keys = vm.FenceChain.Keys;
             Assert.True(vm.Board.ApplyFenceEdit(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => p.Key == keys[1] ? l.Mounts[keys[3]] : p.Value))));
             var canvas = Canvas(vm, 1200, 520);
@@ -319,5 +322,50 @@ public class FenceChipAttachProjectedTests
             return CheckNine(vm, Canvas(vm, width, width * 0.45), $"9자리 {sensors}대 · 칸 {panels} · {end} {(flat ? "평면" : "입체")} {width}px");
         });
         Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+    }
+
+    [Theory, Trait("Scenario", "FLT-020")]
+    [InlineData(2, true, false, 1200)]
+    [InlineData(2, true, true, 640)]
+    [InlineData(3, true, false, 640)]
+    [InlineData(3, true, true, 1200)]
+    [InlineData(2, false, false, 640)]
+    [InlineData(2, false, true, 1200)]
+    [InlineData(3, false, false, 1200)]
+    [InlineData(3, false, true, 640)]
+    public void should_step_preset_chips_crowding_one_three_metre_bay_down_a_tier_on_arms_without_overlap(int crowd, bool samePoint, bool flat, double width)
+    {
+        // 실창 8회차 MNT-R28-460 — 위치 프리셋으로 선 센서 둘(셋)이 같은 3 m 칸(망 2)에 모이면 칸 안에서 다 못 벌려 칩이 겹쳤다.
+        // 여기서는 제어기 옆 3 m 철망 칸(망 1)에 모은다(제어기 상자까지 함께 본다). 이제 다 못 벌린 칩은 아래 단으로 비켜 선다: 칩끼리 안 겹침 · 붙는 점(고정점)은 그 칸 그림 안 · 내려간 칩은 고정점 → 몸 팔(Check) · 제어기 상자와 안 겹침.
+        var result = OnSta(() =>
+        {
+            var vm = Seed(6, 4, FenceControllerEnd.Left, flat);
+            var keys = vm.FenceChain.Keys;
+            var crowded = new[] { keys[1], keys[3], keys[5] }.Take(crowd).ToList();
+            Assert.True(vm.Board.ApplyFenceEdit(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p =>
+            {
+                var at = crowded.IndexOf(p.Key);
+                if (at < 0) return p.Value;
+                var spec = l.Mounts[keys[1]];                                                    // 망 1(철망 3 m · 제어기 옆) · 같은 프리셋
+                return samePoint ? spec : spec with { MountOverride = new SensorMountOverride { HeightM = 0.8 + 0.1 * at } };   // 다른 점 = 따로 고친 높이만 조금씩 다름
+            }))));
+            var canvas = Canvas(vm, width, width * 0.45);
+            var label = $"망 1 에 {crowd}대 {(samePoint ? "같은 점" : "다른 점")} {(flat ? "평면" : "입체")} {width}px";
+            var bad = Check(vm, canvas, label);
+            var bays = crowded.Select(k => vm.FencePresetBayOf(k)).Distinct().ToList();
+            if (bays.Count != 1 || bays[0] != 0) bad.Add($"{label}: 시험 전제 — 모두 망 1(칸 {string.Join(",", bays)})");
+            var poses = crowded.Select(k => vm.FencePoseOf(k)).Distinct().Count();
+            if (poses != (samePoint ? 1 : crowd)) bad.Add($"{label}: 시험 전제 — 붙는 점 {poses}개");
+            var rects = vm.FenceChain.Keys.Where(canvas.SensorChips.ContainsKey).Select(k => (k, R: new Rect(System.Windows.Controls.Canvas.GetLeft(canvas.SensorChips[k]),
+                System.Windows.Controls.Canvas.GetTop(canvas.SensorChips[k]), canvas.SensorChips[k].Width, canvas.SensorChips[k].Height))).ToList();
+            for (var i = 0; i < rects.Count; i++)
+                for (var j = i + 1; j < rects.Count; j++)
+                    if (Rect.Intersect(rects[i].R, rects[j].R) is var o && !o.IsEmpty && o.Width >= 0.5 && o.Height >= 0.5)
+                        bad.Add($"{label}: 칩 겹침 {vm.FenceSensors()[rects[i].k].Number} {rects[i].R} ⟷ {vm.FenceSensors()[rects[j].k].Number} {rects[j].R}");
+            var dropped = crowded.Count(k => System.Windows.Controls.Canvas.GetTop(canvas.SensorChips[k]) - canvas.SensorChips[k].HitBounds.Y > 0.5);
+            return (Bad: bad, Dropped: dropped);
+        });
+        Assert.True(result.Bad.Count == 0, string.Join(Environment.NewLine, result.Bad));
+        Assert.True(result.Dropped >= 1, "3 m 칸에 모인 칩 중 하나 이상은 아래 단으로 비켜 서야 한다(칸이 칩 둘보다 좁다)");
     }
 }
