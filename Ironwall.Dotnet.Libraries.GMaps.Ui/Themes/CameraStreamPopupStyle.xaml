@@ -320,7 +320,7 @@
                                         AutomationProperties.AutomationId="GMaps.CameraPopup.Video"
                                         FrameSource="{Binding FrameSource}"
                                         IsHitTestVisible="False" />
-                                    <!--  드래그-PTZ 목표 표시(끈 길이 선 + 떼면 화면 중심으로 올 점의 과녁). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
+                                    <!--  PTZ 화살표(누른 점 → 마우스, 놓는 순간 한 번 이동 — 도형은 컨트롤이 코드로 그린다). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
                                     <!--  이동 중 표시(영상 오른쪽 아래, 작게) — 끌기 · 휠 이동을 보내면 회전 아이콘 "이동 중", 카메라가 멈췄다고 알려주면(ONVIF MoveStatus)

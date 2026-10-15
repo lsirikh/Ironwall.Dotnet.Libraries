@@ -494,18 +494,52 @@ public class TilePtzInteractionTests
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-145")]
-    public void should_show_drag_amount_in_view_widths_while_dragging()
+    public void should_show_arrow_amount_in_screens_while_dragging()
         => _sta.Invoke(() =>
         {
             var rig = NewRig();
 
             DragStart(rig, 100, 90);
-            DragTo(rig, 260, 90);   // 160 px = 영상 320 의 1/2 = 한 폭
+            DragTo(rig, 260, 90);   // 160 px = 영상 320 의 1/2 = 화면 반
 
-            Assert.Equal("1폭 · 최대", rig.View.DragAmountText.Text);
-            DragTo(rig, 148, 90);   // 48 px = 160 px(가로 1/2)의 0.3
-            Assert.Equal("0.3폭", rig.View.DragAmountText.Text);
+            Assert.Equal("0.5화면", rig.View.DragAmountText.Text);
+            DragTo(rig, 196, 90);   // 96 px = 320 의 0.3
+            Assert.Equal("0.3화면", rig.View.DragAmountText.Text);
+            DragTo(rig, 100, 180);  // 아래로 90 px = 높이 180 의 1/2(세로는 높이 기준)
+            Assert.Equal("0.5화면", rig.View.DragAmountText.Text);
             DragEnd(rig);
+        });
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-146")]
+    public void should_draw_arrow_from_press_point_to_pointer_and_send_nothing_until_release()
+        => _sta.Invoke(() =>
+        {
+            var rig = NewRig();
+
+            DragStart(rig, 100, 90);
+            DragTo(rig, 260, 90);
+
+            // 형태: 몸통(시작점 → 촉 안쪽) + 끝점에 화살촉(오른쪽을 가리킴). 옛 과녁(원 + 십자)은 없다.
+            Assert.Equal(Visibility.Visible, rig.View.PtzDragOverlay.Visibility);
+            Assert.True(rig.View.PtzDragOverlay.Opacity < 1, "화살표는 반투명이어야 한다");
+            Assert.Equal((100d, 90d), (rig.View.DragShaft.X1, rig.View.DragShaft.Y1));
+            Assert.True(rig.View.DragShaft.X2 > 100 && rig.View.DragShaft.X2 < 260, $"몸통 끝 {rig.View.DragShaft.X2}");
+            Assert.Equal(90d, rig.View.DragShaft.Y2, 6);
+            Assert.Empty(rig.View.DragTarget.Children.OfType<System.Windows.Shapes.Ellipse>());
+            var rotate = Assert.IsType<RotateTransform>(rig.View.DragTarget.RenderTransform);
+            Assert.Equal(0d, rotate.Angle, 6);
+            var tip = rig.View.DragTarget.RenderTransform.Transform(new Point(rotate.CenterX, rotate.CenterY));
+            Assert.Equal(260d, Canvas.GetLeft(rig.View.DragTarget) + tip.X, 6);   // 촉 끝 = 지금 마우스 자리
+            Assert.Equal(90d, Canvas.GetTop(rig.View.DragTarget) + tip.Y, 6);
+
+            DragTo(rig, 100, 170);   // 아래로 — 촉이 돈다
+            Assert.Equal(90d, rotate.Angle, 6);
+            Assert.Empty(rig.Calls);   // 누르고 있는 동안 카메라는 움직이지 않는다
+
+            DragEnd(rig);
+            Assert.Equal(new[] { "drag:0,0.444" }, rig.Calls);   // 80/180 — 놓는 순간 한 건
+            Assert.Equal(Visibility.Collapsed, rig.View.PtzDragOverlay.Visibility);
         });
 
     [Fact]

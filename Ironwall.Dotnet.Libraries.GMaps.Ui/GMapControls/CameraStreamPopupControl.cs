@@ -14,8 +14,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 /// 맵 위 이동식 RTSP 스트리밍 팝업 CustomControl(관심지역/레이어 창 드래그 패턴 답습).
 /// DataContext = <see cref="CameraStreamPopupViewModel"/>.
 /// <para>
-/// 좌버튼: 헤더(Y≤42) 드래그=부모 Canvas 내 창 이동(VM.CanvasLeft/Top) / 영상 영역 드래그=드래그 길이만큼 PTZ 상대 이동
-/// (끄는 동안 목표 표시 → 떼는 순간 호스트로 이동 한 건) / 짧은클릭=팝업 선택. 우버튼: 컨트롤 패널(아코디언 탭) 토글.
+/// 좌버튼: 헤더(Y≤42) 드래그=부모 Canvas 내 창 이동(VM.CanvasLeft/Top) / 영상 영역 누르고 움직임=누른 점 → 마우스 화살표
+/// (누르는 동안 이동 0건 → 놓는 순간 화살표 방향 · 길이(화면 비율)로 호스트에 이동 한 건) / 짧은클릭=팝업 선택. 우버튼: 컨트롤 패널(아코디언 탭) 토글.
 /// 휠(영상 영역): PTZ 줌 인/아웃. PTZ/줌은 IsPtzCapable=false면 차단(이유는 영상 위 배지).
 /// </para>
 /// <para>
@@ -27,7 +27,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 public class CameraStreamPopupControl : Control
 {
     private const double HeaderHeight = 42;     // 헤더(창이동 드래그) 높이 — Style 헤더 Row와 일치
-    private const double PtzTargetSize = 28;    // 목표 과녁(원 + 십자) 지름
+    private const double ArrowHeadLength = 20;  // 화살촉 길이(끝 ~ 뒤)
+    private const double ArrowHeadInset = 12;   // 몸통이 끝나는 자리 = 촉 끝에서 이만큼 안쪽(촉 길이 20 · 오목 15 사이)
+    private const double ArrowOpacity = 0.8;    // 화살표 반투명(영상이 비쳐 보이게)
 
     // 좌버튼 창이동 상태
     private bool _isDragging;
@@ -39,7 +41,7 @@ public class CameraStreamPopupControl : Control
     private readonly PtzDragGesture _ptzDrag = new();
     private Line? _ptzShaftHalo, _ptzShaft;
     private Grid? _ptzTarget;
-    private Border? _ptzAmount;          // 끈 크기 글자("0.6폭" — 가로 1/2 = 화면 한 폭 = 최대)
+    private Border? _ptzAmount;          // 화살표 크기 글자("0.6화면" — 화면 끝까지 = 화면 한 폭)
     private TextBlock? _ptzAmountText;
 
     // hold 버튼(방향패드/줌/포커스): 누름=연속이동, 뗌·캡처분실=정지. 눌린 단추의 Tag 로 올바른 모터(PTZ vs Imaging) 정지 라우팅(F-01/02).
@@ -84,7 +86,9 @@ public class CameraStreamPopupControl : Control
         PreviewMouseLeftButtonUp += OnPadUp;
         IsKeyboardFocusWithinChanged += (_, e) =>
         {
-            if (e.NewValue is false && _holdKey != Key.None) FinishPress();   // 포커스가 떠나면 키 뗌을 못 받는다
+            if (e.NewValue is not false) return;
+            if (_holdKey != Key.None) FinishPress();   // 포커스가 떠나면 키 뗌을 못 받는다
+            FinishPtzDrag(commit: false);              // 화살표도 취소(이동을 보내지 않는다)
         };
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -452,32 +456,34 @@ public class CameraStreamPopupControl : Control
         base.OnPreviewKeyUp(e);
     }
 
-    /*──────────────── 드래그 목표 표시(모양: 끈 길이 선 + 과녁) ────────────────*/
+    /*──────────────── PTZ 화살표(모양: 둥근 끝 몸통 + 오목한 화살촉) ────────────────*/
 
     /// <summary>
-    /// 끈 길이(선)와 "떼면 화면 중심으로 올 점"(과녁 = 원 + 십자)을 그린다. 색이 아니라 모양으로 알린다 —
-    /// 밝은 선 아래에 어두운 선을 깔아 어떤 영상 위에서도 보인다(영상은 테마와 무관한 표면이라 흑/백 고정).
-    /// 도형은 한 번 만들고 좌표만 바꾼다(마우스 이동마다 다시 그리지 않는다).
+    /// 누른 점 → 지금 마우스 화살표를 그린다(놓는 순간 이 방향 · 길이로 한 번 돈다). 색이 아니라 모양으로 알린다 —
+    /// 밝은 선 아래에 어두운 테두리를 깔아 어떤 영상 위에서도 보이고 전체는 반투명(영상은 테마와 무관한 표면이라 흑/백 고정 — 위 배지와 같은 값).
+    /// 도형은 한 번 만들고 좌표만 바꾼다(마우스 이동마다 다시 만들지 않는다).
     /// </summary>
     private void DrawPtzTarget()
     {
         if (_ptzOverlay == null || _videoRegion == null) return;
         EnsurePtzTargetShapes();
 
+        var arrow = PtzDragGesture.Arrow(_ptzDrag.StartX, _ptzDrag.StartY, _ptzDrag.CurrentX, _ptzDrag.CurrentY, ArrowHeadInset);
         foreach (var line in new[] { _ptzShaftHalo!, _ptzShaft! })
         {
             line.X1 = _ptzDrag.StartX;
             line.Y1 = _ptzDrag.StartY;
-            line.X2 = _ptzDrag.CurrentX;
-            line.Y2 = _ptzDrag.CurrentY;
+            line.X2 = arrow.ShaftEndX;
+            line.Y2 = arrow.ShaftEndY;
             line.Visibility = Visibility.Visible;
         }
-        var (tx, ty) = PtzDragGesture.TargetPoint(_videoRegion.ActualWidth, _videoRegion.ActualHeight,
-            _ptzDrag.CurrentX - _ptzDrag.StartX, _ptzDrag.CurrentY - _ptzDrag.StartY);
-        Canvas.SetLeft(_ptzTarget!, tx - (PtzTargetSize / 2));
-        Canvas.SetTop(_ptzTarget!, ty - (PtzTargetSize / 2));
-        _ptzTarget!.Visibility = Visibility.Visible;
-        // 과녁이 화면 밖이면 가장자리에 붙는다 — 얼마나 도는지는 선 가운데 옆 글자로(영상 안에 머문다).
+        // 촉 끝(ArrowHeadLength, 반 높이)을 마우스 자리에 놓고 그 점을 중심으로 돌린다
+        var rotate = (RotateTransform)_ptzTarget!.RenderTransform;
+        rotate.Angle = arrow.AngleDeg;
+        Canvas.SetLeft(_ptzTarget, _ptzDrag.CurrentX - rotate.CenterX);
+        Canvas.SetTop(_ptzTarget, _ptzDrag.CurrentY - rotate.CenterY);
+        _ptzTarget.Visibility = Visibility.Visible;
+        // 얼마나 도는지(화면 비율)는 몸통 가운데 옆 글자로(영상 안에 머문다).
         _ptzAmountText!.Text = PtzDragGesture.AmountText(PtzDragGesture.DragMagnitude(_videoRegion.ActualWidth, _videoRegion.ActualHeight,
             _ptzDrag.CurrentX - _ptzDrag.StartX, _ptzDrag.CurrentY - _ptzDrag.StartY));
         Canvas.SetLeft(_ptzAmount!, ((_ptzDrag.StartX + _ptzDrag.CurrentX) / 2) + 8);
@@ -494,14 +500,17 @@ public class CameraStreamPopupControl : Control
             Stroke = stroke, StrokeThickness = thickness, IsHitTestVisible = false,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
         };
-        _ptzShaftHalo = MakeLine(halo, 5);
-        _ptzShaft = MakeLine(Brushes.White, 2);
-        var cross = Geometry.Parse("M14,5 V23 M5,14 H23");
-        _ptzTarget = new Grid { Width = PtzTargetSize, Height = PtzTargetSize, IsHitTestVisible = false };
-        _ptzTarget.Children.Add(new Ellipse { Stroke = halo, StrokeThickness = 5 });
-        _ptzTarget.Children.Add(new Path { Data = cross, Stroke = halo, StrokeThickness = 5 });
-        _ptzTarget.Children.Add(new Ellipse { Stroke = Brushes.White, StrokeThickness = 2 });
-        _ptzTarget.Children.Add(new Path { Data = cross, Stroke = Brushes.White, StrokeThickness = 2 });
+        _ptzOverlay.Opacity = ArrowOpacity;   // 겹친 도형이 서로 비치지 않게 묶음 전체를 반투명으로
+        _ptzShaftHalo = MakeLine(halo, 7);
+        _ptzShaft = MakeLine(Brushes.White, 3);
+        var head = Geometry.Parse("M0,0 L20,10 L0,20 L5,10 Z");   // 끝 = (20,10), 오목 = (5,10)
+        _ptzTarget = new Grid
+        {
+            Width = ArrowHeadLength, Height = ArrowHeadLength, IsHitTestVisible = false,
+            RenderTransform = new RotateTransform { CenterX = ArrowHeadLength, CenterY = ArrowHeadLength / 2 },
+        };
+        _ptzTarget.Children.Add(new Path { Data = head, Stroke = halo, StrokeThickness = 3, StrokeLineJoin = PenLineJoin.Round });
+        _ptzTarget.Children.Add(new Path { Data = head, Fill = Brushes.White });
         _ptzAmountText = new TextBlock { Foreground = Brushes.White, FontSize = 10 };
         _ptzAmount = new Border
         {

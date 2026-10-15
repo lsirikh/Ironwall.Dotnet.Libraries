@@ -410,6 +410,37 @@ public class CameraPopupPtzGestureTests
         });
 
     [Fact]
+    [Trait("Scenario", "PTZ-DRAG-147")]
+    public void should_draw_translucent_arrow_from_press_point_and_send_nothing_until_release()
+        => OnSta(() =>
+        {
+            var rig = NewRig();
+            var overlay = (Canvas)rig.Control.Template.FindName("PART_PtzOverlay", rig.Control);
+
+            DragStart(rig, 100, 100);
+            DragTo(rig, 100, 20);   // 위로
+
+            // 형태: 몸통 2겹(어두운 테두리 + 밝은 선) + 화살촉(끝 = 마우스, 위를 가리킴), 옛 과녁(원) 없음, 묶음 반투명
+            Assert.True(overlay.Opacity < 1, "화살표는 반투명이어야 한다");
+            Assert.Empty(overlay.Children.OfType<Grid>().SelectMany(g => g.Children.OfType<System.Windows.Shapes.Ellipse>()));
+            var shafts = overlay.Children.OfType<System.Windows.Shapes.Line>().ToList();
+            Assert.Equal(2, shafts.Count);
+            Assert.All(shafts, l => Assert.Equal((100d, 100d), (l.X1, l.Y1)));
+            Assert.All(shafts, l => Assert.True(l.Y2 > 20 && l.Y2 < 100, $"몸통 끝 {l.Y2}"));   // 촉 안쪽에서 끝난다
+            var head = overlay.Children.OfType<Grid>().Single();
+            var rotate = Assert.IsType<RotateTransform>(head.RenderTransform);
+            Assert.Equal(-90d, rotate.Angle, 6);
+            var tip = rotate.Transform(new Point(rotate.CenterX, rotate.CenterY));
+            Assert.Equal((100d, 20d), (Canvas.GetLeft(head) + tip.X, Canvas.GetTop(head) + tip.Y));
+            Assert.Empty(rig.Log);   // 누르고 있는 동안 카메라는 움직이지 않는다
+
+            DragEnd(rig);
+            Assert.Equal(new[] { "drag:0,-0.31" }, rig.Log);   // −80/258 — 놓는 순간 한 건
+            Assert.All(shafts, l => Assert.Equal(Visibility.Collapsed, l.Visibility));
+            Assert.Equal(Visibility.Collapsed, head.Visibility);
+        });
+
+    [Fact]
     public void should_not_start_drag_when_camera_is_not_ptz_capable()
         => OnSta(() =>
         {

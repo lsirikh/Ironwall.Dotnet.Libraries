@@ -10,8 +10,10 @@ using Xunit;
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Tests.Unit;
 
 /// <summary>
-/// 끌기 이동량 기준(사용자 결정 2026-10-15): m = (dx, dy) ÷ (영상 가로/2), 길이 1 에서 자름. m = 1 → 화면 한 폭(수평 화각 1개).
-/// 세로도 같은 각도/픽셀. 네 방식(화각 상대 · 일반 상대 · 절대 · 시간 제한 연속) · 목표 표시가 같은 말을 한다.
+/// 화살표 이동량 기준(사용자 결정 2026-10-16 — 옛 2026-10-15 "가로 1/2 = 한 폭"을 대체): 화살표 길이 ÷ 보이는 영상 크기
+/// (가로 성분 ÷ 폭, 세로 성분 ÷ 높이, 성분마다 ±1 에서 자름) = 지금 보이는 화면(시야)의 몇 배. 화면 끝까지(폭 전체) = 화면 한 폭(수평 화각 1개),
+/// 높이 전체 = 수직 화각 1개. 네 방식(화각 상대 · 일반 상대 · 절대 · 시간 제한 연속) · 표시가 같은 말을 한다.
+/// 옛 기준보다 같은 끌기의 이동량이 정확히 절반이므로 값 단언은 새 기준으로 다시 계산했다(같은 정밀도).
 /// </summary>
 public class PtzDragWidthBasisTests
 {
@@ -23,11 +25,11 @@ public class PtzDragWidthBasisTests
 
     [Theory]
     [Trait("Scenario", "PTZ-DRAG-101")]
-    [InlineData(0.5, 0, 1, 0)]          // 가로 1/2 = 1(최대)
-    [InlineData(0.25, 0, 0.5, 0)]       // 가로 1/4 = 0.5
-    [InlineData(0.9, 0, 1, 0)]          // 1/2 를 넘게 끌어도 1 에서 멈춤
-    [InlineData(0, 0.4, 0, 0.45)]       // 세로도 가로 픽셀로: 0.4×h = 0.225×w → 0.45
-    public void should_measure_drag_in_half_view_widths_and_cap_at_one(double viewX, double viewY, double mx, double my)
+    [InlineData(1, 0, 1, 0)]            // 폭 전체 = 1(한 폭)
+    [InlineData(0.5, 0, 0.5, 0)]        // 폭 1/2 = 0.5
+    [InlineData(1.4, 0, 1, 0)]          // 화면 밖까지 끌어도 1 에서 멈춤
+    [InlineData(0, 0.4, 0, 0.225)]      // 세로 0.4×h = 0.225×w(폭 단위로 바꿔 돌려준다 — 높이 전체 = 수직 화각 1개)
+    public void should_measure_arrow_in_view_widths_and_cap_at_full_screen(double viewX, double viewY, double mx, double my)
     {
         var (x, y) = PtzDragGesture.WidthVector(viewX, viewY, Wide);
 
@@ -37,19 +39,19 @@ public class PtzDragWidthBasisTests
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-102")]
-    public void should_keep_direction_when_diagonal_drag_is_capped()
+    public void should_cap_each_component_at_screen_edge_when_arrow_leaves_view()
     {
-        var (x, y) = PtzDragGesture.WidthVector(0.5, 0.5 * Wide, Wide);   // 가로 · 세로 같은 픽셀 → 45°
+        var (x, y) = PtzDragGesture.WidthVector(2, -3, Wide);   // 오른쪽 위로 화면 밖 — 성분마다 화면 하나에서 멈춘다
 
-        Assert.Equal(1d, Math.Sqrt((x * x) + (y * y)), 6);
-        Assert.Equal(x, y, 6);
+        Assert.Equal(1d, x, 6);
+        Assert.Equal(-1d / Wide, y, 6);
     }
 
     [Theory]
     [Trait("Scenario", "PTZ-DRAG-103")]
-    [InlineData(0.5, 60)]     // 가로 1/2 = 화각 하나(60°) = 화면 한 폭
-    [InlineData(0.25, 30)]    // 가로 1/4 = 반 화각
-    [InlineData(0.8, 60)]     // 1/2 초과는 자름
+    [InlineData(1, 60)]       // 폭 전체 = 화각 하나(60°) = 화면 한 폭
+    [InlineData(0.5, 30)]     // 폭 1/2 = 반 화각
+    [InlineData(1.6, 60)]     // 화면 밖은 자름
     public void should_turn_by_view_widths_when_generic_relative_space(double viewX, double expectedDeg)
     {
         var (pan, _) = PtzDragMath.GenericTranslation(viewX, 0, Wide, 0, Lens, 2, 2, -1, 1, -1, 1);
@@ -67,15 +69,15 @@ public class PtzDragWidthBasisTests
 
         double panDeg = pan / 2d * Lens.PanSpanDeg, tiltDeg = tilt / 2d * Lens.TiltSpanDeg;
         Assert.Equal(panDeg, tiltDeg, 6);
-        Assert.Equal(0.4 * 60d, panDeg, 6);
+        Assert.Equal(0.2 * 60d, panDeg, 6);
     }
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-105")]
-    public void should_split_fov_move_into_two_half_steps_when_half_width_is_dragged()
+    public void should_split_fov_move_into_two_half_steps_when_full_width_is_dragged()
     {
         // ±1 = 반 화각인 공간 — 한 폭(2)은 한 번에 못 간다 → 1 씩 두 번
-        var plan = PtzDragMath.Plan(Spaces(fov: true), PtzKnownPosition.Unknown, 0.5, 0, Wide);
+        var plan = PtzDragMath.Plan(Spaces(fov: true), PtzKnownPosition.Unknown, 1, 0, Wide);
 
         Assert.Equal(PtzDragMoveKind.RelativeFov, plan.Kind);
         Assert.Equal(2, plan.Steps);
@@ -85,30 +87,30 @@ public class PtzDragWidthBasisTests
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-106")]
-    public void should_send_quarter_width_once_as_view_edge_when_fov_space()
+    public void should_send_half_width_once_as_view_edge_when_fov_space()
     {
-        var (pan, tilt, steps) = PtzDragMath.FovSteps(0.25, 0, Wide, -1, 1, -1, 1);
+        var (pan, tilt, steps) = PtzDragMath.FovSteps(0.5, 0, Wide, -1, 1, -1, 1);
 
         Assert.Equal((1d, 0d, 1), (Math.Round(pan, 6), Math.Round(tilt, 6), steps));
     }
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-107")]
-    public void should_split_tilt_by_screen_heights_when_a_full_width_is_dragged_upwards()
+    public void should_turn_one_vertical_view_when_full_height_is_dragged_upwards()
     {
-        // 위로 한 폭 = 16:9 에서 화면 높이 1.78개 = 틸트(±1 = 반 높이) 3.56 → 1 이하 몫 4번
-        var (pan, tilt, steps) = PtzDragMath.FovSteps(0, -0.5 * Wide, Wide, -1, 1, -1, 1);
+        // 위로 높이 전체 = 수직 화각 1개 = 틸트(±1 = 반 높이) 2 → 1 씩 두 번
+        var (pan, tilt, steps) = PtzDragMath.FovSteps(0, -1, Wide, -1, 1, -1, 1);
 
         Assert.Equal(0d, pan, 6);
-        Assert.Equal(4, steps);
-        Assert.Equal(2d * Wide, tilt * steps, 6);
+        Assert.Equal(2, steps);
+        Assert.Equal(2d, tilt * steps, 6);
     }
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-108")]
-    public void should_move_absolute_target_by_one_view_width_when_half_width_is_dragged()
+    public void should_move_absolute_target_by_one_view_width_when_full_width_is_dragged()
     {
-        var plan = PtzDragMath.Plan(Spaces(rel: false), new PtzKnownPosition(0.1, 0.2, 0, true, true), 0.5, 0, Wide);
+        var plan = PtzDragMath.Plan(Spaces(rel: false), new PtzKnownPosition(0.1, 0.2, 0, true, true), 1, 0, Wide);
 
         Assert.Equal(PtzDragMoveKind.Absolute, plan.Kind);
         Assert.Equal(0.1 + (60d / 360d * 2d), plan.Pan, 6);
@@ -116,10 +118,10 @@ public class PtzDragWidthBasisTests
 
     [Theory]
     [Trait("Scenario", "PTZ-DRAG-109")]
-    [InlineData(0.25, 350)]   // 0.5 × 700 ms
-    [InlineData(0.5, 700)]    // 최대
-    [InlineData(0.9, 700)]    // 자름
-    public void should_scale_timed_continuous_by_half_width_and_use_given_speed(double viewX, int expectedMs)
+    [InlineData(0.5, 350)]    // 0.5 × 700 ms
+    [InlineData(1, 700)]      // 최대(폭 전체)
+    [InlineData(1.8, 700)]    // 자름
+    public void should_scale_timed_continuous_by_view_width_and_use_given_speed(double viewX, int expectedMs)
     {
         var plan = PtzDragMath.ContinuousPulse(viewX, 0, Wide, speed: 0.8);
 
@@ -127,12 +129,18 @@ public class PtzDragWidthBasisTests
         Assert.Equal(0.8, plan.Pan, 6);   // 속도 = 설정 속도(크기와 무관)
     }
 
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-109b")]
+    public void should_not_pulse_longer_than_one_width_when_arrow_is_diagonal_to_corner()
+        => Assert.Equal(PtzDragMath.PulseMaxMs, PtzDragMath.ContinuousPulse(1, 1, Wide).PulseMs);
+
     [Theory]
     [Trait("Scenario", "PTZ-DRAG-110")]
-    [InlineData(50, 0, 300, 150)]     // 가로 1/8 → 중심 + 1/4 폭
-    [InlineData(100, 0, 400, 150)]    // 가로 1/4 → 오른쪽 가장자리(반 화각)
-    [InlineData(200, 0, 400, 150)]    // 가로 1/2 = 한 폭 → 화면 밖 → 그 방향 가장자리
-    [InlineData(0, -100, 200, 0)]     // 위로 100 px → 중심에서 200 px 위 → 위 가장자리
+    [InlineData(50, 0, 250, 150)]     // 떼면 중심으로 올 점 = 중심 + 화살표
+    [InlineData(200, 0, 400, 150)]    // 폭 1/2 → 오른쪽 가장자리(반 화각)
+    [InlineData(400, 0, 400, 150)]    // 폭 전체 = 한 폭 → 화면 밖 → 그 방향 가장자리
+    [InlineData(0, -100, 200, 50)]    // 위로 100 px → 중심에서 100 px 위
+    [InlineData(0, -200, 200, 0)]     // 위로 200 px → 위 가장자리
     public void should_place_target_where_the_new_center_will_be(double dx, double dy, double x, double y)
     {
         var (tx, ty) = PtzDragGesture.TargetPoint(400, 300, dx, dy);
@@ -143,11 +151,52 @@ public class PtzDragWidthBasisTests
 
     [Theory]
     [Trait("Scenario", "PTZ-DRAG-111")]
-    [InlineData(100, "0.5폭")]
-    [InlineData(200, "1폭 · 최대")]
-    [InlineData(500, "1폭 · 최대")]
-    public void should_tell_drag_amount_in_view_widths(double dx, string expected)
-        => Assert.Equal(expected, PtzDragGesture.AmountText(PtzDragGesture.DragMagnitude(400, 300, dx, 0)));
+    [InlineData(200, 0, "0.5화면")]
+    [InlineData(400, 0, "1.0화면")]
+    [InlineData(900, 0, "1.0화면")]     // 화면 밖은 화면 하나에서 멈춤
+    [InlineData(0, 150, "0.5화면")]     // 세로는 높이 기준
+    public void should_tell_arrow_amount_in_screens(double dx, double dy, string expected)
+        => Assert.Equal(expected, PtzDragGesture.AmountText(PtzDragGesture.DragMagnitude(400, 300, dx, dy)));
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-113")]
+    public void should_turn_exactly_one_screen_width_in_every_kind_when_arrow_spans_the_full_view()
+    {
+        var fov = PtzDragMath.Plan(Spaces(fov: true), PtzKnownPosition.Unknown, 1, 0, Wide);
+        var (generic, _) = PtzDragMath.GenericTranslation(1, 0, Wide, 0, Lens, 2, 2, -1, 1, -1, 1);
+        var abs = PtzDragMath.Plan(Spaces(rel: false), new PtzKnownPosition(0, 0, 0, true, true), 1, 0, Wide);
+
+        Assert.Equal(2d, fov.Pan * fov.Steps, 6);                  // 화각 상대: 2 = 화각 1개
+        Assert.Equal(Lens.WideHorizontalFovDeg, generic / 2d * Lens.PanSpanDeg, 6);
+        Assert.Equal(Lens.WideHorizontalFovDeg, abs.Pan / 2d * Lens.PanSpanDeg, 6);
+    }
+
+    [Theory]
+    [Trait("Scenario", "PTZ-DRAG-114")]
+    [InlineData(100, 90, 260, 90, 0)]       // 오른쪽
+    [InlineData(100, 90, 100, 170, 90)]     // 아래(화면 좌표 y 아래 +)
+    [InlineData(200, 90, 100, 90, 180)]     // 왼쪽
+    [InlineData(100, 90, 140, 50, -45)]     // 오른쪽 위
+    public void should_point_arrow_head_from_start_to_pointer(double sx, double sy, double ex, double ey, double angle)
+    {
+        var arrow = PtzDragGesture.Arrow(sx, sy, ex, ey, headLength: 12);
+
+        Assert.Equal(angle, arrow.AngleDeg, 6);
+        double len = Math.Sqrt(((ex - sx) * (ex - sx)) + ((ey - sy) * (ey - sy)));
+        // 몸통은 화살촉 안에서 끝난다(둥근 끝이 촉 끝을 뚫고 나오지 않게) — 끝점에서 촉 길이만큼 물러난 자리, 방향은 같다
+        Assert.Equal(ex - ((ex - sx) / len * 12), arrow.ShaftEndX, 6);
+        Assert.Equal(ey - ((ey - sy) / len * 12), arrow.ShaftEndY, 6);
+    }
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-115")]
+    public void should_not_draw_shaft_backwards_when_arrow_is_shorter_than_its_head()
+    {
+        var arrow = PtzDragGesture.Arrow(100, 90, 105, 90, headLength: 12);
+
+        Assert.Equal((100d, 90d), (arrow.ShaftEndX, arrow.ShaftEndY));   // 몸통 없음(시작점에서 멈춤) — 촉만
+        Assert.Equal(0d, arrow.AngleDeg, 6);
+    }
 
     [Theory]
     [Trait("Scenario", "PTZ-DRAG-112")]
@@ -254,13 +303,14 @@ public class PtzDragWidthProviderTests
 
     [Fact]
     [Trait("Scenario", "PTZ-DRAG-130")]
-    public async Task should_reach_one_full_view_width_in_two_fov_moves_when_half_width_is_dragged()
+    public async Task should_reach_one_full_view_width_in_two_fov_moves_when_full_width_is_dragged()
     {
         // 화각 상대 공간 ±1(= 반 화각)만 받는 카메라, 위치를 알려준다(MoveStatus IDLE)
         await using var camera = new FakeOnvifCamera { HasRelativeFov = true, HasRelativeGeneric = false, Status = (0, 0, 0) };
         var ptz = await PrepareAsync(camera, "fov-split");
 
-        var outcome = await ptz.DragMoveAsync("fov-split", 0.5, 0, 16d / 9d, Within(5000));
+        // 2026-10-16 사용자 결정: 화살표가 화면 끝까지(폭 전체) = 화면 한 폭(옛 기준은 폭 1/2)
+        var outcome = await ptz.DragMoveAsync("fov-split", 1, 0, 16d / 9d, Within(5000));
         Assert.True(await StateRecorder.WaitUntilAsync(() => camera.Count("RelativeMove") >= 2, TimeSpan.FromSeconds(5)), "두 번째 몫이 안 나갔다");
         await Task.Delay(300);
 
@@ -278,7 +328,7 @@ public class PtzDragWidthProviderTests
         await using var camera = new FakeOnvifCamera { HasRelativeFov = true, HasRelativeGeneric = false };   // MoveStatus 없음 → 몫 사이 어림 대기
         var ptz = await PrepareAsync(camera, "fov-stop");
 
-        await ptz.DragMoveAsync("fov-stop", -0.5, 0, 16d / 9d, Within(5000));
+        await ptz.DragMoveAsync("fov-stop", -1, 0, 16d / 9d, Within(5000));   // 한 폭 = 두 몫(2026-10-16 기준)
         await ptz.StopAsync("fov-stop", Within(5000));
         await Task.Delay(PtzMotionPolicy.StepEstimate + TimeSpan.FromMilliseconds(600));
 
