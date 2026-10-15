@@ -68,7 +68,7 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
         // 파일은 처음 쓸 때 읽는다 — 장비 창을 열기만 해도 디스크를 건드리지는 않는다.
         _store = new Lazy<DevicePresetStore>(() =>
         {
-            var store = new DevicePresetStore(DevicePresetStore.DefaultPath);
+            var store = new DevicePresetStore(DevicePresetStore.DefaultPath) { SerialPortSeeds = _policy.AttachesComponentsAnywhere };
             store.Load();
             if (!string.IsNullOrEmpty(store.StateMessage)) _log?.Warning($"[Assembly] {store.StateMessage}");
             return store;

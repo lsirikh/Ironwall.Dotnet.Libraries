@@ -824,6 +824,37 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
+								<!--  서버 8.0.8 — 센서가 붙은 제어기 포트(connection.port_key). 그 전 서버는 고를 포트가 없어 글자만('—')  -->
+								<DataGridTemplateColumn Width="110" MinWidth="110" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="제어기 포트">
+									<DataGridTemplateColumn.CellTemplate>
+										<DataTemplate>
+											<Grid>
+												<ComboBox
+													AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Wiring.Cell.Port.{0}}"
+													FontSize="12.5"
+													ItemsSource="{Binding DataContext.ControllerPortKeys, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+													SelectedItem="{Binding PortKey, Mode=TwoWay}"
+													Visibility="{Binding DataContext.HasControllerPorts, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVisibility}}" />
+												<TextBlock
+													VerticalAlignment="Center"
+													FontSize="12"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="{Binding PortText}">
+													<TextBlock.Style>
+														<Style TargetType="TextBlock">
+															<Setter Property="Visibility" Value="Collapsed" />
+															<Style.Triggers>
+																<DataTrigger Binding="{Binding DataContext.HasControllerPorts, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False">
+																	<Setter Property="Visibility" Value="Visible" />
+																</DataTrigger>
+															</Style.Triggers>
+														</Style>
+													</TextBlock.Style>
+												</TextBlock>
+											</Grid>
+										</DataTemplate>
+									</DataGridTemplateColumn.CellTemplate>
+								</DataGridTemplateColumn>
 								<DataGridTemplateColumn Width="96" MinWidth="96" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="주소">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>

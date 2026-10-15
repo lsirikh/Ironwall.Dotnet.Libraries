@@ -212,6 +212,24 @@
 								</TextBlock.Style>
 							</TextBlock>
 						</Grid>
+						<!--  서버 8.0.8 — 부품은 어느 장비에나 단다 · 기본은 이 카테고리 즐겨찾기(applies_to)  -->
+						<StackPanel
+							Margin="0,0,0,8"
+							Orientation="Horizontal"
+							Visibility="{Binding CanShowAllComponents, Converter={StaticResource BoolToVisibility}}">
+							<RadioButton
+								AutomationProperties.AutomationId="Devices.Assembly.PaletteFavorites"
+								Content="즐겨찾기"
+								GroupName="AssemblyPaletteScope"
+								IsChecked="{Binding ShowFavoriteComponents, Mode=TwoWay}"
+								Style="{StaticResource Console.Chip}" />
+							<RadioButton
+								AutomationProperties.AutomationId="Devices.Assembly.PaletteAll"
+								Content="전체"
+								GroupName="AssemblyPaletteScope"
+								IsChecked="{Binding ShowAllComponents, Mode=TwoWay}"
+								Style="{StaticResource Console.Chip}" />
+						</StackPanel>
 					</StackPanel>
 					<Grid>
 						<TextBlock

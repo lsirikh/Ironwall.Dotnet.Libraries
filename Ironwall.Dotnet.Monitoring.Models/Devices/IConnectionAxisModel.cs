@@ -25,4 +25,7 @@ public interface IConnectionAxisModel
 
     /// <summary>링크 묶음(<c>connection.urls</c>) — 키는 카테고리마다 다르므로 이름→주소 사전으로 받는다.</summary>
     IDictionary<string, string?> Urls { get; }
+
+    /// <summary>센서가 결선된 제어기 쪽 포트 부품의 key(<c>connection.port_key</c> — 서버 8.0.8 이상). 기본 구현은 없음.</summary>
+    string? PortKey => null;
 }

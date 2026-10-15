@@ -30,6 +30,9 @@ public enum WiringStep
 public sealed record WiringControllerInfo(int Id, int Number, string Name, string Address, string? TypeController = null)
 {
     public string Subject => string.IsNullOrWhiteSpace(Address) ? Name : $"{Name} · {Address}";
+
+    /// <summary>센서를 붙일 수 있는 제어기 포트(부품 key) — 서버 8.0.8 이상에서만 채운다. 비면 표의 '제어기 포트' 칸은 '—'.</summary>
+    public IReadOnlyList<string> PortKeys { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>서버에서 받은 센서 한 대 — 창은 모델 타입을 모른다(헤드리스 테스트).</summary>
@@ -138,6 +141,12 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     #region - Head -
     public WiringControllerInfo Controller { get; }
     public IReadOnlyList<string> SensorTypes { get; }
+
+    /// <summary>표의 '제어기 포트' 칸이 고르는 목록(서버 8.0.8 이상만 · 제어기 부품 key).</summary>
+    public IReadOnlyList<string> ControllerPortKeys => Controller.PortKeys;
+
+    /// <summary>고를 포트가 있는가 — 없으면(그 전 서버 · 부품 없는 제어기) 칸은 글자만 보인다.</summary>
+    public bool HasControllerPorts => Controller.PortKeys.Count > 0;
 
     /// <summary>고를 수 있는 그룹(W2).</summary>
     public IReadOnlyList<WiringGroupInfo> AvailableGroups { get; }

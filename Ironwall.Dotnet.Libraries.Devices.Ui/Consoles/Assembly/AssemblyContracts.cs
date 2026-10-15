@@ -56,6 +56,15 @@ public sealed record ComponentTypeInfo
 
     public bool AppliesToCategory(EnumDeviceCategory category) => AppliesTo is null || AppliesTo.Contains(category);
 
+    /// <summary>
+    /// 서버 8.0.8 이상 — 활성 유형이면 어느 장비에나 단다. 이때 <see cref="AppliesTo"/> 는 허용 목록이 아니라
+    /// 카테고리별 <b>즐겨찾기</b>다(그 전 서버는 <c>false</c> — 종전대로 <see cref="AppliesTo"/> 밖이면 422).
+    /// </summary>
+    public bool AttachesAnywhere { get; init; }
+
+    /// <summary>그 카테고리 장비에 달 수 있는가 — 막는 자리(보드 · 등록 검증)는 이것을 본다. 팔레트 즐겨찾기는 <see cref="AppliesToCategory"/>.</summary>
+    public bool CanAttachTo(EnumDeviceCategory category) => AttachesAnywhere || AppliesToCategory(category);
+
     /// <summary>팔레트 · 말풍선에 보일 글.</summary>
     public string Display => string.Equals(Code, Label, StringComparison.Ordinal) ? Label : $"{Label} ({Code})";
 }
@@ -76,6 +85,17 @@ public interface IComponentCatalog
 
     /// <summary>그 카테고리에 달 수 있는 유형들(팔레트). 폐기된 유형은 기본으로 뺀다.</summary>
     IReadOnlyList<ComponentTypeInfo> ComponentTypes(EnumDeviceCategory category, bool includeDeprecated = false);
+
+    /// <summary>
+    /// 카테고리를 가리지 않은 전체 유형(팔레트 '전체' — 서버 8.0.8). 기본 구현은 카테고리별 목록을 합친다
+    /// (가짜 구현이 깨지지 않게 · <c>CatalogService</c> 는 <c>applies_to: []</c> 인 유형까지 낸다).
+    /// </summary>
+    IReadOnlyList<ComponentTypeInfo> AllComponentTypes(bool includeDeprecated = false)
+        => Enum.GetValues<EnumDeviceCategory>()
+               .Where(c => c != EnumDeviceCategory.None)
+               .SelectMany(c => ComponentTypes(c, includeDeprecated))
+               .DistinctBy(t => t.Code)
+               .ToList();
 
     /// <summary>코드로 찾는다(대소문자 무시 · 폐기된 것도 찾는다). 없으면 null — 카탈로그에서 사라진 유형이다.</summary>
     ComponentTypeInfo? Find(string? code);

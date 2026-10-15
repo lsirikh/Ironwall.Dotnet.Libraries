@@ -14,6 +14,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 public sealed record SensorFacts(int Number, string Name, string TypeText, string Zone)
 {
     public static readonly SensorFacts Empty = new(0, string.Empty, string.Empty, string.Empty);
+
+    /// <summary>
+    /// 결선된 제어기 쪽 포트 부품 key(<c>connection.port_key</c> — 서버 8.0.8 이상). 없으면 <c>null</c>.
+    /// 값 비교에 들어가 바꾸면 "바뀐 줄"이 된다.
+    /// </summary>
+    public string? PortKey { get; init; }
 }
 
 /// <summary>
