@@ -27,7 +27,13 @@
 - Wiring · Fence · RealInput · RealWindow · Mount · Preset 필터 1400/1400 통과. 콘솔 시간 초과 4건은 단독 재실행 통과(STA 흔들림, 무관).
 
 ## 검증 기록(이번 작업)
-- (아래 갱신)
+- Devices.Ui `--filter "FullyQualifiedName~FenceChip|FullyQualifiedName~Wiring|FullyQualifiedName~Fence"`: 1176/1176 통과(FLT-003 3 m · FLT-020 8건 포함).
+- Devices.Ui csproj 전체 실행은 10분을 넘겨 백그라운드로 돌다가 세션이 끝나며 멈췄다(결과 없음).
+- 하네스 sln 시험 1회차: 시간 초과. 이번 변경은 sln 밖 Devices.Ui 뿐이라 sln 시험 결과에 영향을 줄 수 없다 —
+  그때 제가 띄운 Devices.Ui 전체 시험(WPF STA 수천 건)이 같이 돌며 PC 를 나눠 쓴 탓으로 판단. 이후로는 sln 시험과 겹치게 다른 시험을 띄우지 않는다.
+
+- sln 시험 단독 재실행(`dotnet test Ironwall.Dotnet.Libraries.sln --blame-hang-timeout 5m`): exit 0 · 10개 시험 프로젝트 2807건 통과 · 0건 실패(기준선 2799 이상).
+  → 1회차 시간 초과는 시험을 겹쳐 돌린 환경 탓으로 확인.
 
 ## 남은 일
-- 이번 worktree 에서 시험 재확인.
+- 없음. (Devices.Ui csproj 전체 4458건은 이번 세션에서 끝까지 못 돌림 — 관련 필터 1176건 통과, 이전 작업에서 전체 실행 시 무관한 콘솔 시간 초과 4건만 있었다.)
