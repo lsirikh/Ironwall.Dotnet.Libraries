@@ -176,12 +176,18 @@ public static class UnitMapText
     /// <summary>전역 구독이 꺼졌을 때 모든 배치 문구 끝에 붙는 꼬리표(ISSUE-32).</summary>
     public const string LiveOffSuffix = " · 실시간 반영 꺼짐";
 
+    /// <summary>
+    /// 공유 배치 · 빈 문서 · 편집 가능 — 알릴 상태가 없는 평상시 문구. 캔버스는 이 문구일 때 알약을 접는다
+    /// (공유된다는 설명은 관계도 "?" 말풍선이 맡는다 — 화면엔 상태 · 행동 알림만).
+    /// </summary>
+    public const string LayoutStatusQuiet = "배치: 모든 운영자 공유 · 아직 아무도 옮기지 않았습니다";
+
     private static string SharedStatus(bool canEdit, string? updatedBy, DateTime? updatedAtLocal, bool updatedByMe)
     {
         string head;
         if (string.IsNullOrWhiteSpace(updatedBy) && !updatedByMe)
         {
-            head = "배치: 모든 운영자 공유 · 아직 아무도 옮기지 않았습니다";
+            head = LayoutStatusQuiet;
         }
         else
         {

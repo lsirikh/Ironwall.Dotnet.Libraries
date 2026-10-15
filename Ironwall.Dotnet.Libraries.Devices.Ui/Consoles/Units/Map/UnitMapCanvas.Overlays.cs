@@ -337,7 +337,9 @@ public partial class UnitMapCanvas
         if (_confirm is null) return;
 
         _statusText.Text = LayoutStatusText ?? string.Empty;
-        _statusNote.Visibility = string.IsNullOrWhiteSpace(LayoutStatusText) ? Visibility.Collapsed : Visibility.Visible;
+        // 평상시 문구(공유 · 아직 아무도 안 옮김 · 편집 가능)는 알릴 상태가 아니라 설명이다 — 접는다(뜻은 관계도 "?" 말풍선).
+        _statusNote.Visibility = string.IsNullOrWhiteSpace(LayoutStatusText) || LayoutStatusText == UnitMapText.LayoutStatusQuiet
+            ? Visibility.Collapsed : Visibility.Visible;
         _retry.Visibility = CanRetryLayout ? Visibility.Visible : Visibility.Collapsed;
 
         _moveModeText.Text = MoveModeText ?? string.Empty;

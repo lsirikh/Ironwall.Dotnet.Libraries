@@ -57,6 +57,9 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     /// <summary>첫 배율 — 개인 뷰 · 내 부대 중심이 없을 때(FR-15 — 뷰모델이 곧 맞춘다).</summary>
     public const double INITIAL_SCALE = 0.5;
 
+    /// <summary>전체 보기의 배율 상한 — 노드가 적어도 카드(L2)를 제 크기 이상으로 키우지 않는다.</summary>
+    public const double FIT_MAX_SCALE = 1.0;
+
     /// <summary>L1 짧은 이름 여백 — 폭 = 칸 × 배율 − 8(FR-20).</summary>
     public const double LABEL_MARGIN = 8.0;
 
@@ -234,6 +237,17 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         Remember(() => CenterOn(unitId, scale));
     }
 
+    public void CenterOnUnlessSmall(int unitId, double scale)
+    {
+        if (DeferUntilSized(() => CenterOnUnlessSmall(unitId, scale))) return;
+        // 카드 배율(L2)로 전체가 들어가면 전체 보기 — 부대 몇 개를 기호(L1)로 작게 여는 대신 카드로 보인다.
+        var fits = GraphViewport.TryFit(Scene.WorldBounds, ViewportSize, OverlayInsets(), out var fitted, GraphViewport.FitPadding,
+                                        NodeBoxAround(UnitMapLevel.L2))
+                   && fitted.Scale >= UnitMapLod.EnterL2;
+        if (fits) Fit();
+        else CenterOn(unitId, scale);
+    }
+
     public void SetView(double scale, Point centerWorld)
     {
         if (DeferUntilSized(() => SetView(scale, centerWorld))) return;
@@ -265,7 +279,12 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         // 떠 있는 오버레이(위: 배치 문구 · M 표시 / 아래: HUD · 되돌리기 막대)의 띠는 비워 둔다 — 노드가 그 밑에 깔리지 않게.
         var level = UnitMapLod.ForScale(first.Scale);
         var box = NodeBoxAround(level);
-        ApplyView(GraphViewport.TryFit(bounds, size, insets, out var fitted, GraphViewport.FitPadding, box) ? fitted : first);
+        var view = GraphViewport.TryFit(bounds, size, insets, out var fitted, GraphViewport.FitPadding, box) ? fitted : first;
+        // 노드가 적으면 맞춘 배율이 상한(1.6)까지 치솟는다 — 카드가 제 크기(1.0)인 데서 멈추고 가운데에 둔다(과대 확대 금지).
+        if (view.Scale > FIT_MAX_SCALE)
+            view = ClearOfOverlays(new GraphViewport(FIT_MAX_SCALE, view.Offset).CenterOn(
+                new Point((bounds.Left + bounds.Right) / 2, (bounds.Top + bounds.Bottom) / 2), size));
+        ApplyView(view);
         Remember(Fit);
     }
 
