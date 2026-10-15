@@ -14,7 +14,9 @@
       남은 2걸음에 `bay=1 style=ChainLinkRazor points=[… Razor:철조망 위 · 25% … (허용)]` → 가장 가까운 점 = 상단 레일(망 칩 위 1/12 는 코일 아래 · 레일 곁)
 - [x] 제품은 맞다: 윤형 칸에 닿은 뒤 Tab → '철조망 위 · 25%' · 그려진 코일(razor.mid) 위에 마우스만으로 놓기 → '망 2 · 철조망 · 가운데'
       포커스: 누르기 전 [프리셋으로] 단추 → 누를 때 칩으로 옮겨져(OnPointerPressed → chip.Focus) Tab 은 캔버스가 받는다(처리 True)
-- [ ] Devices.Ui csproj 전체 · 솔루션 dotnet test
+- [x] Devices.Ui csproj 전체 — 실패 5건(WiringSignalThread · StaCleanup · ConsoleWindowChromeShown ×2 · AssemblyLayoutScenario ASM303 RepeatExpandView)은 모두 STA 시간 초과 · 다크 픽셀 0(부하)
+      → 그 5건 + Round8 를 따로 돌리니 20/20 통과 = STA 흔들림(이 변경과 무관). 전체 실행은 10분 넘어 세션 끝에 끊겨 최종 합계 없음.
+- [ ] 솔루션 dotnet test — 이 세션에서 명령이 자동 거부됨(하네스가 턴 뒤에 돌린다)
 
 ## 결정
 - 제품 코드는 바꾸지 않는다 — 후보 · 허용 · Tab 라우팅 모두 정상(증거: 위 기록). 칩 배치 코드(FLT-020) 무관.
