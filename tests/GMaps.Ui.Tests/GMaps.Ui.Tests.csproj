@@ -87,6 +87,10 @@
     <!-- 이벤트 시 지도 이동 설정 모델 · 보간/판정 순수 함수(event-map-flyto PRD) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\MapEventFlyToModel.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\MapFlyToMath.cs" />
+    <!-- 지도 3D 바꿔 끼우기(map-3d POC) — 게이트 · 방위 · 줌 · 주소 · 메시지 순수 함수, HTTP 응답 해석(가짜 처리기), 설정 모델 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DMath.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DClient.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\Map3DModel.cs" />
   </ItemGroup>
 
   <ItemGroup>

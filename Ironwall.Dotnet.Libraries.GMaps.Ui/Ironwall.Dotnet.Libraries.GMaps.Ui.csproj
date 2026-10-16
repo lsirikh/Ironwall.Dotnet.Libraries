@@ -18,6 +18,8 @@
 	<PackageReference Include="MaterialDesignColors" Version="5.2.1" />
 	<PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
 	<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+	<!-- 지도 3D 화면(map-3d POC) — Reports.Ui 와 같은 판 -->
+	<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
 	<PackageReference Include="System.Drawing.Common" Version="9.0.7" />
 	<!-- Test packages -->
 	<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />

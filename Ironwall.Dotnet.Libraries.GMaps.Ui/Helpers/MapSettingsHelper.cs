@@ -143,6 +143,32 @@ public static class MapSettingsHelper
     }
 
     /// <summary>
+    /// appsettings(AppSettings.Map3D)에서 <b>동기</b> 로드 — 3D 게이트 켜기 · map-3d 서버 주소. 키 없거나 실패면 기본값(켜짐 · 127.0.0.1:8765).
+    /// </summary>
+    public static Map3DModel LoadMap3D(ILogService? log = default)
+    {
+        var model = new Map3DModel();
+        try
+        {
+            var fp = AppSettingsLocation.AppSettingsReadPath;
+            var t = File.Exists(fp) ? JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Map3D"] : null;
+            if (t != null)
+            {
+                model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
+                model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
+            }
+            if (model.Normalize()) log?.Warning($"[Map3D] ServerUrl 이 올바르지 않아 고쳐 씀 → {model.ServerUrl}");
+            log?.Info($"[Map3D] 로드(appsettings.Map3D): {model}");
+        }
+        catch (Exception ex)
+        {
+            log?.Warning($"[Map3D] 로드 실패, 기본값 사용: {ex.Message}");
+            model = new Map3DModel();
+        }
+        return model;
+    }
+
+    /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>
     public static async Task SaveMapTypeAsync(string mapType, ILogService? log = default)

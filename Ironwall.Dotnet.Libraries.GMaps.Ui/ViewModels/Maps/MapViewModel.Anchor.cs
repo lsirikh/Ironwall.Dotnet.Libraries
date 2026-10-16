@@ -204,6 +204,7 @@ public partial class MapViewModel
     private void EnterAnchorDrawMode()
     {
         if (MainMap == null) return;
+        _isMap3DDrawMode = false;   // 3D 영역 그리기(MapViewModel.Map3D)는 이 뒤에 다시 켠다
         if (!_anchorDrawSubscribed)
         {
             MainMap.AnchorAreaDrawn += OnAnchorAreaDrawn;
@@ -219,6 +220,7 @@ public partial class MapViewModel
     /// <summary>영역 그리기 모드 종료(취소/완료 공통).</summary>
     private void ExitAnchorDrawMode()
     {
+        _isMap3DDrawMode = false;
         if (MainMap != null)
         {
             MainMap.IsAnchorDrawMode = false;
@@ -236,6 +238,7 @@ public partial class MapViewModel
     /// <summary>드래그한 사각형(NW/SE 지리좌표)을 앵커 구역 입력으로 채운다(단발). 최소줌=현재줌.</summary>
     private void OnAnchorAreaDrawn(PointLatLng nw, PointLatLng se)
     {
+        if (TryTakeMap3DArea(nw, se)) return;   // 3D 영역 그리기였으면 굽기로(MapViewModel.Map3D)
         ExitAnchorDrawMode();
         AnchorNwLat = nw.Lat;
         AnchorNwLng = nw.Lng;
