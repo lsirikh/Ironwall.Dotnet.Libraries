@@ -406,6 +406,18 @@ public partial class MapViewModel
     /// 3D pick → 지도 마커 클릭 경로. 편집 모드에서는 3D 가 열리지 않으므로 운영 모드 동작만 한다.
     /// 화면 좌표(3D 화면 DIP)는 지도 컨트롤 좌표로 바꿔 우클릭 메뉴 · 조립 카드에 쓴다.
     /// </summary>
+    /// <summary>
+    /// 3D 위에서는 지도 칸 안 창(상세 창 · 카메라 상자 · 조립 카드)이 WebView2(네이티브 창) 뒤에 가려진다 — 그런 창을 열기 전에
+    /// 같은 위치 · 줌 · 방위로 2D 에 돌아온다. 창을 보는 동안 곧바로 다시 3D 로 들어가지 않게, 줌을 17 아래로 한 번 내릴 때까지 보류한다.
+    /// (WebView2CompositionControl 은 net8.0-windows7.0 대상에 Windows SDK 투영이 없어 로드 순간 앱을 죽였다 — 2026-10-17 실기, 되돌림)
+    /// </summary>
+    private void LeaveMap3DForPanel(string cause)
+    {
+        if (_map3DState != Map3DState.Shown) return;
+        _map3DEntrySuppressed = true;
+        Leave3D(_map3DLastCamera, cause);
+    }
+
     private void OnMap3DPick(Map3DPick pick)
     {
         if (MainMap == null || _map3DState != Map3DState.Shown) return;
@@ -431,6 +443,8 @@ public partial class MapViewModel
                 // 지도 위 누름 · 뗌이 없으므로 같은 자리로 바로 끝낸다(OnMapMarkerClicked 와 같은 조건)
                 if (_componentCard != null && !IsEditModeEnabled && !editable.IsLocked)
                 {
+                    if (Services.ComponentCardService.CanShow(editable)) LeaveMap3DForPanel("component-card");   // 카드는 2D 심볼 위 어도너
+
                     _componentCard.OnMarkerPressed(editable, at ?? default);
                     _componentCard.OnReleased(at ?? default);
                 }

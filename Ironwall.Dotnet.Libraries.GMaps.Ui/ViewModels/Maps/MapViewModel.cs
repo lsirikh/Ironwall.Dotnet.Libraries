@@ -1698,6 +1698,7 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            LeaveMap3DForPanel("camera-popup");   // 3D(네이티브 창) 뒤에 가려지지 않게 — MapViewModel.Map3D.cs
             // 제공자(T-02 · FR-17/18): ONVIF(카메라 IP 필요, 실패 시 저장 주소 폴백) / RTSP 주소(저장 주소 필수).
             // 영상 주소 조회 · 디코딩 · PTZ 는 전부 팝업 호스트 프로세스가 한다 — GIS 는 명령만 보낸다(§0).
             // 설정 창구가 없으면(미등록) 옛 기본 = RTSP 주소.
@@ -2690,6 +2691,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (MainMap == null) return;
+            LeaveMap3DForPanel("camera-stream");   // 3D(네이티브 창) 뒤에 가려지지 않게 — MapViewModel.Map3D.cs
 
             // 중복 더블클릭 → 기존 팝업 포커스(맨 앞으로)
             var existing = CameraPopups.FirstOrDefault(p => p.CameraId == cameraId);
@@ -6256,6 +6258,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (marker == null) return;
+            LeaveMap3DForPanel("symbol-detail");   // 3D(네이티브 창) 뒤에 가려지지 않게 — MapViewModel.Map3D.cs
             if (_symbolDetailVm == null)
             {
                 _symbolDetailVm = new SymbolDetailViewModel(ResolveUnitDirectory(), _eventAggregator);   // 소속 부대 줄(FR-46) — MapViewModel.Locate.cs
