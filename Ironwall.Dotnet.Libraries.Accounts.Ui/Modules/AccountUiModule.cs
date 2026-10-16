@@ -34,12 +34,14 @@ public class AccountUiModule : Module
     /// <param name="count">IService Order 시작값(기존 AccountDb Order=10 유지).</param>
     /// <param name="useDbAuth">AuthMode.Direct(=true): DbAccountGateway 등록. GOP-00에서 false로 전환.</param>
     /// <param name="apiSetup">GOP 서버 설정(useDbAuth=false 시 필수). AccountApiModule 에 주입.</param>
+    /// <param name="isSsoEnabled">SSO 연동(appsettings <c>IsSsoEnabled</c>). 거짓이면 SsoModule 을 등록하지 않는다 — 아이디 · 비밀번호 로그인만.</param>
     public AccountUiModule(IAccountSetupModel accountSetup,
                            IMariaDbSetupModel? dbSetup = default,
                            ILogService? log = default,
                            int count = default,
                            bool useDbAuth = true,
-                           IApiSetupModel? apiSetup = default)
+                           IApiSetupModel? apiSetup = default,
+                           bool isSsoEnabled = true)
     {
         _accountSetup = accountSetup;
         _dbSetup = dbSetup;
@@ -47,6 +49,7 @@ public class AccountUiModule : Module
         _count = count;
         _useDbAuth = useDbAuth;
         _apiSetup = apiSetup;
+        _isSsoEnabled = isSsoEnabled;
     }
     #endregion
 
@@ -100,8 +103,11 @@ public class AccountUiModule : Module
                 //   훅(401 재교환)은 SSO 로그인이 성공했을 때만 켜진다. 비밀번호 세션은 예전 그대로다.
                 //   UI 자동화 시험은 IRONWALL_UITEST_NO_SSO=1 로 끈다 — 빌드마다 바뀌는 실행파일이라 에이전트가 매번 사람에게
                 //   '로그인을 넘길까요?' 를 묻고, 그 창이 시험 클릭을 가로챈다. 시험은 아이디 · 비밀번호로 로그인한다.
-                if (!string.Equals(Environment.GetEnvironmentVariable("IRONWALL_UITEST_NO_SSO"), "1", StringComparison.Ordinal))
+                //   운영 설정 appsettings IsSsoEnabled=false 로도 끈다(사용자 2026-10-16 "SSO 연동 켜기 끄기 옵션").
+                if (UsesSso(_isSsoEnabled, Environment.GetEnvironmentVariable("IRONWALL_UITEST_NO_SSO")))
                     builder.RegisterModule(new Ironwall.Dotnet.Libraries.Sso.SsoModule());
+                else
+                    _log?.Info("[SSO] 연동 꺼짐 — 아이디 · 비밀번호 로그인만 쓴다(appsettings IsSsoEnabled 또는 IRONWALL_UITEST_NO_SSO).");
             }
 
             // 6) 상태 VM (Phase 2 이관 완료) — 패널/다이얼로그 VM은 Phase 3에서 활성화
@@ -147,5 +153,10 @@ public class AccountUiModule : Module
     private int _count;
     private readonly bool _useDbAuth;
     private readonly IApiSetupModel? _apiSetup;
+    private readonly bool _isSsoEnabled;
     #endregion
+
+    /// <summary>SSO 모듈을 등록하는가 — 설정(<c>IsSsoEnabled</c>)이 켜져 있고 시험 스위치(<c>IRONWALL_UITEST_NO_SSO=1</c>)가 꺼져 있을 때만.</summary>
+    public static bool UsesSso(bool isSsoEnabled, string? noSsoVariable)
+        => isSsoEnabled && !string.Equals(noSsoVariable, "1", StringComparison.Ordinal);
 }

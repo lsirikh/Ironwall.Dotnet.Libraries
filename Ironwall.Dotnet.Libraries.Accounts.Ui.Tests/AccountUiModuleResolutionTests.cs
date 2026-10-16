@@ -76,6 +76,30 @@ public class AccountUiModuleResolutionTests
         Assert.Null(Ironwall.Dotnet.Libraries.Accounts.Api.Handlers.BearerAuthHandler.SsoReauthenticator);
     }
 
+    /// <summary>appsettings IsSsoEnabled=false — GOP 모드여도 SSO 를 등록하지 않고, 로그인 패널은 아이디 · 비밀번호로 뜬다(사용자 2026-10-16).</summary>
+    [Fact]
+    public void should_not_register_sso_when_sso_is_disabled_in_settings()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance<IEventAggregator>(new EventAggregator());
+        builder.RegisterInstance(new Mock<ILogService>().Object).As<ILogService>();
+        builder.RegisterType<AccountModel>().AsImplementedInterfaces().SingleInstance();
+        var setup = new StubSetup();
+        builder.RegisterModule(new AccountUiModule(setup, setup, null, 10, useDbAuth: false, apiSetup: new StubApiSetup(), isSsoEnabled: false));
+        using var c = builder.Build();
+
+        Assert.False(c.IsRegistered<Ironwall.Dotnet.Libraries.Sso.SsoSessionCoordinator>());
+        Assert.NotNull(c.Resolve<LoginPanelViewModel>());
+    }
+
+    [Theory]
+    [InlineData(true, null, true)]
+    [InlineData(true, "1", false)]     // 시험 스위치가 이긴다
+    [InlineData(false, null, false)]   // 설정으로 끔
+    [InlineData(false, "0", false)]
+    public void should_use_sso_only_when_enabled_in_settings_and_not_switched_off_for_tests(bool enabled, string? noSso, bool expected)
+        => Assert.Equal(expected, AccountUiModule.UsesSso(enabled, noSso));
+
     /// <summary>DB 모드에는 SSO 가 끼지 않는다 — 예전 그대로.</summary>
     [Fact]
     public void should_not_register_sso_when_db_mode()
