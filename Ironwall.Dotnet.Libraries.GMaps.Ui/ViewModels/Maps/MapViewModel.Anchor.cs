@@ -211,6 +211,7 @@ public partial class MapViewModel
             _anchorDrawSubscribed = true;
         }
         MainMap.IsAnchorDrawMode = true;
+        SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로(MapViewModel.Map3D)
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         EnsureAimEscWindowHook();
         MainMap.Focus();
@@ -233,6 +234,7 @@ public partial class MapViewModel
         if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
             System.Windows.Input.Mouse.OverrideCursor = null;
         IsAimStatusVisible = false;
+        SyncMap3DWithInputModes();   // 모드 끝 → 3D 게이트 다시 판정
     }
 
     /// <summary>드래그한 사각형(NW/SE 지리좌표)을 앵커 구역 입력으로 채운다(단발). 최소줌=현재줌.</summary>

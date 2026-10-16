@@ -23,7 +23,7 @@ public sealed class Map3DViewHost : Grid
     private string? _job;
     private bool _ready;
 
-    /// <summary>3D → GIS 메시지(ready · camera). ready 는 이 호스트가 먼저 기록한 뒤 올린다.</summary>
+    /// <summary>3D → GIS 메시지(ready · camera · pick · overlay.resync). ready 는 이 호스트가 먼저 기록한 뒤 올린다.</summary>
     public event Action<Map3DMessage>? MessageReceived;
 
     /// <summary>WebView2 초기화 또는 탐색 실패(사유 문구).</summary>
@@ -92,6 +92,13 @@ public sealed class Map3DViewHost : Grid
     {
         if (!_ready || _web?.CoreWebView2 == null) return;
         _web.CoreWebView2.PostWebMessageAsJson(Map3DMath.CameraMessageJson(cam, animate));
+    }
+
+    /// <summary>JSON 메시지 보내기(오버레이 등 — ready 전이면 무시).</summary>
+    public void PostJson(string json)
+    {
+        if (!_ready || _web?.CoreWebView2 == null) return;
+        _web.CoreWebView2.PostWebMessageAsJson(json);
     }
 
     private void EnsureWebView()

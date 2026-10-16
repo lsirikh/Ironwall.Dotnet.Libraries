@@ -90,6 +90,7 @@ public partial class MapViewModel
                 .FirstOrDefault(m => (m.LinkedDevice?.Id ?? m.LinkedDeviceId) == entry.DeviceId && m.DeviceType == entry.DeviceType);
             if (marker == null) return;
 
+            Sync2DFrom3DCamera();   // 3D 표시 중이면 지금 보이는 3D 자리에서 출발(MapViewModel.Map3D)
             var target = marker.Position;
             var currentZoom = MainMap.EffectiveZoom;
             var targetZoom = MapFlyToMath.ResolveTargetZoom(_flyToSettings.MaxZoom, MainMap.MinZoom, MainMap.MaxZoom, currentZoom);
@@ -125,6 +126,7 @@ public partial class MapViewModel
             if (targetZoom is double z && MapFlyToMath.SnapHalf(z) != MapFlyToMath.SnapHalf(MainMap.EffectiveZoom))
                 MainMap.SetEffectiveZoom(z);
             MainMap.Position = target;
+            Sync3DAfter2DMove("event-flyto");
             return;
         }
 
@@ -156,7 +158,11 @@ public partial class MapViewModel
                 _flyAppliedZoom = zoom;
             }
             MainMap.Position = new PointLatLng(pose.Lat, pose.Lng);
-            if (animation.IsDone(elapsed)) StopFly();
+            if (animation.IsDone(elapsed))
+            {
+                StopFly();
+                Sync3DAfter2DMove("event-flyto");   // 3D 표시 중이면 끝난 자리 · 줌을 3D 에도
+            }
         }
         catch (Exception ex)
         {

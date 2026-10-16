@@ -20,8 +20,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 /// <summary>3D 카메라 — 경도 · 위도 · 메르카토르 줌 · 화면 위쪽 방위(북 0, 시계) · 기울기(0 = 바로 위).</summary>
 public readonly record struct Map3DCamera(double Lon, double Lat, double Zoom, double Bearing, double Pitch);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "camera". camera 일 때만 <see cref="Camera"/> 가 있다.</summary>
-public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera);
+/// <summary>3D → GIS 메시지. Type = "ready" | "camera" | "pick" | "overlay.resync". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
+{
+    public Map3DPick? Pick { get; init; }
+}
+
+/// <summary>3D 클릭 — Action = "click" | "dblclick" | "context". Kind · Id 가 없으면 빈 곳. 화면 좌표는 3D 화면 기준 DIP(없으면 null).</summary>
+public sealed record Map3DPick(string Action, string? Kind, int? Id, double? ScreenX, double? ScreenY);
 
 public static class Map3DMath
 {
@@ -44,6 +50,16 @@ public static class Map3DMath
 
     /// <summary>3D 가 보고한 줌으로 2D 로 돌아가야 하는가(&lt; 16.5).</summary>
     public static bool ShouldLeave3D(double reportedZoom) => reportedZoom < ExitZoom;
+
+    /// <summary>
+    /// 3D 표시 중 2D 이동(이벤트 시 지도 이동 · 지도에서 보기)이 끝난 자리에서 3D 를 유지하는가 —
+    /// 지금 장면(구운 영역) 안이고 실효줌 ≥ 16.5. 아니면 2D 로 돌아온다. NaN 은 false.
+    /// </summary>
+    public static bool ShouldStay3DAfterMove(double effectiveZoom, bool insideScene)
+        => insideScene && !double.IsNaN(effectiveZoom) && effectiveZoom >= ExitZoom;
+
+    /// <summary>독점 입력 모드(편집 · 선 그리기 · 측정 · 심볼 배치 · 조준 · 홈/앵커 배치) 중에는 3D 에 들어가지 않는다 — 막으면 true.</summary>
+    public static bool IsBlockedByInputMode(bool isEditMode, bool isExclusiveInputMode) => isEditMode || isExclusiveInputMode;
 
     // ── 방위 ──
 
@@ -128,7 +144,7 @@ public static class Map3DMath
 
     /// <summary>
     /// 3D → GIS 메시지 해석(WebMessageAsJson). 페이지가 문자열로 보냈으면(JSON.stringify) 한 번 더 푼다.
-    /// 모르는 형식 · camera 인데 lon/lat/zoom 이 수가 아니면 null.
+    /// 모르는 형식 · camera 인데 lon/lat/zoom 이 수가 아니면 · pick 인데 action 이 모르는 값이면 null.
     /// </summary>
     public static Map3DMessage? ParseMessage(string? json)
     {
@@ -140,6 +156,8 @@ public static class Map3DMath
             if (token is not JObject o) return null;
             string? type = o.Value<string>("type");
             if (type == "ready") return new Map3DMessage(type, null, o["job"]?.ToString(), null);
+            if (type == "overlay.resync") return new Map3DMessage(type, null, null, null);
+            if (type == "pick") return ParsePick(o);
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;
@@ -147,6 +165,21 @@ public static class Map3DMath
             return new Map3DMessage(type, o.Value<string>("reason"), null, cam);
         }
         catch (JsonException) { return null; }
+    }
+
+    /// <summary>pick 해석 — action 이 click · dblclick · context 가 아니면 null. kind 와 id 는 둘 다 있을 때만 쓴다(하나라도 없으면 빈 곳).</summary>
+    private static Map3DMessage? ParsePick(JObject o)
+    {
+        string? action = o["action"]?.Type == JTokenType.String ? o.Value<string>("action") : null;
+        if (action is not ("click" or "dblclick" or "context")) return null;
+        string? kind = o["kind"]?.Type == JTokenType.String ? o.Value<string>("kind") : null;
+        int? id = o["id"]?.Type == JTokenType.Integer ? o.Value<int>("id") : null;
+        if (string.IsNullOrEmpty(kind) || id == null) { kind = null; id = null; }
+        var screen = o["screen"] as JObject;
+        return new Map3DMessage("pick", null, null, null)
+        {
+            Pick = new Map3DPick(action, kind, id, Finite(screen?["x"]), Finite(screen?["y"])),
+        };
     }
 
     private static double? Finite(JToken? t)
