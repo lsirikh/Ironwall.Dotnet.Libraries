@@ -1,6 +1,8 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Providers;
+using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Sso;
@@ -23,18 +25,24 @@ public class LoginPanelViewModel : BasePanelViewModel
     /// <param name="sso">
     /// SSO 조정자(SSO PRD FR-03). GOP 모드에서만 등록된다 — DB 모드·시험에서는 <c>null</c> 이고 그러면 예전과 같다.
     /// </param>
+    /// <param name="loginSettings">로그인 설정 창구(호스트가 등록). 없으면 머리의 톱니(로그인 설정)가 숨는다.</param>
+    /// <param name="ssoAgent">SSO 에이전트 경계(SsoModule 이 등록) — 로그인 설정 창의 '지금 상태' 한 줄에만 쓴다.</param>
     public LoginPanelViewModel(IEventAggregator eventAggregator
                             , ILogService log
                             , LoginViewModel loginViewModel
                             , AccountProvider accountProvider
                             , IAuthGateway gateway
-                            , SsoSessionCoordinator? sso = null)
+                            , SsoSessionCoordinator? sso = null
+                            , ILoginSettingsPort? loginSettings = null
+                            , ISsoAgentGateway? ssoAgent = null)
                             : base(eventAggregator, log)
     {
         ViewModel = loginViewModel;
         AccountProvider = accountProvider;
         _gateway = gateway;
         _sso = sso;
+        _loginSettings = loginSettings;
+        _ssoAgent = ssoAgent;
 
         if (_sso is not null)
         {
@@ -311,10 +319,56 @@ public class LoginPanelViewModel : BasePanelViewModel
         return true;
     }
 
+    /// <summary>
+    /// <b>톱니 단추(로그인 설정)</b> — 로그인 패널 칸 위에 로그인 설정 창을 얹는다. 로그인 전에도 연다
+    /// (SSO 에이전트가 응답하지 않으면 SSO 를 꺼야 아이디 · 비밀번호로 들어갈 수 있다). 창구가 없으면 아무것도 하지 않는다.
+    /// </summary>
+    public void ClickLoginSettings()
+    {
+        if (_loginSettings is null || LoginSettings is not null) return;
+        try
+        {
+            LoginSettings = new LoginSettingsDialogViewModel(_loginSettings, SsoStatusText(), CloseLoginSettings, _log);
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Login] 로그인 설정 읽기 실패: {ex.GetType().Name} {ex.Message}");
+            SetLoginFailed("로그인 설정을 읽지 못했습니다.");
+        }
+    }
+
+    /// <summary>로그인 설정 창을 열 수 있는가(창구가 등록됐나) — 톱니 단추를 보일지.</summary>
+    public bool IsLoginSettingsAvailable => _loginSettings is not null;
+
+    /// <summary>열린 로그인 설정 창. 닫혀 있으면 <c>null</c> — 뷰의 덮개가 이 값으로 창을 그린다.</summary>
+    public LoginSettingsDialogViewModel? LoginSettings
+    {
+        get => _loginSettingsDialog;
+        private set { _loginSettingsDialog = value; NotifyOfPropertyChange(nameof(LoginSettings)); }
+    }
+
+    private void CloseLoginSettings() => LoginSettings = null;
+
+    /// <summary>지금 SSO 상태 한 줄 — 지금 실행 중인 구성 기준(설정 파일 값이 아니다).</summary>
+    private string SsoStatusText()
+    {
+        if (_sso is null) return SsoStatusText(isSsoOn: false, isAgentPresent: false);
+        try { return SsoStatusText(isSsoOn: true, isAgentPresent: _ssoAgent?.IsAgentPresent() == true); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Login] SSO 에이전트 확인 예외: {ex.GetType().Name} {ex.Message}");
+            return SsoStatusText(isSsoOn: true, isAgentPresent: false);
+        }
+    }
+
+    internal static string SsoStatusText(bool isSsoOn, bool isAgentPresent)
+        => !isSsoOn ? "SSO 연동 꺼짐" : isAgentPresent ? "SSO 에이전트 연결됨" : "SSO 에이전트 없음";
+
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
         _ssoButtonCts?.Cancel();   // 패널이 닫히면 에이전트 로그인 기다림도 끝낸다
         _consentWaitCts?.Cancel();
+        CloseLoginSettings();      // 다시 열린 로그인 화면에 지난 설정 창이 남지 않게
         await base.OnDeactivateAsync(close, cancellationToken);
     }
 
@@ -431,6 +485,9 @@ public class LoginPanelViewModel : BasePanelViewModel
     private string? _result;
     private readonly IAuthGateway _gateway;
     private readonly SsoSessionCoordinator? _sso;
+    private readonly ILoginSettingsPort? _loginSettings;
+    private readonly ISsoAgentGateway? _ssoAgent;
+    private LoginSettingsDialogViewModel? _loginSettingsDialog;
     /// <summary>SSO 시작 로그인은 앱 수명에 한 번 — 로그아웃 뒤 다시 열린 패널에서는 시도하지 않는다.</summary>
     private bool _ssoTried;
     private bool _ssoInFlight;

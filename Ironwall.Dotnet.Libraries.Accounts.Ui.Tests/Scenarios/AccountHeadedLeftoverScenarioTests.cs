@@ -91,6 +91,7 @@ public class AccountHeadedLeftoverScenarioTests
     {
         "Accounts.Console", "Accounts.Permissions", "Accounts.Grants", "Accounts.SessionSetup.Policy", "Accounts.SessionSetup.Concurrency",
         "Accounts.Logout",   // 로그아웃 창 "?"(LogoutPanelView) — 뒤에 생긴 키, 설명은 AccountsHelp 에 등록돼 있다
+        "Accounts.LoginSettings",   // 로그인 설정 창 "?"(LoginSettingsDialogView, 2026-10-16) — 설명은 AccountsHelp 에 등록돼 있다
     };
 
     [Trait("Scenario", "ACC-032")]
