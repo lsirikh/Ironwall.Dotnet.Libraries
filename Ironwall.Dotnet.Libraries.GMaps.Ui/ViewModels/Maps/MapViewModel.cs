@@ -799,6 +799,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.AimOverlayCenter = _aimCenter;
             MainMap.AimOverlayRadiusMeters = _aimRadiusMeters;
             MainMap.IsTargetAimMode = true;
+            SyncMap3DWithInputModes();       // 3D 중이면 먼저 2D 로(MapViewModel.Map3D)
             System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
             EnsureAimEscWindowHook();        // ESC: 윈도우 레벨 후킹(맵이 포커스를 못 받아도 수신)
             MainMap.Focus();                 // 보조 — 맵 포커스 확보 시도
@@ -827,6 +828,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 MainMap.AimOverlayCenter = null;
                 MainMap.AimOverlayRadiusMeters = 0d;
                 MainMap.InvalidateVisual();
+                SyncMap3DWithInputModes();   // 모드 끝 → 3D 게이트 다시 판정
             }
             if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
                 System.Windows.Input.Mouse.OverrideCursor = null;
@@ -853,6 +855,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (MainMap.IsMeasuring) MainMap.StopMeasure();
         _placeCategory = category; _placeType = type; _placeTitle = title; _placeVariant = null;
         MainMap.IsSymbolPlacementMode = true;
+        SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         EnsureAimEscWindowHook();   // ESC 취소(윈도우 후킹 재사용)
         MainMap.Focus();
@@ -867,6 +870,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
             System.Windows.Input.Mouse.OverrideCursor = null;
         IsAimStatusVisible = false;
+        SyncMap3DWithInputModes();   // 모드 끝 → 3D 게이트 다시 판정
     }
 
     /// <summary>배치 모드 좌클릭 수신 — 클릭 위치에 대기 심볼 추가 후 모드 종료(단발).</summary>
@@ -6885,7 +6889,16 @@ public partial class MapViewModel : BasePanelViewModel,
 
             if (menu.Items.Count > 0)
             {
-                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+                if (_map3DMenuAt is { } at && MainMap != null)
+                {
+                    // 3D 화면 위 우클릭 — 마우스가 WebView2(네이티브 창) 위라 MousePoint 가 맞지 않아 pick 좌표(지도 컨트롤 좌표)를 쓴다
+                    menu.PlacementTarget = MainMap;
+                    menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Relative;
+                    menu.HorizontalOffset = at.X;
+                    menu.VerticalOffset = at.Y;
+                }
+                else
+                    menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
                 menu.IsOpen = true;
             }
         }
@@ -7660,6 +7673,7 @@ public partial class MapViewModel : BasePanelViewModel,
             }
 
             UpdateCommandStates();
+            SyncMap3DWithInputModes();   // 그리기 시작 = 3D 중이면 먼저 2D 로 · 끝 = 3D 게이트 다시 판정
         });
     }
 
@@ -8498,6 +8512,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 RaiseUndoRedoState();   // Undo/Redo 버튼 갱신(C#2) — CanUndo/CanRedo가 IsEditModeEnabled 포함
                 if (PropertyPanel != null)
                     PropertyPanel.IsEditModeEnabled = value;
+                SyncMap3DWithInputModes();   // 켜짐 = 3D 중이면 먼저 2D 로 · 꺼짐 = 3D 게이트 다시 판정(MapViewModel.Map3D)
                 _log?.Info($"편집 모드: {(value ? "활성화" : "비활성화")}");
             }
         }

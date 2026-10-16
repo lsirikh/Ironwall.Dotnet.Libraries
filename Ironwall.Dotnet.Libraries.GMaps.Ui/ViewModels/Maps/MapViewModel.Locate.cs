@@ -78,7 +78,10 @@ public partial class MapViewModel
                 //   되돌리고(ClampCenterToBounds) 줌이 바뀌면 inset 을 다시 계산하므로, 구역 안의 경계만 주면 가두기와 싸우지 않는다.
                 //   최소 줌 하한(앵커 MinZoomFloor)은 컨트롤 MinZoom 이 지킨다.
                 if (plan.Fit is { } fit)
+                {
                     MainMap.SetZoomToFitRect(RectLatLng.FromLTRB(fit.West, fit.North, fit.East, fit.South));
+                    Sync3DAfter2DMove("locate");   // 3D 표시 중이면 맞춘 자리 · 줌을 3D 에도(MapViewModel.Map3D)
+                }
             }
 
             if (plan.Rings.Count > 0) HookLocateClearTriggers();

@@ -91,6 +91,10 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DMath.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DClient.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\Map3DModel.cs" />
+    <!-- 지도 3D 오버레이 다리 DTO · patch 비교 · 메시지(2차) — 실코드 링크. 상태 enum 은 실코드 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DOverlay.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.Enums\EnumCompositeEventStatus.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.Enums\EnumOperationState.cs" />
   </ItemGroup>
 
   <ItemGroup>

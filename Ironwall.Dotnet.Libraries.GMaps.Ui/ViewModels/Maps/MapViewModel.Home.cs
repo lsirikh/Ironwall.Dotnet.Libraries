@@ -62,6 +62,7 @@ public partial class MapViewModel
             _homePlacementSubscribed = true;
         }
         MainMap.IsHomePlacementMode = true;
+        SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로(MapViewModel.Map3D)
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         EnsureAimEscWindowHook();   // ESC 취소(윈도우 후킹 재사용)
         MainMap.Focus();
@@ -75,6 +76,7 @@ public partial class MapViewModel
         if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
             System.Windows.Input.Mouse.OverrideCursor = null;
         IsAimStatusVisible = false;
+        SyncMap3DWithInputModes();   // 모드 끝 → 3D 게이트 다시 판정
     }
 
     /// <summary>홈 배치 모드 좌클릭 수신 — 클릭 위치를 홈으로 저장 후 종료(단발).</summary>

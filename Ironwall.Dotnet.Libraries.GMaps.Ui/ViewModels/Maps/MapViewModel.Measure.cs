@@ -128,6 +128,7 @@ public partial class MapViewModel
 
         CancelConflictingModesForMeasure();
         MainMap.StartMeasure(kind);
+        SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로(MapViewModel.Map3D)
         Mouse.OverrideCursor = Cursors.Cross;
         EnsureMeasureKeyHook();
         SyncMeasureToggleFlags();
@@ -195,6 +196,7 @@ public partial class MapViewModel
         IsMeasureReadoutVisible = false;
         if (Mouse.OverrideCursor == Cursors.Cross) Mouse.OverrideCursor = null;
         RemoveMeasureKeyHook();
+        SyncMap3DWithInputModes();   // 모드 끝 → 3D 게이트 다시 판정
     }
     #endregion
 
