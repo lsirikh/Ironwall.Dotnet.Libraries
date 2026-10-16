@@ -6899,6 +6899,9 @@ public partial class MapViewModel : BasePanelViewModel,
                     menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Relative;
                     menu.HorizontalOffset = at.X;
                     menu.VerticalOffset = at.Y;
+                    var openedAt = DateTime.Now;
+                    menu.Closed += (_, _) => _log?.Info($"[Map3D] 3D 위 우클릭 메뉴 닫힘 — 열린 지 {(DateTime.Now - openedAt).TotalMilliseconds:F0} ms");
+                    _log?.Info($"[Map3D] 3D 위 우클릭 메뉴 열기 — 항목 {menu.Items.Count}개 @({at.X:F0},{at.Y:F0})");
                 }
                 else
                     menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;

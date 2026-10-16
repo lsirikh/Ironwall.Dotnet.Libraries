@@ -433,6 +433,7 @@ public partial class MapViewModel
         var marker = pick.Kind is { } kind && pick.Id is int id
             ? MainMap.Markers.FirstOrDefault(m => Map3DOverlayBridge.KindOf(m) == kind && ((IEditableMarker)m).Id == id)
             : null;
+        _log?.Info($"[Map3D] pick {pick.Action} kind={pick.Kind ?? "-"} id={pick.Id?.ToString() ?? "-"} → {(marker != null ? "마커" : "빈 곳")}");
 
         if (marker is not IEditableMarker editable)
         {
