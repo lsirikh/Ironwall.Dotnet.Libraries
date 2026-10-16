@@ -1212,6 +1212,14 @@
 							</Button.Style>
 							<md:PackIcon Kind="CropFree" />
 						</Button>
+						<!--  지도 3D(map-3d POC) — 앵커 영역 그리기 러버밴드 재사용. 그린 영역을 굽고, 줌 17 이상에서 3D 화면으로 바뀐다.  -->
+						<Button
+							AutomationProperties.AutomationId="GMaps.Map3D.DrawButton"
+							Command="{Binding DrawMap3DAreaCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="3D 영역 만들기 (Enter = 지금 화면 전체)">
+							<md:PackIcon Kind="CubeOutline" />
+						</Button>
 					</StackPanel>
 				</Border>
 			</StackPanel>
@@ -1264,6 +1272,12 @@
 					</gmap:GMapCustomControl.Margin>
 				</gmap:GMapCustomControl>
 			</AdornerDecorator>
+
+			<!--  지도 3D 화면(map-3d POC) 호스트 — 지도와 같은 칸. 평소엔 비어 있고(WebView2 미생성), 3D 진입 시 WebView2 를 1회 만들어 재사용한다.  -->
+			<ContentControl
+				Panel.ZIndex="1"
+				Content="{Binding Map3DHost}"
+				Focusable="False" />
 
 			<!--  스케일바 + 기울임 배지(map-tilt-25d FR-09 · G6 세로 축척 이탈 표시: 수평 축척은 유지, 세로는 cosφ 배 — φ>0.1° 만 표시).
 			      배지는 색이 아니라 형태(1px 스트로크 필 + 아이콘)로 구분, 토큰은 DynamicResource(라이트/다크 재해석).  -->

@@ -1957,6 +1957,8 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     public const int DIGITAL_ZOOM_MAX = 3;
     // level 1 = 1.25× → 정수줌 사이 "중간 스텝"(예: z17 50m→40m). level 2/3 = 1.5/2.0 (MaxZoom 위 소프트 줌). (FR-A 줌 40m)
     private static readonly double[] DIGITAL_SCALE_TABLE = { 1.0, 1.25, 1.5, 2.0 };
+    /// <summary>디지털 줌 배율표(읽기) — 3D 줌 변환(Map3DMath.ToEffectiveZoom)용.</summary>
+    internal static IReadOnlyList<double> DigitalScaleTable => DIGITAL_SCALE_TABLE;
 
     /// <summary>디지털 줌 레벨 변경 시 발화 (arg = 새 레벨 0~2). 축척바 동기화용.</summary>
     public event Action<int>? DigitalZoomLevelChanged;
