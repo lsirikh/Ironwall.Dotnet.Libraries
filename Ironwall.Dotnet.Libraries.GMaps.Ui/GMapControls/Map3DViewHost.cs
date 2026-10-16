@@ -13,17 +13,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
                     (실행 파일 옆 `{exe}.WebView2`, Reports.Ui 와 같은 관례 — EnsureCoreWebView2Async() 인자 없음).
                   ★ 대기(Park) = 왼쪽 위 1×1. Visibility 를 숨기면 WebView2 가 페이지를 "안 보임"으로 바꿔 그리기(rAF)가 멈추고
                     map-3d 의 ready 가 늦거나 안 올 수 있어, ready 전에는 1×1 로 "보이되 안 보이게" 둔다. ready 뒤 Reveal 로 펼친다.
-                  ★ 기본은 WebView2CompositionControl(WPF 안에서 그림) — 네이티브 창 WebView2 는 펼친 동안 같은 자리의 WPF
-                    (상세 창 · 카메라 상자 · 조립 카드 · 상태 배너)를 덮었다(공역, 2026-10-17). UseComposition=false 면 네이티브 창.
+                  ★ WebView2 는 네이티브 창이라 펼친 동안 같은 자리의 WPF(상태 배너 등)를 덮는다(공역).
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
 ****************************************************************************/
 public sealed class Map3DViewHost : Grid
 {
-    private IWebView2? _web;
-    private FrameworkElement? _el;
-
-    /// <summary>처음 WebView2 를 만들 때 쓸 방식 — true 면 WebView2CompositionControl(공역 없음). 만든 뒤 바꾸면 다음 실행부터.</summary>
-    public bool UseComposition { get; set; } = true;
+    private WebView2? _web;
     private bool _coreHooked;
     private string? _job;
     private bool _ready;
@@ -72,23 +67,23 @@ public sealed class Map3DViewHost : Grid
     /// <summary>지도 칸 전체로 펼치고 포커스를 준다.</summary>
     public void Reveal()
     {
-        if (_el == null) return;
-        _el.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _el.VerticalAlignment = VerticalAlignment.Stretch;
-        _el.Width = double.NaN;
-        _el.Height = double.NaN;
+        if (_web == null) return;
+        _web.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _web.VerticalAlignment = VerticalAlignment.Stretch;
+        _web.Width = double.NaN;
+        _web.Height = double.NaN;
         IsRevealed = true;
-        _el.Focus();
+        _web.Focus();
     }
 
     /// <summary>1×1 대기로 접는다(숨김 — 다음에 재사용).</summary>
     public void Park()
     {
-        if (_el == null) return;
-        _el.HorizontalAlignment = HorizontalAlignment.Left;
-        _el.VerticalAlignment = VerticalAlignment.Top;
-        _el.Width = 1;
-        _el.Height = 1;
+        if (_web == null) return;
+        _web.HorizontalAlignment = HorizontalAlignment.Left;
+        _web.VerticalAlignment = VerticalAlignment.Top;
+        _web.Width = 1;
+        _web.Height = 1;
         IsRevealed = false;
     }
 
@@ -109,18 +104,9 @@ public sealed class Map3DViewHost : Grid
     private void EnsureWebView()
     {
         if (_web != null) return;
-        if (UseComposition)
-        {
-            var c = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Black };
-            _web = c; _el = c;
-        }
-        else
-        {
-            var w = new WebView2 { DefaultBackgroundColor = System.Drawing.Color.Black };
-            _web = w; _el = w;
-        }
-        System.Windows.Automation.AutomationProperties.SetAutomationId(_el, "GMaps.Map3D.View");
-        Children.Add(_el);
+        _web = new WebView2 { DefaultBackgroundColor = System.Drawing.Color.Black };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(_web, "GMaps.Map3D.View");
+        Children.Add(_web);
     }
 
     private void OnWebMessage(string json)

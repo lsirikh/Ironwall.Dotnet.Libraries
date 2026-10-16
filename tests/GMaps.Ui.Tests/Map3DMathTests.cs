@@ -179,7 +179,6 @@ public class Map3DMathTests
         var m = new Map3DModel();
         Assert.True(m.IsEnabled);
         Assert.Equal("http://127.0.0.1:8765", m.ServerUrl);
-        Assert.True(m.UseCompositionHost);   // 기본은 WPF 안에서 그리기 — 상세 창 · 카메라 상자가 3D 위에 보여야 한다
         Assert.False(m.Normalize());
     }
 

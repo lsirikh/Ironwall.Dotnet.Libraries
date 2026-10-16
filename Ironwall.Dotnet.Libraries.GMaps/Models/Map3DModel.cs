@@ -19,10 +19,6 @@ public class Map3DModel
     /// <summary>map-3d 서버 주소(http/https 절대 주소, 끝 '/' 없음).</summary>
     public string ServerUrl { get; set; } = DefaultServerUrl;
 
-    /// <summary>3D 화면을 WPF 안에서 그린다(WebView2CompositionControl, 기본 켜짐) — 상세 창 · 카메라 상자 · 조립 카드가 3D 위에 보인다.
-    /// 끄면 네이티브 창(WebView2) — 더 빠르지만 같은 자리의 WPF 를 덮는다(공역). RDP · 저사양에서 느리면 끈다.</summary>
-    public bool UseCompositionHost { get; set; } = true;
-
     /// <summary>주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 바뀌었으면 true.</summary>
     public bool Normalize()
     {
@@ -36,5 +32,5 @@ public class Map3DModel
     }
 
     public override string ToString()
-        => string.Format(CultureInfo.InvariantCulture, "Map3D[enabled={0}, server={1}, composition={2}]", IsEnabled, ServerUrl, UseCompositionHost);
+        => string.Format(CultureInfo.InvariantCulture, "Map3D[enabled={0}, server={1}]", IsEnabled, ServerUrl);
 }
