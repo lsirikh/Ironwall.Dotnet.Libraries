@@ -276,7 +276,9 @@ public partial class MapViewModel
         _log?.Info($"[Map3D] 진입 시작 job={scene.Id} zoom={MainMap.EffectiveZoom:F1}");
         if (Map3DHost.IsReadyFor(scene.Id)) { Reveal3D(); return; }
         // 위에서 내려다본 같은 축척으로 연다(animate=0) — 펼칠 때(Reveal3D) 기울기 애니메이션을 보낸다.
-        _ = Map3DHost.LoadAsync(scene.Id, Map3DMath.ViewUrl(_map3DSettings.ServerUrl, scene.Id, Current2DCamera(0d), animate: false));
+        bool remote = IsRemoteSession();
+        if (remote) _log?.Info("[Map3D] 원격 세션 — 3D 저사양(low=1)");
+        _ = Map3DHost.LoadAsync(scene.Id, Map3DMath.ViewUrl(_map3DSettings.ServerUrl, scene.Id, Current2DCamera(0d), animate: false, lowQuality: remote));
     }
 
     private void Reveal3D()
@@ -411,6 +413,12 @@ public partial class MapViewModel
     /// 같은 위치 · 줌 · 방위로 2D 에 돌아온다. 창을 보는 동안 곧바로 다시 3D 로 들어가지 않게, 줌을 17 아래로 한 번 내릴 때까지 보류한다.
     /// (WebView2CompositionControl 은 net8.0-windows7.0 대상에 Windows SDK 투영이 없어 로드 순간 앱을 죽였다 — 2026-10-17 실기, 되돌림)
     /// </summary>
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    /// <summary>원격 데스크톱 세션인가(SM_REMOTESESSION) — 3D 화면을 저사양으로 연다(원격 화면 전송량 · 끊김 줄이기).</summary>
+    private static bool IsRemoteSession() => GetSystemMetrics(0x1000) != 0;
+
     private void LeaveMap3DForPanel(string cause)
     {
         if (_map3DState != Map3DState.Shown) return;

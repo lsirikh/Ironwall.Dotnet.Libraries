@@ -119,6 +119,14 @@ public class Map3DMathTests
         finally { System.Globalization.CultureInfo.CurrentCulture = prev; }
     }
 
+    [Fact]
+    public void should_ask_low_quality_3d_when_remote_session()
+    {
+        var cam = new Map3DCamera(127.5, 37.25, 17, 0, 0);
+        Assert.EndsWith("&animate=0&low=1", Map3DMath.ViewUrl("http://h", "j", cam, animate: false, lowQuality: true));
+        Assert.DoesNotContain("low=", Map3DMath.ViewUrl("http://h", "j", cam, animate: false));
+    }
+
     // ── 메시지 ──
 
     [Fact]

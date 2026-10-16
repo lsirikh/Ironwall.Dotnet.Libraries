@@ -123,9 +123,10 @@ public static class Map3DMath
         => $"{server}/api/scenes/at?lon={Num(lon)}&lat={Num(lat)}";
 
     /// <summary>3D 화면 주소(embed=1 — 장식 없이 3D 만).</summary>
-    public static string ViewUrl(string server, string job, Map3DCamera cam, bool animate)
+    /// <param name="lowQuality">원격(RDP) 세션 — 3D 가 저사양(해상도 1배 · 그림자 · AO 끔 · 초당 30장)으로 돈다(<c>&amp;low=1</c>).</param>
+    public static string ViewUrl(string server, string job, Map3DCamera cam, bool animate, bool lowQuality = false)
         => $"{server}/view?job={Uri.EscapeDataString(job)}&embed=1&lon={Num(cam.Lon)}&lat={Num(cam.Lat)}&zoom={Num(cam.Zoom)}"
-           + $"&bearing={Num(cam.Bearing)}&pitch={Num(cam.Pitch)}&animate={(animate ? 1 : 0)}";
+           + $"&bearing={Num(cam.Bearing)}&pitch={Num(cam.Pitch)}&animate={(animate ? 1 : 0)}" + (lowQuality ? "&low=1" : "");
 
     // ── 메시지 ──
 
