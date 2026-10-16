@@ -10,6 +10,8 @@
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:vd="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs"
+	xmlns:vmd="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs"
 	d:Background="#88000000"
 	AutomationProperties.AutomationId="Accounts.Login.Panel"
 	FontFamily="{DynamicResource MaterialDesignFont}"
@@ -76,6 +78,11 @@
 					</DataTrigger>
 				</Style.Triggers>
 			</Style>
+
+			<!--  로그인 설정 창 — 덮개(아래 ContentControl)가 LoginSettings 가 있을 때만 그린다  -->
+			<DataTemplate DataType="{x:Type vmd:LoginSettingsDialogViewModel}">
+				<vd:LoginSettingsDialogView />
+			</DataTemplate>
 		</ResourceDictionary>
 	</UserControl.Resources>
 
@@ -83,6 +90,7 @@
 		x:Name="DialogHost"
 		DialogTheme="Inherit"
 		Identifier="LoginPanel">
+		<Grid>
 		<dlg:ConsoleDialogFrame
 			x:Name="CardContents"
 			DialogKey="Accounts.Login"
@@ -92,6 +100,38 @@
 			ShowClose="{Binding IsEnabled, ElementName=ClickCancel}"
 			Size="Small"
 			Title="로그인">
+
+			<!--
+				톱니 — 로그인 설정(SSO 연동 켜기 · 끄기). 강제 로그인이어도 보인다(SSO 를 꺼야 들어갈 수 있는 경우).
+				호스트가 설정 창구(ILoginSettingsPort)를 등록하지 않았으면 숨는다. 틀의 자기 속성이라 Message.Attach 로 잇는다.
+			-->
+			<dlg:ConsoleDialogFrame.HeaderExtra>
+				<Button
+					Width="28"
+					Height="28"
+					MinWidth="0"
+					Padding="0"
+					AutomationProperties.AutomationId="Accounts.Login.SettingsButton"
+					AutomationProperties.Name="로그인 설정"
+					cal:Message.Attach="ClickLoginSettings"
+					ToolTip="로그인 설정">
+					<Button.Style>
+						<Style BasedOn="{StaticResource Console.Button.Ghost}" TargetType="Button">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsLoginSettingsAvailable}" Value="True">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Kind="CogOutline" />
+				</Button>
+			</dlg:ConsoleDialogFrame.HeaderExtra>
 
 			<dlg:ConsoleDialogFrame.FooterActions>
 				<StackPanel Orientation="Horizontal">
@@ -299,5 +339,13 @@
 				</DockPanel>
 			</StackPanel>
 		</dlg:ConsoleDialogFrame>
+
+		<!--  로그인 설정 창 덮개 — 열려 있을 때만 로그인 틀 위를 스크림째 덮는다(로그인 틀의 자식이 아니라 ESC · Enter 가 섞이지 않는다)  -->
+		<ContentControl
+			AutomationProperties.AutomationId="Accounts.Login.SettingsLayer"
+			Content="{Binding LoginSettings}"
+			Focusable="False"
+			IsTabStop="False" />
+		</Grid>
 	</md:DialogHost>
 </UserControl>
