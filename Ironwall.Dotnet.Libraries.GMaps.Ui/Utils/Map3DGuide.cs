@@ -192,6 +192,33 @@ public static class Map3DGuide
     /// <summary>「이 영역 3D 로 보기」가 옮겨 갈 실효줌 — 17.5, 진입 줌이 그보다 높으면 진입 줌.</summary>
     public static double AreaViewZoomFor(double enterZoom) => Math.Max(AreaViewZoom, enterZoom);
 
+    // ── 영역마다 3D 줌(2026-10-18) ──
+
+    /// <summary>3D 만들기 패널 · 「3D 줌 바꾸기」에서 고를 수 있는 3D 로 바뀌는 줌 — 지도 디지털 줌과 같은 0.5 단위.</summary>
+    public const double EnterZoomChoiceMin = 15d, EnterZoomChoiceMax = 19d;
+
+    /// <summary>줌 선택지 15 · 15.5 · … · 19.</summary>
+    public static IReadOnlyList<double> EnterZoomChoices { get; } = BuildEnterZoomChoices();
+
+    private static double[] BuildEnterZoomChoices()
+    {
+        var list = new List<double>();
+        for (double z = EnterZoomChoiceMin; z <= EnterZoomChoiceMax; z += 0.5) list.Add(z);
+        return list.ToArray();
+    }
+
+    /// <summary>처음 골라 둘 줌 — 세팅 · 영역 값을 가장 가까운 선택지(0.5 단위, 15~19)로. 수가 아니면 17.</summary>
+    public static double EnterZoomChoiceFor(double zoom)
+        => double.IsFinite(zoom) ? Math.Clamp(Math.Round(zoom * 2d, MidpointRounding.AwayFromZero) / 2d, EnterZoomChoiceMin, EnterZoomChoiceMax)
+                                 : Map3DMath.EnterZoom;
+
+    /// <summary>배지 툴팁 · 목록 툴팁 — 이름 · 만든 날짜 · 건물 수 · 그 영역의 3D 줌.</summary>
+    public static string AreaToolTip(string title, DateTime? created, int? buildings, double enterZoom)
+        => $"{AreaToolTip(title, created, buildings)}\n3D 로 바뀌는 줌: {Zoom(enterZoom)} 이상";
+
+    /// <summary>지도 메뉴 「3D 영역 목록」 한 줄 — "이름 · 줌 17 이상".</summary>
+    public static string AreaMenuHeader(string title, double enterZoom) => $"{title} · 줌 {Zoom(enterZoom)} 이상";
+
     /// <summary>bbox 가운데(위도, 경도).</summary>
     public static (double Lat, double Lon) AreaCenter(IReadOnlyList<double> bbox)
         => bbox.Count == 4 ? ((bbox[1] + bbox[3]) / 2d, (bbox[0] + bbox[2]) / 2d) : (0d, 0d);

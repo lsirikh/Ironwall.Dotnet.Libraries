@@ -97,6 +97,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DGuide.cs" />
     <!-- 지도 3D 오버레이 다리 DTO · patch 비교 · 메시지(2차) — 실코드 링크. 상태 enum 은 실코드 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DOverlay.cs" />
+    <!-- 영역마다 3D 줌 — GIS 로컬 영역 줌(map3d-areas.json) 읽기 · 쓰기 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DAreaZoomStore.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Enums\EnumCompositeEventStatus.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Enums\EnumOperationState.cs" />
     <!-- 규약 v2 선 스타일(무늬) — 실코드 링크 -->

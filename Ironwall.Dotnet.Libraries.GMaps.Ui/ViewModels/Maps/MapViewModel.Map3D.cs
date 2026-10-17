@@ -33,6 +33,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                   ★ 4차(2026-10-17, 전환 시간): ① 지도가 뜬 뒤 WebView2 미리 데우기 ② 줌 15 · 영역 안이면 장면 미리 불러오기(1×1)
                     ③ ready 직후 오버레이 스냅샷, 접을 때 Pause · 펼칠 때 Resume(바뀐 것만) ④ 3D 의 rendered 를 받은 뒤 펼침(1.5 s 넘으면 그냥),
                     이미 그려 둔 화면은 0.4 s ⑤ 진입마다 "[Map3D] 전환 시간 …" 한 줄 로그.
+                  ★ 5차(2026-10-18, 영역마다 3D 줌): 게이트 · 미리 불러오기 · 2D 복귀 줌은 그 영역의 진입 줌(로컬 &gt; 서버 enter_zoom &gt; 세팅)으로
+                    세운다(Map3DMath.AreaGate). 만들기 패널에서 고른 줌은 굽기 요청 enter_zoom 으로 보낸다.
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
@@ -157,7 +159,7 @@ public partial class MapViewModel
             if (!Map3DGuide.ShouldGuideAfterLogin(_map3DRevealedBehindLogin, _map3DState == Map3DState.Shown)) return;
             _map3DRevealedBehindLogin = false;
             _log?.Info("[Map3D] 로그인 직후 3D 안내");
-            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("login", _map3DSettings.ExitZoom));
+            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("login", Map3DCurrentGate.Exit));
             RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.AfterLoginShow, timedBar: false);
         });
     }
@@ -304,7 +306,7 @@ public partial class MapViewModel
             SetAimStatus(Map3DGuide.AreaTooLargeText(w, h, _map3DSettings.MaxAreaSideM));
             return;
         }
-        RequestMap3DBake(bbox);   // 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식 고르기(MapViewModel.Map3DBakeOptions)
+        RequestMap3DBake(bbox);   // 만들기 패널 — 3D 줌 고르기(+ 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식, MapViewModel.Map3DBakeOptions)
     }
 
     /// <summary>창 PreviewKeyDown(OnMapPreviewKeyDownForAim) 서두 — 3D 그리기 중 Enter = 지금 화면 전체, 3D 화면 중 ESC = 2D 복귀.</summary>
@@ -335,15 +337,16 @@ public partial class MapViewModel
 
     // ── 굽기 ──
 
-    private async Task BakeMap3DAsync(double[] bbox, string overlayMode = Map3DBake.ModeTiles, IReadOnlyList<Map3DBakeOverlay>? overlays = null)
+    /// <param name="enterZoom">그 영역의 3D 로 바뀌는 줌(만들기 패널에서 고른 값) — 굽기 요청 enter_zoom.</param>
+    private async Task BakeMap3DAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double enterZoom)
     {
         if (_map3DClient == null || _isMap3DBaking) return;
         _isMap3DBaking = true;
         DrawMap3DAreaCommand.RaiseCanExecuteChanged();
         try
         {
-            _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] overlay={overlayMode} images={overlays?.Count ?? 0}");
-            var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays);
+            _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] overlay={overlayMode} images={overlays?.Count ?? 0} enterZoom={enterZoom}");
+            var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays, enterZoom);
             while (!job.IsDone && !job.IsError)
             {
                 SetAimStatus($"3D 만드는 중… {job.Progress:P0}{(string.IsNullOrEmpty(job.Message) ? "" : $" — {job.Message}")}");
@@ -362,9 +365,9 @@ public partial class MapViewModel
                 return;
             }
             _map3DScenes.RemoveAll(sc => sc.Id == job.Id);
-            _map3DScenes.Add(new Map3DScene(job.Id, bbox));
+            _map3DScenes.Add(new Map3DScene(job.Id, bbox) { EnterZoom = enterZoom });
             _map3DEntrySuppressed = false;
-            SetAimStatus("3D 준비됨 — 줌 17 이상에서 3D", autoHide: true);
+            SetAimStatus($"3D 준비됨 — 줌 {Map3DGuide.Zoom(Map3DAreaEnterZoom(job.Id, enterZoom))} 이상에서 3D", autoHide: true);
             QueueMap3DGate();
             _ = RefreshMap3DAreasAsync();   // 새 영역 테두리 · 배지(만든 날짜 · 건물 수는 서버 목록에서)
         }
@@ -390,6 +393,27 @@ public partial class MapViewModel
         }
     }
 
+    // ── 영역마다 3D 줌(2026-10-18) ──
+
+    private Map3DAreaZoomStore? _map3DAreaZooms;
+    /// <summary>GIS 로컬 영역 줌(map3d-areas.json) — 서버가 「3D 줌 바꾸기」를 모를 때 저장한 값.</summary>
+    private Map3DAreaZoomStore Map3DAreaZooms => _map3DAreaZooms ??= new Map3DAreaZoomStore(Map3DAreaZoomStore.DefaultPath);
+
+    /// <summary>영역 진입 줌 — 로컬 값 &gt; 서버 장면의 enter_zoom &gt; 세팅의 3D 최소 줌.</summary>
+    private double Map3DAreaEnterZoom(string id, double? serverZoom)
+        => Map3DMath.ResolveAreaEnterZoom(Map3DAreaZooms.Get(id), serverZoom, _map3DSettings.EnterZoom);
+
+    /// <summary>영역 진입 줌으로 세운 게이트(이탈 · 미리 준비 줌은 세팅에서 옮겨 온다).</summary>
+    private Map3DZoomGate Map3DGateFor(double areaEnterZoom)
+        => Map3DMath.AreaGate(areaEnterZoom, _map3DSettings.EnterZoom, _map3DSettings.ExitZoom, _map3DSettings.PreloadZoom);
+
+    /// <summary>장면의 게이트 — 장면이 없으면 세팅값.</summary>
+    private Map3DZoomGate Map3DGateFor(Map3DScene? scene)
+        => Map3DGateFor(scene == null ? _map3DSettings.EnterZoom : Map3DAreaEnterZoom(scene.Id, scene.EnterZoom));
+
+    /// <summary>지금 3D 로 보는(또는 여는) 장면의 게이트.</summary>
+    private Map3DZoomGate Map3DCurrentGate => Map3DGateFor(_map3DScenes.Find(sc => sc.Id == _map3DJob));
+
     // ── 게이트(코얼레싱 · 장면 조회) ──
 
     private void QueueMap3DGate()
@@ -413,11 +437,12 @@ public partial class MapViewModel
         double zoom = MainMap.EffectiveZoom;
         var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
         // 굽는 동안은 3D 로 들어가지 않는다 — 영역을 그리고 나면 곧바로 옛 3D 로 들어가 굽기 진행 패널이 가려졌다(2026-10-17 실기 S1)
-        double enter = _map3DSettings.EnterZoom, exit = _map3DSettings.ExitZoom;
-        bool active = !_isMap3DBaking && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null, enter, exit);
+        var gate = Map3DGateFor(scene);   // 그 영역의 진입 · 이탈 · 미리 준비 줌(영역마다 3D 줌)
+        bool active = !_isMap3DBaking && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null, gate.Enter, gate.Exit);
 
-        if (!Map3DMath.Decide(zoom, false, scene != null, enter, exit)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
-        if (scene == null && zoom >= exit) QueueMap3DSceneLookup(center);
+        if (!Map3DMath.Decide(zoom, false, scene != null, gate.Enter, gate.Exit)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
+        // 목록에 없는 장면은 가장 낮게 고를 수 있는 영역 줌의 이탈 줌부터 묻는다
+        if (scene == null && zoom >= Map3DGateFor(Math.Min(Map3DGuide.EnterZoomChoiceMin, _map3DSettings.EnterZoom)).Exit) QueueMap3DSceneLookup(center);
 
         if (active && _map3DState == Map3DState.Off && !_map3DEntrySuppressed) Begin3D(scene!);
         else if (!active && _map3DState == Map3DState.Pending)
@@ -427,7 +452,7 @@ public partial class MapViewModel
         }
         else if (_map3DState == Map3DState.Off
                  && Map3DMath.ShouldPreload(zoom, scene?.Id, Map3DHost.Job, Map3DHost.IsLoading, _isMap3DBaking || IsMap3DBlockedByInputMode(),
-                                            _map3DSettings.PreloadZoom))
+                                            gate.Preload))
         {
             // 줌 17 진입 전에(줌 15 · 영역 안) 장면을 1×1 로 미리 열어 둔다 — 진입은 펼치기만. 벗어나도 연 장면은 그대로 둔다.
             string job = scene!.Id;
@@ -621,7 +646,7 @@ public partial class MapViewModel
         }
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
-        if (Map3DMath.ShouldLeave3D(cam.Zoom, _map3DSettings.ExitZoom)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
+        if (Map3DMath.ShouldLeave3D(cam.Zoom, Map3DCurrentGate.Exit)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
         // 3D 카메라(위치 · 줌 · 방위)에 맞춰 오버레이가 3D 상태를 보이게 하고, 2D 로 돌아갈 때도 끊기지 않게 한다(2026-10-17 실기: 나침반이 0° 에 멈춰 있었다).
         if (Map3DHost.HostMode == "composition") Apply3DCameraTo2D(cam);
@@ -677,7 +702,7 @@ public partial class MapViewModel
         var center = MainMap.Position;
         var scene = _map3DScenes.Find(sc => sc.Id == _map3DJob);
         bool inside = scene != null && Map3DMath.BboxContains(scene.Bbox, center.Lng, center.Lat);
-        if (!Map3DMath.ShouldStay3DAfterMove(MainMap.EffectiveZoom, inside, _map3DSettings.ExitZoom))
+        if (!Map3DMath.ShouldStay3DAfterMove(MainMap.EffectiveZoom, inside, Map3DGateFor(scene).Exit))
         {
             Leave3D(null, cause);
             return;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Ironwall.Dotnet.Libraries.GMaps.Models;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
@@ -19,6 +20,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
 /// <summary>3D 카메라 — 경도 · 위도 · 메르카토르 줌 · 화면 위쪽 방위(북 0, 시계) · 기울기(0 = 바로 위).</summary>
 public readonly record struct Map3DCamera(double Lon, double Lat, double Zoom, double Bearing, double Pitch);
+
+/// <summary>3D 영역 하나의 게이트 줌 — 3D 로 바뀌는 줌 · 2D 로 돌아가는 줌 · 미리 준비하는 줌(<see cref="Map3DMath.AreaGate"/>).</summary>
+public readonly record struct Map3DZoomGate(double Enter, double Exit, double Preload);
 
 /// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "progress". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
@@ -95,6 +99,25 @@ public static class Map3DMath
     public static bool ShouldPreload(double effectiveZoom, string? sceneAtCenter, string? hostJob, bool hostLoading, bool blocked, double preloadZoom)
         => !blocked && !hostLoading && sceneAtCenter != null && sceneAtCenter != hostJob
            && !double.IsNaN(effectiveZoom) && effectiveZoom >= preloadZoom;
+
+    /// <summary>
+    /// 영역 하나의 게이트 줌(2026-10-18, 영역마다 3D 줌) — 진입 = 그 영역 진입 줌, 이탈 = 영역 진입 − (세팅 진입 − 세팅 이탈),
+    /// 미리 준비 = min(세팅 미리 준비, 영역 진입 − 1). 영역 진입 줌이 세팅과 같으면 이탈은 세팅 그대로다.
+    /// </summary>
+    public static Map3DZoomGate AreaGate(double areaEnterZoom, double enterZoom, double exitZoom, double preloadZoom)
+        => new(areaEnterZoom, areaEnterZoom - (enterZoom - exitZoom), Math.Min(preloadZoom, areaEnterZoom - 1d));
+
+    /// <summary>
+    /// 영역 진입 줌 — GIS 로컬 값(서버가 줌 바꾸기를 모를 때 저장, map3d-areas.json) &gt; 서버 장면의 enter_zoom &gt; 세팅의 3D 최소 줌.
+    /// 수가 아닌 값은 건너뛰고, 고른 값은 3D 줌 범위(10~20.5)로 자른다.
+    /// </summary>
+    public static double ResolveAreaEnterZoom(double? localZoom, double? serverZoom, double settingsEnterZoom)
+    {
+        double zoom = localZoom is double l && double.IsFinite(l) ? l
+                    : serverZoom is double s && double.IsFinite(s) ? s
+                    : settingsEnterZoom;
+        return Math.Clamp(zoom, Map3DModel.MinZoom, Map3DModel.MaxZoom);
+    }
 
     /// <summary>독점 입력 모드(편집 · 선 그리기 · 측정 · 심볼 배치 · 조준 · 홈/앵커 배치) 중에는 3D 에 들어가지 않는다 — 막으면 true.</summary>
     public static bool IsBlockedByInputMode(bool isEditMode, bool isExclusiveInputMode) => isEditMode || isExclusiveInputMode;

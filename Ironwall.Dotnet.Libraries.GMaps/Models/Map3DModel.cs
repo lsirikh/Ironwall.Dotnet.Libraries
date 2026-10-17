@@ -24,8 +24,9 @@ public class Map3DModel
     /// 끄면 네이티브 창(WebView2) — 더 빠르지만 같은 자리의 WPF 를 덮는다(공역). RDP · 저사양에서 느리면 끈다.</summary>
     public bool UseCompositionHost { get; set; } = true;
 
-    /// <summary>오버레이 이미지 기본 굽기 방식(마지막 고른 값) — "tiles"(기본, 위성 타일만) | "composite"(그림 합성) | "extract"(합성 + 건물 추출).</summary>
-    public string OverlayMode { get; set; } = "tiles";
+    /// <summary>오버레이 이미지 기본 만들기 방식(마지막 고른 값) — "tiles"(위성 타일만) | "photo"(기본, 오버레이를 사진으로 · 건물 유지) |
+    /// "mask"(오버레이로 가리기, 보안) | "extract"(가리기 + 건물 찾기). 옛 값 "composite" 는 mask 로 읽는다(2026-10-18).</summary>
+    public string OverlayMode { get; set; } = "photo";
 
     // ── 전환 · 영역 값(설정 화면 「3D 지도」, 기본값 = 2026-10-17 까지의 고정값) ──
 
@@ -47,7 +48,7 @@ public class Map3DModel
     public double GuideMinSeconds { get; set; } = 0.6;
 
     /// <summary>
-    /// 주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 굽기 방식이 셋 중 하나가 아니면 tiles.
+    /// 주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 굽기 방식은 옛 "composite" → mask, 넷 중 하나가 아니면 tiles.
     /// 줌은 10~20.5 · 영역 200~5000 m · 안내 0~3 s 로 자르고(수가 아니면 기본값), 이탈 줌 &lt; 진입 줌(아니면 진입 − 0.5) · 미리 준비 ≤ 이탈.
     /// 주소가 바뀌었으면 true(다른 값 고침은 반환값에 넣지 않는다).
     /// </summary>
@@ -65,7 +66,7 @@ public class Map3DModel
         if (PreloadZoom > ExitZoom) PreloadZoom = ExitZoom;
 
         string mode = OverlayMode?.Trim().ToLowerInvariant() ?? "";
-        OverlayMode = mode is "composite" or "extract" ? mode : "tiles";
+        OverlayMode = mode == "composite" ? "mask" : mode is "photo" or "mask" or "extract" ? mode : "tiles";
         string before = ServerUrl;
         if (!Uri.TryCreate(ServerUrl?.Trim(), UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
