@@ -351,8 +351,12 @@
 	<utils:AddValueConverter x:Key="AddValueConverter" />
 	<utils:NegativeHalfConverter x:Key="NegativeHalfConverter" />
 	<utils:PositiveHalfConverter x:Key="PositiveHalfConverter" />
-	<utils:MultiAddValueConverter x:Key="MultiAddValueConverter" />
 	<utils:HalfAndAddConverter x:Key="HalfAndAddConverter" />
+	<utils:EnumToVisibilityConverter x:Key="EnumToVisibilityConverter" />
+	<!--<utils:MultiplyValueConverter x:Key="MultiplyValueConverter " />
+	<utils:MultiAddValueConverter x:Key="MultiAddValueConverter" />-->
+
+
 	<utilPass:PasswordBoxAssistant x:Key="PasswordBoxAssistant" />
 	<utilPass:PasswordMaskConverter x:Key="PasswordMaskConverter" />
 

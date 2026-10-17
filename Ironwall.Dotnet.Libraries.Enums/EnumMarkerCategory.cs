@@ -44,7 +44,7 @@ public enum EnumMarkerCategory
     /// <summary>
     /// 분석/예측 마커 (추정 위치 등)
     /// </summary>
-    ANALYSIS,
+    //ANALYSIS,
 
     /// <summary>
     /// 인프라/시설물
@@ -54,5 +54,5 @@ public enum EnumMarkerCategory
     /// <summary>
     /// 독립적 이벤트 심볼 (특수 상황용)
     /// </summary>
-    EVENT_SYMBOLS
+    //EVENT_SYMBOLS
 }

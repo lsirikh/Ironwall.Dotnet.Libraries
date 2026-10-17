@@ -165,6 +165,25 @@ public interface IGMapDbService
     Task<bool> DeleteDefinedMapAsync(
         IDefinedMapModel model, CancellationToken token = default);
 
+    /// <summary>
+    /// DefinedMap 메타데이터 업데이트 (MBTiles 파일 변경 시 bounds/zoom 갱신)
+    /// </summary>
+    Task UpdateDefinedMapMetadataAsync(
+        int mapId,
+        double minLat, double maxLat,
+        double minLng, double maxLng,
+        int minZoom, int maxZoom,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// 지도 줌 범위(Min/MaxZoomLevel)만 갱신한다 — 설정정보>지도설정 편집용 (zoom-float-halfstep FR-20).
+    /// bounds 등 다른 컬럼은 건드리지 않는다. UpdatedAt=NOW() 갱신으로 MBTiles 시드의
+    /// "파일이 더 새로우면 메타데이터 원복" 경로(LastWriteTime 비교)로부터 사용자 편집을 보호한다.
+    /// </summary>
+    /// <returns>갱신된 행 존재 여부</returns>
+    Task<bool> UpdateMapZoomRangeAsync(
+        int mapId, int minZoom, int maxZoom, CancellationToken token = default);
+
     /*───────────────────── GeoControlPoint ────────────────*/
 
     /// <summary>
@@ -202,4 +221,105 @@ public interface IGMapDbService
     /// <returns>삭제 성공 여부</returns>
     Task<bool> DeleteControlPointAsync(
         IGeoControlPointModel model, CancellationToken token = default);
+
+    /*────────────────────── MapRoi (관심지역) ──────────────*/
+
+    /// <summary>
+    /// 특정 지도의 관심지역 목록을 조회한다.
+    /// </summary>
+    /// <param name="mapId">Maps.Id</param>
+    /// <param name="token">작업 취소 토큰</param>
+    Task<List<IMapRoiModel>?> FetchMapRoisAsync(
+        int mapId, CancellationToken token = default);
+
+    /// <summary>
+    /// PK 로 관심지역 한 건을 조회한다.
+    /// </summary>
+    /// <param name="id">MapRois.Id</param>
+    /// <param name="token">작업 취소 토큰</param>
+    Task<IMapRoiModel?> FetchMapRoiAsync(
+        int id, CancellationToken token = default);
+
+    /// <summary>
+    /// 관심지역을 INSERT 하고 PK 를 반환한다.
+    /// </summary>
+    /// <param name="model">삽입할 관심지역</param>
+    /// <param name="token">작업 취소 토큰</param>
+    Task<int> InsertMapRoiAsync(
+        IMapRoiModel model, CancellationToken token = default);
+
+    /// <summary>
+    /// 관심지역 Title 을 UPDATE 한다.
+    /// </summary>
+    /// <param name="id">MapRois.Id</param>
+    /// <param name="title">변경할 제목</param>
+    /// <param name="token">작업 취소 토큰</param>
+    /// <returns>업데이트 성공 여부</returns>
+    Task<bool> UpdateMapRoiTitleAsync(
+        int id, string title, CancellationToken token = default);
+
+    /// <summary>
+    /// PK 로 관심지역을 삭제한다.
+    /// </summary>
+    /// <param name="id">MapRois.Id</param>
+    /// <param name="token">작업 취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    Task<bool> DeleteMapRoiAsync(
+        int id, CancellationToken token = default);
+
+    /*────────────────────── CameraPopupPosition (카메라 RTSP 팝업 위치) ──────────────*/
+
+    /// <summary>카메라 팝업 위치를 Upsert(CameraId 단독 키, 다중 클라 공유).</summary>
+    Task<bool> UpsertCameraPopupPositionAsync(ICameraPopupPositionModel model, CancellationToken token = default);
+    /// <summary>카메라 Id로 저장된 팝업 위치 조회(없으면 null).</summary>
+    Task<ICameraPopupPositionModel?> GetCameraPopupPositionAsync(int cameraId, CancellationToken token = default);
+    /// <summary>모든 카메라 팝업 위치 조회.</summary>
+    Task<List<ICameraPopupPositionModel>?> FetchCameraPopupPositionsAsync(CancellationToken token = default);
+    /// <summary>카메라 Id로 저장된 팝업 위치 삭제.</summary>
+    Task<bool> DeleteCameraPopupPositionAsync(int cameraId, CancellationToken token = default);
+
+    /*────────────────────── CameraPopupHubPosition (제어 허브 위치, 단일 행) ──────────────*/
+
+    /// <summary>제어 허브 화면 좌표(X,Y) Upsert(단일 행 Id=1). (CameraPopup_ControlHub FR-08)</summary>
+    Task UpsertCameraPopupHubPositionAsync(double x, double y, CancellationToken token = default);
+    /// <summary>저장된 제어 허브 화면 좌표 조회(없으면 null).</summary>
+    Task<CameraPopupHubPositionDto?> GetCameraPopupHubPositionAsync(CancellationToken token = default);
+
+    /*────────────────────── CameraPtzPresets (PTZ 프리셋, 로컬 DB) ──────────────*/
+
+    /// <summary>카메라의 PTZ 프리셋 목록 조회(Home 우선, 이름 순).</summary>
+    Task<List<IPtzPresetModel>?> FetchPtzPresetsAsync(int cameraId, CancellationToken token = default);
+    /// <summary>PTZ 프리셋 Upsert((CameraId, PresetName) 유니크 → 덮어쓰기).</summary>
+    Task<bool> UpsertPtzPresetAsync(IPtzPresetModel model, CancellationToken token = default);
+    /// <summary>PTZ 프리셋 삭제(Id).</summary>
+    Task<bool> DeletePtzPresetAsync(int presetId, CancellationToken token = default);
+    /// <summary>카메라의 Home 프리셋 지정(presetId만 IsHome=1, 카메라당 1개).</summary>
+    Task<bool> SetHomePtzPresetAsync(int cameraId, int presetId, CancellationToken token = default);
+
+    /*────────────────────── CameraTrackPoints (추적 좌표 영속, 로컬 DB) ──────────*/
+
+    /// <summary>추적 좌표 일괄 저장(수신 batch). 반환=삽입 행수.</summary>
+    Task<int> InsertTrackPointsAsync(IEnumerable<ITrackPointModel> points, CancellationToken token = default);
+    /// <summary>시간범위 추적 좌표 조회(observed_at ASC). cameraId null=전체.</summary>
+    Task<List<ITrackPointModel>?> FetchTrackPointsAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken token = default);
+    /// <summary>보존정책 — 기준 시각 이전 좌표 삭제. 반환=삭제 행수.</summary>
+    Task<int> DeleteTrackPointsBeforeAsync(DateTime cutoffUtc, CancellationToken token = default);
+
+    /*────────────────────── MapLayer (레이어 관리) ─────────────*/
+
+    Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default);
+    Task<int> InsertMapLayerAsync(IMapLayerModel model, CancellationToken token = default);
+    Task<bool> UpdateMapLayerAsync(IMapLayerModel model, CancellationToken token = default);
+    Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default);
+    Task<bool> UpdateMapLayerOpacityAsync(int id, double opacity, CancellationToken token = default);
+    Task<bool> DeleteMapLayerAsync(int id, CancellationToken token = default);
+
+    /// <summary>
+    /// 레이어 순서(ZOrder) 일괄 기록 — <b>한 트랜잭션</b>. 드래그 · Alt+↑↓ · 우클릭 위로/아래로가 전부 이 한 번의 호출로 끝난다.
+    /// </summary>
+    /// <returns>전 행이 갱신되면 true. 한 행이라도 없으면(다른 세션이 지움) 전부 되돌리고 false.</returns>
+    Task<bool> BatchUpdateMapLayerZOrderAsync(IReadOnlyList<(int Id, int ZOrder)> changes, CancellationToken token = default);
+
+    Task<int> GetNextZOrderAsync(string layerType, CancellationToken token = default);
+    Task SeedDefaultSymbolLayersAsync(CancellationToken token = default);
 }

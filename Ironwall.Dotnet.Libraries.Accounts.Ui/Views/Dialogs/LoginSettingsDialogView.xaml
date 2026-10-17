@@ -1,0 +1,67 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs.LoginSettingsDialogView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	AutomationProperties.AutomationId="Accounts.LoginSettings.Panel"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	KeyboardNavigation.TabNavigation="Cycle">
+	<!--
+		로그인 설정 — 로그인 화면 머리의 톱니가 로그인 패널 칸 위에 얹는다(로그인 전에도). 커널 다이얼로그 틀 T4 · S 400.
+		· 버튼 · ESC · Enter 는 틀이 정한다: 첫 포커스 [취소] · ESC = 취소 · Enter = [저장](바꾼 것이 있을 때만 켜진다).
+		· 저장하면 같은 창이 재시작 안내로 바뀐다 — [지금 다시 시작] · [나중에](앱에 재시작 길이 없으면 [닫기]만). 안내는 버튼 줄 왼쪽 글.
+		· 설명은 머리 "?"(Accounts.LoginSettings)로 — 화면에는 값과 상태만.
+		· Tab 은 이 창 안에서만 돈다 — 아래 로그인 칸으로 새지 않게.
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</UserControl.Resources>
+
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource ScrimModalBrush}"
+		DialogKey="Accounts.LoginSettings"
+		HelpKey="Accounts.LoginSettings"
+		IsPrimaryEnabled="{Binding IsPrimaryEnabled}"
+		Message="{Binding Message}"
+		MessageSeverity="{Binding MessageSeverity}"
+		PrimaryInvoked="OnPrimaryInvoked"
+		PrimaryText="{Binding PrimaryText}"
+		SecondaryInvoked="OnSecondaryInvoked"
+		SecondaryText="{Binding SecondaryText}"
+		Size="Small"
+		Title="로그인 설정">
+		<StackPanel>
+			<c:ConsoleField>
+				<c:ConsoleField.Header>
+					<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="SSO 연동 사용" />
+				</c:ConsoleField.Header>
+				<ToggleButton
+					HorizontalAlignment="Left"
+					AutomationProperties.AutomationId="Accounts.LoginSettings.SsoEnabledToggle"
+					AutomationProperties.Name="SSO 연동 사용"
+					IsChecked="{Binding IsSsoEnabled, Mode=TwoWay}"
+					IsEnabled="{Binding IsEditable}"
+					Style="{StaticResource Console.ToggleSwitch}" />
+			</c:ConsoleField>
+
+			<c:ConsoleField>
+				<c:ConsoleField.Header>
+					<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="지금 상태" />
+				</c:ConsoleField.Header>
+				<TextBlock
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Accounts.LoginSettings.SsoStatusText"
+					FontSize="13"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding SsoStatus}"
+					TextWrapping="Wrap" />
+			</c:ConsoleField>
+		</StackPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

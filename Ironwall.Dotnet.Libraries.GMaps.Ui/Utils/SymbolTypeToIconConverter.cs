@@ -23,6 +23,9 @@ public class SymbolTypeToIconConverter : IValueConverter
         //{ "Text", PackIconKind.Text },
         //{ "Flag", PackIconKind.Flag },
         
+        // GEOMETRICS
+
+
         // VEHICLES
         { "Car", PackIconKind.Car },
         //{ "Truck", PackIconKind.Truck },
@@ -34,7 +37,7 @@ public class SymbolTypeToIconConverter : IValueConverter
         //{ "Helicopter", PackIconKind.Helicopter },
         
         // MILITARY_SYMBOLS
-        { "Infantry", PackIconKind.AccountGroup },
+        { "Register", PackIconKind.WindowOpen },
         //{ "Armor", PackIconKind.Tank },
         //{ "Air_Defense", PackIconKind.Shield },
         //{ "Command", PackIconKind.AccountTie },
@@ -46,37 +49,26 @@ public class SymbolTypeToIconConverter : IValueConverter
         { "Multi", PackIconKind.DoorbellVideo },
         { "Fence", PackIconKind.Fence },
         { "IpCamera", PackIconKind.Camera },
+        { "IpSpeaker", PackIconKind.Speaker },
+        { "SmartSensor", PackIconKind.Chip },
+        { "Fence_Group", PackIconKind.Fence },
         //{ "Radar", PackIconKind.Radar },
         //{ "Control_Box", PackIconKind.Cube },
         //{ "Gate", PackIconKind.Gate },
         //{ "Barrier", PackIconKind.Barrier },
         
         // AREA_BOUNDARY
-        { "Zone", PackIconKind.MapOutline },
-        //{ "Perimeter", PackIconKind.BorderAll },
-        //{ "Road", PackIconKind.Road },
-        //{ "Building", PackIconKind.Building },
+        { "Area", PackIconKind.MapOutline },
+        { "Line", PackIconKind.VectorPolylineEdit },
         //{ "Bridge", PackIconKind.Bridge },
         //{ "Forest", PackIconKind.Tree },
         
-        // ANALYSIS
-        { "Predicted_Path", PackIconKind.TrendingUp },
-        //{ "Risk_Area", PackIconKind.Alert },
-        //{ "Search_Zone", PackIconKind.Magnify },
-        //{ "Target_Area", PackIconKind.Target },
-        //{ "Escape_Route", PackIconKind.ExitToApp },
-        
         // INFRASTRUCTURE
-        { "Tower", PackIconKind.TransmissionTower },
-        //{ "Power_Plant", PackIconKind.Factory },
+        { "Factory", PackIconKind.Factory },
         //{ "Substation", PackIconKind.ElectricSwitch },
         //{ "Antenna", PackIconKind.Antenna },
         
-        // EVENT_SYMBOLS
-        { "Alert", PackIconKind.Alert },
-        //{ "Warning", PackIconKind.Warning },
-        //{ "Incident", PackIconKind.Information },
-        //{ "Fire", PackIconKind.Fire },
+      
     };
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

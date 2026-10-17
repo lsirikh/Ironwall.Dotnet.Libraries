@@ -1,0 +1,16 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/BasePropertyStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  멀티셀렉트 혼합 타입 공통 속성창 — BasePropertyStyle(공통 속성 편집 필드) 그대로 사용.
+	      그룹 Pending 모드(EnterGroupMode)가 "전원 동일=값 / 서로 다름=빈칸"을 채우고,
+	      값 입력 시 MapViewModel이 선택된 전 마커에 일괄 적용+배치 Undo. (기능 ② 확정 스펙)  -->
+	<Style
+		BasedOn="{StaticResource BasePropertyStyle}"
+		TargetType="{x:Type properties:GMapPropertyCommonControl}" />
+</ResourceDictionary>

@@ -1,0 +1,251 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        카메라 팝업 호스트 스타일(T-05). 색은 전부 라이브러리 토큰(DynamicResource — 테마 전환 때 매번 재해석).
+        예외: 영상 위 글자 · 칩은 영상이 테마와 무관하게 어두우므로 테마 불변 값(아래 CameraPopup.Video*)을 쓴다
+        (스토리보드 §3 .tile2 와 같은 처리).
+    -->
+
+    <!-- ══ 테마 불변(영상 위) ══ -->
+    <SolidColorBrush x:Key="CameraPopup.VideoBackgroundBrush" Color="#0A0F14" />
+    <SolidColorBrush x:Key="CameraPopup.VideoChipBrush" Color="#8C000000" />
+    <SolidColorBrush x:Key="CameraPopup.VideoTextBrush" Color="#F2F6FA" />
+    <SolidColorBrush x:Key="CameraPopup.VideoMutedTextBrush" Color="#C9D6E2" />
+    <!-- 배지 글자(빨강 위 흰 글자 · 주황 위 어두운 글자) -->
+    <SolidColorBrush x:Key="CameraPopup.OnCriticalBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CameraPopup.OnWarningBrush" Color="#1A1004" />
+
+    <BooleanToVisibilityConverter x:Key="CameraPopup.BoolToVis" />
+
+    <!-- ══ 우클릭 메뉴(암시적 — 호스트의 모든 ContextMenu) ══ -->
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="HasDropShadow" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="{DynamicResource RadiusMedium}" Padding="0,4" MinWidth="190">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Separator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1" Margin="8,4" Background="{DynamicResource DividerBrush}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="Bd" Background="Transparent" Padding="8,5,10,5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="18" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="16" />
+                                </Grid.ColumnDefinitions>
+                                <!-- 체크는 글자(모양)로 — 색만으로 구분하지 않는다 -->
+                                <TextBlock x:Name="Check" Text="✓" FontWeight="Bold" Visibility="Collapsed"
+                                           Foreground="{DynamicResource PrimaryBrush}" VerticalAlignment="Center" />
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" />
+                                <TextBlock x:Name="Arrow" Grid.Column="2" Text="▸" Visibility="Collapsed" HorizontalAlignment="Right"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="-2" AllowsTransparency="True" Focusable="False"
+                               PopupAnimation="None"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="{DynamicResource RadiusMedium}" Padding="0,4" MinWidth="150">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="360">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ══ 머리 단추(✕) ══ -->
+    <Style x:Key="CameraPopup.HeaderButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="MinWidth" Value="28" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="{DynamicResource RadiusSmall}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ══ 📌 고정(켜짐 = 테두리 상자 + "고정" 글자 — 모양으로 구분) ══ -->
+    <Style x:Key="CameraPopup.PinToggle" TargetType="ToggleButton">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="{DynamicResource RadiusSmall}" Padding="{TemplateBinding Padding}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="📌" FontFamily="Segoe UI Emoji" VerticalAlignment="Center" />
+                            <TextBlock x:Name="OnText" Text="고정" Margin="4,0,0,0" FontWeight="SemiBold" Visibility="Collapsed" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TintInfoBrush}" />
+                            <Setter TargetName="OnText" Property="Visibility" Value="Visible" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ══ 영상 위 칩 · 칩 단추 ══ -->
+    <Style x:Key="CameraPopup.VideoChip" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CameraPopup.VideoChipBrush}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusSmall}" />
+        <Setter Property="Padding" Value="6,1" />
+    </Style>
+
+    <Style x:Key="CameraPopup.VideoText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource CameraPopup.VideoTextBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="CameraPopup.ChipButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{DynamicResource CameraPopup.VideoTextBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CameraPopup.VideoChipBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CameraPopup.VideoMutedTextBrush}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="8,1" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="{DynamicResource RadiusSmall}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource CameraPopup.VideoTextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ══ PTZ 패드 단추 ══ -->
+    <Style x:Key="CameraPopup.PadButton" TargetType="Button" BasedOn="{StaticResource CameraPopup.ChipButton}">
+        <Setter Property="Width" Value="30" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Margin" Value="1" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- ══ 끌기 손잡이(Thumb — peer 있음). 점 6개 그립 ══ -->
+    <Style x:Key="CameraPopup.GripThumb" TargetType="Thumb">
+        <Setter Property="Cursor" Value="SizeAll" />
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="Bd" Background="{DynamicResource CameraPopup.VideoChipBrush}" CornerRadius="{DynamicResource RadiusSmall}">
+                        <Path Data="M5,4 h2.4 v2.4 h-2.4 z M10.6,4 h2.4 v2.4 h-2.4 z M5,8.8 h2.4 v2.4 h-2.4 z M10.6,8.8 h2.4 v2.4 h-2.4 z M5,13.6 h2.4 v2.4 h-2.4 z M10.6,13.6 h2.4 v2.4 h-2.4 z"
+                              Fill="{DynamicResource CameraPopup.VideoTextBrush}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

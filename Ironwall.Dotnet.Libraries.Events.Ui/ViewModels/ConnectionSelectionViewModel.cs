@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -43,7 +44,6 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
         foreach (var item in _selection)
         {
             item.MessageType = MessageType ?? item.MessageType;
-            item.EventGroup = EventGroup ?? item.EventGroup;
             item.Device = Device ?? item.Device;
             item.Status = Status ?? item.Status;
             item.DateTime = DateTime ?? item.DateTime;
@@ -121,22 +121,49 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
     public void RefreshAll()
     {
         MessageType = CommonOrNullValue(_selection, m => m.MessageType);
-        EventGroup = CommonOrNullString(_selection, m => m.EventGroup);
         Device = CommonOrNullReference(_selection, DeviceProvider, _log);
         Status = CommonOrNullValue(_selection, m => m.Status);
         DateTime = CommonOrNullValue(_selection, m => m.DateTime);
+
+        // 읽기 전용 장비 필수정보 표시 갱신 (탐지/장애와 동일)
+        NotifyOfPropertyChange(nameof(DeviceZoneText));
+        NotifyOfPropertyChange(nameof(DeviceTypeText));
+        NotifyOfPropertyChange(nameof(DeviceNameText));
+        NotifyOfPropertyChange(nameof(DeviceNumberText));
     }
     #endregion
     #region - IHanldes -
     #endregion
     #region - Properties -
     public EnumEventType? MessageType { get; set; }
-    public string? EventGroup { get; set; }
     public IBaseDeviceModel? Device { get; set; }
     public EnumTrueFalse? Status { get; set; }
     public DateTime? DateTime { get; set; }
     public ConnectionEventPanelViewModel PanelViewModel { get; }
     public DeviceProvider DeviceProvider { get; }
+
+    // ── 장비 필수정보 읽기 전용 표시 — 연결 이벤트는 서버 관측값(device_id 불변, PUT=type_event만).
+    //    탐지/장애 SelectionView와 동일한 구역/종류/장비/번호만 노출(Type·상태·시각 불필요). ──
+    public string DeviceNameText   => Device?.DeviceName is string n && n.Length > 0 ? n : "—";
+    public string DeviceTypeText   => Device != null ? EnumKoreanMap.To(Device.DeviceType) : "—";
+    public string DeviceNumberText => Device is { } d ? d.DeviceNumber.ToString() : "—";
+
+    /// <summary>장비 소속 구역(그룹) 이름 — DeviceGroups(Id)→DeviceGroupProvider 변환(DetectionSelection 패턴 미러).</summary>
+    public string DeviceZoneText
+    {
+        get
+        {
+            var groups = Device?.DeviceGroups;
+            if (groups == null || groups.Count == 0) return "—";
+            try
+            {
+                var provider = IoC.Get<DeviceGroupProvider>();
+                return string.Join(", ", groups.Select(id =>
+                    provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+            }
+            catch { return string.Join(", ", groups); }
+        }
+    }
     #endregion
     #region - Attributes -
     private readonly IList<ConnectionEventViewModel> _selection;

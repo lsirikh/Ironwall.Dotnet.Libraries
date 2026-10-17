@@ -1,0 +1,81 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerMetricHistoryView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers"
+	c:ConsoleWindowChrome.DressWindow="True"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		지표 이력(N-12) — 값만 보인다. 임계 배지를 그리지 않는다(SB L1359).
+	-->
+	<UserControl.Resources>
+		<local:TextToVisibilityConverter x:Key="TextToVisibility" />
+	</UserControl.Resources>
+
+	<DockPanel Margin="12" LastChildFill="True">
+		<DockPanel Margin="0,10,0,0" DockPanel.Dock="Bottom" LastChildFill="False">
+			<Button
+				Padding="14,4"
+				AutomationProperties.AutomationId="Servers.MetricHistory.Close"
+				Click="OnClose"
+				Content="닫기"
+				DockPanel.Dock="Right"
+				Style="{StaticResource Console.Button}" />
+		</DockPanel>
+
+		<Grid Margin="0,10,0,0">
+			<DataGrid
+				AutomationProperties.AutomationId="Servers.MetricHistory.Grid"
+				AutoGenerateColumns="False"
+				CanUserReorderColumns="False"
+				CanUserSortColumns="False"
+				HeadersVisibility="Column"
+				IsReadOnly="True"
+				ItemsSource="{Binding Rows}"
+				Style="{StaticResource Console.DataGrid}">
+				<!--  콘솔 표 스타일 — 빠져 있던 동안 MDIX 기본 회색 바탕이 창 바탕(토큰)과 어긋났다(2026-09-30 r15 갤러리 021).  -->
+				<!--  U-18 — 최소폭 합(540)이 이력 창 안쪽(536)보다 4 넓어 가로 스크롤이 섰다. 지표 칸(값 "91.5%")은 80 이면 넉넉하다.  -->
+				<DataGrid.Columns>
+					<DataGridTextColumn
+						Width="130"
+						MinWidth="130"
+						Binding="{Binding TimeText}"
+						Header="관측 시각" />
+					<DataGridTextColumn
+						Width="*"
+						MinWidth="80"
+						Binding="{Binding Cpu}"
+						Header="CPU" />
+					<DataGridTextColumn
+						Width="*"
+						MinWidth="80"
+						Binding="{Binding Ram}"
+						Header="메모리" />
+					<DataGridTextColumn
+						Width="*"
+						MinWidth="80"
+						Binding="{Binding Disk}"
+						Header="디스크" />
+					<DataGridTextColumn
+						Width="1.6*"
+						MinWidth="140"
+						Binding="{Binding Network}"
+						Header="네트워크" />
+				</DataGrid.Columns>
+			</DataGrid>
+
+			<!--  머리 줄(약 36) 아래에 둔다 — 예전 여백 14 는 "디스크" 머리 글자 위에 겹쳤다(2026-09-30 사용자 보고).  -->
+			<TextBlock
+				Margin="0,52,0,0"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Top"
+				AutomationProperties.AutomationId="Servers.MetricHistory.Empty"
+				FontSize="12.5"
+				Foreground="{DynamicResource TextMutedBrush}"
+				Text="{Binding EmptyText}"
+				Visibility="{Binding EmptyText, Converter={StaticResource TextToVisibility}}" />
+		</Grid>
+	</DockPanel>
+</UserControl>

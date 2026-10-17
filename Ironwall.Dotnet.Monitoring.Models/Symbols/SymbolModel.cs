@@ -23,6 +23,7 @@ public class SymbolModel : BaseModel, ISymbolModel
         Id = 0;
         Pid = 0;
         Title = "Unknown";
+        TitleSize = 15;
         OperationState = EnumOperationState.NONE;
         Latitude = 0.0;       // 순수 double 타입
         Longitude = 0.0;      // 순수 double 타입
@@ -56,6 +57,7 @@ public class SymbolModel : BaseModel, ISymbolModel
     #region - 기본 식별 속성 -
     public int Pid { get; set; }
     public string Title { get; set; }
+    public double TitleSize { get; set; }
     #endregion
 
     #region - 타입 및 상태 속성 -
@@ -87,8 +89,35 @@ public class SymbolModel : BaseModel, ISymbolModel
     public EnumMarkerCategory Category { get; set; }
     public bool ShowShape { get; set; }
     public bool ShowTitle { get; set; }
+    /// <summary>레이어 마스터 가시성(조건2) — 레이어 패널 체크. false=심볼 전체(모양+Indicator+제목) 숨김.
+    /// 속성창 ShowShape/ShowTitle(조건3)과 독립·상위 게이트. 기본 true(전 생성자·전 파생 impl 자동 커버).</summary>
+    public bool Visible { get; set; } = true;
+    /// <summary>잠금 상태 — true면 맵에서 클릭/선택 불가(레이어 패널에서만 토글). 기본 false.</summary>
+    public bool IsLocked { get; set; }
     public EnumColorType FillColor { get; set; } = EnumColorType.Blue;
     public EnumColorType StrokeColor { get; set; } = EnumColorType.White;
     public double StrokeThickness { get; set; } = 1.0;
     #endregion
+
+    #region - 레이어 순서 -
+    public int ZOrder { get; set; } = 10;
+    #endregion
+
+    #region - 라벨 오프셋 (Symbol_Label_Decouple) -
+    /// <summary>라벨 상대 오프셋 X(화면 픽셀, 아이콘 중심 기준). 0=기본위치.</summary>
+    public double LabelOffsetX { get; set; }
+    /// <summary>라벨 상대 오프셋 Y(화면 픽셀, 아이콘 중심 기준). 0=기본위치.</summary>
+    public double LabelOffsetY { get; set; }
+    #endregion
+
+    #region - 라벨 스타일 (Overlay_Title_ZoomStyle FR-05·13 v2.5) -
+    // 색=FillColor와 동일 EnumColorType(심볼 기본 색상 콤보 재사용). White/Black(α합성)≈종전 하드코딩 시각. DB DEFAULT와 삼위일치.
+    public EnumColorType TitleColor { get; set; } = EnumColorType.White;
+    public EnumColorType TitleBackground { get; set; } = EnumColorType.Black;
+    public string TitleFontFamily { get; set; } = string.Empty;   // 빈값=Segoe UI
+    public bool TitleBold { get; set; }
+    public bool TitleItalic { get; set; }
+    public double TitleMaxWidth { get; set; } = 200.0;
+    #endregion
+
 }

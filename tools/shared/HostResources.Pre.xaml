@@ -1,0 +1,35 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+	<!--
+		D-28 / D-2026-09-23 — shared preview-tool resource stack, part 1 of 2 (see HostResources.Post.xaml
+		for part 2; the MahApps/BundledTheme split rationale is below).
+
+		Mirrors the host app's App.xaml MahApps.Metro dictionaries VERBATIM, in the host's order
+		(C:\workspace_app\Dotnet.Monitoring.Solution\Dotnet.Monitoring.Solution\App.xaml:15-17).
+
+		Linked (not copied) as tools/shared/HostResources.Pre.xaml into every tools/*-console-preview
+		project and console-gallery, so the five preview tools can never drift from each other or from the
+		host — see the D-28 ledger entry. Before this file existed: 4 of the 5 tools merged ZERO MahApps
+		dictionaries (MDIX only) and 1 (console-gallery) merged NEITHER MahApps NOR MDIX. Consequence
+		(measured): MahApps' own templates resolve keys such as MahApps.Styles.Button.Chromeless /
+		MahApps.Styles.ContentControl.PathIcon / MahApps.Styles.DatePickerTextBox via DynamicResource —
+		inside the tools those lookups failed, so mah:DateTimePicker's calendar toggle rendered as a solid
+		teal #009688 block and a bare ContentPresenter printed raw Path geometry as text. That was a
+		PHANTOM defect the host itself (which has this catalog) does not show. The reverse direction is
+		just as real: a tool missing this catalog can also HIDE a defect the host does have.
+
+		<md:BundledTheme .../> (host App.xaml:22-26) is deliberately NOT in this shared file — it stays a
+		direct child of each tool's own Resources.MergedDictionaries because tools/*-console-preview's
+		App.xaml.cs (ApplyDark) does `Resources.MergedDictionaries.OfType<BundledTheme>()`, which only
+		enumerates DIRECT top-level entries. Nesting BundledTheme inside a shared merged dictionary would
+		make that lookup return zero results and silently break the dark-mode Material color switch. See
+		HostResources.Post.xaml for the rest of the host's list (MaterialDesign3.Defaults.xaml onward).
+	-->
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+		<ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+		<ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Light.Blue.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>

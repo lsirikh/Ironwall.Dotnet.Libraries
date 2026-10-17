@@ -6,13 +6,13 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Db.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Providers;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 using MySql.Data.MySqlClient;
 using System;
 using System.Buffers;
+using System.IO;
 using System.Data;
 using System.Security.Cryptography;
-using System.Threading;
-using System.Windows.Media.Media3D;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Db.Services;
 /****************************************************************************
@@ -23,9 +23,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Services;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
+internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 {
-
     #region - Ctors -
     /// <summary>
     /// GMapDbSymbolService 생성자
@@ -38,12 +37,22 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                                IEventAggregator eventAggregator,
                                SymbolProvider symbolProvider,
                                GeometricSymbolProvider geometrySymbolProvider,
+                               PidsSymbolProvider pidsSymbolProvider,
+                               MilitarySymbolProvider militarySymbolProvider,
+                               LineSymbolProvider lineSymbolProvider,
+                               InfraSymbolProvider infraSymbolProvider,
+                               PidsGroupSymbolProvider pidsGroupSymbolProvider,
                                GMapDbSetupModel setupModel)
     {
         _log = log;
         _eventAggregator = eventAggregator;
         _symbolProvider = symbolProvider;
         _geometrySymbolProvider = geometrySymbolProvider;
+        _pidsSymbolProvider = pidsSymbolProvider;
+        _militarySymbolProvider = militarySymbolProvider;
+        _lineSymbolProvider = lineSymbolProvider;
+        _infraSymbolProvider = infraSymbolProvider;
+        _pidsGroupSymbolProvider = pidsGroupSymbolProvider;
         _setup = setupModel;
     }
     #endregion
@@ -221,6 +230,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 _log?.Info("Symbol DB 연결 종료 완료");
             }
         }
+        catch (IOException)
+        {
+            // 앱 종료 시 소켓 선종료 후 MySQL close 패킷 전송 실패 — 정상 패턴, 무시
+        }
         catch (Exception ex)
         {
             _log?.Error($"Symbol DB 연결 종료 실패: {ex.Message}");
@@ -252,6 +265,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     `Id`                INT AUTO_INCREMENT PRIMARY KEY,
                     `Pid`               INT NOT NULL DEFAULT 0,
                     `Title`             VARCHAR(200) NOT NULL,                          -- 심볼제목
+                    `TitleSize`         DECIMAL(4,2) DEFAULT 10.0,                      -- 제목크기
                     `OperationState`    VARCHAR(20) NOT NULL DEFAULT 'NONE',            -- 운영상태
                     `Latitude`          DECIMAL(10,8) NOT NULL,                         -- 위도
                     `Longitude`         DECIMAL(11,8) NOT NULL,                         -- 경도
@@ -261,11 +275,22 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     `Width`             DECIMAL(8,3) DEFAULT 30,                        -- 넓이
                     `Height`            DECIMAL(8,3) DEFAULT 30,                        -- 크기
                     `Category`          VARCHAR(30) NOT NULL DEFAULT 'BASIC_SHAPES',    -- 심볼 카테고리
-                    `ShowShape`         BOOLEAN DEFAULT TRUE,                           -- 심볼 Visibility
-                    `ShowTitle`         BOOLEAN DEFAULT FALSE,                          -- 타이틀 Visibility
+                    `ShowShape`         BOOLEAN DEFAULT TRUE,                           -- 모양(아이콘/Indicator) 표시(속성창, 조건3)
+                    `ShowTitle`         BOOLEAN DEFAULT FALSE,                          -- 타이틀 표시(속성창, 조건3)
+                    `Visible`           BOOLEAN DEFAULT TRUE,                           -- 레이어 마스터 가시성(레이어패널, 조건2). false=심볼 전체 숨김
+                    `IsLocked`          BOOLEAN DEFAULT FALSE,                          -- 잠금 상태(맵 클릭 차단)
                     `FillColor`         VARCHAR(20) NOT NULL DEFAULT 'Blue',            -- 내부 색상
                     `StrokeColor`       VARCHAR(20) NOT NULL DEFAULT 'White',           -- 외부 선 라인 색상
                     `StrokeThickness`   DECIMAL(4,2) DEFAULT 1.0,                       -- 외부 선 라인 두께
+                    `ZOrder`            INT DEFAULT 10,                                 -- 레이어 순서 (높을수록 위)
+                    `LabelOffsetX`      DOUBLE DEFAULT 0,                               -- 라벨 상대 오프셋 X (화면 픽셀)
+                    `LabelOffsetY`      DOUBLE DEFAULT 0,                               -- 라벨 상대 오프셋 Y (화면 픽셀)
+                    `TitleColor`        VARCHAR(20) NOT NULL DEFAULT 'White',           -- 라벨 글자색(EnumColorType — FillColor 파이프라인, FR-06 v2.5)
+                    `TitleBackground`   VARCHAR(20) NOT NULL DEFAULT 'Black',           -- 라벨 배경색(EnumColorType, 렌더 α합성·Transparent=없음)
+                    `TitleFontFamily`   VARCHAR(100) DEFAULT '',                        -- 라벨 폰트(빈값=Segoe UI)
+                    `TitleBold`         BOOLEAN DEFAULT FALSE,                          -- 라벨 굵게
+                    `TitleItalic`       BOOLEAN DEFAULT FALSE,                          -- 라벨 이탤릭
+                    `TitleMaxWidth`     DECIMAL(5,1) DEFAULT 200.0,                     -- 라벨 최대폭 px(말줄임 지점, FR-13)
                     `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     `CreatedBy`         VARCHAR(100),
@@ -276,7 +301,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     INDEX `IX_Symbols_Colors` (`FillColor`, `StrokeColor`)
                 );";
 
-            // ── GeometrySymbols 테이블 (간소화) ──
+            // ── GeometrySymbols 테이블  ──
             var createGeometrySymbolsSql = @"
             CREATE TABLE IF NOT EXISTS `GeometrySymbols` (
                 `SymbolId`          INT PRIMARY KEY,
@@ -290,6 +315,190 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INDEX `IX_GeometrySymbols_ShapeType` (`ShapeType`)
             );";
 
+            // ── PidsSymbols 테이블 ──
+            var createPidsSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `PidsSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `LinkedDeviceId`    INT NOT NULL DEFAULT 0,
+                `DeviceType`        VARCHAR(20) NOT NULL DEFAULT 'Fence',
+                `ModelVariant`      VARCHAR(20) NULL,
+                `ShowFOV`           BOOLEAN DEFAULT FALSE,
+                `FOVColor`          VARCHAR(20) NOT NULL DEFAULT 'Red',
+                `FOVOpacity`        DECIMAL(3,2) DEFAULT 0.3,
+                `EventStatus`       VARCHAR(20) NOT NULL DEFAULT 'Normal',
+                `BaseBearing`       DECIMAL(5,2) DEFAULT 0.0,
+                `DetectionRange`    DECIMAL(8,2) NULL,
+                `DetectionAngle`    DECIMAL(5,2) NULL,
+                `DetectionBearing`  DECIMAL(6,3) NULL,
+                `GateWidthM`        DECIMAL(4,1) NULL,                              -- 통문 폭(m), NULL=기본 4.0 (FR-12)
+                `OpenOnContactOn`   BOOLEAN NOT NULL DEFAULT TRUE,                  -- ContactOn=열림 해석 (FR-12)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_PidsSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_PidsSymbols_DeviceType` (`DeviceType`),
+                INDEX `IX_PidsSymbols_LinkedDeviceId` (`LinkedDeviceId`),
+                INDEX `IX_PidsSymbols_EventStatus` (`EventStatus`)
+            );";
+
+            // ── MilitarySymbols 테이블 ──
+            var createMilitarySymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `MilitarySymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `Affiliation`       VARCHAR(20) NOT NULL DEFAULT 'Friend',              -- 소속구분 (Friend, Hostile, Neutral, Unknown)
+                `BattleDimension`   VARCHAR(20) NOT NULL DEFAULT 'Land',                -- 전투차원 (Land, Sea, Air, Subsurface)
+                `StandardIdentity`  VARCHAR(20) NOT NULL DEFAULT 'Present',             -- 표준정체성 (Present, Planned, Anticipated)
+                `UnitType`          VARCHAR(50) NOT NULL DEFAULT 'Artillery',            -- 부대종류 (Infantry, Artillery, Armour 등)
+                `UnitSize`          VARCHAR(20) NOT NULL DEFAULT 'Company',             -- 부대규모 (Squad, Platoon, Company 등)
+                `UnitDesignator`    VARCHAR(100),                                       -- 부대지시자 (부대명)
+                `HigherFormation`   VARCHAR(100),                                       -- 상급부대명
+                `CallSign`          VARCHAR(50),                                        -- 콜사인
+                `CountryCode`       VARCHAR(10),                                        -- 국가코드 (KR, US 등)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_MilitarySymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_MilitarySymbols_Affiliation` (`Affiliation`),
+                INDEX `IX_MilitarySymbols_BattleDimension` (`BattleDimension`),
+                INDEX `IX_MilitarySymbols_UnitType` (`UnitType`),
+                INDEX `IX_MilitarySymbols_UnitSize` (`UnitSize`),
+                INDEX `IX_MilitarySymbols_StandardIdentity` (`StandardIdentity`)
+            );";
+
+            // ── LineSymbols 테이블 ──
+            var createLineSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `LineSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `LineOpacity`       DECIMAL(3,2) DEFAULT 1.0,
+                `IsClosedPath`      BOOLEAN DEFAULT FALSE,
+                `ShowArrowHead`     BOOLEAN DEFAULT FALSE,
+                `LinePattern`       VARCHAR(20) NOT NULL DEFAULT 'Solid',
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_LineSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_LineSymbols_LinePattern` (`LinePattern`)
+            );";
+
+            // ── LinePoints 테이블 ──
+            var createLinePointsSql = @"
+            CREATE TABLE IF NOT EXISTS `LinePoints` (
+                `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+                `LineSymbolId`      INT NOT NULL,
+                `SequenceOrder`     INT NOT NULL,
+                `Latitude`          DECIMAL(10,8) NOT NULL,
+                `Longitude`         DECIMAL(11,8) NOT NULL,
+                `Altitude`          FLOAT DEFAULT 0,
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_LinePoints_LineSymbols`
+                    FOREIGN KEY (`LineSymbolId`) REFERENCES `LineSymbols` (`SymbolId`)
+                    ON DELETE CASCADE,
+                INDEX `IX_LinePoints_LineSymbolId` (`LineSymbolId`),
+                INDEX `IX_LinePoints_Sequence` (`LineSymbolId`, `SequenceOrder`),
+                UNIQUE KEY `UQ_LinePoints_Symbol_Sequence` (`LineSymbolId`, `SequenceOrder`)
+            );";
+
+            // ── InfraSymbols 테이블 ──
+            var createInfraSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `InfraSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `BuildingType`      VARCHAR(20) NOT NULL DEFAULT 'Factory',
+                `BuildingUsage`     VARCHAR(20) NOT NULL DEFAULT 'Office',
+                `FloorCount`        INT NOT NULL DEFAULT 1,
+                `BasementFloorCount` INT NOT NULL DEFAULT 0,
+                `BuildingArea`      DECIMAL(10,2) DEFAULT 100.0,
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_InfraSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE
+            );";
+
+            // ── PidsGroupSymbols 테이블 ──
+            var createPidsGroupSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `PidsGroupSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `LinkedDeviceGroup` INT NOT NULL DEFAULT 0,                         -- 연결된 디바이스 그룹 ID
+                `EventStatus`       VARCHAR(20) NOT NULL DEFAULT 'Normal',          -- 이벤트 상태 (Normal, Detecting, Fault, Connection)
+                `LineOpacity`       DECIMAL(3,2) DEFAULT 1.0,                       -- 라인 투명도
+                `IsClosedPath`      BOOLEAN DEFAULT TRUE,                           -- 닫힌 경로 여부 (그룹은 대부분 닫힌 경로)
+                `ShowArrowHead`     BOOLEAN DEFAULT FALSE,                          -- 화살표 표시 여부
+                `LinePattern`       VARCHAR(20) NOT NULL DEFAULT 'Solid',           -- 라인 패턴 (Solid, Dash, Dot 등)
+                `PostSpacingM`      DECIMAL(4,1) NULL,                              -- 3D 철망 기둥 간격(m), NULL=전역 설정 (FR-03)
+                `FenceHeightM`      DECIMAL(3,1) NULL,                              -- 3D 철망 높이(m), NULL=전역 설정
+                `FenceMode`         TINYINT NOT NULL DEFAULT 0,                     -- 0=Posts(기둥 간격) 1=SensorMount(센서 장착) (FR-04)
+                `Render3D`          BOOLEAN NOT NULL DEFAULT TRUE,                  -- 그룹별 3D 렌더 on/off (FR-06)
+                `ReverseSensorOrder` BOOLEAN NOT NULL DEFAULT FALSE,                -- 센서 노드 역순 번호 (FR-04)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_PidsGroupSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_PidsGroupSymbols_DeviceGroup` (`LinkedDeviceGroup`),
+                INDEX `IX_PidsGroupSymbols_EventStatus` (`EventStatus`)
+            );";
+
+            // ── PidsGroupPoints 테이블 (라인 포인트 저장용) ──
+            var createPidsGroupPointsSql = @"
+            CREATE TABLE IF NOT EXISTS `PidsGroupPoints` (
+                `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+                `GroupSymbolId`     INT NOT NULL,
+                `SequenceOrder`     INT NOT NULL,
+                `Latitude`          DECIMAL(10,8) NOT NULL,
+                `Longitude`         DECIMAL(11,8) NOT NULL,
+                `Altitude`          FLOAT DEFAULT 0,
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_PidsGroupPoints_PidsGroupSymbols`
+                    FOREIGN KEY (`GroupSymbolId`) REFERENCES `PidsGroupSymbols` (`SymbolId`)
+                    ON DELETE CASCADE,
+                INDEX `IX_PidsGroupPoints_GroupSymbolId` (`GroupSymbolId`),
+                INDEX `IX_PidsGroupPoints_Sequence` (`GroupSymbolId`, `SequenceOrder`),
+                UNIQUE KEY `UQ_PidsGroupPoints_Symbol_Sequence` (`GroupSymbolId`, `SequenceOrder`)
+            );";
+
+            // ── Images 테이블 ──
+            var createImagesSql = @"
+            CREATE TABLE IF NOT EXISTS `Images` (
+                `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+                `Title`             VARCHAR(200),                                       -- 이미지 제목
+                `FilePath`          VARCHAR(500) NOT NULL,                              -- 이미지 파일 경로
+                `Left`              DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 좌측 경도 (Left Longitude)
+                `Top`               DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 상단 위도 (Top Latitude)
+                `Right`             DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 우측 경도 (Right Longitude)
+                `Bottom`            DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 하단 위도 (Bottom Latitude)
+                `Latitude`          DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 중심 위도
+                `Longitude`         DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 중심 경도
+                `Altitude`          FLOAT DEFAULT 0,                                    -- 고도
+                `Zoom`              DECIMAL(3,1) DEFAULT 0,                             -- 표시 줌 레벨 (0 = 모든 줌 레벨)
+                `Width`             DECIMAL(10,3) DEFAULT 0,                            -- 이미지 너비 (픽셀)
+                `Height`            DECIMAL(10,3) DEFAULT 0,                            -- 이미지 높이 (픽셀)
+                `Opacity`           DECIMAL(3,2) DEFAULT 1.0,                           -- 투명도 (0.0 ~ 1.0)
+                `Rotation`          DECIMAL(6,3) DEFAULT 0,                             -- 회전 각도 (도)
+                `Visibility`        BOOLEAN DEFAULT TRUE,                               -- 표시 여부
+                `IsLocked`          BOOLEAN DEFAULT FALSE,                              -- 잠금 상태(맵 클릭 차단)
+                `HasGeoReference`   BOOLEAN DEFAULT FALSE,                              -- 지리 참조 여부
+                `CoordinateSystem`  VARCHAR(50),                                        -- 좌표계 (예: EPSG:4326)
+                `TitleSize`         DECIMAL(4,2) DEFAULT 11.0,                          -- 라벨 글자 크기 (Overlay_Title FR-10)
+                `ShowTitle`         BOOLEAN DEFAULT FALSE,                              -- 라벨 표시 여부 (FR-10)
+                `LabelOffsetU`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 U(하프익스텐트 비율, FR-02)
+                `LabelOffsetV`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 V(비율, FR-02)
+                `TitleColor`        VARCHAR(20) NOT NULL DEFAULT 'White',               -- 라벨 글자색(EnumColorType, FR-06 v2.5)
+                `TitleBackground`   VARCHAR(20) NOT NULL DEFAULT 'Black',               -- 라벨 배경색(EnumColorType, 렌더 α합성·Transparent=없음)
+                `TitleFontFamily`   VARCHAR(100) DEFAULT '',                            -- 라벨 폰트(빈값=Segoe UI)
+                `TitleBold`         BOOLEAN DEFAULT FALSE,                              -- 라벨 굵게
+                `TitleItalic`       BOOLEAN DEFAULT FALSE,                              -- 라벨 이탤릭
+                `TitleMaxWidth`     DECIMAL(5,1) DEFAULT 200.0,                         -- 라벨 최대폭 px(FR-13)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX `IX_Images_Location` (`Latitude`, `Longitude`),
+                INDEX `IX_Images_Bounds` (`Left`, `Top`, `Right`, `Bottom`)
+            );";
+
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
             if (_eventAggregator != null)
@@ -301,7 +510,298 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "GeometrySymbols 테이블 생성…" });
 
-            _log?.Info("Symbol 관련 테이블 생성/확인 완료");
+            await conn.ExecuteAsync(createPidsSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "PidsSymbols 테이블 생성…" });
+
+            // BuildSchemeAsync 메서드에서 실행
+            await conn.ExecuteAsync(createMilitarySymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MilitarySymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createLineSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "LineSymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createLinePointsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "LinePoints 테이블 생성…" });
+
+            await conn.ExecuteAsync(createInfraSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "InfraSymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createPidsGroupSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "PidsGroupSymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createPidsGroupPointsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "PidsGroupPoints 테이블 생성…" });
+
+            await conn.ExecuteAsync(createImagesSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "Images 테이블 생성…" });
+
+            // ── (제거됨) 레거시 ZIndex 컬럼 추가 + ZIndex → ZOrder 데이터 이관 ──
+            //  [GMap_Schema_Migration_Idempotency FR-03 · FR-04]
+            //
+            //  제거한 문장:
+            //      ALTER TABLE `Symbols` ADD COLUMN `ZIndex` INT DEFAULT 10;   ← FR-04
+            //      UPDATE Symbols SET ZOrder = ZIndex;                          ← FR-03 (위험)
+            //
+            //  이 UPDATE 는 배포 이후 단 한 번도 실행된 적이 없다. 같은 try 안에서 바로 앞의
+            //  ADD COLUMN `ZOrder` 가 기존 DB 에서 항상 1060(Duplicate column name)을 던져
+            //  catch 로 빠져나가기 때문이다. 즉 '동작하는 이관'이 아니라 '예외에 가려진 사문'이었다.
+            //
+            //  ZIndex 는 심볼 INSERT 컬럼 목록에 없어 모든 행이 DDL 기본값 10 에 고정돼 있고,
+            //  실제 레이어 순서는 ZOrder 만 담는다.
+            //  (실측 2026-08-04: Symbols 102행 전부 ZIndex=10, ZOrder=1000~1106, 불일치 102/102)
+            //  따라서 이 UPDATE 가 살아나면 WHERE 절 없이 전 행의 ZOrder 를 10 으로 평탄화하고,
+            //  아래 band shift 가 그 전부를 1010 으로 밀어 상대 순서가 소실된다. 그 상태로 지도를
+            //  로드하면 EnsureUniqueZOrder 가 중복을 감지해 마커 열거 순서대로 재번호한 뒤
+            //  BatchUpdateZOrderAsync 로 DB 에 확정 기록한다 → 코드 롤백으로 복구 불가.
+            //
+            //  ⚠ 예외 기반 가드를 information_schema 가드로 바꾸기 전에 반드시 제거해야 한다.
+            //     (예외가 사라지는 순간 이 UPDATE 가 처음으로 실행된다)
+
+            // ══════════════════════════════════════════════════════════════════════════════
+            //  스키마 마이그레이션 — information_schema 멱등 가드
+            //  [GMap_Schema_Migration_Idempotency FR-01·FR-02·FR-05~FR-09]
+            //
+            //  이전 방식: 매 부팅 ALTER TABLE ADD COLUMN 을 22회 실행하고 1060(Duplicate column
+            //  name)을 bare catch 로 삼켰다. 부팅마다 예외 22건이 발생했고, 무엇이 실제로 적용됐고
+            //  무엇이 실패했는지 로그에 전혀 남지 않았다.
+            //
+            //  현재 방식: 테이블당 1회 컬럼 메타를 조회해 부재 컬럼에만 ALTER 를 실행한다.
+            //  같은 솔루션의 GMapDbService.MigrateCustomMapsTableAsync 가 쓰는 검증된 패턴이다.
+            //  MariaDB 전용 `ADD COLUMN IF NOT EXISTS` 는 쓰지 않는다 — MySQL 서버에서 1064 로
+            //  전 마이그레이션이 죽고, 적용/스킵 여부를 앱이 알 수 없어 요약 로그를 만들 수 없다.
+            //
+            //  ⚠ 취소 비대상 구간(FR-09): 아래 DDL/DML 은 CancellationToken 을 전달하지 않는다.
+            //     DDL 은 암묵 커밋이라 중도 취소 시 원자적으로 되돌릴 수 없고, 스키마가 절반만
+            //     적용된 채 로드로 진행하면 심볼 0건 부팅이 된다. 시그니처의 token 은 위쪽
+            //     OpenConnectionAsync(token) 에만 쓴다. (토큰을 깜빡한 것이 아니라 의도된 설계다)
+            //     참고: MySql.Data 9.3.0 은 명령 실행 경로에서 CancellationToken 을 관측하지 않는다
+            //     — 취소 가능 지점은 MySqlConnection.OpenAsync 뿐이다.
+            // ══════════════════════════════════════════════════════════════════════════════
+
+            var applied = 0;
+            var skipped = 0;
+            var failed = 0;
+            var modified = 0;
+
+            // FR-02: 스냅샷은 반드시 CREATE TABLE 이후에 찍는다.
+            //        연결 직후에 찍으면 신규 DB 에서 전 컬럼을 '부재'로 오판한다.
+            var columnMeta = new Dictionary<string, Dictionary<string, ColumnMeta>?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Symbols"] = await LoadColumnMetaAsync(conn, "Symbols"),
+                ["Images"]  = await LoadColumnMetaAsync(conn, "Images"),
+                ["PidsSymbols"] = await LoadColumnMetaAsync(conn, "PidsSymbols"),
+                ["PidsGroupSymbols"] = await LoadColumnMetaAsync(conn, "PidsGroupSymbols"),   // FR-16: 사양표에 그룹 테이블이 포함되므로 반드시 로드(키 부재 = KeyNotFound 부팅 크래시)
+            };
+
+            // ── FR-01 · FR-10: 사양표 순회 — 부재 컬럼만 ADD ──
+            foreach (var spec in COLUMN_SPECS)
+            {
+                var meta = columnMeta[spec.Table];
+                if (meta is null)
+                {
+                    // 판정 불능(조회 실패/0행) — 추측으로 ALTER 하지 않는다
+                    skipped++;
+                    continue;
+                }
+                if (meta.ContainsKey(spec.Column))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                try
+                {
+                    await conn.ExecuteAsync($"ALTER TABLE `{spec.Table}` ADD COLUMN `{spec.Column}` {spec.Ddl};");
+                    applied++;
+                    _log?.Info($"{spec.Table}.{spec.Column} 컬럼 추가 완료");
+                }
+                catch (OperationCanceledException) { throw; }               // FR-06: 취소를 '스킵'으로 위장하지 않는다
+                catch (MySqlException mex) when (mex.Number is ERR_DUP_COLUMN or ERR_CANT_DROP)
+                {
+                    // 동시 부팅 경합 등으로 그 사이에 생긴 경우 — 정상 수렴
+                    skipped++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{spec.Table}.{spec.Column} 컬럼 추가 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            // ── FR-05: 색 컬럼 타입 교정(MODIFY) — ADD 가드와 분리 판정 ──
+            //    ADD 가드는 '컬럼 존재'만 본다. MODIFY 를 거기에 접으면 v2.2 INT 스키마로 생성된 DB 의
+            //    타입 교정 경로가 영구 정지한다(이 문장들은 오늘 유일하게 매 부팅 성공 실행되던 경로다).
+            //    따라서 COLUMN_TYPE / IS_NULLABLE 로 별도 판정하고, 실행하면 반드시 로그를 남긴다.
+            foreach (var (tbl, col, want) in new[]
+                     {
+                         ("Symbols", "TitleColor",      "'White'"),
+                         ("Symbols", "TitleBackground", "'Black'"),
+                         ("Images",  "TitleColor",      "'White'"),
+                         ("Images",  "TitleBackground", "'Black'"),
+                     })
+            {
+                var meta = columnMeta[tbl];
+                if (meta is null || !meta.TryGetValue(col, out var cm)) continue;
+                if (string.Equals(cm.ColumnType, "varchar(20)", StringComparison.OrdinalIgnoreCase) && !cm.IsNullable)
+                    continue;   // 이미 목표 타입 — 실행 불필요
+
+                try
+                {
+                    await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `{col}` VARCHAR(20) NOT NULL DEFAULT {want};");
+                    modified++;
+                    _log?.Info($"{tbl}.{col} 타입 교정 완료 ({cm.ColumnType} → varchar(20) NOT NULL)");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{tbl}.{col} 타입 교정 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            // ── zoom-float-halfstep FR-15: Zoom 컬럼 타입 교정(MODIFY) — 레거시 INT/DECIMAL(x,0) DB 대비 ──
+            //    정수형 Zoom 컬럼이면 하프스텝(17.5) INSERT 가 18로 반올림된다(SIM-P005). 색 컬럼과 동일하게
+            //    COLUMN_TYPE 별도 판정(ADD 가드에 접으면 타입 교정 영구 정지 — 위 FR-05 주석의 교훈).
+            //    ※ 목표 타입 근거는 실측 DECIMAL(3,1) (POCO 주석의 DECIMAL(4,3)은 오기 — 최대 9.999라 줌 표현 불가).
+            foreach (var (tbl, col, wantDefault) in new[]
+                     {
+                         ("Symbols", "Zoom", "17.0"),
+                         ("Images",  "Zoom", "0.0"),
+                     })
+            {
+                var meta = columnMeta[tbl];
+                if (meta is null || !meta.TryGetValue(col, out var cm)) continue;
+                if (cm.ColumnType.StartsWith("decimal(3,1)", StringComparison.OrdinalIgnoreCase))
+                    continue;   // 이미 목표 타입 — 실행 불필요
+
+                try
+                {
+                    await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `{col}` DECIMAL(3,1) DEFAULT {wantDefault};");
+                    modified++;
+                    _log?.Info($"{tbl}.{col} 타입 교정 완료 ({cm.ColumnType} → decimal(3,1))");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{tbl}.{col} 타입 교정 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            // ── FR-08: 레거시 숫자 색상값 정리 ──
+            //    이 4문은 배포 이후 한 번도 실행된 적이 없었다. `conn.ExecuteAsync(sql, token)` 형태로
+            //    CancellationToken 이 Dapper 의 param 슬롯에 들어갔는데, 정규식 '^-?[0-9]+$' 안의
+            //    홀로 선 '?' 가 Dapper 의 OleDb 판정에 걸려 파라미터 필터링이 꺼지고,
+            //    CancellationToken 을 파라미터로 바인딩하려다 NotSupportedException 으로 죽었다
+            //    (SQL 이 서버에 도달조차 못 했다). param 인자를 제거해 정상화한다.
+            //    WHERE 절이 자기제한적이라 반복 실행해도 멱등 — 2회차부터 0행이다.
+            foreach (var (tbl, col, fallback) in new[]
+                     {
+                         ("Symbols", "TitleColor",      "White"),
+                         ("Symbols", "TitleBackground", "Black"),
+                         ("Images",  "TitleColor",      "White"),
+                         ("Images",  "TitleBackground", "Black"),
+                     })
+            {
+                var meta = columnMeta[tbl];
+                if (meta is null || !meta.ContainsKey(col)) continue;
+
+                try
+                {
+                    var rows = await conn.ExecuteAsync(
+                        $"UPDATE `{tbl}` SET `{col}` = '{fallback}' WHERE `{col}` REGEXP '^-?[0-9]+$';");
+                    if (rows > 0) _log?.Info($"{tbl}.{col} 레거시 숫자 색상값 {rows}행 정리 완료");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{tbl}.{col} 숫자 색상값 정리 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            // ── 심볼 ZOrder Band 시프트 (FR-07: 영향 행수를 반드시 기록) ──
+            //    이미지 band(0~999)와 충돌 방지: 심볼 ZOrder 를 1000+ 대역으로 승격.
+            //    `WHERE ZOrder < 1000` 이 자기제한적이라 별도 멱등 마커가 필요 없다.
+            //    다만 이전 코드는 반환 행수를 버려 '0행'인지 '전 행'인지 구분할 수 없었다 —
+            //    band 이탈 행이 새로 유입되면 그것이 신호이므로 반드시 수치로 남긴다.
+            var bandShifted = 0;
+            if (columnMeta["Symbols"]?.ContainsKey("ZOrder") == true)
+            {
+                try
+                {
+                    bandShifted = await conn.ExecuteAsync(
+                        "UPDATE `Symbols` SET `ZOrder` = `ZOrder` + 1000 WHERE `ZOrder` < 1000;");
+                    if (bandShifted > 0)
+                        _log?.Info($"Symbols ZOrder band 시프트 {bandShifted}행 (1000+ 대역)");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"Symbols ZOrder band 시프트 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            // ── (제거됨) 구 '라인/PidsGroup 라벨 오프셋 px→비율 1회 정리' UPDATE (Overlay_Title OQ-1) ──
+            // 주석은 '1회'였으나 멱등 가드가 없어 BuildSchemeAsync 본문에서 '매 부팅' 재실행됐다. 그 결과
+            // 비등방(세로로 긴) 구역/라인 footprint에서 라벨을 옆으로 정상 드래그하면 축별 비율이 |v|>3을 만드는데,
+            // 이 UPDATE가 그 유효 비율값을 재시작마다 0으로 소거 → "라벨 위치가 재시작 시 초기화" 데이터손실 버그.
+            // 레거시 px 정리는 이 전환 코드 배포 직후 이미 완료(이후 부팅에서 걸리는 >3 값은 사실상 정상 드래그값).
+            // → 제거하여 모든 크기의 유효 드래그 비율값을 보존(라벨 위치 재시작 유지). 재드래그 없이도 향후 손실 차단.
+
+            // ── 라인/PidsGroup 라벨 오프셋 비율 캡(±3) 초과 복구 (2026-10-16 DbProbe '라벨오프셋 도메인잔재(비율)') ──
+            //    위 제거 사유(정상 드래그가 축별 |v|>3 을 만듦)는 LabelAdorner 가 축별 ±3 으로 묶도록 고쳐 사라졌다.
+            //    이제 >3 은 정상 경로로 생길 수 없다 — ⓐ px 레거시 또는 ⓑ 가는 축 클램프 퇴화(비율=px÷1) 잔재뿐.
+            //    저장 당시 투영 하프익스텐트를 DB 가 모르므로 px→비율 환산 근거가 없다 → 쌍을 0(마커 아래 기본 위치)으로.
+            //    WHERE 가 자기제한이라 멱등(2회차부터 0행) · 캡 안 정상 값은 건드리지 않는다.
+            var labelOffsetReset = 0;
+            if (columnMeta["Symbols"] is { } symMeta && symMeta.ContainsKey("LabelOffsetX") && symMeta.ContainsKey("LabelOffsetY"))
+            {
+                try
+                {
+                    labelOffsetReset = await conn.ExecuteAsync(
+                        "UPDATE `Symbols` SET `LabelOffsetX` = 0, `LabelOffsetY` = 0 " +
+                        "WHERE `Category` IN ('AREA_BOUNDARY','PIDS_GROUP') " +
+                        "AND (ABS(COALESCE(`LabelOffsetX`,0)) > 3 OR ABS(COALESCE(`LabelOffsetY`,0)) > 3);");
+                    if (labelOffsetReset > 0)
+                        _log?.Info($"Symbols 라인/PidsGroup 라벨 오프셋 비율 캡 초과 {labelOffsetReset}행 0 으로 복구");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"Symbols 라벨 오프셋 캡 초과 복구 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            // ── FR-07: 요약 로그 ──
+            //    이전에는 "생성/확인 완료" 한 줄뿐이라 성공과 무음 실패가 구분되지 않았다.
+            //    적용/스킵/실패 건수를 남겨 '이 DB 가 몇 세대 스키마인가'와 '무엇이 실패했나'를
+            //    부팅 로그만으로 판별할 수 있게 한다.
+            var unresolved = columnMeta.Where(kv => kv.Value is null).Select(kv => kv.Key).ToList();
+            var summary = $"Symbol 스키마 마이그레이션 완료 — 적용 {applied} / 스킵 {skipped} / 실패 {failed} / 타입교정 {modified} / band시프트 {bandShifted}행 / 라벨오프셋복구 {labelOffsetReset}행";
+            if (unresolved.Count > 0)
+                summary += $" / 판정불능 테이블: {string.Join(", ", unresolved)}";
+
+            if (failed > 0 || unresolved.Count > 0) _log?.Warning(summary);
+            else                                    _log?.Info(summary);
         }
         catch (Exception ex)
         {
@@ -309,6 +809,123 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             throw;
         }
     }
+
+    /// <summary>
+    /// 마이그레이션 대상 컬럼 사양표 (GMap_Schema_Migration_Idempotency FR-11).
+    /// </summary>
+    /// <remarks>
+    /// 선언적 사양표 — 가드 루프는 이 배열만 순회한다. 컬럼을 추가할 때는
+    /// (1) 해당 테이블의 CREATE TABLE 정의 (2) 이 배열 (3) 읽기 SQL의 명시 컬럼 목록
+    /// 세 곳을 함께 갱신한다. 셋의 정합성은 단위 테스트가 검증한다.
+    ///
+    /// ⚠ 1회성 데이터 이관 DML 은 이 표에도, BuildSchemeAsync 본문에도 두지 않는다.
+    ///   불가피하면 마이그레이션 이력 테이블을 먼저 도입하고 그 게이트 뒤에서만 실행한다.
+    ///   (BuildSchemeAsync 는 부팅당 무조건 1회 실행되므로 '1회성'을 보장할 수단이 없다)
+    /// </remarks>
+    private static readonly (string Table, string Column, string Ddl)[] COLUMN_SPECS =
+    {
+        // ── Symbols ──
+        ("PidsSymbols", "ModelVariant", "VARCHAR(20) NULL"),
+        // D-3: 탐지 방향/거리/각도 영속 — 종전엔 컬럼이 없어 저장 후 재조회 시 BaseBearing 으로 되돌아갔다(3D 헤드·FOV 방향 손실)
+        ("PidsSymbols", "DetectionRange",   "DECIMAL(8,2) NULL"),
+        ("PidsSymbols", "DetectionAngle",   "DECIMAL(5,2) NULL"),
+        ("PidsSymbols", "DetectionBearing", "DECIMAL(6,3) NULL"),
+        // FR-16: PIDS 3D 철망·통문 — 장비 2열 + 그룹 5열, 부재 시 ADD(자가치유). 사양표 테이블은 columnMeta 에 반드시 로드돼 있어야 한다.
+        ("PidsSymbols", "GateWidthM",       "DECIMAL(4,1) NULL"),
+        ("PidsSymbols", "OpenOnContactOn",  "BOOLEAN NOT NULL DEFAULT TRUE"),
+        ("PidsGroupSymbols", "PostSpacingM",       "DECIMAL(4,1) NULL"),
+        ("PidsGroupSymbols", "FenceHeightM",       "DECIMAL(3,1) NULL"),
+        ("PidsGroupSymbols", "FenceMode",          "TINYINT NOT NULL DEFAULT 0"),
+        ("PidsGroupSymbols", "Render3D",           "BOOLEAN NOT NULL DEFAULT TRUE"),
+        ("PidsGroupSymbols", "ReverseSensorOrder", "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("Symbols", "ZOrder",          "INT DEFAULT 10"),
+        ("Symbols", "Visible",         "BOOLEAN DEFAULT TRUE"),
+        ("Symbols", "IsLocked",        "BOOLEAN DEFAULT FALSE"),
+        ("Symbols", "LabelOffsetX",    "DOUBLE DEFAULT 0"),
+        ("Symbols", "LabelOffsetY",    "DOUBLE DEFAULT 0"),   // FR-10: X와 독립 판정(이전엔 try 공유로 X가 던지면 Y가 영구 누락)
+        ("Symbols", "TitleColor",      "VARCHAR(20) NOT NULL DEFAULT 'White'"),
+        ("Symbols", "TitleBackground", "VARCHAR(20) NOT NULL DEFAULT 'Black'"),
+        ("Symbols", "TitleFontFamily", "VARCHAR(100) DEFAULT ''"),
+        ("Symbols", "TitleBold",       "BOOLEAN DEFAULT FALSE"),
+        ("Symbols", "TitleItalic",     "BOOLEAN DEFAULT FALSE"),
+        ("Symbols", "TitleMaxWidth",   "DECIMAL(5,1) DEFAULT 200.0"),
+        // zoom-float-halfstep FR-15: Zoom 도입(0a1bbab) 이전 레거시 창에서 생성된 DB 대비 ADD 가드
+        ("Symbols", "Zoom",            "DECIMAL(3,1) DEFAULT 17.0"),
+
+        // ── Images ──
+        ("Images",  "IsLocked",        "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "TitleSize",       "DECIMAL(4,2) DEFAULT 11.0"),
+        ("Images",  "ShowTitle",       "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "LabelOffsetU",    "DOUBLE DEFAULT 0"),
+        ("Images",  "LabelOffsetV",    "DOUBLE DEFAULT 0"),
+        ("Images",  "TitleColor",      "VARCHAR(20) NOT NULL DEFAULT 'White'"),
+        ("Images",  "TitleBackground", "VARCHAR(20) NOT NULL DEFAULT 'Black'"),
+        ("Images",  "TitleFontFamily", "VARCHAR(100) DEFAULT ''"),
+        ("Images",  "TitleBold",       "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "TitleItalic",     "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "TitleMaxWidth",   "DECIMAL(5,1) DEFAULT 200.0"),
+        // zoom-float-halfstep FR-15: Zoom 도입(b22a2d3) 이전 레거시 창(cd14d08~) DB — 미보강 시 읽기 SQL 1054로 이미지 0건
+        ("Images",  "Zoom",            "DECIMAL(3,1) DEFAULT 0.0"),
+    };
+
+    /// <summary>MySQL 에러 번호 — 컬럼 중복.</summary>
+    private const int ERR_DUP_COLUMN = 1060;
+    /// <summary>MySQL 에러 번호 — 존재하지 않는 대상 DROP/변경.</summary>
+    private const int ERR_CANT_DROP = 1091;
+
+    /// <summary>information_schema 에서 읽은 컬럼 메타.</summary>
+    private sealed record ColumnMeta(string Name, string ColumnType, bool IsNullable);
+
+    /// <summary>
+    /// 지정 테이블의 컬럼 메타를 1회 조회한다 (GMap_Schema_Migration_Idempotency FR-01).
+    /// </summary>
+    /// <returns>
+    /// 컬럼명 → 메타 딕셔너리(대소문자 무시). 조회 실패 또는 0행이면 <c>null</c> —
+    /// 이는 "컬럼이 전부 없다"가 아니라 **판정 불능**을 뜻하며, 호출부는 추측으로 ALTER 하지 않고 스킵한다.
+    /// </returns>
+    /// <remarks>
+    /// ⚠ <c>AND TABLE_SCHEMA = DATABASE()</c> 는 필수다. 빠뜨리면 같은 인스턴스에 공존하는
+    ///   monitor_test_db 의 동명 테이블과 합집합이 되어, 운영 DB 에 실제로 없는 컬럼을
+    ///   '존재'로 오판 → ALTER 스킵 → 읽기 SQL 이 Unknown column(1054) → 심볼 0건 부팅이 된다.
+    ///   비교자도 반드시 OrdinalIgnoreCase 여야 한다(플랫폼별 식별자 케이싱 차이).
+    ///   취소 토큰은 전달하지 않는다 — 스키마 구간은 취소 비대상이다(FR-09).
+    /// </remarks>
+    private async Task<Dictionary<string, ColumnMeta>?> LoadColumnMetaAsync(MySqlConnection conn, string table)
+    {
+        const string sql = @"
+            SELECT COLUMN_NAME AS Name, COLUMN_TYPE AS ColumnType, IS_NULLABLE AS IsNullable
+              FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME   = @Table;";
+
+        try
+        {
+            var rows = await conn.QueryAsync<(string Name, string ColumnType, string IsNullable)>(
+                new CommandDefinition(sql, new { Table = table }, commandTimeout: COLUMN_META_TIMEOUT_SEC));
+
+            var map = new Dictionary<string, ColumnMeta>(StringComparer.OrdinalIgnoreCase);
+            foreach (var r in rows)
+                map[r.Name] = new ColumnMeta(r.Name, r.ColumnType,
+                    string.Equals(r.IsNullable, "YES", StringComparison.OrdinalIgnoreCase));
+
+            if (map.Count == 0)
+            {
+                _log?.Warning($"{table} 컬럼 메타 0행 — 마이그레이션 판정 불능으로 스킵합니다.");
+                return null;
+            }
+            return map;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // 부팅을 막지 않는다 — 판정 불능으로 열화시키고 해당 테이블 마이그레이션만 건너뛴다.
+            _log?.Warning($"{table} 컬럼 메타 조회 실패 — {ex.GetType().Name}: {ex.Message}. 마이그레이션을 스킵합니다.");
+            return null;
+        }
+    }
+
+    /// <summary>컬럼 메타 조회 타임아웃(초). 대형 인스턴스에서 information_schema 가 느릴 수 있다.</summary>
+    private const int COLUMN_META_TIMEOUT_SEC = 10;
 
     /// <summary>
     /// 데이터베이스에서 모든 Symbol 인스턴스를 로드하여 SymbolProvider에 저장
@@ -352,6 +969,21 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 2. GeometrySymbols 로드
             var geometrySymbols = await FetchGeometrySymbolsAsync(token: token);
 
+            // 3. PidsSymbols 로드 (새로 추가)
+            var pidsSymbols = await FetchPidsSymbolsAsync(token: token);
+
+            // 4. MilitarySymbols 로드 (새로 추가)
+            var militarySymbols = await FetchMilitarySymbolsAsync(token: token);
+
+            // 5. LineSymbol 로드 (새로 추가)
+            var lineSymbols = await FetchLineSymbolsAsync(token: token);
+
+            // 6. InfraSymbol 로드 (새로 추가)
+            var infraSymbols = await FetchInfraSymbolsAsync(token: token);
+
+            // 7. PidsGroupSymbol 로드 (새로 추가)
+            var pidsGroupSymbols = await FetchPidsGroupSymbolsAsync(token: token);
+
             _symbolProvider.Clear();
 
             // 3. 일반 심볼 추가 (BASIC_SHAPES가 아닌 것만)
@@ -372,6 +1004,51 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 foreach (var geometrySymbol in geometrySymbols)
                 {
                     _symbolProvider.Add(geometrySymbol);
+                }
+            }
+
+            _pidsSymbolProvider.Clear();
+            if (pidsSymbols?.Any() == true)
+            {
+                foreach (var pidsSymbol in pidsSymbols)
+                {
+                    _symbolProvider.Add(pidsSymbol);
+                }
+            }
+
+            _militarySymbolProvider.Clear();
+            if (militarySymbols?.Any() == true)
+            {
+                foreach (var militarySymbol in militarySymbols)
+                {
+                    _symbolProvider.Add(militarySymbol);
+                }
+            }
+
+            _lineSymbolProvider.Clear();
+            if (lineSymbols?.Any() == true)
+            {
+                foreach (var lineSymbol in lineSymbols)
+                {
+                    _symbolProvider.Add(lineSymbol);
+                }
+            }
+
+            _infraSymbolProvider.Clear();
+            if (infraSymbols?.Any() == true)
+            {
+                foreach (var infraSymbol in infraSymbols)
+                {
+                    _symbolProvider.Add(infraSymbol);
+                }
+            }
+
+            _pidsGroupSymbolProvider.Clear();
+            if (pidsGroupSymbols?.Any() == true)
+            {
+                foreach (var pidsGroupSymbol in pidsGroupSymbols)
+                {
+                    _symbolProvider.Add(pidsGroupSymbol);
                 }
             }
 
@@ -400,9 +1077,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
-                        Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness,
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
+                        Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+                        FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = 'BASIC_SHAPES'
@@ -412,7 +1090,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(s => s.ToDomain())
                 .ToList();
 
-            _log?.Info($"FetchSymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchSymbolsAsync 완료 - {list.Count}건");
             return list.OfType<ISymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -432,9 +1110,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(id));
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom,
-                        Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness,
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom,
+                        Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+                        FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Id = @Id;";
@@ -442,9 +1121,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var symbolDto = await conn.QuerySingleOrDefaultAsync<SymbolSQL>(sql, new { Id = id });
             var symbol = symbolDto?.ToDomain();
 
-            _log?.Info(symbol != null
-                ? $"FetchSymbolAsync 완료 - Id={symbol.Id}"
-                : $"FetchSymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(symbol != null
+                //? $"FetchSymbolAsync 완료 - Id={symbol.Id}"
+                //: $"FetchSymbolAsync 대상 없음 - Id={id}");
 
             return symbol;
         }
@@ -465,9 +1144,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(pid));
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
-                        Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness,
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
+                        Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+                        FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Pid = @Pid;";
@@ -475,9 +1155,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var symbolDto = await conn.QuerySingleOrDefaultAsync<SymbolSQL>(sql, new { Pid = pid });
             var symbol = symbolDto?.ToDomain();
 
-            _log?.Info(symbol != null
-                ? $"FetchSymbolByPidAsync 완료 - Pid={symbol.Pid}"
-                : $"FetchSymbolByPidAsync 대상 없음 - Pid={pid}");
+            //_log?.Info(symbol != null
+                //? $"FetchSymbolByPidAsync 완료 - Pid={symbol.Pid}"
+                //: $"FetchSymbolByPidAsync 대상 없음 - Pid={pid}");
 
             return symbol;
         }
@@ -495,9 +1175,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
-                        Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness,
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
+                        Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+                        FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = @Category
@@ -507,7 +1188,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(s => s.ToDomain())
                 .ToList();
 
-            _log?.Info($"FetchSymbolsByCategoryAsync 완료 - Category={category}, {list.Count}건");
+            //_log?.Info($"FetchSymbolsByCategoryAsync 완료 - Category={category}, {list.Count}건");
             return list.OfType<ISymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -525,18 +1206,19 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                 INSERT INTO Symbols
-                    (Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
-                     Width, Height, Category, ShowShape, ShowTitle, 
-                     FillColor, StrokeColor, StrokeThickness, CreatedBy)
-                    VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
-                            @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                            @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+                    (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+                     Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+                     FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+                    VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                            @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                            @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
                     SELECT LAST_INSERT_ID();";
 
             var id = await conn.ExecuteScalarAsync<int>(sql, new
             {
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -547,10 +1229,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
+                model.Visible,
+                model.IsLocked,
                 model.ShowTitle,
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
                 CreatedBy = "System" // 또는 현재 사용자 정보
             });
 
@@ -575,11 +1262,12 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                UPDATE Symbols SET
-                Pid = @Pid, Title = @Title, OperationState = @OperationState,
+                Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
-                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
                 CreatedBy = @CreatedBy
                WHERE Id = @Id;";
 
@@ -588,6 +1276,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Id,
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -598,23 +1287,63 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
+                model.Visible,
+                model.IsLocked,
                 model.ShowTitle,
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
                 CreatedBy = "System" // 또는 현재 사용자 정보
             });
 
             if (affected == 0)
                 throw new KeyNotFoundException($"Symbol not found. Id={model.Id}");
 
-            _log?.Info($"Symbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"Symbol 업데이트 완료 - Id={model.Id}");
             return await FetchSymbolAsync(model.Id, token);
         }
         catch (Exception ex)
         {
             _log?.Error($"Symbol 업데이트 실패: {ex.Message}");
             throw;
+        }
+    }
+
+    public async Task UpdateSymbolZOrderAsync(int symbolId, int zOrder, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "UPDATE Symbols SET ZOrder = @ZOrder WHERE Id = @Id;";
+            await conn.ExecuteAsync(sql, new { ZOrder = zOrder, Id = symbolId });
+            //_log?.Info($"Symbol ZOrder 업데이트 완료 — Id={symbolId}, ZOrder={zOrder}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Symbol ZOrder 업데이트 실패 — Id={symbolId}: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task BatchUpdateZOrderAsync(List<(int id, int zOrder)> changes, CancellationToken token = default)
+    {
+        if (changes == null || changes.Count == 0) return;
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            var cases = string.Join("\n", changes.Select(c => $"WHEN {c.id} THEN {c.zOrder}"));
+            var ids = string.Join(",", changes.Select(c => c.id));
+            var sql = $"UPDATE Symbols SET ZOrder = CASE Id\n{cases}\nEND\nWHERE Id IN ({ids});";
+            await conn.ExecuteAsync(sql);
+            //_log?.Info($"[ZOrder] Batch UPDATE 완료 — {changes.Count}건");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ZOrder] Batch UPDATE 실패 — {changes.Count}건: {ex.Message}");
         }
     }
 
@@ -628,9 +1357,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteSymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteSymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteSymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -651,9 +1380,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Pid = @Pid;";
             int ret = await conn.ExecuteAsync(sql, new { Pid = pid });
 
-            _log?.Info(ret > 0
-                ? $"DeleteSymbolByPidAsync 완료 - Pid={pid}"
-                : $"DeleteSymbolByPidAsync 대상 없음 - Pid={pid}");
+            //_log?.Info(ret > 0
+                //? $"DeleteSymbolByPidAsync 완료 - Pid={pid}"
+                //: $"DeleteSymbolByPidAsync 대상 없음 - Pid={pid}");
 
             return ret > 0;
         }
@@ -673,7 +1402,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Category = @Category;";
             int ret = await conn.ExecuteAsync(sql, new { Category = category.ToString() });
 
-            _log?.Info($"DeleteSymbolsByCategoryAsync 완료 - Category={category}, {ret}건 삭제");
+            //_log?.Info($"DeleteSymbolsByCategoryAsync 완료 - Category={category}, {ret}건 삭제");
             return ret;
         }
         catch (Exception ex)
@@ -683,6 +1412,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         }
     }
     #endregion
+
     #region - GeometrySymbol CRUD -
 
     /// <summary>
@@ -695,9 +1425,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness,
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -709,7 +1439,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(j => j.ToGeometryDomain())
                 .ToList();
 
-            _log?.Info($"FetchGeometrySymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchGeometrySymbolsAsync 완료 - {list.Count}건");
             return list.OfType<IGeometricSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -732,9 +1462,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(id));
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness,
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -744,9 +1474,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var joinResult = await conn.QuerySingleOrDefaultAsync<GeometrySymbolSQL>(sql, new { Id = id });
             var geometrySymbol = joinResult?.ToGeometryDomain();
 
-            _log?.Info(geometrySymbol != null
-                ? $"FetchGeometrySymbolAsync 완료 - Id={geometrySymbol.Id}, ShapeType={geometrySymbol.ShapeType}"
-                : $"FetchGeometrySymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(geometrySymbol != null
+                //? $"FetchGeometrySymbolAsync 완료 - Id={geometrySymbol.Id}, ShapeType={geometrySymbol.ShapeType}"
+                //: $"FetchGeometrySymbolAsync 대상 없음 - Id={id}");
 
             return geometrySymbol;
         }
@@ -770,18 +1500,19 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 1. Symbols 테이블에 기본 정보 삽입
             const string symbolSql = @"
             INSERT INTO Symbols
-            (Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
-             Width, Height, Category, ShowShape, ShowTitle, 
-             FillColor, StrokeColor, StrokeThickness, CreatedBy)
-            VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
-                    @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                    @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+            (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+             Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+             FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+            VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                    @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                    @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
             SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
             {
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -792,10 +1523,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
+                model.Visible,
+                model.IsLocked,
                 model.ShowTitle,
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
                 CreatedBy = "System"
             }, transaction);
 
@@ -840,11 +1576,12 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 1. Symbols 테이블 업데이트
             const string symbolSql = @"
             UPDATE Symbols SET
-                Pid = @Pid, Title = @Title, OperationState = @OperationState,
+                Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
-                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
                 CreatedBy = @CreatedBy
             WHERE Id = @Id;";
 
@@ -853,6 +1590,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Id,
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -863,17 +1601,23 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
+                model.Visible,
+                model.IsLocked,
                 model.ShowTitle,
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
                 CreatedBy = "System"
             }, transaction);
 
             // 2. GeometrySymbols 테이블 업데이트 (간소화)
             const string geometrySql = @"
             UPDATE GeometrySymbols SET
-                ShapeType = @ShapeType, Opacity = @Opacity
+                ShapeType = @ShapeType, Opacity = @Opacity,
+                UpdatedAt = CURRENT_TIMESTAMP
             WHERE SymbolId = @SymbolId;";
 
             var geometryAffected = await conn.ExecuteAsync(geometrySql, new
@@ -883,12 +1627,22 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Opacity
             }, transaction);
 
-            if (symbolAffected == 0 || geometryAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"GeometrySymbol not found. Id={model.Id}");
+            if (geometryAffected == 0)
+            {
+                // 타입 테이블 행 부재(구버전 INSERT/외부 시드로 base만 존재) — 종전엔 전체 롤백되어 Title 등
+                // base 변경까지 무음 소실(사용자 "반영 안 됨"). 자가치유 INSERT 후 진행(제목 저장 전수감사).
+                await conn.ExecuteAsync(@"
+                    INSERT INTO GeometrySymbols (SymbolId, ShapeType, Opacity)
+                    VALUES (@SymbolId, @ShapeType, @Opacity);",
+                    new { SymbolId = model.Id, ShapeType = model.ShapeType.ToString(), model.Opacity }, transaction);
+                _log?.Warning($"GeometrySymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"GeometrySymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"GeometrySymbol 업데이트 완료 - Id={model.Id}");
             return await FetchGeometrySymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -913,9 +1667,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteGeometrySymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteGeometrySymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteGeometrySymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteGeometrySymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -936,9 +1690,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness,
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -950,7 +1704,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(j => j.ToGeometryDomain())
                 .ToList();
 
-            _log?.Info($"FetchGeometrySymbolsByShapeTypeAsync 완료 - ShapeType={shapeType}, {list.Count}건");
+            //_log?.Info($"FetchGeometrySymbolsByShapeTypeAsync 완료 - ShapeType={shapeType}, {list.Count}건");
             return list.OfType<IGeometricSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -960,6 +1714,2218 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         }
     }
 
+    #endregion
+
+    #region - PidsSymbol CRUD -
+
+    /// <summary>
+    /// 모든 PIDS 심볼 조회 (JOIN 쿼리)
+    /// </summary>
+    public async Task<List<IPidsSymbolModel>?> FetchPidsSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   s.Category = 'PIDS_EQUIPMENT'
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsSymbolSQL>(sql))
+                .Select(p => p.ToPidsDomain())
+                .ToList();
+
+            //_log?.Info($"FetchPidsSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IPidsSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 PIDS 심볼 조회
+    /// </summary>
+    public async Task<IPidsSymbolModel?> FetchPidsSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<PidsSymbolSQL>(sql, new { Id = id });
+            var pidsSymbol = joinResult?.ToPidsDomain();
+
+            //_log?.Info(pidsSymbol != null
+                //? $"FetchPidsSymbolAsync 완료 - Id={pidsSymbol.Id}, DeviceType={pidsSymbol.DeviceType}"
+                //: $"FetchPidsSymbolAsync 대상 없음 - Id={id}");
+
+            return pidsSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// LinkedDeviceId로 PIDS 심볼 조회
+    /// </summary>
+    public async Task<IPidsSymbolModel?> FetchPidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (deviceId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(deviceId));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   p.LinkedDeviceId = @DeviceId;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<PidsSymbolSQL>(sql, new { DeviceId = deviceId });
+            var pidsSymbol = joinResult?.ToPidsDomain();
+
+            //_log?.Info(pidsSymbol != null
+                //? $"FetchPidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}, Id={pidsSymbol.Id}"
+                //: $"FetchPidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
+
+            return pidsSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol DeviceId 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// DeviceType별 PIDS 심볼 조회
+    /// </summary>
+    public async Task<List<IPidsSymbolModel>?> FetchPidsSymbolsByDeviceTypeAsync(EnumDeviceType deviceType, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   p.DeviceType = @DeviceType
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsSymbolSQL>(sql, new { DeviceType = deviceType.ToString() }))
+                .Select(p => p.ToPidsDomain())
+                .ToList();
+
+            //_log?.Info($"FetchPidsSymbolsByDeviceTypeAsync 완료 - DeviceType={deviceType}, {list.Count}건");
+            return list.OfType<IPidsSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbols DeviceType별 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertPidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+        INSERT INTO Symbols
+        (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+         Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+        VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
+        SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsSymbols 테이블에 PIDS 전용 정보 삽입
+            const string pidsSql = @"
+        INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing, ModelVariant, DetectionRange, DetectionAngle, DetectionBearing, GateWidthM, OpenOnContactOn)
+        VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing, @ModelVariant, @DetectionRange, @DetectionAngle, @DetectionBearing, @GateWidthM, @OpenOnContactOn);";
+
+            await conn.ExecuteAsync(pidsSql, new
+            {
+                SymbolId = symbolId,
+                model.LinkedDeviceId,
+                DeviceType = model.DeviceType.ToString(),
+                model.ShowFOV,
+                FOVColor = model.FOVColor.ToString(),
+                model.FOVOpacity,
+                EventStatus = model.EventStatus.ToString(),
+                model.BaseBearing,
+                model.ModelVariant,
+                model.DetectionRange,
+                model.DetectionAngle,
+                model.DetectionBearing,
+                model.GateWidthM,
+                model.OpenOnContactOn
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"PidsSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, DeviceType={model.DeviceType}");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IPidsSymbolModel?> UpdatePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. 먼저 레코드 존재 여부 확인
+            const string checkSql = @"
+        SELECT COUNT(*) FROM Symbols s 
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId 
+        WHERE s.Id = @Id;";
+
+            var exists = await conn.ExecuteScalarAsync<int>(checkSql, new { Id = model.Id }, transaction);
+            if (exists == 0)
+            {
+                _log?.Warning($"PidsSymbol 업데이트 대상 없음: Id={model.Id}");
+                return null; // 예외 대신 null 반환
+            }
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+        UPDATE Symbols SET
+            Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+            Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+            Bearing = @Bearing, Width = @Width, Height = @Height,
+            Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+            LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
+            CreatedBy = @CreatedBy
+        WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsSymbols 테이블 업데이트
+            const string pidsSql = @"
+        UPDATE PidsSymbols SET
+            LinkedDeviceId = @LinkedDeviceId, DeviceType = @DeviceType, ShowFOV = @ShowFOV,
+            FOVColor = @FOVColor, FOVOpacity = @FOVOpacity, EventStatus = @EventStatus,
+            BaseBearing = @BaseBearing, ModelVariant = @ModelVariant,
+            DetectionRange = @DetectionRange, DetectionAngle = @DetectionAngle, DetectionBearing = @DetectionBearing,
+            GateWidthM = @GateWidthM, OpenOnContactOn = @OpenOnContactOn,
+            UpdatedAt = CURRENT_TIMESTAMP
+        WHERE SymbolId = @SymbolId;";
+
+            var pidsAffected = await conn.ExecuteAsync(pidsSql, new
+            {
+                SymbolId = model.Id,
+                model.LinkedDeviceId,
+                DeviceType = model.DeviceType.ToString(),
+                model.ShowFOV,
+                FOVColor = model.FOVColor.ToString(),
+                model.FOVOpacity,
+                EventStatus = model.EventStatus.ToString(),
+                model.BaseBearing,
+                model.ModelVariant,
+                model.DetectionRange,
+                model.DetectionAngle,
+                model.DetectionBearing,
+                model.GateWidthM,
+                model.OpenOnContactOn
+            }, transaction);
+
+            if (symbolAffected == 0)
+                throw new KeyNotFoundException($"PidsSymbol not found. Id={model.Id}");
+            if (pidsAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing, ModelVariant, DetectionRange, DetectionAngle, DetectionBearing, GateWidthM, OpenOnContactOn)
+                    VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing, @ModelVariant, @DetectionRange, @DetectionAngle, @DetectionBearing, @GateWidthM, @OpenOnContactOn);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        model.LinkedDeviceId,
+                        DeviceType = model.DeviceType.ToString(),
+                        model.ShowFOV,
+                        FOVColor = model.FOVColor.ToString(),
+                        model.FOVOpacity,
+                        EventStatus = model.EventStatus.ToString(),
+                        model.BaseBearing,
+                        model.ModelVariant,
+                        model.DetectionRange,
+                        model.DetectionAngle,
+                        model.DetectionBearing,
+                        model.GateWidthM,
+                        model.OpenOnContactOn
+                    }, transaction);
+                _log?.Warning($"PidsSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
+
+            await transaction.CommitAsync(token);
+
+            //_log?.Info($"PidsSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchPidsSymbolAsync(model.Id, token);
+        }
+        catch (MySqlException mex) when (mex.Message.Contains("Record has changed"))
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Warning($"PidsSymbol 동시 업데이트 충돌 (무시됨): Id={model.Id} — 다른 업데이트가 먼저 커밋됨");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 심볼 삭제 (CASCADE로 PidsSymbols도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeletePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 PidsSymbols는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            //_log?.Info(ret > 0
+                //? $"DeletePidsSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeletePidsSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// LinkedDeviceId로 PIDS 심볼 삭제
+    /// </summary>
+    public async Task<bool> DeletePidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (deviceId <= 0) throw new ArgumentException(nameof(deviceId));
+
+            const string sql = @"
+        DELETE s FROM Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE p.LinkedDeviceId = @DeviceId;";
+
+            int ret = await conn.ExecuteAsync(sql, new { DeviceId = deviceId });
+
+            //_log?.Info(ret > 0
+                //? $"DeletePidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}"
+                //: $"DeletePidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol DeviceId 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// EventStatus별 PIDS 심볼 조회
+    /// </summary>
+    public async Task<List<IPidsSymbolModel>?> FetchPidsSymbolsByEventStatusAsync(EnumEventStatus eventStatus, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   p.EventStatus = @EventStatus
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsSymbolSQL>(sql, new { EventStatus = eventStatus.ToString() }))
+                .Select(p => p.ToPidsDomain())
+                .ToList();
+
+            //_log?.Info($"FetchPidsSymbolsByEventStatusAsync 완료 - EventStatus={eventStatus}, {list.Count}건");
+            return list.OfType<IPidsSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbols EventStatus별 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - MilitarySymbol CRUD -
+
+    /// <summary>
+    /// 모든 군사 심볼 조회 (JOIN 쿼리)
+    /// </summary>
+    public async Task<List<IMilitarySymbolModel>?> FetchMilitarySymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                    s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                    m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
+                    m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
+            FROM    Symbols s
+            INNER JOIN MilitarySymbols m ON s.Id = m.SymbolId
+            WHERE   s.Category = 'MILITARY_SYMBOLS'
+            ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<MilitarySymbolSQL>(sql))
+                .Select(m => m.ToMilitaryDomain())
+                .ToList();
+
+            //_log?.Info($"FetchMilitarySymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IMilitarySymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MilitarySymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 군사 심볼 조회
+    /// </summary>
+    public async Task<IMilitarySymbolModel?> FetchMilitarySymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                    s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                    m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
+                    m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
+            FROM    Symbols s
+            INNER JOIN MilitarySymbols m ON s.Id = m.SymbolId
+            WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<MilitarySymbolSQL>(sql, new { Id = id });
+            var militarySymbol = joinResult?.ToMilitaryDomain();
+
+            //_log?.Info(militarySymbol != null
+                //? $"FetchMilitarySymbolAsync 완료 - Id={militarySymbol.Id}, UnitType={militarySymbol.UnitType}"
+                //: $"FetchMilitarySymbolAsync 대상 없음 - Id={id}");
+
+            return militarySymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MilitarySymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+            INSERT INTO Symbols
+            (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+             Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+             FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+            VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                    @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                    @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
+            SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. MilitarySymbols 테이블에 군사 심볼 전용 정보 삽입
+            const string militarySql = @"
+            INSERT INTO MilitarySymbols 
+            (SymbolId, Affiliation, BattleDimension, StandardIdentity, UnitType, UnitSize,
+             UnitDesignator, HigherFormation, CallSign, CountryCode)
+            VALUES (@SymbolId, @Affiliation, @BattleDimension, @StandardIdentity, @UnitType, @UnitSize,
+                    @UnitDesignator, @HigherFormation, @CallSign, @CountryCode);";
+
+            await conn.ExecuteAsync(militarySql, new
+            {
+                SymbolId = symbolId,
+                Affiliation = model.Affiliation.ToString(),
+                BattleDimension = model.BattleDimension.ToString(),
+                StandardIdentity = model.StandardIdentity.ToString(),
+                UnitType = model.UnitType.ToString(),
+                UnitSize = model.UnitSize.ToString(),
+                model.UnitDesignator,
+                model.HigherFormation,
+                model.CallSign,
+                model.CountryCode
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"MilitarySymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, UnitType={model.UnitType}");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"MilitarySymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IMilitarySymbolModel?> UpdateMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+            UPDATE Symbols SET
+                Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+                Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+                Bearing = @Bearing, Width = @Width, Height = @Height,
+                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
+                CreatedBy = @CreatedBy
+            WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. MilitarySymbols 테이블 업데이트
+            const string militarySql = @"
+            UPDATE MilitarySymbols SET
+                Affiliation = @Affiliation, BattleDimension = @BattleDimension, StandardIdentity = @StandardIdentity,
+                UnitType = @UnitType, UnitSize = @UnitSize, UnitDesignator = @UnitDesignator,
+                HigherFormation = @HigherFormation, CallSign = @CallSign, CountryCode = @CountryCode,
+                UpdatedAt = CURRENT_TIMESTAMP
+            WHERE SymbolId = @SymbolId;";
+
+            var militaryAffected = await conn.ExecuteAsync(militarySql, new
+            {
+                SymbolId = model.Id,
+                Affiliation = model.Affiliation.ToString(),
+                BattleDimension = model.BattleDimension.ToString(),
+                StandardIdentity = model.StandardIdentity.ToString(),
+                UnitType = model.UnitType.ToString(),
+                UnitSize = model.UnitSize.ToString(),
+                model.UnitDesignator,
+                model.HigherFormation,
+                model.CallSign,
+                model.CountryCode
+            }, transaction);
+
+            if (symbolAffected == 0)
+                throw new KeyNotFoundException($"MilitarySymbol not found. Id={model.Id}");
+            if (militaryAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO MilitarySymbols (SymbolId, Affiliation, BattleDimension, StandardIdentity, UnitType, UnitSize, UnitDesignator, HigherFormation, CallSign, CountryCode)
+                    VALUES (@SymbolId, @Affiliation, @BattleDimension, @StandardIdentity, @UnitType, @UnitSize, @UnitDesignator, @HigherFormation, @CallSign, @CountryCode);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        Affiliation = model.Affiliation.ToString(),
+                        BattleDimension = model.BattleDimension.ToString(),
+                        StandardIdentity = model.StandardIdentity.ToString(),
+                        UnitType = model.UnitType.ToString(),
+                        UnitSize = model.UnitSize.ToString(),
+                        model.UnitDesignator,
+                        model.HigherFormation,
+                        model.CallSign,
+                        model.CountryCode
+                    }, transaction);
+                _log?.Warning($"MilitarySymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
+
+            await transaction.CommitAsync(token);
+
+            //_log?.Info($"MilitarySymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchMilitarySymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"MilitarySymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 삭제 (CASCADE로 MilitarySymbols도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeleteMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 MilitarySymbols는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            //_log?.Info(ret > 0
+                //? $"DeleteMilitarySymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteMilitarySymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MilitarySymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - LineSymbol CRUD -
+
+    /// <summary>
+    /// 모든 라인 심볼 조회 (JOIN 쿼리 및 포인트 포함)
+    /// </summary>
+    public async Task<List<ILineSymbolModel>?> FetchLineSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
+        FROM    Symbols s
+        INNER JOIN LineSymbols l ON s.Id = l.SymbolId
+        WHERE   s.Category = 'AREA_BOUNDARY'
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<LineSymbolSQL>(sql))
+                .Select(l => l.ToLineDomain())
+                .ToList();
+
+            // 포인트 로드
+            if (list.Any())
+            {
+                var symbolIds = list.Select(ls => ls.Id).ToList();
+                const string pointsSql = @"
+            SELECT LineSymbolId, SequenceOrder, Latitude, Longitude, Altitude
+            FROM LinePoints
+            WHERE LineSymbolId IN @SymbolIds
+            ORDER BY LineSymbolId, SequenceOrder;";
+
+                var allPoints = await conn.QueryAsync<LinePointSQL>(pointsSql, new { SymbolIds = symbolIds });
+
+                var pointsLookup = allPoints
+                    .GroupBy(p => p.LineSymbolId)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(p => p.SequenceOrder).Select(p => p.ToGeoPoint()).ToList());
+
+                foreach (var lineSymbol in list)
+                {
+                    if (pointsLookup.TryGetValue(lineSymbol.Id, out var points))
+                    {
+                        lineSymbol.LinePoints = points;
+                    }
+                }
+            }
+
+            //_log?.Info($"FetchLineSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<ILineSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"LineSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 라인 심볼 조회
+    /// </summary>
+    public async Task<ILineSymbolModel?> FetchLineSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
+        FROM    Symbols s
+        INNER JOIN LineSymbols l ON s.Id = l.SymbolId
+        WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<LineSymbolSQL>(sql, new { Id = id });
+            var lineSymbol = joinResult?.ToLineDomain();
+
+            if (lineSymbol != null)
+            {
+                // 포인트 로드
+                const string pointsSql = @"
+            SELECT SequenceOrder, Latitude, Longitude, Altitude
+            FROM LinePoints
+            WHERE LineSymbolId = @LineSymbolId
+            ORDER BY SequenceOrder;";
+
+                var points = await conn.QueryAsync<LinePointSQL>(pointsSql, new { LineSymbolId = id });
+                lineSymbol.LinePoints = points.Select(p => p.ToGeoPoint()).ToList();
+            }
+
+            //_log?.Info(lineSymbol != null
+                //? $"FetchLineSymbolAsync 완료 - Id={lineSymbol.Id}, Points={lineSymbol.LinePoints.Count}개"
+                //: $"FetchLineSymbolAsync 대상 없음 - Id={id}");
+
+            return lineSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"LineSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 라인 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default)
+    {
+        // null 체크 추가
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+        INSERT INTO Symbols
+        (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+         Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+        VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
+        SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. LineSymbols 테이블에 라인 심볼 전용 정보 삽입
+            const string lineSql = @"
+        INSERT INTO LineSymbols 
+        (SymbolId, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+        VALUES (@SymbolId, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);";
+
+            await conn.ExecuteAsync(lineSql, new
+            {
+                SymbolId = symbolId,
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString()
+            }, transaction);
+
+            // 3. LinePoints 삽입
+            if (model.LinePoints?.Any() == true)
+            {
+                const string pointSql = @"
+            INSERT INTO LinePoints (LineSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+            VALUES (@LineSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    LineSymbolId = symbolId,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(pointSql, pointParams, transaction);
+            }
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"LineSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, Points={model.LinePoints?.Count ?? 0}개");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"LineSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 라인 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<ILineSymbolModel?> UpdateLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default)
+    {
+        // null 체크 추가
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+        UPDATE Symbols SET
+            Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+            Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+            Bearing = @Bearing, Width = @Width, Height = @Height,
+            Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+            LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
+            CreatedBy = @CreatedBy
+        WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. LineSymbols 테이블 업데이트
+            const string lineSql = @"
+        UPDATE LineSymbols SET
+            LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath,
+            ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern,
+            UpdatedAt = CURRENT_TIMESTAMP
+        WHERE SymbolId = @SymbolId;";
+
+            var lineAffected = await conn.ExecuteAsync(lineSql, new
+            {
+                SymbolId = model.Id,
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString()
+            }, transaction);
+
+            // 3. 기존 포인트 삭제 후 새로 삽입
+            const string deletePointsSql = "DELETE FROM LinePoints WHERE LineSymbolId = @LineSymbolId;";
+            await conn.ExecuteAsync(deletePointsSql, new { LineSymbolId = model.Id }, transaction);
+
+            if (model.LinePoints?.Any() == true)
+            {
+                const string insertPointSql = @"
+            INSERT INTO LinePoints (LineSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+            VALUES (@LineSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    LineSymbolId = model.Id,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(insertPointSql, pointParams, transaction);
+            }
+
+            if (symbolAffected == 0)
+                throw new KeyNotFoundException($"LineSymbol not found. Id={model.Id}");
+            if (lineAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO LineSymbols (SymbolId, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+                    VALUES (@SymbolId, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        model.LineOpacity,
+                        model.IsClosedPath,
+                        model.ShowArrowHead,
+                        LinePattern = model.LinePattern.ToString()
+                    }, transaction);
+                _log?.Warning($"LineSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
+
+            await transaction.CommitAsync(token);
+
+            //_log?.Info($"LineSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchLineSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"LineSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 라인 심볼 삭제 (CASCADE로 LineSymbols와 LinePoints도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeleteLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default)
+    {
+        // null 체크 추가
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 LineSymbols와 LinePoints는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            //_log?.Info(ret > 0
+                //? $"DeleteLineSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteLineSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"LineSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - InfraSymbol CRUD -
+
+    /// <summary>
+    /// 모든 인프라 심볼 조회 (JOIN 쿼리)
+    /// </summary>
+    public async Task<List<IInfraSymbolModel>?> FetchInfraSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
+        FROM    Symbols s
+        INNER JOIN InfraSymbols i ON s.Id = i.SymbolId
+        WHERE   s.Category = 'INFRASTRUCTURE'
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<InfraSymbolSQL>(sql))
+                .Select(i => i.ToInfraDomain())
+                .ToList();
+
+            //_log?.Info($"FetchInfraSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IInfraSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"InfraSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 인프라 심볼 조회
+    /// </summary>
+    public async Task<IInfraSymbolModel?> FetchInfraSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
+        FROM    Symbols s
+        INNER JOIN InfraSymbols i ON s.Id = i.SymbolId
+        WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<InfraSymbolSQL>(sql, new { Id = id });
+            var infraSymbol = joinResult?.ToInfraDomain();
+
+            //_log?.Info(infraSymbol != null
+                //? $"FetchInfraSymbolAsync 완료 - Id={infraSymbol.Id}, BuildingType={infraSymbol.BuildingType}"
+                //: $"FetchInfraSymbolAsync 대상 없음 - Id={id}");
+
+            return infraSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"InfraSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 인프라 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+        INSERT INTO Symbols
+        (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+         Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+        VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
+        SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. InfraSymbols 테이블에 인프라 정보 삽입 (현재는 Factory/Office 고정)
+            const string infraSql = @"
+        INSERT INTO InfraSymbols 
+        (SymbolId, BuildingType, BuildingUsage, FloorCount, BasementFloorCount, BuildingArea)
+        VALUES (@SymbolId, @BuildingType, @BuildingUsage, @FloorCount, @BasementFloorCount, @BuildingArea);";
+
+            await conn.ExecuteAsync(infraSql, new
+            {
+                SymbolId = symbolId,
+                BuildingType = model.BuildingType.ToString(),    // Enum → String
+                BuildingUsage = model.BuildingUsage.ToString(),  // Enum → String
+                model.FloorCount,
+                model.BasementFloorCount,
+                model.BuildingArea
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"InfraSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"InfraSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 인프라 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IInfraSymbolModel?> UpdateInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. 존재 여부 확인
+            const string checkSql = @"
+        SELECT COUNT(*) FROM Symbols s 
+        INNER JOIN InfraSymbols i ON s.Id = i.SymbolId 
+        WHERE s.Id = @Id;";
+
+            var exists = await conn.ExecuteScalarAsync<int>(checkSql, new { Id = model.Id }, transaction);
+            if (exists == 0)
+            {
+                _log?.Warning($"InfraSymbol 업데이트 대상 없음: Id={model.Id}");
+                return null;
+            }
+
+            // 2. Symbols 테이블 업데이트
+            const string symbolSql = @"
+        UPDATE Symbols SET
+            Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+            Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+            Bearing = @Bearing, Width = @Width, Height = @Height,
+            Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+            LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
+            CreatedBy = @CreatedBy
+        WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 3. InfraSymbols 테이블 업데이트
+            const string infraSql = @"
+        UPDATE InfraSymbols SET
+            BuildingType = @BuildingType, BuildingUsage = @BuildingUsage,
+            FloorCount = @FloorCount, BasementFloorCount = @BasementFloorCount,
+            BuildingArea = @BuildingArea,
+            UpdatedAt = CURRENT_TIMESTAMP
+        WHERE SymbolId = @SymbolId;";
+
+            var infraAffected = await conn.ExecuteAsync(infraSql, new
+            {
+                SymbolId = model.Id,
+                BuildingType = model.BuildingType.ToString(),    // Enum → String
+                BuildingUsage = model.BuildingUsage.ToString(),  // Enum → String
+                model.FloorCount,
+                model.BasementFloorCount,
+                model.BuildingArea
+            }, transaction);
+
+            if (symbolAffected == 0)
+                throw new KeyNotFoundException($"InfraSymbol not found. Id={model.Id}");
+            if (infraAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO InfraSymbols (SymbolId, BuildingType, BuildingUsage, FloorCount, BasementFloorCount, BuildingArea)
+                    VALUES (@SymbolId, @BuildingType, @BuildingUsage, @FloorCount, @BasementFloorCount, @BuildingArea);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        BuildingType = model.BuildingType.ToString(),
+                        BuildingUsage = model.BuildingUsage.ToString(),
+                        model.FloorCount,
+                        model.BasementFloorCount,
+                        model.BuildingArea
+                    }, transaction);
+                _log?.Warning($"InfraSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
+
+            await transaction.CommitAsync(token);
+
+            //_log?.Info($"InfraSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchInfraSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"InfraSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 인프라 심볼 삭제 (CASCADE로 InfraSymbols도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeleteInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 InfraSymbols는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            //_log?.Info(ret > 0
+                //? $"DeleteInfraSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteInfraSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"InfraSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - 부분 UPDATE (판별자 보존) -
+
+    /// <summary>잠금만 부분 UPDATE. 전체 행 재기록이 Category 판별자('PIDS_GROUP' 등 DB 전용값)를
+    /// 런타임 Category로 덮어쓰던 오염(2026-07-15 현장 사고: 잠금 17건→재부팅 전멸) 원천 차단.</summary>
+    public async Task<bool> UpdateSymbolLockAsync(int id, bool isLocked, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET IsLocked = @IsLocked WHERE Id = @Id;", new { Id = id, IsLocked = isLocked });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 잠금 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    /// <summary>제목만 부분 UPDATE — 위와 동일 사유(레이어패널 이름변경 경로).</summary>
+    public async Task<bool> UpdateSymbolTitleAsync(int id, string title, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET Title = @Title WHERE Id = @Id;", new { Id = id, Title = title });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 제목 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    /// <summary>가시성(ShowShape)만 부분 UPDATE — 위와 동일 사유(레이어패널 심볼 Visibility 토글 경로).
+    /// 전체 행 재기록이 Category 판별자('PIDS_GROUP' 등)를 런타임값으로 덮는 오염을 회피.</summary>
+    public async Task<bool> UpdateSymbolShowShapeAsync(int id, bool showShape, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET ShowShape = @ShowShape WHERE Id = @Id;", new { Id = id, ShowShape = showShape });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 가시성 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    /// <summary>레이어 마스터 가시성(Visible)만 부분 UPDATE — 레이어패널 심볼 Visibility 토글 경로.
+    /// ShowShape(속성창 모양)와 독립 컬럼. 전체 행 재기록의 Category 판별자 오염 회피(위와 동일 사유).</summary>
+    public async Task<bool> UpdateSymbolVisibleAsync(int id, bool visible, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET Visible = @Visible WHERE Id = @Id;", new { Id = id, Visible = visible });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 마스터 가시성 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    /// <summary>라벨 스타일 6종만 부분 UPDATE — 타입별 전체 UPDATE에 스타일 컬럼을 넣지 않는 전략(Overlay_Title FR-06).
+    /// 전체 행 재기록의 Category 판별자 오염 회피 선례(ShowShape/Visible)와 동일 사유. 심볼 영속 경로가 함께 호출.</summary>
+    public async Task<bool> UpdateSymbolLabelStyleAsync(int id, EnumColorType titleColor, EnumColorType titleBackground,
+        string titleFontFamily, bool titleBold, bool titleItalic, double titleMaxWidth, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                @"UPDATE Symbols SET TitleColor = @TitleColor, TitleBackground = @TitleBackground,
+                    TitleFontFamily = @TitleFontFamily, TitleBold = @TitleBold,
+                    TitleItalic = @TitleItalic, TitleMaxWidth = @TitleMaxWidth WHERE Id = @Id;",
+                new { Id = id, TitleColor = titleColor.ToString(), TitleBackground = titleBackground.ToString(),
+                      TitleFontFamily = titleFontFamily ?? string.Empty, TitleBold = titleBold,
+                      TitleItalic = titleItalic, TitleMaxWidth = titleMaxWidth });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 라벨 스타일 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    #endregion
+
+    #region - PidsGroupSymbol CRUD -
+
+    /// <summary>
+    /// 모든 PIDS 그룹 심볼 조회 (JOIN 쿼리 및 포인트 포함)
+    /// </summary>
+    public async Task<List<IPidsGroupSymbolModel>?> FetchPidsGroupSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            // [자가치유] 공통 UPDATE/복원 경로가 남긴 Category 오염(≠'PIDS_GROUP') 정상화 — PidsGroupSymbols
+            //   JOIN(자식 테이블)이 타입의 진실이므로 안전. 오염된 현장 DB도 재기동만으로 복구(2026-07-15 사고 대응).
+            //   best-effort 격리: 치유 실패(권한/락 대기)가 부팅 로더를 죽이면 사고와 같은 증상이 되므로 로드는 계속(리뷰 warn).
+            try
+            {
+                int healed = await conn.ExecuteAsync(@"
+                    UPDATE Symbols s INNER JOIN PidsGroupSymbols pg ON pg.SymbolId = s.Id
+                    SET s.Category = 'PIDS_GROUP' WHERE s.Category <> 'PIDS_GROUP';");
+                if (healed > 0)
+                    _log?.Warning($"[자가치유] PidsGroup Category 오염 {healed}건 정상화('PIDS_GROUP') — 공통 업데이트/복원 경로 잔재");
+            }
+            catch (Exception healEx)
+            {
+                _log?.Warning($"[자가치유] Category 정상화 실패(무시, 로드는 계속): {healEx.Message}");
+            }
+
+            const string sql = @"
+                SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                        s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                        s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                        pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
+                        pg.ShowArrowHead, pg.LinePattern, pg.PostSpacingM, pg.FenceHeightM, pg.FenceMode, pg.Render3D, pg.ReverseSensorOrder
+                FROM    Symbols s
+                INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
+                WHERE   s.Category = 'PIDS_GROUP'
+                ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsGroupSymbolSQL>(sql))
+                .Select(pg => pg.ToPidsGroupDomain())
+                .ToList();
+
+            // 포인트 로드
+            if (list.Any())
+            {
+                var symbolIds = list.Select(pgs => pgs.Id).ToList();
+                const string pointsSql = @"
+                    SELECT GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude
+                    FROM PidsGroupPoints
+                    WHERE GroupSymbolId IN @SymbolIds
+                    ORDER BY GroupSymbolId, SequenceOrder;";
+
+                var allPoints = await conn.QueryAsync<PidsGroupPointSQL>(pointsSql, new { SymbolIds = symbolIds });
+
+                var pointsLookup = allPoints
+                    .GroupBy(p => p.GroupSymbolId)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(p => p.SequenceOrder).Select(p => p.ToGeoPoint()).ToList());
+
+                foreach (var pidsGroupSymbol in list)
+                {
+                    if (pointsLookup.TryGetValue(pidsGroupSymbol.Id, out var points))
+                    {
+                        pidsGroupSymbol.LinePoints = points;
+                    }
+                }
+            }
+
+            //_log?.Info($"FetchPidsGroupSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IPidsGroupSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 PIDS 그룹 심볼 조회
+    /// </summary>
+    public async Task<IPidsGroupSymbolModel?> FetchPidsGroupSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+                SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                        s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
+                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
+                        s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                        pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
+                        pg.ShowArrowHead, pg.LinePattern, pg.PostSpacingM, pg.FenceHeightM, pg.FenceMode, pg.Render3D, pg.ReverseSensorOrder
+                FROM    Symbols s
+                INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
+                WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<PidsGroupSymbolSQL>(sql, new { Id = id });
+            var pidsGroupSymbol = joinResult?.ToPidsGroupDomain();
+
+            if (pidsGroupSymbol != null)
+            {
+                // 포인트 로드
+                const string pointsSql = @"
+            SELECT SequenceOrder, Latitude, Longitude, Altitude
+            FROM PidsGroupPoints
+            WHERE GroupSymbolId = @GroupSymbolId
+            ORDER BY SequenceOrder;";
+
+                var points = await conn.QueryAsync<PidsGroupPointSQL>(pointsSql, new { GroupSymbolId = id });
+                pidsGroupSymbol.LinePoints = points.Select(p => p.ToGeoPoint()).ToList();
+            }
+
+            //_log?.Info(pidsGroupSymbol != null
+                //? $"FetchPidsGroupSymbolAsync 완료 - Id={pidsGroupSymbol.Id}, Points={pidsGroupSymbol.LinePoints.Count}개"
+                //: $"FetchPidsGroupSymbolAsync 대상 없음 - Id={id}");
+
+            return pidsGroupSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    
+
+    /// <summary>
+    /// PIDS 그룹 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertPidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+                INSERT INTO Symbols
+                (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+                 Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
+                 FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
+                VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                        @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked, 
+                        @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);
+                SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = "PIDS_GROUP",  // PIDS 그룹 카테고리
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsGroupSymbols 테이블에 PIDS 그룹 전용 정보 삽입
+            const string pidsGroupSql = @"
+                INSERT INTO PidsGroupSymbols 
+                (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern, PostSpacingM, FenceHeightM, FenceMode, Render3D, ReverseSensorOrder)
+                VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern, @PostSpacingM, @FenceHeightM, @FenceMode, @Render3D, @ReverseSensorOrder);";
+
+            await conn.ExecuteAsync(pidsGroupSql, new
+            {
+                SymbolId = symbolId,
+                model.LinkedDeviceGroup,
+                EventStatus = model.EventStatus.ToString(),
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString(),
+                model.PostSpacingM,
+                model.FenceHeightM,
+                FenceMode = (int)model.FenceMode,
+                model.Render3D,
+                model.ReverseSensorOrder
+            }, transaction);
+
+            // 3. PidsGroupPoints 삽입
+            if (model.LinePoints?.Any() == true)
+            {
+                const string pointSql = @"
+                    INSERT INTO PidsGroupPoints (GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+                    VALUES (@GroupSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    GroupSymbolId = symbolId,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(pointSql, pointParams, transaction);
+            }
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"PidsGroupSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, Points={model.LinePoints?.Count ?? 0}개");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsGroupSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 그룹 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IPidsGroupSymbolModel?> UpdatePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+                UPDATE Symbols SET
+                    Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+                    Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+                    Bearing = @Bearing, Width = @Width, Height = @Height,
+                    Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, Visible = @Visible, IsLocked = @IsLocked,
+                    FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                    LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
+                    CreatedBy = @CreatedBy
+                WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = "PIDS_GROUP",
+                model.ShowShape,
+                model.Visible,
+                model.IsLocked,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                model.ZOrder,
+                model.LabelOffsetX,
+                model.LabelOffsetY,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsGroupSymbols 테이블 업데이트
+            const string pidsGroupSql = @"
+                UPDATE PidsGroupSymbols SET
+                    LinkedDeviceGroup = @LinkedDeviceGroup, EventStatus = @EventStatus,
+                    LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath,
+                    ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern,
+                    PostSpacingM = @PostSpacingM, FenceHeightM = @FenceHeightM, FenceMode = @FenceMode,
+                    Render3D = @Render3D, ReverseSensorOrder = @ReverseSensorOrder,
+                    UpdatedAt = CURRENT_TIMESTAMP
+                WHERE SymbolId = @SymbolId;";
+
+            var pidsGroupAffected = await conn.ExecuteAsync(pidsGroupSql, new
+            {
+                SymbolId = model.Id,
+                model.LinkedDeviceGroup,
+                EventStatus = model.EventStatus.ToString(),
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString(),
+                model.PostSpacingM,
+                model.FenceHeightM,
+                FenceMode = (int)model.FenceMode,
+                model.Render3D,
+                model.ReverseSensorOrder
+            }, transaction);
+
+            // 3. 기존 포인트 삭제 후 새로 삽입
+            const string deletePointsSql = "DELETE FROM PidsGroupPoints WHERE GroupSymbolId = @GroupSymbolId;";
+            await conn.ExecuteAsync(deletePointsSql, new { GroupSymbolId = model.Id }, transaction);
+
+            if (model.LinePoints?.Any() == true)
+            {
+                const string insertPointSql = @"
+                    INSERT INTO PidsGroupPoints (GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+                    VALUES (@GroupSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    GroupSymbolId = model.Id,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(insertPointSql, pointParams, transaction);
+            }
+
+            if (symbolAffected == 0)
+                throw new KeyNotFoundException($"PidsGroupSymbol not found. Id={model.Id}");
+            if (pidsGroupAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실
+                // (사용자 보고: PidsGroup 제목 변경 미반영). base는 이미 갱신됐으므로 타입행만 복구 후 커밋.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern, PostSpacingM, FenceHeightM, FenceMode, Render3D, ReverseSensorOrder)
+                    VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern, @PostSpacingM, @FenceHeightM, @FenceMode, @Render3D, @ReverseSensorOrder);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        model.LinkedDeviceGroup,
+                        EventStatus = model.EventStatus.ToString(),
+                        model.LineOpacity,
+                        model.IsClosedPath,
+                        model.ShowArrowHead,
+                        LinePattern = model.LinePattern.ToString(),
+                        model.PostSpacingM,
+                        model.FenceHeightM,
+                        FenceMode = (int)model.FenceMode,
+                        model.Render3D,
+                        model.ReverseSensorOrder
+                    }, transaction);
+                _log?.Warning($"PidsGroupSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
+
+            await transaction.CommitAsync(token);
+
+            //_log?.Info($"PidsGroupSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchPidsGroupSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsGroupSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 그룹 심볼 삭제 (CASCADE로 PidsGroupSymbols와 PidsGroupPoints도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeletePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 PidsGroupSymbols와 PidsGroupPoints는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            //_log?.Info(ret > 0
+                //? $"DeletePidsGroupSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeletePidsGroupSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// LinkedDeviceGroup으로 PIDS 그룹 심볼 삭제
+    /// </summary>
+    public async Task<bool> DeletePidsGroupSymbolByDeviceGroupAsync(int deviceGroup, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (deviceGroup <= 0) throw new ArgumentException(nameof(deviceGroup));
+
+            const string sql = @"
+        DELETE s FROM Symbols s
+        INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
+        WHERE pg.LinkedDeviceGroup = @DeviceGroup;";
+
+            int ret = await conn.ExecuteAsync(sql, new { DeviceGroup = deviceGroup });
+
+            //_log?.Info(ret > 0
+                //? $"DeletePidsGroupSymbolByDeviceGroupAsync 완료 - DeviceGroup={deviceGroup}"
+                //: $"DeletePidsGroupSymbolByDeviceGroupAsync 대상 없음 - DeviceGroup={deviceGroup}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbol DeviceGroup 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - Image CRUD -
+    /// <summary>
+    /// 모든 이미지를 조회합니다
+    /// </summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>Image 목록</returns>
+    public async Task<List<IImageModel>?> FetchImagesAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
+                        Latitude, Longitude, Altitude, Zoom, Width, Height,
+                        Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
+                        TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
+                        CreatedAt, UpdatedAt
+                FROM    Images
+                ORDER BY CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<ImageSQL>(sql))
+                .Select(s => s.ToDomain())
+                .ToList();
+
+            _log?.Info($"FetchImagesAsync 완료 - {list.Count}건");
+            return list.OfType<IImageModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Images 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// ID로 단일 이미지를 조회합니다
+    /// </summary>
+    /// <param name="id">Image ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>Image 모델</returns>
+    public async Task<IImageModel?> FetchImageAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+                SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
+                        Latitude, Longitude, Altitude, Zoom, Width, Height,
+                        Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
+                        TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
+                        CreatedAt, UpdatedAt
+                FROM    Images
+                WHERE   Id = @Id;";
+
+            var imageDto = await conn.QuerySingleOrDefaultAsync<ImageSQL>(sql, new { Id = id });
+            var image = imageDto?.ToDomain();
+
+            _log?.Info(image != null
+                ? $"FetchImageAsync 완료 - Id={image.Id}"
+                : $"FetchImageAsync 대상 없음 - Id={id}");
+
+            return image;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 새로운 이미지를 삽입합니다
+    /// </summary>
+    /// <param name="model">Image 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Image ID</returns>
+    public async Task<int> InsertImageAsync(IImageModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO Images
+                    (Title, FilePath, `Left`, Top, `Right`, Bottom,
+                     Latitude, Longitude, Altitude, Zoom, Width, Height,
+                     Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
+                     TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
+                     TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth)
+                VALUES
+                    (@Title, @FilePath, @Left, @Top, @Right, @Bottom,
+                     @Latitude, @Longitude, @Altitude, @Zoom, @Width, @Height,
+                     @Opacity, @Rotation, @Visibility, @IsLocked, @HasGeoReference, @CoordinateSystem,
+                     @TitleSize, @ShowTitle, @LabelOffsetU, @LabelOffsetV,
+                     @TitleColor, @TitleBackground, @TitleFontFamily, @TitleBold, @TitleItalic, @TitleMaxWidth);
+                SELECT LAST_INSERT_ID();";
+
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Title,
+                model.FilePath,
+                model.Left,
+                model.Top,
+                model.Right,
+                model.Bottom,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Width,
+                model.Height,
+                model.Opacity,
+                model.Rotation,
+                model.Visibility,
+                model.IsLocked,
+                model.HasGeoReference,
+                model.CoordinateSystem,
+                model.TitleSize,
+                model.ShowTitle,
+                model.LabelOffsetU,
+                model.LabelOffsetV,
+                TitleColor = model.TitleColor.ToString(),
+                TitleBackground = model.TitleBackground.ToString(),
+                model.TitleFontFamily,
+                model.TitleBold,
+                model.TitleItalic,
+                model.TitleMaxWidth
+            });
+
+            model.Id = id;
+            _log?.Info($"Image 삽입 완료 - Id={id}, Title={model.Title}");
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 이미지를 업데이트합니다
+    /// </summary>
+    /// <param name="model">Image 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 Image 모델</returns>
+    public async Task<IImageModel?> UpdateImageAsync(IImageModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            const string sql = @"
+                UPDATE Images SET
+                    Title = @Title, FilePath = @FilePath,
+                    `Left` = @Left, Top = @Top, `Right` = @Right, Bottom = @Bottom,
+                    Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude,
+                    Zoom = @Zoom, Width = @Width, Height = @Height,
+                    Opacity = @Opacity, Rotation = @Rotation, Visibility = @Visibility, IsLocked = @IsLocked,
+                    HasGeoReference = @HasGeoReference, CoordinateSystem = @CoordinateSystem,
+                    TitleSize = @TitleSize, ShowTitle = @ShowTitle,
+                    LabelOffsetU = @LabelOffsetU, LabelOffsetV = @LabelOffsetV,
+                    TitleColor = @TitleColor, TitleBackground = @TitleBackground,
+                    TitleFontFamily = @TitleFontFamily, TitleBold = @TitleBold,
+                    TitleItalic = @TitleItalic, TitleMaxWidth = @TitleMaxWidth,
+                    UpdatedAt = CURRENT_TIMESTAMP
+                WHERE Id = @Id;";
+
+            var affected = await conn.ExecuteAsync(sql, new
+            {
+                model.Id,
+                model.Title,
+                model.FilePath,
+                model.Left,
+                model.Top,
+                model.Right,
+                model.Bottom,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Width,
+                model.Height,
+                model.Opacity,
+                model.Rotation,
+                model.Visibility,
+                model.IsLocked,
+                model.HasGeoReference,
+                model.CoordinateSystem,
+                model.TitleSize,
+                model.ShowTitle,
+                model.LabelOffsetU,
+                model.LabelOffsetV,
+                TitleColor = model.TitleColor.ToString(),
+                TitleBackground = model.TitleBackground.ToString(),
+                model.TitleFontFamily,
+                model.TitleBold,
+                model.TitleItalic,
+                model.TitleMaxWidth
+            });
+
+            if (affected == 0)
+                throw new KeyNotFoundException($"Image not found. Id={model.Id}");
+
+            _log?.Info($"Image 업데이트 완료 - Id={model.Id}");
+            return await FetchImageAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 이미지를 삭제합니다
+    /// </summary>
+    /// <param name="id">Image ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    public async Task<bool> DeleteImageAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (id <= 0) throw new ArgumentException(nameof(id));
+
+            const string sql = "DELETE FROM Images WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id });
+
+            _log?.Info(ret > 0
+                ? $"DeleteImageAsync 완료 - Id={id}"
+                : $"DeleteImageAsync 대상 없음 - Id={id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
     #endregion
     #endregion
     #region - IHanldes -
@@ -971,7 +3937,6 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     /// <value>연결되어 있으면 true, 그렇지 않으면 false</value>
     public bool IsConnected => _conn != null && _conn.State == ConnectionState.Open;
     #endregion
-
     #region - Attributes -
     /// <summary>로깅 서비스</summary>
     private ILogService _log;
@@ -982,6 +3947,11 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     /// <summary>Symbol 데이터 제공자</summary>
     private SymbolProvider _symbolProvider;
     private GeometricSymbolProvider _geometrySymbolProvider;
+    private PidsSymbolProvider _pidsSymbolProvider;
+    private MilitarySymbolProvider _militarySymbolProvider;
+    private LineSymbolProvider _lineSymbolProvider;
+    private InfraSymbolProvider _infraSymbolProvider;
+    private PidsGroupSymbolProvider _pidsGroupSymbolProvider;
 
     /// <summary>데이터베이스 설정 모델</summary>
     private GMapDbSetupModel _setup;
@@ -1016,12 +3986,15 @@ internal class SymbolSQL
     /// <summary>Symbol 제목/이름</summary>
     public string Title { get; set; } = string.Empty;
 
+    /// <summary>Title 크기</summary>
+    public double TitleSize { get; set; }
+
     /// <summary>동작 상태 (NONE, DEACTIVE, ACTIVE, FAULT)</summary>
     public string OperationState { get; set; } = string.Empty;
     //`Latitude`          DECIMAL(10,8) NOT NULL,                 --위도
     //`Longitude`         DECIMAL(11,8) NOT NULL,                 --경도
     //`Altitude`          FLOAT DEFAULT 0,                        --고도
-    //`Zoom`              DECIMAL(4, 3) DEFAULT 17,               --디스플레이용(Zoom)
+    //`Zoom`              DECIMAL(3,1) DEFAULT 17.0,              --최소 표시 줌(하프스텝 0.5 지원) ※구주석 DECIMAL(4,3)은 오기(최대 9.999)
     //`Bearing`           DECIMAL(6,3) DEFAULT 0,                 --심볼각도
     /// <summary>위도 좌표 (DECIMAL(10,8))</summary>
     public decimal Latitude { get; set; }
@@ -1048,6 +4021,9 @@ internal class SymbolSQL
 
     /// <summary>Shape 표시 여부</summary>
     public bool ShowShape { get; set; }
+    /// <summary>레이어 마스터 가시성(레이어패널). false=심볼 전체 숨김.</summary>
+    public bool Visible { get; set; } = true;
+    public bool IsLocked { get; set; }
 
     /// <summary>Title 표시 여부</summary>
     public bool ShowTitle { get; set; }
@@ -1055,6 +4031,21 @@ internal class SymbolSQL
     public string FillColor { get; set; } = "Blue";
     public string StrokeColor { get; set; } = "White";
     public decimal StrokeThickness { get; set; } = 1.0m;
+
+    /// <summary>레이어 순서 (높을수록 위)</summary>
+    public int ZOrder { get; set; } = 10;
+
+    /// <summary>라벨 상대 오프셋 X/Y (화면 픽셀). 0=기본. (Symbol_Label_Decouple)</summary>
+    public double LabelOffsetX { get; set; }
+    public double LabelOffsetY { get; set; }
+
+    // 라벨 스타일 (Overlay_Title FR-06 v2.5) — 색=EnumColorType 문자열(FillColor 동형)
+    public string TitleColor { get; set; } = "White";
+    public string TitleBackground { get; set; } = "Black";
+    public string TitleFontFamily { get; set; } = string.Empty;
+    public bool TitleBold { get; set; }
+    public bool TitleItalic { get; set; }
+    public decimal TitleMaxWidth { get; set; } = 200.0m;
 
     /// <summary>생성 일시</summary>
     public DateTime CreatedAt { get; set; }
@@ -1075,7 +4066,8 @@ internal class SymbolSQL
         Id = Id,
         Pid = Pid,
         Title = Title,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -1083,13 +4075,23 @@ internal class SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
     };
 }
 
@@ -1115,7 +4117,8 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         Id = Id,
         Pid = Pid,
         Title = Title,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -1123,17 +4126,639 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
         ShowTitle = ShowTitle,
 
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // GeometrySymbol 전용 속성들 (간소화)
-        ShapeType = Enum.Parse<EnumShapeType>(GeometryShapeType),
+        ShapeType = EnumParseHelper.TryParseEnum(GeometryShapeType, EnumShapeType.Circle),
         Opacity = (double)GeometryOpacity
     };
+}
+
+/// <summary>
+/// Symbols와 PidsSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class PidsSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 PIDS 전용 속성들
+
+    /// <summary>연결된 디바이스 ID</summary>
+    public int LinkedDeviceId { get; set; }
+
+    /// <summary>장비 타입</summary>
+    public string DeviceType { get; set; } = "Fence";
+
+    /// <summary>FOV 표시 여부</summary>
+    public bool ShowFOV { get; set; }
+
+    /// <summary>FOV 색상</summary>
+    public string FOVColor { get; set; } = "Red";
+
+    /// <summary>FOV 투명도</summary>
+    public decimal FOVOpacity { get; set; } = 0.3m;
+
+    /// <summary>이벤트 상태</summary>
+    public string EventStatus { get; set; } = "Normal";
+
+    /// <summary>기준 방향 각도 (카메라 물리적 설치 방향)</summary>
+    public decimal BaseBearing { get; set; } = 0.0m;
+    public string? ModelVariant { get; set; }
+
+    /// <summary>탐지 거리(m) — NULL 이면 모델 기본값(30). 3D 헤드/FOV 방향 영속을 위해 신설(D-3).</summary>
+    public decimal? DetectionRange { get; set; }
+    /// <summary>탐지 각도(도) — NULL 이면 모델 기본값(80).</summary>
+    public decimal? DetectionAngle { get; set; }
+    /// <summary>탐지 방향(도, 북 기준 절대각) — NULL 이면 BaseBearing 으로 초기화(종전 동작 유지).</summary>
+    public decimal? DetectionBearing { get; set; }
+    /// <summary>통문 폭(m) — NULL 이면 모델 기본(4.0)(FR-12).</summary>
+    public decimal? GateWidthM { get; set; }
+    /// <summary>ContactOn=열림 해석 여부(FR-12).</summary>
+    public bool OpenOnContactOn { get; set; } = true;
+
+    /// <summary>
+    /// JOIN 결과를 PidsSymbolModel로 변환
+    /// </summary>
+    public PidsSymbolModel ToPidsDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
+        ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
+        ShowTitle = ShowTitle,
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
+        StrokeThickness = (double)StrokeThickness,
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
+
+        // PidsSymbol 전용 속성들
+        LinkedDeviceId = LinkedDeviceId,
+        DeviceType = EnumParseHelper.TryParseEnum(DeviceType, EnumDeviceType.NONE),
+        ShowFOV = ShowFOV,
+        FOVColor = EnumParseHelper.TryParseEnum(FOVColor, EnumColorType.Blue),
+        FOVOpacity = (double)FOVOpacity,
+        EventStatus = EnumParseHelper.TryParseEnum(EventStatus, EnumEventStatus.Normal),
+        BaseBearing = (double)BaseBearing,
+        ModelVariant = ModelVariant,
+
+        // Detection* 는 컬럼이 NULL(신설 전 저장 행)이면 종전 동작으로 폴백한다 —
+        // Bearing 은 BaseBearing, Range/Angle 은 모델 기본값(30m/80°). 한 번 저장되면 실제 값이 왕복된다(D-3).
+        DetectionBearing = DetectionBearing.HasValue ? (double)DetectionBearing.Value : (double)BaseBearing,
+        DetectionRange = DetectionRange.HasValue ? (double)DetectionRange.Value : 30.0,
+        DetectionAngle = DetectionAngle.HasValue ? (double)DetectionAngle.Value : 80.0,
+        GateWidthM = GateWidthM.HasValue ? (double)GateWidthM.Value : null,
+        OpenOnContactOn = OpenOnContactOn
+    };
+}
+
+/// <summary>
+/// Symbols와 MilitarySymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class MilitarySymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 군사 심볼 전용 속성들
+
+    /// <summary>소속 구분</summary>
+    public string Affiliation { get; set; } = "Friend";
+
+    /// <summary>전투 차원 (공중성)</summary>
+    public string BattleDimension { get; set; } = "Land";
+
+    /// <summary>표준 정체성 (계획 속성)</summary>
+    public string StandardIdentity { get; set; } = "Present";
+
+    /// <summary>부대 종류</summary>
+    public string UnitType { get; set; } = "Artillery";
+
+    /// <summary>부대 규모</summary>
+    public string UnitSize { get; set; } = "Company";
+
+    /// <summary>부대 지시자 (부대명)</summary>
+    public string? UnitDesignator { get; set; }
+
+    /// <summary>상급 부대명</summary>
+    public string? HigherFormation { get; set; }
+
+    /// <summary>콜사인</summary>
+    public string? CallSign { get; set; }
+
+    /// <summary>국가 코드</summary>
+    public string? CountryCode { get; set; }
+
+    /// <summary>
+    /// JOIN 결과를 MilitarySymbolModel로 변환
+    /// </summary>
+    public MilitarySymbolModel ToMilitaryDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
+        ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
+        ShowTitle = ShowTitle,
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
+        StrokeThickness = (double)StrokeThickness,
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
+
+        // MilitarySymbol 전용 속성들
+        Affiliation = EnumParseHelper.TryParseEnum(Affiliation, EnumMilitaryAffiliation.Unknown),
+        BattleDimension = EnumParseHelper.TryParseEnum(BattleDimension, EnumMilitaryBattleDimension.Land),
+        StandardIdentity = EnumParseHelper.TryParseEnum(StandardIdentity, EnumMilitaryStandardIdentity.Present),
+        UnitType = EnumParseHelper.TryParseEnum(UnitType, EnumMilitaryUnitType.Infantry),
+        UnitSize = EnumParseHelper.TryParseEnum(UnitSize, EnumMilitaryUnitSize.Individual),
+        UnitDesignator = UnitDesignator,
+        HigherFormation = HigherFormation,
+        CallSign = CallSign,
+        CountryCode = CountryCode
+    };
+}
+
+
+/// <summary>
+/// Symbols와 LineSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class LineSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 라인 심볼 전용 속성들
+
+    /// <summary>라인 투명도</summary>
+    public decimal LineOpacity { get; set; } = 1.0m;
+
+    /// <summary>닫힌 경로 여부</summary>
+    public bool IsClosedPath { get; set; }
+
+    /// <summary>화살표 머리 표시 여부</summary>
+    public bool ShowArrowHead { get; set; }
+
+    /// <summary>라인 패턴 타입</summary>
+    public string LinePattern { get; set; } = "Solid";
+
+    /// <summary>
+    /// JOIN 결과를 LineSymbolModel로 변환 (포인트는 별도 로드 필요)
+    /// </summary>
+    public LineSymbolModel ToLineDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
+        ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
+        ShowTitle = ShowTitle,
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
+        StrokeThickness = (double)StrokeThickness,
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
+
+        // LineSymbol 전용 속성들
+        LineOpacity = (double)LineOpacity,
+        IsClosedPath = IsClosedPath,
+        ShowArrowHead = ShowArrowHead,
+        LinePattern = EnumParseHelper.TryParseEnum(LinePattern, EnumLinePattern.Solid),
+        LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
+    };
+}
+
+/// <summary>
+/// LinePoints 테이블과 매핑되는 DTO
+/// </summary>
+internal sealed class LinePointSQL
+{
+    public int Id { get; set; }
+    public int LineSymbolId { get; set; }
+    public int SequenceOrder { get; set; }
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public float Altitude { get; set; }
+
+    /// <summary>
+    /// DTO를 GeoPoint로 변환
+    /// </summary>
+    public GeoPoint ToGeoPoint() => new(
+        latitude: (double)Latitude,
+        longitude: (double)Longitude,
+        altitude: (double)Altitude
+    );
+}
+
+/// <summary>
+/// Symbols와 InfraSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class InfraSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 인프라 전용 속성들
+
+    /// <summary>건물 종류 (Factory만)</summary>
+    public string BuildingType { get; set; } = "Factory";
+
+    /// <summary>건물 용도 (Office만)</summary>
+    public string BuildingUsage { get; set; } = "Office";
+
+    /// <summary>지상 층수</summary>
+    public int FloorCount { get; set; } = 1;
+
+    /// <summary>지하 층수</summary>
+    public int BasementFloorCount { get; set; } = 0;
+
+    /// <summary>건물 면적 (㎡)</summary>
+    public decimal BuildingArea { get; set; } = 100.0m;
+
+    /// <summary>
+    /// JOIN 결과를 InfraSymbolModel로 변환
+    /// </summary>
+    public InfraSymbolModel ToInfraDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
+        ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
+        ShowTitle = ShowTitle,
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
+        StrokeThickness = (double)StrokeThickness,
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
+
+        // InfraSymbol 전용 속성들
+        BuildingType = EnumParseHelper.TryParseEnum(BuildingType, EnumBuildingType.Factory),
+        BuildingUsage = EnumParseHelper.TryParseEnum(BuildingUsage, EnumBuildingUsage.Office),
+        FloorCount = FloorCount,
+        BasementFloorCount = BasementFloorCount,
+        BuildingArea = (double)BuildingArea
+    };
+}
+#endregion
+#region - DTO Classes for PidsGroupSymbol -
+
+/// <summary>
+/// Symbols와 PidsGroupSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class PidsGroupSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 PIDS 그룹 전용 속성들
+
+    /// <summary>연결된 디바이스 그룹 ID</summary>
+    public int LinkedDeviceGroup { get; set; }
+
+    /// <summary>이벤트 상태</summary>
+    public string EventStatus { get; set; } = "Normal";
+
+    /// <summary>라인 투명도</summary>
+    public decimal LineOpacity { get; set; } = 1.0m;
+
+    /// <summary>닫힌 경로 여부</summary>
+    public bool IsClosedPath { get; set; } = true;
+
+    /// <summary>화살표 머리 표시 여부</summary>
+    public bool ShowArrowHead { get; set; }
+
+    /// <summary>라인 패턴 타입</summary>
+    public string LinePattern { get; set; } = "Solid";
+
+    /// <summary>3D 철망 기둥 간격(m) — NULL 이면 전역 설정(FR-03).</summary>
+    public decimal? PostSpacingM { get; set; }
+    /// <summary>3D 철망 높이(m) — NULL 이면 전역 설정.</summary>
+    public decimal? FenceHeightM { get; set; }
+    /// <summary>철망 형태 0=Posts 1=SensorMount(FR-04).</summary>
+    public int FenceMode { get; set; }
+    /// <summary>그룹별 3D 렌더(FR-06).</summary>
+    public bool Render3D { get; set; } = true;
+    /// <summary>센서 노드 역순(FR-04).</summary>
+    public bool ReverseSensorOrder { get; set; }
+
+    /// <summary>
+    /// JOIN 결과를 PidsGroupSymbolModel로 변환 (포인트는 별도 로드 필요)
+    /// </summary>
+    public PidsGroupSymbolModel ToPidsGroupDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = EnumMarkerCategory.AREA_BOUNDARY,
+        ShowShape = ShowShape,
+        Visible = Visible,
+        IsLocked = IsLocked,
+        ShowTitle = ShowTitle,
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
+        StrokeThickness = (double)StrokeThickness,
+        ZOrder = ZOrder,
+        LabelOffsetX = LabelOffsetX,
+        LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
+
+        // PidsGroupSymbol 전용 속성들
+        LinkedDeviceGroup = LinkedDeviceGroup,
+        EventStatus = EnumParseHelper.TryParseEnum(EventStatus, EnumEventStatus.Normal),
+        LineOpacity = (double)LineOpacity,
+        IsClosedPath = IsClosedPath,
+        ShowArrowHead = ShowArrowHead,
+        LinePattern = EnumParseHelper.TryParseEnum(LinePattern, EnumLinePattern.Solid),
+        PostSpacingM = PostSpacingM.HasValue ? (double)PostSpacingM.Value : null,
+        FenceHeightM = FenceHeightM.HasValue ? (double)FenceHeightM.Value : null,
+        FenceMode = Enum.IsDefined(typeof(EnumFenceMode), FenceMode) ? (EnumFenceMode)FenceMode : EnumFenceMode.Posts,   // 미지값 → Posts 폴백
+        Render3D = Render3D,
+        ReverseSensorOrder = ReverseSensorOrder,
+        LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
+    };
+}
+
+/// <summary>
+/// PidsGroupPoints 테이블과 매핑되는 DTO
+/// </summary>
+internal sealed class PidsGroupPointSQL
+{
+    public int Id { get; set; }
+    public int GroupSymbolId { get; set; }
+    public int SequenceOrder { get; set; }
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public float Altitude { get; set; }
+
+    /// <summary>
+    /// DTO를 GeoPoint로 변환
+    /// </summary>
+    public GeoPoint ToGeoPoint() => new(
+        latitude: (double)Latitude,
+        longitude: (double)Longitude,
+        altitude: (double)Altitude
+    );
+}
+
+#endregion
+#region - DTO Classes for Image -
+
+/// <summary>
+/// Images 테이블과 매핑되는 DTO
+/// </summary>
+internal sealed class ImageSQL
+{
+    /// <summary>자동 증가 기본 키</summary>
+    public int Id { get; set; }
+
+    /// <summary>이미지 제목</summary>
+    public string? Title { get; set; }
+
+    /// <summary>이미지 파일 경로</summary>
+    public string FilePath { get; set; } = string.Empty;
+
+    /// <summary>좌측 경도 (Left Longitude)</summary>
+    public decimal Left { get; set; }
+
+    /// <summary>상단 위도 (Top Latitude)</summary>
+    public decimal Top { get; set; }
+
+    /// <summary>우측 경도 (Right Longitude)</summary>
+    public decimal Right { get; set; }
+
+    /// <summary>하단 위도 (Bottom Latitude)</summary>
+    public decimal Bottom { get; set; }
+
+    /// <summary>중심 위도</summary>
+    public decimal Latitude { get; set; }
+
+    /// <summary>중심 경도</summary>
+    public decimal Longitude { get; set; }
+
+    /// <summary>고도</summary>
+    public float Altitude { get; set; }
+
+    /// <summary>표시 줌 레벨 (0 = 모든 줌 레벨)</summary>
+    public decimal Zoom { get; set; }
+
+    /// <summary>이미지 너비 (픽셀)</summary>
+    public decimal Width { get; set; }
+
+    /// <summary>이미지 높이 (픽셀)</summary>
+    public decimal Height { get; set; }
+
+    /// <summary>투명도 (0.0 ~ 1.0)</summary>
+    public decimal Opacity { get; set; } = 1.0m;
+
+    /// <summary>회전 각도 (도)</summary>
+    public decimal Rotation { get; set; }
+
+    /// <summary>표시 여부</summary>
+    public bool Visibility { get; set; } = true;
+    public bool IsLocked { get; set; }
+
+    /// <summary>지리 참조 여부</summary>
+    public bool HasGeoReference { get; set; }
+
+    /// <summary>좌표계 (예: EPSG:4326)</summary>
+    public string? CoordinateSystem { get; set; }
+
+    // 라벨 스타일 (FR-06 v2.5) — 색=EnumColorType 문자열(FillColor 동형)
+    public string TitleColor { get; set; } = "White";
+    public string TitleBackground { get; set; } = "Black";
+    public string TitleFontFamily { get; set; } = string.Empty;
+    public bool TitleBold { get; set; }
+    public bool TitleItalic { get; set; }
+    public decimal TitleMaxWidth { get; set; } = 200.0m;
+
+    /// <summary>라벨 글자 크기 (FR-10)</summary>
+    public decimal TitleSize { get; set; } = 11.0m;
+
+    /// <summary>라벨 표시 여부 (FR-10)</summary>
+    public bool ShowTitle { get; set; }
+
+    /// <summary>라벨 오프셋 U — 하프익스텐트 비율 (FR-02)</summary>
+    public double LabelOffsetU { get; set; }
+
+    /// <summary>라벨 오프셋 V — 하프익스텐트 비율 (FR-02)</summary>
+    public double LabelOffsetV { get; set; }
+
+    /// <summary>생성 일시</summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>수정 일시</summary>
+    public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// DTO를 ImageModel로 변환
+    /// </summary>
+    public ImageModel ToDomain() => new()
+    {
+        Id = Id,
+        Title = Title,
+        FilePath = FilePath,
+        Left = (double)Left,
+        Top = (double)Top,
+        Right = (double)Right,
+        Bottom = (double)Bottom,
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Width = (double)Width,
+        Height = (double)Height,
+        Opacity = (double)Opacity,
+        Rotation = (double)Rotation,
+        Visibility = Visibility,
+        IsLocked = IsLocked,
+        HasGeoReference = HasGeoReference,
+        CoordinateSystem = CoordinateSystem,
+        TitleSize = (double)TitleSize,
+        ShowTitle = ShowTitle,
+        LabelOffsetU = LabelOffsetU,
+        LabelOffsetV = LabelOffsetV,
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth
+    };
+}
+
+#endregion
+#region - Enum Parse Helper -
+/// <summary>
+/// DB에서 읽은 문자열을 Enum으로 안전하게 변환하는 헬퍼.
+/// 알 수 없는 문자열이 있으면 예외 대신 fallback 값을 반환한다.
+/// </summary>
+internal static class EnumParseHelper
+{
+    // DB에 저장된 구 EnumOperationState 값 → 신규 값 매핑 (SQL 마이그레이션 없이 호환)
+    private static readonly Dictionary<string, string> _legacyOperationStateMap
+        = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "ACTIVE",   "ACTIVATED"   },
+            { "DEACTIVE", "DEACTIVATED" },
+            { "FAULT",    "ERROR"       },
+        };
+
+    internal static T TryParseEnum<T>(string value, T fallback)
+        where T : struct, Enum
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        // EnumOperationState: 구 DB 값 → 신규 값 정규화
+        if (typeof(T) == typeof(EnumOperationState)
+            && _legacyOperationStateMap.TryGetValue(value, out var normalized))
+            value = normalized;
+
+        if (Enum.TryParse<T>(value, ignoreCase: true, out var result))
+            return result;
+        return fallback;
+    }
 }
 #endregion

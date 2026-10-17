@@ -1,25 +1,57 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.BulkImport;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Groups;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Lists;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services.Onvif;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
-using System.Runtime.InteropServices;
-using System.Windows.Controls;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Data;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
-/****************************************************************************
-   Purpose      :                                                          
-   Created By   : GHLee                                                
-   Created On   : 5/27/2025 7:34:02 PM                                                    
-   Department   : SW Team                                                   
-   Company      : Sensorway Co., Ltd.                                       
-   Email        : lsirikh@naver.com                                         
-****************************************************************************/
-public class DeviceDashboardViewModel : BasePanelViewModel
+
+/// <summary>
+/// 장비 콘솔 — 레일(그룹 + 7 카테고리 + 부품으로 찾기) · 목록 · 상세 3단.
+/// </summary>
+/// <remarks>
+/// <para>이 뷰모델은 <b>전송 경로를 갖지 않는다.</b> 저장 · 삭제 · 재조회는 카테고리별 패널 뷰모델의 기존 경로를
+/// <see cref="IDeviceConsoleSource"/> 로 감싸 그대로 부른다(device-console-redesign NFR-02 · CD-1).
+/// 유일한 예외는 장비 → 그룹 끌어 놓기로, 기존에도 패널 밖(배정 다이얼로그)에서 API 를 직접 부르던 길이다.</para>
+/// <para>싱글턴이다 — 창을 닫을 때 선택 · 미적용 변경 · 구독을 전부 내려놓는다.</para>
+/// </remarks>
+public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptions
+                                      , IHandle<CallCloseDeviceConsoleMessageModel>
 {
+    public const string ConsoleKey = "Devices";
+    public const string GroupsRailKey = "groups";
+    public const string ByComponentRailKey = "by-component";
+
     #region - Ctors -
     public DeviceDashboardViewModel(IEventAggregator eventAggregator
                                 , ILogService log
@@ -27,362 +59,1804 @@ public class DeviceDashboardViewModel : BasePanelViewModel
                                 , ControllerDevicePanelViewModel controllerDevicePanelViewModel
                                 , SensorDevicePanelViewModel sensorDevicePanelViewModel
                                 , CameraDevicePanelViewModel cameraDevicePanelViewModel
+                                , SpeakerDevicePanelViewModel speakerDevicePanelViewModel
+                                , EnclosureDevicePanelViewModel enclosureDevicePanelViewModel
+                                , LampDevicePanelViewModel lampDevicePanelViewModel
+                                , GateDevicePanelViewModel gateDevicePanelViewModel
+                                , DeviceGroupPanelViewModel deviceGroupPanelViewModel
+                                , DeviceProvider deviceProvider
+                                , DeviceGroupProvider deviceGroupProvider
+                                , ControllerDeviceProvider controllerDeviceProvider
+                                , ServerProvider serverProvider
+                                , IDeviceApiService deviceApiService
+                                , ICatalogService catalogService
+                                , DeviceQueryPolicy? queryPolicy = null
+                                , Lazy<IAssemblyLauncher>? assemblyLauncher = null
+                                , Lazy<IWiringLauncher>? wiringLauncher = null
+                                , Lazy<IDeviceAssignLauncher>? assignLauncher = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
         ControllerPanelViewModel = controllerDevicePanelViewModel;
         SensorPanelViewModel = sensorDevicePanelViewModel;
         CameraPanelViewModel = cameraDevicePanelViewModel;
+        SpeakerPanelViewModel = speakerDevicePanelViewModel;
+        EnclosurePanelViewModel = enclosureDevicePanelViewModel;
+        LampPanelViewModel = lampDevicePanelViewModel;
+        GatePanelViewModel = gateDevicePanelViewModel;
+        DeviceGroupPanelViewModel = deviceGroupPanelViewModel;
 
+        DeviceProvider = deviceProvider;
+        _groupProvider = deviceGroupProvider;
+        _controllerProvider = controllerDeviceProvider;
+        _serverProvider = serverProvider;
+
+        // 패널의 UpdateAction 은 기반 클래스가 아니라 패널마다 선언돼 있다 — 구독 방법을 람다로 넘긴다.
+        _sources = new Dictionary<string, IDeviceConsoleSource>(StringComparer.Ordinal)
+        {
+            [GroupsRailKey] = new DeviceConsoleSource<DeviceGroupViewModel>(deviceGroupPanelViewModel, h => deviceGroupPanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Controller)] = new DeviceConsoleSource<ControllerDeviceViewModel>(controllerDevicePanelViewModel, h => controllerDevicePanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Sensor)] = new DeviceConsoleSource<SensorDeviceViewModel>(sensorDevicePanelViewModel, h => sensorDevicePanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Camera)] = new DeviceConsoleSource<CameraDeviceViewModel>(cameraDevicePanelViewModel, h => cameraDevicePanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Speaker)] = new DeviceConsoleSource<SpeakerDeviceViewModel>(speakerDevicePanelViewModel, h => speakerDevicePanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Enclosure)] = new DeviceConsoleSource<EnclosureDeviceViewModel>(enclosureDevicePanelViewModel, h => enclosureDevicePanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Lamp)] = new DeviceConsoleSource<LampDeviceViewModel>(lampDevicePanelViewModel, h => lampDevicePanelViewModel.UpdateAction += h),
+            [RailKeyOf(EnumDeviceCategory.Gate)] = new DeviceConsoleSource<GateDeviceViewModel>(gateDevicePanelViewModel, h => gateDevicePanelViewModel.UpdateAction += h),
+        };
+
+        _typeAxis = new Dictionary<EnumDeviceCategory, TypeAxisPanelSupport>
+        {
+            [EnumDeviceCategory.Controller] = controllerDevicePanelViewModel.TypeAxis,
+            [EnumDeviceCategory.Sensor] = sensorDevicePanelViewModel.TypeAxis,
+            [EnumDeviceCategory.Camera] = cameraDevicePanelViewModel.TypeAxis,
+            [EnumDeviceCategory.Speaker] = speakerDevicePanelViewModel.TypeAxis,
+            [EnumDeviceCategory.Enclosure] = enclosureDevicePanelViewModel.TypeAxis,
+            [EnumDeviceCategory.Lamp] = lampDevicePanelViewModel.TypeAxis,
+            [EnumDeviceCategory.Gate] = gateDevicePanelViewModel.TypeAxis,
+        };
+
+        Detail = new ConsoleDetailPresenter();
+        // 손댄 칸이 생기거나 사라지면 "손댄 칸이 있으면 못 연다" 입구들(부품 구성 · 결선 · 장비 배정)을 다시 판정한다 —
+        // 예전에는 적용 · 레일 이동 때만 알려 칸을 고쳐도 단추가 켜진 채였다(누르면 말없이 돌아왔다).
+        Detail.Tracker.Changed += (_, _) => RefreshToolbar();
+        Form = new DevicePropertyFormViewModel(Detail, this);
+        _deviceApiService = deviceApiService;
+        _catalogService = catalogService;
+        _assemblyFactory = assemblyLauncher;
+        _wiringFactory = wiringLauncher;
+        _assignFactory = assignLauncher;
+
+        // 계약 판정은 한 곳에서 — 레일(부품으로 찾기를 낼지)과 그 조회 뷰모델이 서로 다른 정책을 보면 항목은 있는데 화면은 영영 빈다.
+        // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
+        _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
+        ContractGate = new DeviceContractGateViewModel(_queryPolicy, log);
+        // 집계기를 넘긴다 — 소속을 바꾸면 지도의 구역선 조회표가 그 그룹을 다시 등록한다(DeviceGroupMembershipChangedMessage).
+        GroupDrop = new DeviceGroupDropHandler(deviceApiService, () => DeviceProvider.OfType<IBaseDeviceModel>(), log, eventAggregator);
+        _axisWriter = new DeviceAxisWriter(deviceApiService, _queryPolicy, log);
+
+        RailEntries = new ObservableCollection<ConsoleRailEntry>();
+        GroupChips = new ObservableCollection<DeviceGroupViewModel>();
+        BuildRail();
+
+        // [ONVIF 검색](카메라 레일) — 검색 · 조회는 서비스, [추가] 는 상세 칸의 새 카메라 Draft 로만 들어온다(등록은 [등록]).
+        CameraDiscovery = CreateCameraDiscovery(new WsDiscoveryClient(), new OnvifCameraLookup(log: log));
+
+        // 대량 등록(device-bulk-import) — 미리보기 판은 목록 칸 위 덮개. 서버 쓰기는 판의 [등록] 때만.
+        BulkImport = new BulkImportViewModel(BuildBulkContext, CreateBulkWriter, log);
+        BulkImport.Written += OnBulkWritten;
+        BulkImport.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(BulkImportViewModel.IsBusy) or nameof(BulkImportViewModel.IsOpen)) RefreshBulkToolbar();
+        };
     }
     #endregion
-    #region - Implementation of Interface -
-    #endregion
+
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        IsSelected = false;
-        ControllerPanelViewModel.CheckSelectedItems += ControllerPanelViewModel_CheckSelectedItems;
-        ControllerPanelViewModel.UpdateAction += ControllerPanelViewModel_UpdateAction;
-        SensorPanelViewModel.CheckSelectedItems += SensorPanelViewModel_CheckSelectedItems;
-        SensorPanelViewModel.UpdateAction += SensorPanelViewModel_UpdateAction;
-        CameraPanelViewModel.CheckSelectedItems += CameraPanelViewModel_CheckSelectedItems;
-        CameraPanelViewModel.UpdateAction += CameraPanelViewModel_UpdateAction;
+
+        foreach (var source in _sources.Values) source.BusyEnded += OnSourceBusyEnded;
+        DeviceProvider.CollectionEntity.CollectionChanged += OnDevicesChanged;
+        DeviceProvider.DeviceUpdated += OnDeviceUpdated;
+        _groupProvider.CollectionEntity.CollectionChanged += OnGroupsChanged;
+        GroupDrop.Completed += OnGroupDropCompleted;
+        Detail.Guard.Blocked += OnNavigationBlocked;
+
+        BuildRail();            // 계약 세대가 바뀌었을 수 있다(부품으로 찾기는 축 계약에서만).
+        RefreshRailCounts();
+        RefreshGroupChips();
+
+        // "소속 부대" 선택지가 부대 이름으로 뜨도록 미리 읽어 둔다(8.0 미만이면 서버를 부르지 않는다 · 실패해도 창은 연다).
+        _ = UnitDirectory()?.EnsureLoadedAsync();
 
         await TabControlViewModel.ActivateAsync();
-
-        await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
-
-        await DataInitialize(cancellationToken);
-        await GetDeviceType(cancellationToken);
-
-
-        
-
-
+        await SwitchRailAsync(_railKey ?? GroupsRailKey, force: true);
     }
-
-
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
         await base.OnDeactivateAsync(close, cancellationToken);
-        ControllerPanelViewModel.CheckSelectedItems -= ControllerPanelViewModel_CheckSelectedItems;
-        ControllerPanelViewModel.UpdateAction -= ControllerPanelViewModel_UpdateAction;
-        SensorPanelViewModel.CheckSelectedItems -= SensorPanelViewModel_CheckSelectedItems;
-        SensorPanelViewModel.UpdateAction -= SensorPanelViewModel_UpdateAction;
-        CameraPanelViewModel.CheckSelectedItems -= CameraPanelViewModel_CheckSelectedItems;
-        CameraPanelViewModel.UpdateAction -= CameraPanelViewModel_UpdateAction;
 
-        ClearData();
-        SelectedItemEditor = null;
+        foreach (var source in _sources.Values) source.BusyEnded -= OnSourceBusyEnded;
+        DeviceProvider.CollectionEntity.CollectionChanged -= OnDevicesChanged;
+        DeviceProvider.DeviceUpdated -= OnDeviceUpdated;
+        _groupProvider.CollectionEntity.CollectionChanged -= OnGroupsChanged;
+        GroupDrop.Completed -= OnGroupDropCompleted;
+        Detail.Guard.Blocked -= OnNavigationBlocked;
+        DetachRows();
+
+        // 싱글턴 — 다음에 열 때 옛 선택 · 미적용 변경 · Draft 가 남아 있으면 안 된다.
+        _pending = null;
+        _draft = null;
+        _lastGroupUndo = null;
+        _closeConfirmed = false;
+        CameraDiscovery.OnClickCloseButton();
+        _externalUpdateWhileEditing = false;
+        BulkImport.Close();   // 싱글턴 — 다음에 열 때 지난 미리보기가 남지 않게(보내던 일은 멈춘다)
+        Form.Clear();
+        Detail.Reset();
+        SearchText = string.Empty;
+        StatusText = string.Empty;
+        NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
+
+        // 먼저 닫고 나서 비운다 — 비우고 닫으면 활성 패널이 닫힘을 못 받아 다음에 열 때 구독이 겹친다(패널은 싱글턴).
+        if (TabControlViewModel.ActiveItem is not null)
+            await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
         TabControlViewModel.Items.Clear();
-        await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
         await TabControlViewModel.DeactivateAsync(true);
     }
     #endregion
-    #region - Binding Methods -
-    private void ControllerPanelViewModel_CheckSelectedItems(IList<ControllerDeviceViewModel> selectedItems)
-    {
 
-        if (!(selectedItems.Count > 0))
-        {
-            SelectedItemEditor = null;
-            IsSelected = false;
-        }
-        else
-        {
-           SelectedItemEditor =  new ControllerSelectionViewModel(selectedItems);
-           (SelectedItemEditor as ControllerSelectionViewModel)!.RefreshAll();
-           IsSelected = true;
-        }    
-
-    }
-
-    private void SensorPanelViewModel_CheckSelectedItems(IList<SensorDeviceViewModel> selectedItems)
-    {
-        if (!(selectedItems.Count > 0))
-        {
-            SelectedItemEditor = null;
-            IsSelected = false;
-        }
-        else
-        {
-            SelectedItemEditor = new SensorSelectionViewModel(selectedItems);
-            (SelectedItemEditor as SensorSelectionViewModel)!.RefreshAll();
-            IsSelected = true;
-        }
-    }
-
-    private async void CameraPanelViewModel_CheckSelectedItems(IList<CameraDeviceViewModel> selectedItems)
-    {
-        if (!(selectedItems.Count > 0))
-        {
-            if (SelectedItemEditor != null)
-                await SelectedItemEditor.DeactivateAsync(true);
-
-            SelectedItemEditor = null;
-            IsSelected = false;
-        }
-        else
-        {
-            SelectedItemEditor = new CameraSelectionViewModel(selectedItems);
-            await SelectedItemEditor.ActivateAsync();
-            (SelectedItemEditor as CameraSelectionViewModel)!.RefreshAll();
-            IsSelected = true;
-        }
-    }
-    
-    private async void SensorPanelViewModel_UpdateAction()
-    {
-        await GetDeviceType();
-    }
-
-    private async void ControllerPanelViewModel_UpdateAction()
-    {
-        await GetDeviceType();
-    }
-
-    private async void CameraPanelViewModel_UpdateAction()
-    {
-        await GetDeviceType();
-    }
-
-   
-    #endregion
-    #region - Processes -
+    #region - Close guard -
     /// <summary>
-    /// 여러가지 Setup에 관련된 ViewModel을 순환적으로 활성화 시키는 역할을 하고, 
-    /// 각 ViewModel과 View 바인딩의 라이프사이클을 올바르게 유지하고 지속시키는 역할을 해준다.
+    /// 창을 닫아도 되는가 — 적용하지 않은 상세 변경(만들던 장비 포함)이 있으면 <b>먼저 묻는다</b>
+    /// (2026-09-27 전수 조사: ✕ 와 좌측 메뉴 전환이 묻지 않고 버렸다). 확인 팝업은 이벤트 콘솔과 같은 길
+    /// (<see cref="OpenConfirmPopupMessageModel"/>)이고, [확인] 이 오면 <see cref="CallCloseDeviceConsoleMessageModel"/> 로
+    /// 돌아와 버리고 닫는다. 팝업은 기다리지 않는다 — 이번 닫기는 막고 false.
     /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="args"></param>
-    public async void OnActiveTab(object sender, SelectionChangedEventArgs args)
+    /// <remarks>호스트의 창 틀(DevicePanelViewModel)이 ✕ · 좌측 메뉴 전환 앞에서 이 판정을 묻는다.</remarks>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
     {
+        var pending = PendingWorkSummary();
+        if (_closeConfirmed || pending is null) return true;
+
+        if (_eventAggregator is null) return true;   // 물을 길이 없으면(헤드리스) 막지 않는다
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "장비 창 닫기",
+            Explain = $"{pending}\n닫으면 이 내용은 사라집니다. 버리고 닫을까요?",
+            MessageModel = new CallCloseDeviceConsoleMessageModel(),
+        }, cancellationToken);
+        return false;
+    }
+
+    /// <summary>닫으면 사라질 것 — 없으면 null. 확인 문장에 그대로 쓴다.</summary>
+    public string? PendingWorkSummary()
+    {
+        if (!Detail.IsDirty) return null;
+        return (Detail.IsCreating ? "저장하지 않은 새 장비 정보" : "적용하지 않은 장비 정보 변경") + "이(가) 있습니다.";
+    }
+
+    /// <summary>닫기 확인에서 [확인] — 이번 닫기만 묻지 않고 통과시킨다(창을 닫으면 다시 초기화).</summary>
+    public async Task HandleAsync(CallCloseDeviceConsoleMessageModel message, CancellationToken cancellationToken)
+    {
+        _closeConfirmed = true;
+        if (_eventAggregator is null) return;
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePanelMessageModel(), cancellationToken);
+    }
+
+    private bool _closeConfirmed;
+    #endregion
+
+    #region - Rail -
+    /// <summary>레일에서 항목을 골랐다(뷰가 부른다). 막혔으면 false — 뷰는 레일 선택을 <see cref="SelectedRail"/> 로 되돌린다.</summary>
+    public async Task<bool> SelectRailAsync(string key)
+    {
+        if (string.Equals(key, _railKey, StringComparison.Ordinal)) return true;
+
+        // 전환 중이거나 저장 · 재조회가 도는 중이면 받지 않는다 — 전환은 패널을 닫는다(목록 비우기 + 진행 중 요청 취소).
+        if (_isSwitching || IsOperationRunning || BulkImport.IsBusy || !Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
+        {
+            if (BulkImport.IsBusy) StatusText = BulkBusyText;
+            // 바빠서 막은 것은 말한다 — 예전에는 말없이 막아, [등록] 직후 다음 레일을 고른 운영자가 앞 레일에서 [추가]해
+            // 다른 카테고리로 장비를 만들었다(GIS 실창 WP-2: '경광등'으로 친 것이 함체로 — api_logs POST devices/enclosures).
+            // 미적용 변경으로 막은 것은 상세 바닥 막대가 흔들리며 말한다(여기서 겹쳐 말하지 않는다).
+            if (_isSwitching || IsOperationRunning) StatusText = RailRefusedWhileBusyText;
+            NotifyOfPropertyChange(nameof(SelectedRail));
+            return false;
+        }
+
+        await SwitchRailAsync(key, force: false);
+        return true;
+    }
+
+    public ConsoleRailEntry? SelectedRail
+    {
+        get => RailEntries.FirstOrDefault(e => e.Key == _railKey);
+        set
+        {
+            if (value is null || value.Key == _railKey) return;
+            _ = SelectRailAsync(value.Key);
+        }
+    }
+
+    private async Task SwitchRailAsync(string key, bool force)
+    {
+        if (!RailEntries.Any(e => e.Key == key)) key = GroupsRailKey;
+        if (!force && key == _railKey) return;
+        if (_isSwitching) return;   // 두 전환이 await 사이에 끼어들면 목록은 C 인데 열은 B 인 화면이 된다
+
+        _isSwitching = true;
         try
         {
-            if (!(args.Source is TabControl)) return;
+            DetachRows();
+            _draft = null;
+            _pending = null;
+            _lastGroupUndo = null;          // 되돌리기는 그 일이 있었던 목록에서만 뜻이 있다
+            NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
+            if (StatusText is RailRefusedWhileBusyText or SelectionRefusedWhileBusyText) StatusText = string.Empty;   // 거절 까닭은 이제 지난 일
+            Form.Clear();
+            Detail.Reset();
 
-            if (args.AddedItems.Count == 0 || args.AddedItems[0] is not TabItem tab) return;
+            // 패널의 활성화 수명주기는 그대로 — 활성화가 목록을 채우고 권한 · 종류 축을 준비한다.
+            if (TabControlViewModel.ActiveItem is not null)
+                await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
 
+            _railKey = key;
+            _current = _sources.TryGetValue(key, out var source) ? source : null;
+            Category = CategoryOfRail(key);
 
-            _log?.Info($"Tag : {tab.Tag}");
-
-            // 1) 시각 트리 탐색으로 ContentControl 확보
-            //var contentControl = VisualTreeHelperEx.FindChild<ContentControl>(tab);
-
-            await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
-
-            ///PREPARING_TIME_MS는 기존의 ViewModel과 View를 바인딩하고, 유연하게 View를 불러오는 시간적 여유를 
-            ///제공하므로써, UI/UX의 경험을 보다 우수하게 만들 수 있다. OnActiveTab에서 제어하지 않고, 
-            ///각 ViewModel에서 제어를 하게 되면 여러가지 타이밍적 에러에 의해서 버그가 발생하고 해결하기 어려운 과제로 만들게 된다.
-            //await Task.Delay(PREPARING_TIME_MS);
-
-            switch (tab.Tag)
+            if (_current is not null)
             {
-                case "ControllerDeviceViewModel":
-                    await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
-                    break;
-
-                case "SensorDeviceViewModel":
-                    await TabControlViewModel.ActivateItemAsync(SensorPanelViewModel);
-                    break;
-
-                case "CameraDeviceViewModel":
-                    await TabControlViewModel.ActivateItemAsync(CameraPanelViewModel);
-                    break;
-
-                default:
-                    break;
+                await TabControlViewModel.ActivateItemAsync(_current.Panel);
+                AttachRows(_current);
             }
+            else if (key == ByComponentRailKey)
+            {
+                // 늦게 만든다 — 이 뷰모델은 계약 판정 전에 만들어질 수 있고, 조회 뷰모델은 만들 때의 계약으로 굳는다.
+                if (ByComponent is null || !ByComponent.IsAvailable)
+                {
+                    ByComponent = new ByComponentViewModel(_deviceApiService, _catalogService, _log, _queryPolicy, LookupCachedDevice);
+                    NotifyOfPropertyChange(nameof(ByComponent));
+                }
+            }
+
+            Detail.TypeName = RailEntries.First(e => e.Key == key).Label;
+            Columns = key == GroupsRailKey ? DeviceColumnCatalog.ForGroups()
+                    : Category is { } category ? DeviceColumnCatalog.For(category, ContractGate.IsAxisUi, ContractGate.IsUnitEra)
+                    : Array.Empty<DeviceColumnSpec>();
         }
         catch (Exception ex)
         {
-            _log?.Error($"{ex.Message}");
+            _log?.Error($"[DeviceConsole] 레일 전환 실패({key}) — {ex.Message}");
+        }
+        finally { _isSwitching = false; }
+
+        // 검색 영역은 카메라 레일의 것이다 — 다른 레일로 가면 닫는다(돌던 검색 · 조회도 멈춘다).
+        if (!IsCameraRail && CameraDiscovery.IsOpen) CameraDiscovery.OnClickCloseButton();
+        // 대량 등록 미리보기는 그 레일의 파일이다 — 레일을 바꾸면 닫는다(보내는 중이면 레일 이동 자체를 막았다).
+        if (BulkImport.IsOpen && !BulkImport.IsBusy) BulkImport.Close();
+        RefreshBulkToolbar();
+
+        NotifyOfPropertyChange(nameof(SelectedRail));
+        NotifyOfPropertyChange(nameof(IsByComponent));
+        NotifyOfPropertyChange(nameof(IsListVisible));
+        NotifyOfPropertyChange(nameof(IsGroupsRail));
+        NotifyOfPropertyChange(nameof(CanDragToGroup));
+        RefreshToolbar();
+        RefreshStatus();
+    }
+
+    private void BuildRail()
+    {
+        var wanted = new List<ConsoleRailEntry> { new(GroupsRailKey, "그룹", new ConsoleIconToken("FolderMultipleOutline")) { ShowCount = true } };
+        foreach (var category in DeviceRailCounter.RailOrder)
+            wanted.Add(new ConsoleRailEntry(RailKeyOf(category), CategoryLabel(category), new ConsoleIconToken(CategoryIcon(category))) { ShowCount = true, Tag = category, HasSeparatorAbove = category == DeviceRailCounter.RailOrder[0] });
+
+        // 부품으로 찾기는 축 계약(7.0+)에서만 있는 조회다 — 6.3 에서는 항목 자체를 내지 않는다.
+        if (ContractGate.IsAxisUi)
+            wanted.Add(new ConsoleRailEntry(ByComponentRailKey, "부품으로 찾기", new ConsoleIconToken("Magnify")) { HasSeparatorAbove = true, ShowCount = false });
+
+        if (RailEntries.Select(e => e.Key).SequenceEqual(wanted.Select(e => e.Key))) return;
+
+        RailEntries.Clear();
+        foreach (var entry in wanted) RailEntries.Add(entry);
+    }
+
+    private void RefreshRailCounts()
+    {
+        var counts = DeviceRailCounter.Count(DeviceProvider.OfType<IBaseDeviceModel>());
+        foreach (var count in counts)
+        {
+            var entry = RailEntries.FirstOrDefault(e => e.Key == RailKeyOf(count.Category));
+            if (entry is null) continue;
+            entry.Count = count.Total;
+            entry.BadCount = count.Fault;
+        }
+
+        var groups = RailEntries.FirstOrDefault(e => e.Key == GroupsRailKey);
+        if (groups is not null) groups.Count = _groupProvider.CollectionEntity.Count;
+
+        var (total, fault) = DeviceRailCounter.Totals(counts);
+        RailFooterText = $"전체 {total}대 / 장애 {fault}대";
+    }
+
+    private void RefreshGroupChips()
+    {
+        GroupChips.Clear();
+        foreach (var group in _groupProvider.CollectionEntity.Where(g => g.Id > 0).OrderBy(g => g.Name, StringComparer.CurrentCulture))
+            GroupChips.Add(new DeviceGroupViewModel(group));
+        NotifyOfPropertyChange(nameof(HasGroupChips));
+    }
+
+    private void OnDevicesChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshRailCounts();
+
+    private void OnGroupsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RefreshRailCounts();
+        RefreshGroupChips();
+    }
+    #endregion
+
+    #region - List -
+    /// <summary>그리드의 선택이 바뀌었다(뷰가 부른다). 미적용 변경이 있으면 막고 false — 뷰는 선택을 <see cref="Form"/> 의 행으로 되돌린다.</summary>
+    public bool OnRowsSelected(IList selected)
+    {
+        var rows = selected?.Cast<object>().ToList() ?? new List<object>();
+        if (SameRows(rows, Form.Rows) && !Detail.IsCreating) return true;
+
+        // 그리드가 고른 행을 놓친 까닭이 운영자가 아니라 목록 변경이다(삭제 알림 · 같은 Id 행 교체) — 폼을 비우지 않는다.
+        // 그리드는 원천에서 빠진 고른 행을 선택에서 떼며 이 경로를 먼저 부른다. 여기서 비우면 뒤이은 Id 맞추기가 고를 것이 없다.
+        if (IsSelectionLostToListChange(rows))
+        {
+            ScheduleExternalReconcile();
+            return true;
+        }
+
+        if (IsOperationRunning)
+        {
+            // 저장 · 재조회가 도는 중 — 패널의 선택을 바꾸면 안 된다. 거절은 말없이 하지 않는다: 예전에는 [갱신] 뒤 2초 동안 고른 행이
+            // 조용히 원래 선택으로 튕겨 돌아가, 운영자가 고른 줄 안 장비와 상세 칸의 장비가 달랐다(GIS 실창 WP-2 SC-DEV-033).
+            // 목록이 다시 만들어질 때 선택이 풀리는 것(빈 선택)은 운영자의 조작이 아니다 — 그때는 알리지 않는다.
+            if (rows.Count > 0) StatusText = SelectionRefusedWhileBusyText;
+            return false;
+        }
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return false;
+
+        _draft = null;
+        _current?.Select(rows);
+        LoadForm(rows, isCreating: false);
+        RefreshToolbar();
+        RefreshStatus();
+        return true;
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            var next = value ?? string.Empty;
+            if (_searchText == next) return;
+            _searchText = next;
+            NotifyOfPropertyChange();
+            Rows?.Refresh();
+            RefreshStatus();
         }
     }
 
-    private Task DataInitialize(CancellationToken cancellationToken = default)
+    private void AttachRows(IDeviceConsoleSource source)
     {
-        return Task.Run(() =>
+        var view = new ListCollectionView((IList)source.Rows) { Filter = MatchesSearch };
+        Rows = view;
+        _rowsChanged = source.RowsChanged;
+        _rowsChanged.CollectionChanged += OnRowsChanged;
+    }
+
+    private void DetachRows()
+    {
+        if (_rowsChanged is not null) _rowsChanged.CollectionChanged -= OnRowsChanged;
+        _rowsChanged = null;
+        (_rows as ListCollectionView)?.DetachFromSourceCollection();   // 안 떼면 버린 뷰가 패널의 목록에 매달려 남는다
+        Rows = null;
+    }
+
+    private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RefreshStatus();
+
+        // 콘솔이 시키지 않은 변경으로 행이 빠지거나 바뀌었다(SYNC_DEVICE 삭제 · 같은 Id 행 교체) — 고른 장비를 Id 로 다시 맞춘다.
+        // 다시 채우기(Reset)는 패널의 재조회 · 저장 · 삭제가 하고, 그 끝남(OnSourceBusyEnded)이 맞춘다.
+        if (e.Action is NotifyCollectionChangedAction.Remove or NotifyCollectionChangedAction.Replace)
+            ScheduleExternalReconcile();
+
+        // [등록] 을 기다리는 중에 새 행이 목록에 들어왔다 — 패널의 끝남(저장 뒤 2초 지연 + 결과 안내)을 기다리지 않고
+        // 그 행을 곧바로 고른다. 예전에는 새 그룹이 목록에 떴는데도 상세가 한참 "새 그룹 등록 · 아직 등록 전" 이었다(GIS 실창 #16).
+        if (_pending is { Kind: PendingKind.Create, ResolvedId: null }
+            && e.Action is NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Replace or NotifyCollectionChangedAction.Reset)
+            Caliburn.Micro.Execute.BeginOnUIThread(ResolveCreatedEarly);
+    }
+
+    /// <summary>등록한 행을 확실히 가려낼 수 있을 때만(번호나 이름이 같다) 고른다 — 남이 동시에 만든 행을 고르지 않는다.</summary>
+    private void ResolveCreatedEarly()
+    {
+        if (_pending is not { Kind: PendingKind.Create, ResolvedId: null } pending || _current is null || _draft is null) return;
+
+        var created = FindCreated(_current.Rows.Cast<object>().ToList(), pending, exactOnly: true);
+        if (created is null) return;
+
+        pending.ResolvedId = RowId(created);
+        _draft = null;
+        Reselect(new[] { created }, "등록했습니다.");
+    }
+
+    /// <summary>
+    /// 저장 전에는 없던 Id 의 행 가운데 등록한 것. 번호 → 이름 순으로 맞춰 보고, <paramref name="exactOnly"/> 가 아니면
+    /// 맞는 것이 없을 때 새 행 아무것이나(예전 동작) — 가장 큰 Id 를 고르면 필터에 가려졌을 때 엉뚱한 장비를 "등록했다"며 고른다.
+    /// </summary>
+    private object? FindCreated(IReadOnlyList<object> rows, PendingOperation pending, bool exactOnly)
+    {
+        var fresh = rows.Where(r => RowId(r) > 0 && !pending.KnownIds.Contains(RowId(r))).ToList();
+        if (pending.ResolvedId is { } resolved)
+            return fresh.FirstOrDefault(r => RowId(r) == resolved) ?? (exactOnly ? null : fresh.FirstOrDefault());
+
+        var number = _draft is null ? null : RowText(_draft, "DeviceNumber");
+        var name = _draft is null ? null : RowText(_draft, "DeviceName") ?? RowText(_draft, "Name");
+        var exact = (string.IsNullOrEmpty(number) ? null : fresh.FirstOrDefault(r => RowText(r, "DeviceNumber") == number))
+            ?? (string.IsNullOrEmpty(name) ? null : fresh.FirstOrDefault(r => (RowText(r, "DeviceName") ?? RowText(r, "Name")) == name));
+        return exact ?? (exactOnly ? null : fresh.FirstOrDefault());
+    }
+
+    private bool MatchesSearch(object row)
+    {
+        if (string.IsNullOrWhiteSpace(_searchText)) return true;
+        var needle = _searchText.Trim();
+        return Contains(RowText(row, "DeviceNumber"), needle) || Contains(RowText(row, "DeviceName"), needle) || Contains(RowText(row, "Name"), needle);
+
+        static bool Contains(string? text, string needle) => text?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) == true;
+    }
+    #endregion
+
+    #region - Toolbar -
+    public void Add()
+    {
+        if (_current is null || !CanAdd || IsOperationRunning) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+
+        // Draft 는 목록에서 뗀 채로 폼에만 물린다 — [등록] 전에는 목록에 아무것도 남지 않는다(FR-12).
+        var draft = _current.CreateDraft();
+        if (draft is null)
         {
-            DeviceProvider = IoC.Get<DeviceProvider>();
-            NotifyOfPropertyChange(() => DeviceProvider);
+            StatusText = "지금은 추가할 수 없습니다 — 다른 작업 중이거나 권한이 없습니다.";
+            return;
+        }
+
+        _draft = draft;
+        _current.Select(Array.Empty<object>());
+        ClearGridSelectionRequested?.Invoke(this, EventArgs.Empty);
+        LoadForm(new[] { draft }, isCreating: true);
+        RefreshToolbar();
+    }
+
+    public void Delete()
+    {
+        if (_current is null || !CanDelete || IsOperationRunning) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return;
+
+        // 패널의 삭제는 확인 팝업부터 띄운다 — 취소하면 아무 일도 없고 끝남도 오지 않는다. 그래서 여기서는 아무것도 걸어 두지 않는다.
+        // 지워졌다면 패널이 UpdateAction 을 울리고, 그때 Reconcile 이 사라진 행을 선택에서 뺀다.
+        _current.Delete();
+    }
+
+    public void Reload()
+    {
+        if (_current is null)
+        {
+            if (IsByComponent && ByComponent is not null) _ = ByComponent.SearchAsync();
+            return;
+        }
+        if (IsOperationRunning || !Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
+
+        if (_current.Reload())
+            _pending = new PendingOperation(PendingKind.Reload, 0, 0, RowIds(Form.Rows), Array.Empty<int>(), Array.Empty<(DevicePropertySpec, string)>());
+        else
+            StatusText = "지금은 새로 불러올 수 없습니다 — 잠시 후 다시 [갱신]을 누르세요.";
+        RefreshToolbar();
+    }
+
+    public bool CanAdd => _current is not null && !IsOperationRunning && DevicePermissionGate.CanEdit();
+    public string? AddBlockedReason => _current is null ? "이 화면에서는 추가할 수 없습니다." : !DevicePermissionGate.CanEdit() ? "권한이 없습니다." : IsOperationRunning ? "처리 중입니다." : null;
+
+    public bool CanDelete => _current is not null && !IsOperationRunning && Form.Rows.Count > 0 && !Detail.IsCreating && DevicePermissionGate.CanDelete();
+    public string? DeleteBlockedReason => _current is null ? "이 화면에서는 삭제할 수 없습니다."
+        : !DevicePermissionGate.CanDelete() ? "권한이 없습니다."
+        : Form.Rows.Count == 0 || Detail.IsCreating ? "삭제할 항목을 먼저 고르세요."
+        : IsOperationRunning ? "처리 중입니다." : null;
+
+    public bool CanReload => _current is null ? IsByComponent : !IsOperationRunning;
+
+    /// <summary>저장 · 재조회가 도는 중 — 걸어 둔 일이 있거나 패널이 바쁘다. 이 동안에는 이동도 명령도 받지 않는다.</summary>
+    public bool IsOperationRunning => _pending is not null || _current?.IsBusy == true;
+
+    private void RefreshToolbar()
+    {
+        NotifyOfPropertyChange(nameof(CanAdd));
+        NotifyOfPropertyChange(nameof(AddBlockedReason));
+        NotifyOfPropertyChange(nameof(CanDelete));
+        NotifyOfPropertyChange(nameof(DeleteBlockedReason));
+        NotifyOfPropertyChange(nameof(CanReload));
+        NotifyOfPropertyChange(nameof(CanAssemble));
+        NotifyOfPropertyChange(nameof(CanEditComponents));
+        NotifyOfPropertyChange(nameof(IsEditComponentsVisible));
+        NotifyOfPropertyChange(nameof(EditComponentsBlockedReason));
+        NotifyOfPropertyChange(nameof(CanOpenWiring));
+        NotifyOfPropertyChange(nameof(IsWiringVisible));
+        NotifyOfPropertyChange(nameof(WiringBlockedReason));
+        NotifyOfPropertyChange(nameof(CanOpenCameraDetail));
+        NotifyOfPropertyChange(nameof(IsCameraDetailVisible));
+        NotifyOfPropertyChange(nameof(CanApplyNow));
+        NotifyOfPropertyChange(nameof(IsCameraRail));
+        NotifyOfPropertyChange(nameof(CanOpenCameraDiscovery));
+        NotifyOfPropertyChange(nameof(CameraDiscoveryBlockedReason));
+        NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
+        SyncCameraDiscovery();
+        if (BulkImport is not null) RefreshBulkToolbar();   // 생성자 도중(판을 만들기 전)에도 불릴 수 있다
+    }
+    #endregion
+
+    #region - Detail -
+    /// <summary>[적용] · [등록].</summary>
+    public void Apply()
+    {
+        if (_current is null || IsOperationRunning) return;
+
+        var creating = Detail.IsCreating;
+        var commit = Form.Commit();
+        if (!commit.IsWritten)
+        {
+            Detail.LastMessage = commit.Message;
+            return;
+        }
+
+        // 저장이 끝난 뒤 서버 값과 맞춰 보려고 무엇을 썼는지 적어 둔다 — 패널의 저장은 성공 여부를 돌려주지 않는다.
+        var written = Form.Fields.Where(f => f.IsTouched && !f.IsLocked && !f.WritesAxis).Select(f => (f.Spec, f.Text)).ToList();
+        var axisEdits = commit.AxisEdits ?? Array.Empty<(DevicePropertySpec Spec, string Text)>();
+
+        // 축 값 칸(접속 · 하드웨어 · 부대 · 운용 설정)만 고쳤다 — 패널 저장 없이 좁은 PATCH 로 보낸다.
+        if (!commit.HasRowWrites && axisEdits.Count > 0 && !creating)
+        {
+            _ = ApplyAxisEditsAsync(Form.Rows.ToList(), axisEdits, commit.RowCount, commit.FieldCount);
+            return;
+        }
+
+        var knownIds = RowIds(_current.Rows.Cast<object>());
+        if (creating && _draft is not null) _current.AdoptDraft(_draft);
+
+        // 패널은 권한이 없거나 다른 일을 하는 중이면 말없이 돌아온다 — 그때는 끝남도 오지 않는다.
+        // 걸어 두고 기다리면 다음에 오는 아무 끝남이나 "등록했다"로 읽힌다. 시작한 것을 확인하고서야 건다.
+        if (!_current.Save())
+        {
+            if (creating && _draft is not null) _current.ReleaseDraft(_draft);
+            Detail.LastMessage = "지금은 저장할 수 없습니다 — 다른 작업 중이거나 권한이 없습니다. 고친 값은 그대로 있습니다.";
+            RefreshToolbar();
+            return;
+        }
+
+        _pending = new PendingOperation(creating ? PendingKind.Create : PendingKind.Update, commit.RowCount, commit.FieldCount, RowIds(Form.Rows), knownIds, written)
+        {
+            AxisEdits = axisEdits,
+        };
+        Detail.Settle(creating ? "등록하는 중…" : "적용하는 중…");
+        RefreshToolbar();
+    }
+
+    /// <summary>[되돌리기] · [취소] — 서버 호출 0.</summary>
+    public void Revert()
+    {
+        if (Detail.IsCreating)
+        {
+            _draft = null;
+            Form.Clear();
+            Detail.Reset();
+            Detail.TypeName = SelectedRail?.Label ?? string.Empty;
+            RefreshToolbar();
+            return;
+        }
+
+        // 고치는 동안 다른 곳에서 이 장비가 바뀌었다 — 되돌리기는 옛 글이 아니라 지금 값을 불러온다.
+        if (_externalUpdateWhileEditing && Form.Rows.Count > 0)
+        {
+            LoadForm(Form.Rows.ToList(), isCreating: false);
+            Detail.LastMessage = "되돌렸습니다 — 다른 곳에서 바뀐 값을 불러왔습니다.";
+            RefreshToolbar();
+            return;
+        }
+
+        Form.Revert();
+        Detail.Settle("되돌렸습니다.");
+    }
+
+    private void LoadForm(IReadOnlyList<object> rows, bool isCreating)
+    {
+        var readOnly = !DevicePermissionGate.CanEdit();
+        _externalUpdateWhileEditing = false;   // 새로 읽은 폼은 지금 값이다 — "다른 곳에서 바뀌었다"는 이제 지난 일
+        if (StatusText == ExternalUpdateWhileEditingText) StatusText = string.Empty;
+
+        if (_railKey == GroupsRailKey)
+            Form.Load(rows, DeviceGroupPropertySpecs.All, default, isCreating, readOnly);
+        else if (Category is { } category)
+            Form.Load(rows, category, ContractGate.IsAxisUi, isCreating, readOnly, ContractGate.IsUnitEra);
+        else
+            Form.Clear();
+
+        Detail.IsCreating = isCreating;
+        Detail.IsReadOnly = readOnly;
+        Detail.SelectedCount = isCreating ? 0 : rows.Count;
+        Detail.SingleTitle = rows.Count == 1 ? RowText(rows[0], "DeviceName") ?? RowText(rows[0], "Name") ?? string.Empty : string.Empty;
+        Detail.SingleNumber = rows.Count == 1 ? RowText(rows[0], "DeviceNumber") ?? string.Empty : string.Empty;
+        Detail.CreateBanner = $"필수 항목(*)을 채우고 [등록]을 누르면 새 {Detail.TypeName}{SubjectParticle(Detail.TypeName)} 만들어집니다.";
+        Detail.LastMessage = null;
+    }
+
+    /// <summary>
+    /// 축 값 칸(접속 · 하드웨어 · 부대 · 운용 설정)을 장비마다 좁은 PATCH 한 건으로 보내고, 목록을 다시 읽어 맞춰 본다.
+    /// </summary>
+    /// <remarks>
+    /// 도는 동안 걸어 둔 일(<see cref="PendingKind.AxisPatch"/>)로 이동 · 명령을 막는다. 실패하면 목록을 다시 읽지 않고 한 줄로 알린다 —
+    /// 폼의 고친 값은 행 칸을 같이 저장한 경우가 아니면 그대로 남아 다시 [적용]할 수 있다.
+    /// </remarks>
+    private async Task ApplyAxisEditsAsync(IReadOnlyList<object> rows, IReadOnlyList<(DevicePropertySpec Spec, string Text)> edits, int rowCount, int fieldCount)
+    {
+        var models = DeviceGroupDropHandler.ModelsOf(rows).ToList();
+        _pending = new PendingOperation(PendingKind.AxisPatch, rowCount, fieldCount, RowIds(rows), Array.Empty<int>(), edits);
+        Detail.Settle("적용하는 중…");
+        RefreshToolbar();
+
+        DeviceAxisWriteResult result;
+        try
+        {
+            result = await _axisWriter.ApplyAsync(models, edits);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceConsole] 축 값 저장 실패 — {ex.Message}");
+            result = new DeviceAxisWriteResult(0, models.Count, "저장하지 못했습니다. 잠시 후 다시 [적용]하세요.");
+        }
+
+        _pending = null;
+        if (result.SentCount == 0)
+        {
+            Detail.LastMessage = result.Message;
+            RefreshToolbar();
+            return;
+        }
+
+        // 보낸 값이 목록에 보이도록 다시 읽는다 — 끝남(OnSourceBusyEnded)이 다시 고르고, 보낸 값과 맞춰 본다.
+        var applied = result.IsSuccess ? ConsoleDetailStateMachine.AppliedMessage(rowCount, fieldCount) : result.Message;
+        if (_current?.Reload() == true)
+        {
+            _pending = new PendingOperation(PendingKind.Reload, rowCount, fieldCount, RowIds(rows), Array.Empty<int>(), edits)
+            {
+                AfterAxisMessage = applied,
+            };
+        }
+        else
+        {
+            Detail.LastMessage = applied + " 목록은 [갱신]으로 다시 불러오세요.";
+        }
+        RefreshToolbar();
+    }
+
+    private static string MismatchMessage(string label) => $"'{label}' 값이 저장되지 않았습니다. 다시 확인한 뒤 [적용]하세요.";
+
+    /// <summary>숫자는 "45" 와 "45.0" 을 같은 값으로 본다 — 나머지는 글 그대로.</summary>
+    private static bool SameAxisText(string read, string written)
+    {
+        if (string.Equals(read.Trim(), written.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+        return double.TryParse(read, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var a)
+            && double.TryParse(written, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var b)
+            && a.Equals(b);
+    }
+
+    private void OnNavigationBlocked(object? sender, ConsoleNavigation navigation)
+        => SelectionRestoreRequested?.Invoke(this, Form.Rows);
+
+    private void OnSourceBusyEnded(object? sender, EventArgs e)
+    {
+        if (!ReferenceEquals(sender, _current)) return;
+
+        RefreshRailCounts();
+        RefreshToolbar();
+
+        var pending = _pending;
+        _pending = null;
+        var rows = _current!.Rows.Cast<object>().ToList();
+
+        // 걸어 둔 일이 없는 끝남 — 첫 로딩 · 삭제 · 패널 스스로의 재조회. 행 인스턴스가 바뀌었거나 사라졌을 수 있다.
+        if (pending is null)
+        {
+            Reconcile(rows);
+            RefreshToolbar();
+            RefreshStatus();
+            return;
+        }
+
+        switch (pending.Kind)
+        {
+            case PendingKind.Create:
+            {
+                // 패널은 실패한 Draft(Id≤0)를 목록에 남긴다 — 남아 있으면 등록되지 않은 것이다.
+                var leftover = _draft is not null && rows.Contains(_draft) && RowId(_draft) <= 0;
+                if (leftover)
+                {
+                    LoadForm(new[] { _draft! }, isCreating: true);
+                    Detail.LastMessage = "등록하지 못했습니다. 입력한 값을 확인한 뒤 다시 [등록]하세요.";
+                    break;
+                }
+
+                // 새로 생긴 행 = 저장 전에는 없던 Id(목록에 뜨자마자 이미 골랐으면 그 Id — ResolveCreatedEarly).
+                var created = FindCreated(rows, pending, exactOnly: false);
+                _draft = null;
+                Reselect(created is null ? Array.Empty<object>() : new[] { created },
+                    created is null ? "등록했습니다 — 지금 검색 조건에서는 목록에 보이지 않습니다." : "등록했습니다.");
+                break;
+            }
+
+            case PendingKind.Update:
+            {
+                var again = rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList();
+                var mismatch = again.Count == 0 ? null : pending.Written
+                    .Where(w => again.Any(r => !string.Equals(DevicePropertyAccessor.ReadText(r, w.Spec), w.Text, StringComparison.Ordinal)))
+                    .Select(w => w.Spec.Label)
+                    .FirstOrDefault();
+
+                // 행 칸이 제대로 저장됐고 축 값 칸이 함께 있으면 이어서 보낸다(패널 저장 뒤 — 패널 저장이 받은 축을 되싣기 때문).
+                if (mismatch is null && pending.AxisEdits.Count > 0 && again.Count > 0)
+                {
+                    _ = ApplyAxisEditsAsync(again, pending.AxisEdits, pending.RowCount, pending.FieldCount);
+                    break;
+                }
+
+                Reselect(again, mismatch is null
+                    ? ConsoleDetailStateMachine.AppliedMessage(pending.RowCount, pending.FieldCount)
+                    : MismatchMessage(mismatch));
+                break;
+            }
+
+            default:
+            {
+                // 조립기 · 등록 창이 서버에 쓰고 돌아온 재조회면 그 장비를 고르고, 상태 띠의 한 줄("등록했습니다")은 그대로 둔다.
+                var afterWindow = _selectAfterReload is not null;
+                _selectAfterReload = null;
+                var reselected = rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList();
+
+                // 축 값 편집 뒤의 재조회 — 다시 읽은 값이 보낸 값과 같은지 맞춰 본다(서버가 받았다고 답해도 값이 다를 수 있다).
+                var axisMismatch = reselected.Count == 0 ? null : pending.Written
+                    .Where(w => reselected.Any(r => !SameAxisText(DevicePropertyAccessor.ReadText(r, w.Spec), w.Text)))
+                    .Select(w => w.Spec.Label)
+                    .FirstOrDefault();
+                var message = pending.AfterAxisMessage is null
+                    ? (afterWindow ? null : "새로 불러왔습니다.")
+                    : axisMismatch is null ? pending.AfterAxisMessage : MismatchMessage(axisMismatch);
+                Reselect(reselected, message);
+                break;
+            }
+        }
+
+        RefreshStatus();
+        SyncCameraDiscovery();   // 등록된 Draft 의 검색 줄은 "이미 등록됨" 으로
+    }
+
+    /// <summary>
+    /// 콘솔이 시킨 일이 아닌데 목록이 바뀌었다 — 폼이 쥔 행을 지금 목록의 같은 Id 행으로 맞춘다.
+    /// 손댄 칸이 있으면 글은 그대로 두고 행만 바꿔 끼운다(옛 인스턴스에 쓰면 저장 경로가 그 값을 못 본다).
+    /// </summary>
+    private void Reconcile(IReadOnlyList<object> rows)
+    {
+        if (Detail.IsCreating || Form.Rows.Count == 0) return;
+        if (Form.Rows.All(rows.Contains)) return;
+
+        var ids = RowIds(Form.Rows);
+        var again = rows.Where(r => ids.Contains(RowId(r))).ToList();
+
+        if (Detail.Tracker.IsDirty && again.Count == Form.Rows.Count)
+        {
+            Form.RebindRows(again);
+            _current?.Select(again);
+            SelectionRestoreRequested?.Invoke(this, again);
+            return;
+        }
+
+        var lost = Form.Rows.Count - again.Count;
+        var message = lost > 0 ? $"고른 장비 {lost}대가 목록에서 사라졌습니다." : null;
+        Reselect(again, message);
+        // 상세 바닥 막대는 남은 행이 있으면 "변경 없음" 자리라 가려질 수 있다 — 상태 띠에도 남긴다(말없이 선택을 잃지 않는다).
+        if (message is not null) StatusText = message;
+    }
+
+    /// <summary>목록 변경 뒤 Id 로 다시 맞추기를 한 번만 걸어 둔다(같은 차례의 삭제 · 추가를 다 본 뒤에 맞춘다).</summary>
+    private void ScheduleExternalReconcile()
+    {
+        if (_externalReconcileQueued) return;
+        _externalReconcileQueued = true;
+        Caliburn.Micro.Execute.BeginOnUIThread(() =>
+        {
+            _externalReconcileQueued = false;
+            ReconcileAfterListChange();
         });
     }
 
-    private void ClearData()
+    /// <summary>
+    /// 콘솔이 시키지 않은 목록 변경 뒤 — 폼이 쥔 행이 목록에 그대로면 할 일이 없고, 아니면 같은 Id 행으로 바꿔 끼우거나(손댄 칸 보존)
+    /// 사라졌다고 알린다(<see cref="Reconcile"/>). 걸어 둔 일이 도는 중이면 그 끝남이 맞춘다.
+    /// </summary>
+    private void ReconcileAfterListChange()
     {
-        Controller = 0;
-        MultiSensor = 0;
-        FenseSensor = 0;
-        SmartSensor = 0;
-        ContactSensor = 0;
-        UndergroundSensor = 0;
-        PIRSensor = 0;
-        IOController = 0;
-        LaserSensor = 0;
-        IPCamera = 0;
+        if (_current is null || IsOperationRunning || Detail.IsCreating || Form.Rows.Count == 0) return;
+
+        var rows = _current.Rows.Cast<object>().ToList();
+        if (Form.Rows.All(rows.Contains)) return;
+
+        Reconcile(rows);
+        RefreshToolbar();
+        RefreshStatus();
     }
 
-    private Task GetDeviceType(CancellationToken cancellationToken = default)
+    /// <summary>그리드가 보고한 선택이 폼의 행 일부뿐이고, 빠진 행이 원천에서 사라졌다 — 운영자의 조작이 아니다.</summary>
+    private bool IsSelectionLostToListChange(IReadOnlyList<object> rows)
     {
-        return Task.Run(async () =>
+        if (_current is null || Detail.IsCreating || Form.Rows.Count == 0 || rows.Count >= Form.Rows.Count) return false;
+        if (!rows.All(Form.Rows.Contains)) return false;
+
+        var source = _current.Rows.Cast<object>().ToList();
+        return Form.Rows.Any(r => !source.Contains(r));
+    }
+
+    /// <summary>SYNC_DEVICE 가 캐시의 장비 모델을 제자리에서 고쳤다 — 어느 스레드에서든 온다.</summary>
+    private void OnDeviceUpdated(object? sender, IBaseDeviceModel device)
+        => Caliburn.Micro.Execute.BeginOnUIThread(() => ApplyExternalUpdate(device));
+
+    /// <summary>
+    /// 그 장비의 행을 다시 그리고, 상세가 그 장비를 보고 있으면 새 값을 읽는다. 손댄 칸이 있으면 <b>덮지 않고</b> 상태 띠로 알린다 —
+    /// [적용]은 고친 칸만 새 값 위에 쓰고, [되돌리기]는 새 값을 불러온다.
+    /// </summary>
+    private void ApplyExternalUpdate(IBaseDeviceModel device)
+    {
+        if (_current is null) return;
+
+        // 모델은 변경 알림이 없는 객체라 행이 스스로 모른다 — 그 행의 칸을 전부 다시 읽게 한다.
+        foreach (var row in _current.Rows.Cast<object>().Where(r => ReferenceEquals(ModelOf(r), device)).ToList())
+            (row as Caliburn.Micro.INotifyPropertyChangedEx)?.Refresh();
+
+        if (Detail.IsCreating || IsOperationRunning) return;     // 걸어 둔 일 뒤에는 그 끝남이 다시 고르고 읽는다
+        if (!Form.Rows.Any(r => ReferenceEquals(ModelOf(r), device))) return;
+
+        if (Detail.Tracker.IsDirty)
         {
-            Controller = DeviceProvider.OfType<IControllerDeviceModel>().Count();
-            await Task.Delay(100, cancellationToken);
-            MultiSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.Multi).Count();
-            await Task.Delay(100, cancellationToken);
-            FenseSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.Fence).Count();
-            await Task.Delay(100, cancellationToken);
-            SmartSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.SmartSensor).Count();
-            await Task.Delay(100, cancellationToken);
-            ContactSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.Contact).Count();
-            await Task.Delay(100, cancellationToken);
-            UndergroundSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.Underground).Count();
-            await Task.Delay(100, cancellationToken);
-            PIRSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.PIR).Count();
-            await Task.Delay(100, cancellationToken);
-            IOController = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.IoController).Count();
-            await Task.Delay(100, cancellationToken);
-            LaserSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.Laser).Count();
-            await Task.Delay(100, cancellationToken);
-            IPCamera = DeviceProvider.OfType<ICameraDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.IpCamera).Count();
-            await Task.Delay(100, cancellationToken);
+            _externalUpdateWhileEditing = true;
+            StatusText = ExternalUpdateWhileEditingText;
+            RefreshToolbar();
+            return;
+        }
+
+        LoadForm(Form.Rows.ToList(), isCreating: false);
+        RefreshToolbar();
+    }
+
+    private static IBaseDeviceModel? ModelOf(object row) => row.GetType().GetProperty("Model")?.GetValue(row) as IBaseDeviceModel;
+
+    /// <summary>재조회로 행 인스턴스가 바뀐다 — 같은 Id 의 새 행을 다시 고른다.</summary>
+    private void Reselect(IReadOnlyList<object> rows, string? message)
+    {
+        _current?.Select(rows);
+        LoadForm(rows, isCreating: false);
+        if (message is not null) Detail.LastMessage = message;
+        SelectionRestoreRequested?.Invoke(this, rows);
+        RefreshToolbar();
+    }
+    #endregion
+
+    #region - Group drop -
+    /// <summary>키보드 폴백 — 고른 장비를 그룹에 넣는다(끌어 놓기와 같은 경로).</summary>
+    public async Task AssignSelectionToGroupAsync(DeviceGroupViewModel group)
+    {
+        if (group is null || !CanDragToGroup) return;
+        await GroupDrop.AssignAsync(group.Id, group.Name, DeviceGroupDropHandler.ModelsOf(Form.Rows));
+    }
+
+    public async Task UndoGroupDropAsync()
+    {
+        if (_lastGroupUndo is null) return;
+        await GroupDrop.UndoAsync(_lastGroupUndo);
+    }
+
+    public bool CanUndoGroupDrop => _lastGroupUndo is not null;
+
+    /// <summary>장비 목록에서만 그룹으로 끌 수 있다(그룹 목록 · 부품으로 찾기에서는 핸들을 내지 않는다).</summary>
+    public bool CanDragToGroup => _current is not null && _railKey != GroupsRailKey && DevicePermissionGate.CanEdit();
+
+    private void OnGroupDropCompleted(GroupDropResult result)
+    {
+        _lastGroupUndo = result.Undo;
+        StatusText = result.Line;
+        NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
+
+        if (result.Delta != 0)
+        {
+            // 소속은 모델의 평범한 목록이라 바뀌어도 아무도 모른다 — 그 행들의 "그룹" 글자와 칩의 개수를 여기서 다시 그리게 한다.
+            var group = _groupProvider.CollectionEntity.FirstOrDefault(g => g.Id == result.GroupId);
+            if (group is not null) group.DeviceCount = Math.Max(0, group.DeviceCount + result.Delta);
+            RefreshGroupChips();
+
+            var changed = result.DeviceIds.ToHashSet();
+            foreach (var row in _current?.Rows.Cast<object>().Where(r => changed.Contains(RowId(r))) ?? Enumerable.Empty<object>())
+                (row as Caliburn.Micro.INotifyPropertyChangedEx)?.NotifyOfPropertyChange("DeviceGroupsText");
+        }
+
+        // 그룹 칸은 읽기 전용 표시다 — 손댄 칸이 없을 때만 폼을 다시 읽는다(미적용 변경을 덮지 않는다).
+        if (!Detail.Tracker.IsDirty && !Detail.IsCreating && Form.Rows.Count > 0) LoadForm(Form.Rows, isCreating: false);
+    }
+    #endregion
+
+    #region - IDevicePropertyOptions -
+    public IReadOnlyList<PropertyOption> OptionsFor(DevicePropertySpec spec, EnumDeviceCategory category)
+    {
+        switch (spec.OptionSource)
+        {
+            case DevicePropertyOptionSource.TypeAxis:
+                return _typeAxis.TryGetValue(category, out var axis)
+                    ? axis.Options.Select(o => new PropertyOption(o.Display, o.Code)).ToList()
+                    : Array.Empty<PropertyOption>();
+
+            case DevicePropertyOptionSource.ExtraAxis:
+                return _typeAxis.TryGetValue(category, out var extra)
+                    ? extra.ExtraAxes.Where(a => spec.VocabularyName is null || a.Field == spec.VocabularyName || a.Field == spec.ApiPath)
+                           .SelectMany(a => a.Values)
+                           .Select(o => new PropertyOption(DeviceEnumDisplay.SpeakerRoleKorean(o.Code, o.Label), o.Code))
+                           .ToList()
+                    : Array.Empty<PropertyOption>();
+
+            case DevicePropertyOptionSource.Units:
+            {
+                // 값 = 부대 id, 화면 = 부대 이름. 이름을 아직 못 읽었으면 지금 고른 장비들의 부대 id 만이라도 싣는다(지어내지 않는다).
+                var directory = UnitDirectory();
+                var units = directory?.Snapshot() ?? Array.Empty<(int Id, string Name)>();
+                var options = units.Select(u => new PropertyOption(u.Name, u.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
+                foreach (var id in DeviceGroupDropHandler.ModelsOf(Form.Rows).Select(m => m.UnitId).OfType<int>().Distinct())
+                {
+                    var code = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    if (options.All(o => o.Text != code)) options.Add(new PropertyOption(directory?.Display(id) ?? code, code));
+                }
+                return options;
+            }
+
+            case DevicePropertyOptionSource.Controllers:
+                // 저장 전 제어기(Id≤0)는 고를 수 없다 — 고르면 센서 등록이 말없이 보류된다(패널도 같은 필터를 쓴다).
+                return _controllerProvider.CollectionEntity
+                    .Where(c => c.Id > 0)
+                    .Select(c => new PropertyOption($"{c.DeviceName} (#{c.DeviceNumber})", null, c))
+                    .ToList();
+
+            case DevicePropertyOptionSource.Servers:
+            {
+                // 이 카테고리를 받는 유형의 서버만 낸다(스피커 → SPEAKER_API) — 예전에는 전부 늘어놓아 VMS 를 고르면 서버가 422 로 거절했다
+                // (GIS 실창 WP-2 SC-DEV-015). 고른 장비가 이미 쥔 서버는 유형이 어긋나도 싣는다 — 빠지면 칸이 비어 보인다(감추지 않는다).
+                var allowed = DeviceServerChoice.Allowed(_serverProvider.CollectionEntity, category).ToList();
+                foreach (var current in DeviceGroupDropHandler.ModelsOf(Form.Rows).OfType<ISpeakerDeviceModel>().Select(m => m.Server).OfType<Ironwall.Dotnet.Monitoring.Models.Servers.IServerModel>())
+                {
+                    if (allowed.Any(s => s.Id == current.Id)) continue;
+                    allowed.Add(_serverProvider.CollectionEntity.FirstOrDefault(s => s.Id == current.Id) ?? current);
+                }
+                return allowed.Select(s => new PropertyOption(s.Name ?? $"서버 {s.Id}", null, s)).ToList();
+            }
+
+            default:
+                return Array.Empty<PropertyOption>();
+        }
+    }
+    #endregion
+
+    #region - Contract -
+    /// <summary>
+    /// 서버 계약 게이트(device-console-v8 FR-07) — 축 UI 표시 여부와 "판본 미확정" 배너.
+    /// </summary>
+    public DeviceContractGateViewModel ContractGate { get; }
+
+    /// <summary>배너의 [다시 확인] — 판본을 재확인하고, 세대가 바뀌었으면 장비를 그 계약으로 다시 읽는다.</summary>
+    public async void OnClickRefreshContract()
+    {
+        var wasAxis = ContractGate.IsAxisUi;
+        var wasUnitEra = ContractGate.IsUnitEra;
+        var ok = await ContractGate.RefreshContractAsync();
+        // D-14: 7.0 → 8.0 처럼 IsAxisUi 는 그대로인데 IsUnitEra 만 바뀌는 전환도 다시 그린다 —
+        // 안 그러면 "소속 부대" 열/칸이 재확인 한 번으로는 안 나타나고 다음 레일 전환까지 기다려야 한다.
+        if (!ok || (ContractGate.IsAxisUi == wasAxis && ContractGate.IsUnitEra == wasUnitEra)) return;
+
+        try
+        {
+            // 6.3 쿼리로 읽어 둔 캐시는 새 계약에서 틀린 모양이다 — 전량 재조회.
+            var provider = IoC.Get<IDeviceProviderService>();
+            if (provider != null) await provider.FetchAllDevicesAsync();
+
+            BuildRail();
+            await SwitchRailAsync(_railKey ?? GroupsRailKey, force: true);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceDashboard] 판본 전환 후 재조회 실패 — {ex.Message}");
+        }
+    }
+    #endregion
+
+    #region - Status -
+    private void RefreshStatus()
+    {
+        var shown = (Rows as ListCollectionView)?.Count ?? 0;
+        var total = _current?.RowCount ?? 0;
+        // 부품으로 찾기는 제 화면 안에 결과 줄이 있다 — 같은 말을 두 번 하지 않는다.
+        ListStatusText = IsByComponent ? string.Empty
+            : shown == total ? $"목록 {total}건 · 선택 {Form.Rows.Count}"
+            : $"목록 {shown}건(전체 {total}) · 선택 {Form.Rows.Count}";
+
+        // 빈 목록 안내 — 첫 읽기 · 재조회가 도는 동안에는 띄우지 않는다("없다"와 "아직 모른다"는 다르다).
+        var label = SelectedRail?.Label ?? "장비";
+        IsListEmpty = _current is not null && !IsByComponent && shown == 0 && _current.IsBusy == false;
+        EmptyTitle = total > 0 ? "검색 결과가 없습니다"
+            : IsGroupsRail ? "등록된 그룹이 없습니다"
+            : $"등록된 {label}{SubjectParticle(label)} 없습니다";
+        EmptyHint = total > 0 ? "검색어를 지우거나 바꿔 보세요"
+            : IsGroupsRail ? "[추가]로 새 그룹을 만드세요"
+            : "[추가]로 새 장비를 등록하세요";
+    }
+
+    /// <summary>
+    /// 주격 조사 — 받침이 있으면 "이", 없으면 "가". 끝이 숫자 · 영문이면 읽는 소리로 가른다
+    /// ("센서 3" → 삼 → 이, "arm2" → 이 → 가, "GATE" → 이 → 가, "L" → 엘 → 이). 그 밖(기호 · 빈 글)은 "이(가)".
+    /// </summary>
+    internal static string SubjectParticle(string word)
+    {
+        var trimmed = (word ?? string.Empty).TrimEnd(' ', '\'', '"', ')', ']');
+        if (trimmed.Length == 0) return "이(가)";
+        var last = trimmed[^1];
+        if (last >= '\uAC00' && last <= '\uD7A3') return (last - 0xAC00) % 28 == 0 ? "가" : "이";
+        // 숫자: 영 일 이 삼 사 오 육 칠 팔 구 — 받침은 0 1 3 6 7 8.
+        if (last is >= '0' and <= '9') return "013678".IndexOf(last) >= 0 ? "이" : "가";
+        // 영문 글자 이름: 엘 · 엠 · 엔 · 알 만 받침이 있다.
+        if (char.IsAsciiLetter(last)) return "LMNRlmnr".IndexOf(last) >= 0 ? "이" : "가";
+        return "이(가)";
+    }
+
+    /// <summary>목록이 비었다(검색 결과 없음 포함) — 빈 상태 안내를 띄운다.</summary>
+    public bool IsListEmpty
+    {
+        get => _isListEmpty;
+        private set { if (_isListEmpty == value) return; _isListEmpty = value; NotifyOfPropertyChange(); }
+    }
+
+    public string EmptyTitle
+    {
+        get => _emptyTitle;
+        private set { if (_emptyTitle == value) return; _emptyTitle = value; NotifyOfPropertyChange(); }
+    }
+
+    public string EmptyHint
+    {
+        get => _emptyHint;
+        private set { if (_emptyHint == value) return; _emptyHint = value; NotifyOfPropertyChange(); }
+    }
+
+    private bool _isListEmpty;
+    private string _emptyTitle = string.Empty;
+    private string _emptyHint = string.Empty;
+    #endregion
+
+    #region - Wiring setup (device-wiring-setup N-04 FR-03 · FR-04) -
+    /// <summary>
+    /// 셋업 · 결선 입구를 낼 것인가 — 결선을 담을 자리가 있는 서버(7.0+)에서 <b>제어기 한 대</b>를 골랐을 때만.
+    /// </summary>
+    /// <summary>
+    /// 셋업 · 결선 입구를 툴바에 둘 것인가 — 결선을 담을 수 있는 서버의 <b>제어기 목록</b>에서만(다른 레일에서는 늘 꺼져 있어 자리만 차지했다).
+    /// 제어기 목록에서 제어기를 아직 안 골랐으면 보이되 꺼져 있고 툴팁이 까닭을 말한다.
+    /// </summary>
+    public bool IsWiringVisible => _wiring?.IsAvailable == true && Category == EnumDeviceCategory.Controller;
+
+    public bool CanOpenWiring => _wiring?.IsAvailable == true
+        && Category == EnumDeviceCategory.Controller
+        && DevicePermissionGate.CanEdit()
+        && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    public string? WiringBlockedReason => _wiring?.IsAvailable != true ? "현재 서버에서는 결선을 저장할 수 없습니다."
+        : Category != EnumDeviceCategory.Controller ? "제어기 목록에서 제어기 한 대를 고르세요."
+        : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
+        : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
+        : Detail.IsCreating ? "만들던 장비를 먼저 저장하거나 취소하세요."
+        : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
+        : Form.Rows.Count != 1 ? "제어기 한 대를 고르세요."
+        : RowId(Form.Rows[0]) > 0 ? null
+        : "아직 저장되지 않은 제어기입니다 — 먼저 저장하세요.";
+
+    /// <summary>고른 제어기의 센서 표 · 결선맵을 연다.</summary>
+    public async Task OpenWiringAsync()
+    {
+        if (!CanOpenWiring) return;
+        var model = DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault();
+        if (model is null) return;
+
+        if (await _wiring!.OpenAsync(model)) SelectAfterReload(model.Id, "센서 · 결선을 저장했습니다.");
+    }
+
+    /// <summary>
+    /// 센서 모델 입구(sensor-mount-preset W1 "장비 창 도구줄 [⋯] › 센서 모델") — 프리셋 저장소가 있을 때만(GMaps.Db 모듈이 없으면 감춘다).
+    /// 결선 입구와 같은 창 관리자(<see cref="Consoles.SensorPresets.ISensorPresetLauncher"/>)를 쓴다.
+    /// </summary>
+    public bool IsSensorModelsVisible => SensorPresetLauncher?.IsSensorModelsAvailable == true;
+
+    /// <summary>센서 모델 창을 연다(목록 · 프리셋 편집 — 저장은 GIS 로컬 DB · 장비 서버에는 쓰지 않는다).</summary>
+    public async Task OpenSensorModelsAsync()
+    {
+        if (SensorPresetLauncher is not { IsSensorModelsAvailable: true } launcher) return;
+        await launcher.OpenSensorModelsAsync();
+    }
+
+    private Consoles.SensorPresets.ISensorPresetLauncher? SensorPresetLauncher => _wiring as Consoles.SensorPresets.ISensorPresetLauncher;
+
+    private readonly Lazy<IWiringLauncher>? _wiringFactory;
+    private bool _wiringFailed;
+
+    /// <summary>조립기 입구와 같은 관용구 — 늦게 풀고, 못 만들면 그 입구만 감춘다(장비 창 전체가 안 열리는 일을 막는다).</summary>
+    private IWiringLauncher? _wiring
+    {
+        get
+        {
+            if (_wiringFactory is null || _wiringFailed) return null;
+            try { return _wiringFactory.Value; }
+            catch (Exception ex)
+            {
+                _wiringFailed = true;
+                _log?.Error($"[DeviceConsole] 셋업 · 결선 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                return null;
+            }
+        }
+    }
+    #endregion
+
+    #region - Assembly · presets (FR-17 · FR-18) -
+    /// <summary>조립기 · 프리셋 입구를 낼 것인가 — 부품 모델이 있는 서버(7.0+)의 장비 목록에서만. 6.3 에서는 통째로 감춘다.</summary>
+    public bool CanAssemble => _assembly?.IsAvailable == true && Category is not null && DevicePermissionGate.CanEdit();
+
+    /// <summary>고른 장비 하나의 부품 구성을 조립기로 바꿀 수 있는가(저장된 장비 · 미적용 변경 없음).</summary>
+    public bool CanEditComponents => IsEditComponentsVisible && !IsOperationRunning && !Detail.Tracker.IsDirty;
+
+    /// <summary>
+    /// [부품 구성 바꾸기] 를 <b>보일</b> 것인가 — 저장된 장비 한 대를 골랐을 때. 적용 중 · 손댄 칸이 있을 때는 숨기지 않고 끈다
+    /// (숨기면 폼 전체가 38px 튀었다 — GIS 실창 #13). 까닭은 <see cref="EditComponentsBlockedReason"/>.
+    /// </summary>
+    public bool IsEditComponentsVisible => CanAssemble && !Detail.IsCreating && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    /// <summary>꺼져 있는 까닭 — 거절은 말없이 하지 않는다.</summary>
+    public string? EditComponentsBlockedReason
+        => !IsEditComponentsVisible ? null
+        : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
+        : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
+        : null;
+
+    public async Task OpenAssemblyAsync()
+    {
+        if (!CanAssemble || Category is not { } category || IsOperationRunning) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+        SelectAfterReload(await _assembly!.ComposeAsync(category), "등록했습니다.");
+    }
+
+    public async Task RegisterFromPresetAsync()
+    {
+        if (!CanAssemble || Category is not { } category || IsOperationRunning) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+        SelectAfterReload(await _assembly!.RegisterFromPresetAsync(category), "프리셋으로 등록했습니다.");
+    }
+
+    public async Task ManagePresetsAsync()
+    {
+        if (_assembly?.IsAvailable != true) return;
+        await _assembly.ManagePresetsAsync(Category ?? DeviceRailCounter.RailOrder[0]);
+    }
+
+    public async Task EditComponentsAsync()
+    {
+        if (!CanEditComponents || Category is not { } category) return;
+        var model = DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault();
+        if (model is null) return;
+
+        if (await _assembly!.EditDeviceAsync(model, category)) SelectAfterReload(model.Id, "부품 구성을 적용했습니다.");
+    }
+
+    /// <summary>창이 서버에 쓰고 프로바이더를 다시 읽었다 — 이 목록도 다시 읽고 그 장비를 고른다.</summary>
+    private void SelectAfterReload(int? deviceId, string message)
+    {
+        if (deviceId is not { } id || _current is null) return;
+        StatusText = message;
+        _selectAfterReload = id;
+        if (_current.Reload())
+            _pending = new PendingOperation(PendingKind.Reload, 0, 0, new[] { id }, Array.Empty<int>(), Array.Empty<(DevicePropertySpec, string)>());
+        else
+            _selectAfterReload = null;
+        RefreshToolbar();
+    }
+    #endregion
+
+    #region - Camera detail (6.3) -
+    /// <summary>
+    /// 카메라 [상세보기] — 6.3 서버에서만. 카메라 설정(/settings) · 링크를 고치는 기존 창을 연다(호스트가 창을 띄운다).
+    /// 7.0 이상에서는 같은 값(하드웨어 · 동작 모드)을 상세 칸에서 바로 고치고, 그 창의 설정 탭은 서버에 없는 입구라 열지 않는다.
+    /// </summary>
+    public bool IsCameraDetailVisible => Category == EnumDeviceCategory.Camera && !ContractGate.IsAxisUi;
+
+    public bool CanOpenCameraDetail => IsCameraDetailVisible && !IsOperationRunning && !Detail.IsCreating
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    public void OpenCameraDetail()
+    {
+        if (!CanOpenCameraDetail) return;
+        if (DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault() is not ICameraDeviceModel camera) return;
+        try
+        {
+            _eventAggregator?.PublishOnUIThreadAsync(new Ironwall.Dotnet.Libraries.ViewModel.Models.OpenCameraDetailDialogMessageModel
+            {
+                Dialog = new Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs.CameraDetailDialogViewModel(camera),
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceConsole] 카메라 상세보기를 열지 못했습니다 — {ex.Message}");
+            StatusText = "카메라 상세보기를 열지 못했습니다. 잠시 후 다시 누르세요.";
+        }
+    }
+    #endregion
+
+    #region - ONVIF discovery (camera rail) -
+    /// <summary>
+    /// [ONVIF 검색] 펼침 영역 — 찾은 카메라를 조회해 [추가] 하면 상세 칸에 새 카메라(Draft)로 열린다.
+    /// 서버에는 쓰지 않는다: 등록은 상세 칸의 [등록] 이 기존 패널 저장(검증 · 종류축 · 권한)으로 한다.
+    /// </summary>
+    public OnvifDiscoveryViewModel CameraDiscovery { get; private set; }
+
+    /// <summary>카메라 레일에서만 [ONVIF 검색] 단추가 보인다.</summary>
+    public bool IsCameraRail => Category == EnumDeviceCategory.Camera && _current is not null;
+
+    public bool CanOpenCameraDiscovery => IsCameraRail && DevicePermissionGate.CanEdit();
+
+    public string? CameraDiscoveryBlockedReason => !IsCameraRail ? null : !DevicePermissionGate.CanEdit() ? "권한이 없습니다." : null;
+
+    /// <summary>검색 영역은 카메라 레일에서 열었을 때만 보인다(다른 레일로 가면 닫는다).</summary>
+    public bool IsCameraDiscoveryOpen => IsCameraRail && CameraDiscovery.IsOpen;
+
+    /// <summary>툴바 [ONVIF 검색] — 펼침 영역 열기/닫기(처음 열 때 바로 검색).</summary>
+    public void ToggleCameraDiscovery()
+    {
+        if (!CanOpenCameraDiscovery)
+        {
+            if (IsCameraRail) _log?.Warning("[FR-EN-09] 추가 권한 없음(devices, ONVIF 검색)");
+            return;
+        }
+        CameraDiscovery.OnClickToggleButton();
+        SyncCameraDiscovery();
+    }
+
+    /// <summary>검색 · 조회 서비스를 바꿔 끼운다(시험 · 도구 — 가짜 카메라 팜을 유니캐스트로 겨눌 때).</summary>
+    internal void UseCameraDiscoveryServices(IWsDiscoveryClient discovery, IOnvifCameraLookup lookup)
+    {
+        CameraDiscovery.OnClickCloseButton();
+        CameraDiscovery.PropertyChanged -= OnCameraDiscoveryChanged;
+        CameraDiscovery = CreateCameraDiscovery(discovery, lookup);
+        NotifyOfPropertyChange(nameof(CameraDiscovery));
+        NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
+    }
+
+    private OnvifDiscoveryViewModel CreateCameraDiscovery(IWsDiscoveryClient discovery, IOnvifCameraLookup lookup)
+    {
+        var vm = new OnvifDiscoveryViewModel(discovery, lookup, IsCameraListedInConsole, TryOpenDiscoveredDraft, _log)
+        {
+            AddedHint = "상세 칸에 새 카메라로 열었습니다 — [등록] 하면 등록됩니다.",
+        };
+        vm.PropertyChanged += OnCameraDiscoveryChanged;
+        return vm;
+    }
+
+    private void OnCameraDiscoveryChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OnvifDiscoveryViewModel.IsOpen)) NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
+    }
+
+    /// <summary>같은 IP · 포트 카메라가 저장된 목록이나 상세 칸의 Draft 에 있는가 — "이미 등록됨" · 중복 추가 차단.</summary>
+    internal bool IsCameraListedInConsole(string host, int port) => IsSavedCamera(host, port) || IsDraftCamera(host, port);
+
+    private bool IsSavedCamera(string host, int port) =>
+        CameraPanelViewModel.ViewModelProvider.Any(vm => vm.Id > 0 && SameAddress(vm.Model as ICameraDeviceModel, host, port));
+
+    private bool IsDraftCamera(string host, int port) =>
+        _draft is CameraDeviceViewModel draft && SameAddress(draft.Model as ICameraDeviceModel, host, port);
+
+    private static bool SameAddress(ICameraDeviceModel? camera, string host, int port) =>
+        camera is not null && camera.IpPort == port && string.Equals(camera.IpAddress?.Trim(), host, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 검색 결과 [추가] — 툴바 [추가] 와 같은 길(이동 막기 · 패널의 번호 자동 배정 · 권한)로 Draft 를 만들고,
+    /// 조회한 값을 채운 카메라로 바꿔 상세 칸에 연다. 목록에는 [등록] 전까지 아무것도 남지 않는다(FR-12).
+    /// </summary>
+    internal bool TryOpenDiscoveredDraft(Func<int, CameraDeviceModel> build)
+    {
+        if (!IsCameraRail || _current is null || !CanAdd || IsOperationRunning) return false;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return false;
+
+        if (_current.CreateDraft() is not CameraDeviceViewModel seed) return false;
+        var draft = new CameraDeviceViewModel(build(seed.Model.DeviceNumber));
+
+        _draft = draft;
+        _current.Select(Array.Empty<object>());
+        ClearGridSelectionRequested?.Invoke(this, EventArgs.Empty);
+        LoadForm(new[] { draft }, isCreating: true);
+        RefreshToolbar();
+        return true;
+    }
+
+    /// <summary>Draft 취소 · 등록 · 레일 이동 뒤 검색 목록의 줄 상태를 맞춘다.</summary>
+    private void SyncCameraDiscovery()
+    {
+        if (CameraDiscovery is null || CameraDiscovery.Items.Count == 0) return;
+        CameraDiscovery.Resync(IsSavedCamera, IsDraftCamera);
+    }
+    #endregion
+
+    #region - Device assign dialog (N-05) -
+    /// <summary>그룹 레일에서 그룹 하나를 골랐을 때만 — 그 그룹의 소속을 고치는 창을 낸다.</summary>
+    public bool CanOpenAssign => _assign is not null && _railKey == GroupsRailKey && DevicePermissionGate.CanEdit()
+        && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    /// <summary>눌리지 않는 까닭 — 거절은 말없이 하지 않는다.</summary>
+    public string? AssignBlockedReason
+        => _assign is null ? "장비 배정 창을 열 수 없습니다."
+        : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
+        : _railKey != GroupsRailKey ? "그룹 레일에서 그룹을 고르세요."
+        : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
+        : Detail.IsCreating ? "만들던 그룹을 먼저 저장하거나 취소하세요."
+        : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
+        : Form.Rows.Count != 1 ? "그룹 하나를 고르세요."
+        : RowId(Form.Rows[0]) > 0 ? null
+        : "아직 저장되지 않은 그룹입니다 — 먼저 저장하세요.";
+
+    public async Task OpenDeviceAssignAsync()
+    {
+        if (!CanOpenAssign) return;
+        var row = Form.Rows[0];
+        var groupId = RowId(row);
+        if (groupId <= 0) return;
+
+        if (await _assign!.OpenAsync(groupId, RowText(row, "Name")))
+        {
+            StatusText = "그룹 소속을 저장했습니다.";
+            if (_current?.Reload() != true) StatusText = "그룹 소속을 저장했습니다 — 목록은 [갱신]으로 다시 불러오세요.";
+            RefreshToolbar();
+        }
+    }
+
+    private readonly Lazy<IDeviceAssignLauncher>? _assignFactory;
+    private bool _assignFailed;
+
+    /// <summary>조립기 · 결선 입구와 같은 관용구 — 늦게 풀고, 못 만들면 그 입구만 감춘다.</summary>
+    private IDeviceAssignLauncher? _assign
+    {
+        get
+        {
+            if (_assignFactory is null || _assignFailed) return null;
+            try { return _assignFactory.Value; }
+            catch (Exception ex)
+            {
+                _assignFailed = true;
+                _log?.Error($"[DeviceConsole] 장비 배정 입구를 만들지 못해 감춥니다: {ex.Message}");
+                return null;
+            }
+        }
+    }
+    #endregion
+
+    #region - Bulk import · export (device-bulk-import) -
+    /// <summary>미리보기 판(목록 칸 위 덮개).</summary>
+    public BulkImportViewModel BulkImport { get; }
+
+    /// <summary>파일 창 — 시험은 가짜로 바꿔 끼운다(창을 띄우지 않는다).</summary>
+    internal IBulkFilePicker BulkFilePicker { get; set; } = new WpfBulkFilePicker();
+
+    /// <summary>[내보내기] · [양식] · [올리기] 는 7 카테고리 레일에서만(그룹 · 부품으로 찾기에는 없다).</summary>
+    public bool IsBulkVisible => Category is not null && _current is not null;
+
+    /// <summary>[올리기] · 파일 끌어 놓기 — 고칠 권한이 있고 다른 일을 하지 않을 때.</summary>
+    public bool CanBulkImport => IsBulkVisible && DevicePermissionGate.CanEdit() && !IsOperationRunning && !BulkImport.IsBusy;
+
+    public string? BulkImportBlockedReason => !IsBulkVisible ? "장비 목록(레일)을 고른 뒤 올리세요."
+        : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
+        : IsOperationRunning || BulkImport.IsBusy ? "하던 작업이 끝난 뒤에 올릴 수 있습니다."
+        : null;
+
+    /// <summary>[내보내기] · [양식] — 보기만 하는 권한이어도 된다(서버에 쓰지 않는다).</summary>
+    public bool CanBulkExport => IsBulkVisible && !BulkImport.IsBusy;
+
+    /// <summary>미리보기 판이 열려 있다 — 목록 대신 판이 보인다.</summary>
+    public bool IsBulkImportOpen => BulkImport.IsOpen;
+
+    /// <summary>[올리기] — 파일 창에서 고른다(끌어 놓기의 단추 폴백).</summary>
+    public async Task PickAndImportAsync()
+    {
+        if (!CanBulkImport)
+        {
+            StatusText = BulkImportBlockedReason ?? string.Empty;
+            return;
+        }
+        var path = BulkFilePicker.PickOpen();
+        if (path is null) return;
+        await ImportFileAsync(path);
+    }
+
+    /// <summary>파일 끌어 놓기 · [올리기] 공통 — 읽고 판정해 미리보기 판을 연다(서버에는 쓰지 않는다).</summary>
+    public async Task ImportFileAsync(string path)
+    {
+        if (!CanBulkImport)
+        {
+            StatusText = BulkImportBlockedReason ?? string.Empty;
+            return;
+        }
+        if (!IsBulkFile(path))
+        {
+            StatusText = "CSV(.csv) 또는 Excel(.xlsx) 파일만 올릴 수 있습니다.";
+            return;
+        }
+        await BulkImport.OpenFileAsync(path);
+    }
+
+    /// <summary>끌어 놓을 수 있는 파일인가(확장자만 본다 — 내용은 읽을 때).</summary>
+    public static bool IsBulkFile(string? path)
+        => System.IO.Path.GetExtension(path ?? string.Empty).ToLowerInvariant() is ".csv" or ".xlsx";
+
+    /// <summary>[내보내기] — 지금 목록(검색 적용 결과) 또는 전체를 파일로. 비밀번호 칸은 빈칸(FR-03).</summary>
+    public async Task ExportAsync(BulkFileFormat format, bool all)
+    {
+        if (!CanBulkExport || Category is not { } category || _current is null) return;
+        var source = all ? _current.Rows.Cast<object>() : (Rows?.Cast<object>() ?? Enumerable.Empty<object>());
+        var devices = source.Select(ModelOf).OfType<IBaseDeviceModel>().Where(d => d.Id > 0).ToList();
+        var label = BulkColumnCatalog.CategoryLabel(category);
+        var path = BulkFilePicker.PickSave($"{label}_{DateTime.Now:yyyyMMdd_HHmm}", format);
+        if (path is null) return;
+
+        var columns = BulkColumnCatalog.For(category, ContractGate.IsAxisUi, ContractGate.IsUnitEra);
+        var ok = await WriteFileAsync(path, stream => BulkExporter.Write(stream, format, category, columns, BulkExporter.Rows(columns, devices)));
+        StatusText = ok ? $"{label} {devices.Count}대를 파일로 내보냈습니다." : "내보내지 못했습니다 — 같은 파일이 열려 있으면 닫고 다시 하세요.";
+    }
+
+    /// <summary>[양식 받기] — 머리 줄 + 숨은 키 줄 + 예시 1줄(+ Excel 은 선택 칸 목록).</summary>
+    public async Task SaveTemplateAsync(BulkFileFormat format)
+    {
+        if (!CanBulkExport || Category is not { } category) return;
+        var label = BulkColumnCatalog.CategoryLabel(category);
+        var path = BulkFilePicker.PickSave($"{label}_양식", format);
+        if (path is null) return;
+
+        var columns = BulkColumnCatalog.For(category, ContractGate.IsAxisUi, ContractGate.IsUnitEra);
+        var example = BulkExporter.ExampleRow(columns, category, this);
+        var choices = BulkExporter.Choices(columns, category, this);
+        var ok = await WriteFileAsync(path, stream => BulkExporter.Write(stream, format, category, columns, new[] { example }, choices));
+        StatusText = ok ? $"{label} 양식을 저장했습니다." : "양식을 저장하지 못했습니다 — 같은 파일이 열려 있으면 닫고 다시 하세요.";
+    }
+
+    /// <summary>미리보기 판의 [결과 받기].</summary>
+    public async Task SaveBulkResultAsync()
+    {
+        if (!BulkImport.CanSaveResult) return;
+        var path = BulkFilePicker.PickSave(BulkImport.SuggestedResultName, BulkFileFormat.Csv);
+        if (path is null) return;
+        var ok = await WriteFileAsync(path, BulkImport.SaveResult);
+        StatusText = ok ? "결과를 파일로 저장했습니다." : "결과를 저장하지 못했습니다 — 같은 파일이 열려 있으면 닫고 다시 하세요.";
+    }
+
+    private async Task<bool> WriteFileAsync(string path, Action<System.IO.Stream> write)
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var stream = new System.IO.FileStream(path, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
+                write(stream);
+            });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[DeviceConsole] 대량 등록 파일 쓰기 실패 — {ex.GetType().Name}");
+            return false;
+        }
+    }
+
+    /// <summary>판정에 쓸 서버 쪽 사실 — 지금 레일 · 계약 · 장비 캐시 · 선택지 · 부대 · 권한.</summary>
+    private BulkImportContext BuildBulkContext() => new()
+    {
+        RailCategory = Category,
+        IsAxisContract = ContractGate.IsAxisUi,
+        IsUnitEra = ContractGate.IsUnitEra,
+        Devices = DeviceProvider.OfType<IBaseDeviceModel>().ToList(),
+        Options = this,
+        Units = UnitDirectory()?.Snapshot() ?? Array.Empty<(int, string)>(),
+        CanEdit = DevicePermissionGate.CanEdit(),
+    };
+
+    private BulkImportWriter CreateBulkWriter()
+    {
+        IDeviceProviderService? provider = null;
+        try { provider = IoC.Get<IDeviceProviderService>(); }
+        catch { /* 컨테이너 미구성(시험) — 등록 뒤 다시 읽기만 건너뛴다 */ }
+        return new BulkImportWriter(_deviceApiService, provider, () => DeviceProvider.OfType<IBaseDeviceModel>().ToList(), _log);
+    }
+
+    /// <summary>판이 서버에 썼다 — 이 목록을 다시 읽는다(쓰기기가 장비 캐시는 이미 다시 읽었다).</summary>
+    private void OnBulkWritten(object? sender, int succeeded)
+    {
+        Caliburn.Micro.Execute.OnUIThread(() =>
+        {
+            StatusText = $"대량 등록 — {BulkImport.ResultSummary()}";
+            RefreshRailCounts();
+            if (!IsOperationRunning) _current?.Reload();
+            RefreshToolbar();
         });
     }
 
+    private void RefreshBulkToolbar()
+    {
+        NotifyOfPropertyChange(nameof(IsBulkVisible));
+        NotifyOfPropertyChange(nameof(CanBulkImport));
+        NotifyOfPropertyChange(nameof(BulkImportBlockedReason));
+        NotifyOfPropertyChange(nameof(CanBulkExport));
+        NotifyOfPropertyChange(nameof(IsBulkImportOpen));
+    }
 
+    /// <summary>미리보기 판이 보내는 중에 레일을 골랐다 — 바꾸지 않은 까닭.</summary>
+    public const string BulkBusyText = "대량 등록이 도는 중이라 레일을 바꾸지 않았습니다 — 끝나거나 [멈추기] 뒤 다시 고르세요.";
     #endregion
-    #region - IHanldes -
+
+    #region - Selection narrowing -
+    /// <summary>
+    /// 화면이 되돌려 놓으려던 행 가운데 일부가 지금 그리드에 없다(검색에 가려졌다). 폼이 안 보이는 행을 쥔 채 남으면
+    /// [삭제] 가 눈에 안 보이는 장비를 지운다 — 실제로 골라진 것에 맞춘다. 손댄 칸이 있으면 건드리지 않는다.
+    /// </summary>
+    public void NarrowSelectionTo(IList actuallySelected)
+    {
+        if (Detail.IsCreating || Detail.Tracker.IsDirty || IsOperationRunning) return;
+
+        var rows = actuallySelected?.Cast<object>().ToList() ?? new List<object>();
+        if (SameRows(rows, Form.Rows)) return;
+
+        _current?.Select(rows);
+        LoadForm(rows, isCreating: false);
+        RefreshToolbar();
+        RefreshStatus();
+    }
     #endregion
+
+    #region - Test seam -
+    /// <summary>
+    /// 한 레일의 목록 원천을 바꿔 끼운다 — <b>열기 전에</b> 부른다. 저장 · 삭제가 끝난 뒤의 판정(재선택 · 서버 값 대조 · 남은 Draft)을
+    /// 진짜 패널의 async void 경로 없이 결정적으로 시험하려는 이음매다.
+    /// </summary>
+    internal void UseSource(string railKey, IDeviceConsoleSource source) => _sources[railKey] = source;
+    #endregion
+
+    #region - Helpers -
+    public static string RailKeyOf(EnumDeviceCategory category) => category.ToString().ToLowerInvariant();
+
+    private EnumDeviceCategory? CategoryOfRail(string key)
+        => DeviceRailCounter.RailOrder.Cast<EnumDeviceCategory?>().FirstOrDefault(c => RailKeyOf(c!.Value) == key);
+
+    private static string CategoryLabel(EnumDeviceCategory category) => category switch
+    {
+        EnumDeviceCategory.Controller => "제어기",
+        EnumDeviceCategory.Sensor => "센서",
+        EnumDeviceCategory.Camera => "카메라",
+        EnumDeviceCategory.Speaker => "스피커",
+        EnumDeviceCategory.Enclosure => "함체",
+        EnumDeviceCategory.Lamp => "경광등",
+        EnumDeviceCategory.Gate => "통문",
+        _ => category.ToString(),
+    };
+
+    // MDIX PackIconKind 이름 — 뷰가 문자열을 PackIcon 으로 바꾼다. 없는 이름이면 아이콘만 빈다(레일은 그대로 동작).
+    private static string CategoryIcon(EnumDeviceCategory category) => category switch
+    {
+        EnumDeviceCategory.Controller => "Chip",
+        EnumDeviceCategory.Sensor => "Radar",
+        EnumDeviceCategory.Camera => "Cctv",
+        EnumDeviceCategory.Speaker => "Bullhorn",
+        EnumDeviceCategory.Enclosure => "ServerNetwork",
+        EnumDeviceCategory.Lamp => "AlarmLight",
+        EnumDeviceCategory.Gate => "Gate",
+        _ => "Devices",
+    };
+
+    /// <summary>부대 이름 사전(컨테이너에 있을 때만) — 없으면 부대 칸은 id 로 보인다.</summary>
+    private static UnitNameDirectory? UnitDirectory()
+    {
+        try { return IoC.Get<UnitNameDirectory>(); }
+        catch { return null; }
+    }
+
+    private static bool SameRows(IReadOnlyList<object> a, IReadOnlyList<object> b)
+        => a.Count == b.Count && !a.Except(b).Any();
+
+    private static IReadOnlyList<int> RowIds(IEnumerable<object> rows) => rows.Select(RowId).Where(id => id > 0).ToList();
+
+    private static int RowId(object row)
+    {
+        var type = row.GetType();
+        if (type.GetProperty("Id")?.GetValue(row) is int id) return id;
+        return type.GetProperty("Model")?.GetValue(row) is IBaseDeviceModel model ? model.Id : 0;
+    }
+
+    private static string? RowText(object row, string property)
+        => row.GetType().GetProperty(property)?.GetValue(row)?.ToString();
+    #endregion
+
     #region - Properties -
-    public int Controller
+    public ObservableCollection<ConsoleRailEntry> RailEntries { get; }
+    public ObservableCollection<DeviceGroupViewModel> GroupChips { get; }
+    public bool HasGroupChips => GroupChips.Count > 0;
+
+    public ConsoleDetailPresenter Detail { get; }
+    public DevicePropertyFormViewModel Form { get; }
+
+    /// <summary>[적용] · [등록] 실제 켜짐 — 상세 상태(Detail.CanApply)는 손댄 칸이 있는가만 본다.
+    /// 손댄 칸 가운데 즉시 검증(이름 200자 상한 등)에 걸린 것이 있으면 여기서 마저 잠근다(FR-13).
+    /// 뷰는 Detail.CanApply 대신 이것을 켜짐 막대에 묶는다.</summary>
+    public bool CanApplyNow => Detail.CanApply && !Form.HasInvalidField;
+
+    public ByComponentViewModel? ByComponent { get; private set; }
+
+    /// <summary>
+    /// "부품으로 찾기" 행이 부품 이름 · 고장 사유를 읽는 장비 캐시(component-display-unify FR-03). 컨테이너 미구성이면 null.
+    /// </summary>
+    private static Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel? LookupCachedDevice(int id)
     {
-        get { return _controller; }
-        set
-        {
-            _controller = value;
-            NotifyOfPropertyChange(() => Controller);
-        }
+        try { return IoC.Get<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()?.FirstOrDefault(d => d.Id == id); }
+        catch (Exception) { return null; }
+    }
+    public DeviceGroupDropHandler GroupDrop { get; }
+
+    public EnumDeviceCategory? Category { get; private set; }
+    public bool IsByComponent => _railKey == ByComponentRailKey;
+    public bool IsGroupsRail => _railKey == GroupsRailKey;
+    public bool IsListVisible => !IsByComponent;
+
+    public ICollectionView? Rows
+    {
+        get => _rows;
+        private set { _rows = value; NotifyOfPropertyChange(); }
     }
 
-    public int MultiSensor
+    /// <summary>지금 목록의 열 명세 — 바뀌면 뷰가 그리드의 열을 다시 만든다.</summary>
+    public IReadOnlyList<DeviceColumnSpec> Columns
     {
-        get { return _multiSensor; }
-        set
-        {
-            _multiSensor = value;
-            NotifyOfPropertyChange(() => MultiSensor);
-        }
-    }
-    public int FenseSensor
-    {
-        get { return _fenseSensor; }
-        set
-        {
-            _fenseSensor = value;
-            NotifyOfPropertyChange(() => FenseSensor);
-        }
+        get => _columns;
+        private set { _columns = value; NotifyOfPropertyChange(); }
     }
 
-    public int SmartSensor
+    public string RailFooterText
     {
-        get { return _smartSensor; }
-        set
-        {
-            _smartSensor = value;
-            NotifyOfPropertyChange(() => SmartSensor);
-        }
+        get => _railFooterText;
+        private set { _railFooterText = value; NotifyOfPropertyChange(); }
     }
 
-    public int UndergroundSensor
+    public string ListStatusText
     {
-        get { return _undergroundSensor; }
-        set
-        {
-            _undergroundSensor = value;
-            NotifyOfPropertyChange(() => UndergroundSensor);
-        }
+        get => _listStatusText;
+        private set { _listStatusText = value; NotifyOfPropertyChange(); }
     }
 
-    public int ContactSensor
+    /// <summary>저장 · 재조회 중에 레일을 골랐다 — 바꾸지 않은 까닭(상태 띠).</summary>
+    public const string RailRefusedWhileBusyText = "저장하거나 불러오는 중이라 레일을 바꾸지 않았습니다 — 끝난 뒤 다시 고르세요.";
+
+    /// <summary>저장 · 재조회 중에 행을 골랐다 — 받지 않은 까닭(상태 띠).</summary>
+    public const string SelectionRefusedWhileBusyText = "목록을 불러오거나 저장하는 중이라 고른 행을 받지 않았습니다 — 끝난 뒤 다시 고르세요.";
+
+    /// <summary>고치던 장비가 다른 곳에서 바뀌었다 — 고치던 칸은 덮지 않았다(상태 띠).</summary>
+    public const string ExternalUpdateWhileEditingText = "고른 장비가 다른 곳에서 바뀌었습니다 — 고치던 칸은 그대로 두었습니다. [되돌리기]를 누르면 바뀐 값을 불러옵니다.";
+
+    /// <summary>상태 띠의 한 줄 소식(그룹 넣기 결과 등).</summary>
+    public string StatusText
     {
-        get { return _contactSensor; }
-        set
-        {
-            _contactSensor = value;
-            NotifyOfPropertyChange(() => ContactSensor);
-        }
-    }
-    public int PIRSensor
-    {
-        get { return _pirSensor; }
-        set
-        {
-            _pirSensor = value;
-            NotifyOfPropertyChange(() => PIRSensor);
-        }
-    }
-    public int IOController
-    {
-        get { return _ioController; }
-        set
-        {
-            _ioController = value;
-            NotifyOfPropertyChange(() => IOController);
-        }
-    }
-    public int LaserSensor
-    {
-        get { return _laserSensor; }
-        set
-        {
-            _laserSensor = value;
-            NotifyOfPropertyChange(() => LaserSensor);
-        }
-    }
-    public int IPCamera
-    {
-        get { return _ipCamera; }
-        set
-        {
-            _ipCamera = value;
-            NotifyOfPropertyChange(() => IPCamera);
-        }
-    }
-    public bool IsSelected
-    {
-        get { return _isSelected; }
-        set { _isSelected = value; NotifyOfPropertyChange(() => IsSelected); }
-    }
-    
-    public BasePanelViewModel? SelectedItemEditor
-    {
-        get { return _selectedItemEditor; }
-        set { _selectedItemEditor = value; NotifyOfPropertyChange(() => SelectedItemEditor); }
+        get => _statusText;
+        private set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
+    /// <summary>그리드의 선택을 이 행들로 맞춰 달라(막힌 이동의 원복 · 재조회 뒤 재선택).</summary>
+    public event EventHandler<IReadOnlyList<object>>? SelectionRestoreRequested;
+
+    /// <summary>그리드의 선택을 비워 달라([추가] 로 새 등록에 들어갈 때).</summary>
+    public event EventHandler? ClearGridSelectionRequested;
+
+    public DeviceProvider DeviceProvider { get; }
     public DeviceTabControlViewModel TabControlViewModel { get; }
     public ControllerDevicePanelViewModel ControllerPanelViewModel { get; }
     public SensorDevicePanelViewModel SensorPanelViewModel { get; }
     public CameraDevicePanelViewModel CameraPanelViewModel { get; }
-    public DeviceProvider DeviceProvider { get; private set; }
+    public SpeakerDevicePanelViewModel SpeakerPanelViewModel { get; }
+    public EnclosureDevicePanelViewModel EnclosurePanelViewModel { get; }
+    public LampDevicePanelViewModel LampPanelViewModel { get; }
+    public GateDevicePanelViewModel GatePanelViewModel { get; }
+    public DeviceGroupPanelViewModel DeviceGroupPanelViewModel { get; }
     #endregion
-    #region - Attributes -
-    private int _controller;
-    private int _multiSensor;
-    private int _fenseSensor;
-    private int _smartSensor;
-    private int _undergroundSensor;
-    private int _contactSensor;
-    private int _pirSensor;
-    private int _ioController;
-    private int _laserSensor;
-    private int _ipCamera;
 
-    private bool _isSelected;
-    private BasePanelViewModel? _selectedItemEditor;
+    #region - Attributes -
+    private enum PendingKind { Create, Update, Reload, AxisPatch }
+
+    private sealed record PendingOperation(PendingKind Kind, int RowCount, int FieldCount, IReadOnlyList<int> RowIds, IReadOnlyList<int> KnownIds, IReadOnlyList<(DevicePropertySpec Spec, string Text)> Written)
+    {
+        /// <summary>행 칸 저장이 끝난 뒤 이어 보낼 축 값 칸.</summary>
+        public IReadOnlyList<(DevicePropertySpec Spec, string Text)> AxisEdits { get; init; } = Array.Empty<(DevicePropertySpec, string)>();
+
+        /// <summary>축 값 편집 뒤의 재조회면, 다시 고른 뒤 보일 한 줄(맞춰 보기가 어긋나면 그 한 줄로 바뀐다).</summary>
+        public string? AfterAxisMessage { get; init; }
+
+        /// <summary>등록한 행이 끝남보다 먼저 목록에 떠서 이미 골랐다 — 그 행의 Id.</summary>
+        public int? ResolvedId { get; set; }
+    }
+
+    private readonly DeviceAxisWriter _axisWriter;
+
+    private readonly Dictionary<string, IDeviceConsoleSource> _sources;
+    private readonly Dictionary<EnumDeviceCategory, TypeAxisPanelSupport> _typeAxis;
+    private readonly DeviceGroupProvider _groupProvider;
+    private readonly ControllerDeviceProvider _controllerProvider;
+    private readonly ServerProvider _serverProvider;
+    private readonly IDeviceApiService _deviceApiService;
+    private readonly ICatalogService _catalogService;
+    private readonly DeviceQueryPolicy _queryPolicy;
+    private readonly Lazy<IAssemblyLauncher>? _assemblyFactory;
+    private bool _assemblyFailed;
+
+    /// <summary>
+    /// 조립기 입구 — <b>늦게</b> 만든다. 곧바로 주입받으면 입구의 의존 하나가 컨테이너에서 안 풀릴 때 이 뷰모델까지 못 만들어져
+    /// 장비 창 전체가 안 열린다(입구가 보이지도 않는 6.3 운영에서도). 늦게 풀고, 실패하면 입구만 감춘다.
+    /// </summary>
+    private IAssemblyLauncher? _assembly
+    {
+        get
+        {
+            if (_assemblyFactory is null || _assemblyFailed) return null;
+            try { return _assemblyFactory.Value; }
+            catch (Exception ex)
+            {
+                _assemblyFailed = true;
+                _log?.Error($"[DeviceConsole] 조립기 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                return null;
+            }
+        }
+    }
+    private int? _selectAfterReload;
+
+    private IDeviceConsoleSource? _current;
+    private INotifyCollectionChanged? _rowsChanged;
+    private ICollectionView? _rows;
+    private IReadOnlyList<DeviceColumnSpec> _columns = Array.Empty<DeviceColumnSpec>();
+    private string? _railKey;
+    private bool _isSwitching;
+    private bool _externalReconcileQueued;
+    private bool _externalUpdateWhileEditing;
+    private object? _draft;
+    private PendingOperation? _pending;
+    private GroupDropUndo? _lastGroupUndo;
+    private string _searchText = string.Empty;
+    private string _railFooterText = string.Empty;
+    private string _listStatusText = string.Empty;
+    private string _statusText = string.Empty;
     #endregion
 }
+
+/// <summary>장비 창 닫기 확인에서 [확인] — 적용하지 않은 변경을 버리고 창을 닫는다(<see cref="DeviceDashboardViewModel.CanCloseAsync"/>).</summary>
+public sealed class CallCloseDeviceConsoleMessageModel : Ironwall.Dotnet.Libraries.Base.Models.IMessageModel { }

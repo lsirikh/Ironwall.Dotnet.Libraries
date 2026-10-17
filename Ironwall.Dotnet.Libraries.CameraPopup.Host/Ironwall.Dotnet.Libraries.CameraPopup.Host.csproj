@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    카메라 팝업 호스트 프로세스(PRD camera-popup-modes §0 · FR-24).
+    팝업용 LibVLC(LibVLCSharp · VideoLAN.LibVLC.Windows)를 참조하는 유일한 곳 — GIS 프로세스는 이 exe 를 띄워
+    명명 파이프로 명령만 보내고, 영상은 공유 메모리로 받는다. 여기서 무엇이 죽어도 GIS 는 산다.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <AssemblyName>Ironwall.CameraPopupHost</AssemblyName>
+    <RootNamespace>Ironwall.Dotnet.Libraries.CameraPopup.Host</RootNamespace>
+    <StartupObject>Ironwall.Dotnet.Libraries.CameraPopup.Host.Program</StartupObject>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <!-- 모니터별 DPI 인지 v2 — 이벤트 창 배치(물리 픽셀 · 모니터 배율)가 GIS 계산과 어긋나지 않게(T-05). -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF 암시적 using 은 System.IO 를 뺀다(Path 충돌 회피) — 이 exe 는 System.Windows.Shapes 를 쓰지 않는다. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.CameraPopup.Host.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp" Version="3.9.4" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+    <!-- 이벤트 창 토큰(Tokens.Light/Dark/Shared — 무의존 leaf 사전)만 쓴다. MDIX · MahApps 형식은 로드하지 않는다(T-05). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+    <!-- T-02: 영상 · PTZ 제공자(ONVIF · RTSP 주소 · 외부 VMS 자리). 팝업용 ONVIF 호출은 이 프로세스에서만 일어난다. -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ironwall.Dotnet.Libraries.CameraPopup.Providers.csproj" />
+  </ItemGroup>
+
+</Project>

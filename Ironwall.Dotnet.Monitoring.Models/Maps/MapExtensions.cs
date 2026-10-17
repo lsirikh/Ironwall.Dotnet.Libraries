@@ -357,8 +357,16 @@ public static class CustomMapExtensions
         if (string.IsNullOrWhiteSpace(map.SourceImagePath))
             errors.Add("원본 이미지 경로는 필수입니다.");
 
-        if (string.IsNullOrWhiteSpace(map.TilesDirectoryPath))
-            errors.Add("타일 디렉토리 경로는 필수입니다.");
+        if (!string.IsNullOrEmpty(map.MbtilesPath))
+        {
+            if (!File.Exists(map.MbtilesPath))
+                errors.Add("MBTiles 파일이 존재하지 않습니다.");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(map.TilesDirectoryPath))
+                errors.Add("타일 디렉토리 경로는 필수입니다.");
+        }
 
         if (!map.ValidateSourceImage())
             errors.Add("원본 이미지 파일이 존재하지 않거나 비어있습니다.");

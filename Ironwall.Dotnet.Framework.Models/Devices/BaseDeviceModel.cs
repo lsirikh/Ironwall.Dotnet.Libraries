@@ -19,7 +19,6 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
 
     public BaseDeviceModel(IDeviceMapperBase model) : base(model)
     {
-        DeviceGroup = model.DeviceGroup;
         DeviceNumber = model.DeviceNumber;
         DeviceName = model.DeviceName;
         DeviceType = model.DeviceType;
@@ -29,7 +28,7 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
 
     public BaseDeviceModel(IBaseDeviceModel model) : base(model)
     {
-        DeviceGroup = model.DeviceGroup;
+        DeviceGroups = model.DeviceGroups;
         DeviceNumber = model.DeviceNumber;
         DeviceName = model.DeviceName;
         DeviceType = model.DeviceType;
@@ -37,9 +36,9 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
         Status = model.Status;
     }
 
+    [JsonProperty("device_groups", Order = 3, NullValueHandling = NullValueHandling.Ignore)]
+    public List<int>? DeviceGroups { get; set; }
     [JsonProperty("device_number", Order = 2)]
-    public int DeviceGroup { get; set; }
-    [JsonProperty("device_group", Order = 3)]
     public int DeviceNumber { get; set; }
     [JsonProperty("device_name", Order = 4)]
     public string DeviceName { get; set; }  = string.Empty;

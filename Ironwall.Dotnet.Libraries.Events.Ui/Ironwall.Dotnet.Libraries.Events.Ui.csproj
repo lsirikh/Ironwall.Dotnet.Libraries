@@ -18,17 +18,46 @@
   	 <PackageReference Include="MaterialDesignColors" Version="5.2.1" />
   	 <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
   	 <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+  	 <PackageReference Include="xunit" Version="2.9.3" />
+  	 <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+  	   <PrivateAssets>all</PrivateAssets>
+  	   <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+  	 </PackageReference>
+  	 <PackageReference Include="Moq" Version="4.20.72" />
+  	 <PackageReference Include="coverlet.collector" Version="6.0.2">
+  	   <PrivateAssets>all</PrivateAssets>
+  	   <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+  	 </PackageReference>
+  	 <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
   </ItemGroup>
 
 
   <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Api.Messages\Ironwall.Dotnet.Libraries.Api.Messages.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Ui\Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Nats\Ironwall.Dotnet.Libraries.Nats.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
-    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Db\Ironwall.Dotnet.Libraries.Events.Db.csproj" />
+    <!-- Tracking(FR-15): TRACKING_STATUS DTO(targets[]) 역직렬화 + ITrackingOverlayManager 계약 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Messages\Ironwall.Dotnet.Libraries.Messages.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Api\Ironwall.Dotnet.Libraries.Events.Api.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Sounds\Ironwall.Dotnet.Libraries.Sounds.csproj" />
+    <!-- camera-popup-modes T-03: 카메라 팝업 설정 모델 · 배치 순수 함수(Streaming.Base/CameraPopup, WPF 무관) — 설정 콘솔 블록이 쓴다 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
+    <!-- camera-popup-modes T-06: 탐지 트리거 → 이벤트 창 관리자(IEventWindowManager) · 호스트 계약(EventWindowCamera). LibVLC 없음 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup\Ironwall.Dotnet.Libraries.CameraPopup.csproj" />
+    <!-- Phase 2 (IMPL-08): Modern Dark/Light 테마 토큰/서비스 (leaf, 순환 없음 — AD-1) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+    <!-- FR-EN-10/11: IPermissionService 게이팅 (순환 없음 — Accounts.Api는 Events.Ui 미참조) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <!-- 완성도 수정 패스: 조치 트레이 · 조치보고 창의 문구를 조치보고 문구 관리 목록(IActionReportTemplateApiService)에서 읽는다
+         (순환 없음 — Reports.Api 는 Accounts.Api · Api · Base · Messages 만 참조한다). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Reports.Api\Ironwall.Dotnet.Libraries.Reports.Api.csproj" />
   </ItemGroup>
 
 </Project>

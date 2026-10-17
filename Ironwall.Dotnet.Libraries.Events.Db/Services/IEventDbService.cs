@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Monitoring.Models.Events;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Monitoring.Models.Events;
 using MySql.Data.MySqlClient;
 
 namespace Ironwall.Dotnet.Libraries.Events.Db.Services;
@@ -12,7 +13,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Db.Services;
 /// 모든 메서드는 <see cref="CancellationToken"/> 을 인자로 받아
 /// 호출 측에서 작업 취소를 제어할 수 있어야 한다.
 /// </summary>
-public interface IEventDbService
+public interface IEventDbService : IService
 {
     /*──────────────────────── 상태 ────────────────────────*/
 

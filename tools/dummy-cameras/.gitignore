@@ -1,0 +1,10 @@
+# dummy-cameras local ignores (the repo-root .gitignore is not touched).
+# Downloaded MediaMTX binaries live under bin/mediamtx/<version>/ - never commit them.
+bin/
+obj/
+out/
+run/
+*.zip
+*.exe
+tests/bin/
+tests/obj/

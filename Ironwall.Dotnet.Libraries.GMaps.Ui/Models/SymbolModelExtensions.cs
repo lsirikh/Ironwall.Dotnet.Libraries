@@ -118,6 +118,7 @@ public static class SymbolModelExtensions
     /// </summary>
     private static double NormalizeAngle(double angle)
     {
+        if (!double.IsFinite(angle)) return 0;
         angle = angle % 360;
         return angle < 0 ? angle + 360 : angle;
     }
@@ -129,5 +130,90 @@ public static class SymbolModelExtensions
     private const double MIN_SIZE = 10;
     private const double MAX_SIZE = 200;
 
+    #endregion
+
+
+    #region Copy
+    public static SymbolModel Clone(this SymbolModel original)
+    {
+        return new SymbolModel
+        {
+            Title = original.Title,
+            TitleSize = original.TitleSize,
+            Latitude = original.Latitude,
+            Longitude = original.Longitude,
+            Zoom = original.Zoom,
+            Width = original.Width,
+            Height = original.Height,
+            Bearing = original.Bearing,
+            Category = original.Category,
+            ShowShape = original.ShowShape,
+            ShowTitle = original.ShowTitle,
+            OperationState = original.OperationState,
+            FillColor = original.FillColor,
+            StrokeColor = original.StrokeColor,
+            StrokeThickness = original.StrokeThickness
+        };
+    }
+
+    public static GeometricSymbolModel Clone(this GeometricSymbolModel original)
+    {
+        return new GeometricSymbolModel
+        {
+            Title = original.Title,
+            TitleSize = original.TitleSize,
+            Latitude = original.Latitude,
+            Longitude = original.Longitude,
+            Zoom = original.Zoom,
+            Width = original.Width,
+            Height = original.Height,
+            Bearing = original.Bearing,
+            Category = original.Category,
+            ShowShape = original.ShowShape,
+            ShowTitle = original.ShowTitle,
+            OperationState = original.OperationState,
+            FillColor = original.FillColor,
+            StrokeColor = original.StrokeColor,
+            StrokeThickness = original.StrokeThickness,
+            Opacity = original.Opacity,
+            ShapeType = original.ShapeType
+        };
+    }
+
+    public static PidsSymbolModel Clone(this PidsSymbolModel original)
+    {
+        return new PidsSymbolModel
+        {
+            Title = original.Title,
+            TitleSize = original.TitleSize,
+            Latitude = original.Latitude,
+            Longitude = original.Longitude,
+            Zoom = original.Zoom,
+            Width = original.Width,
+            Height = original.Height,
+            Bearing = original.Bearing,
+            Category = original.Category,
+            ShowShape = original.ShowShape,
+            ShowTitle = original.ShowTitle,
+            OperationState = original.OperationState,
+            FillColor = original.FillColor,
+            StrokeColor = original.StrokeColor,
+            StrokeThickness = original.StrokeThickness,
+            LinkedDeviceId = original.LinkedDeviceId + 1000, // 중복 방지를 위해 다른 값
+            DeviceType = original.DeviceType,
+            ModelVariant = original.ModelVariant,
+            BaseBearing = original.BaseBearing,
+            DetectionRange = original.DetectionRange,
+            DetectionAngle = original.DetectionAngle,
+            DetectionBearing = original.DetectionBearing,
+            ShowFOV = original.ShowFOV,
+            EventStatus = original.EventStatus,
+            FOVColor = original.FOVColor,
+            FOVOpacity = original.FOVOpacity,
+            GateWidthM = original.GateWidthM,
+            OpenOnContactOn = original.OpenOnContactOn
+            // DoorState 는 런타임 형태 축 — 복사본은 Unknown 에서 출발(FR-12)
+        };
+    }
     #endregion
 }

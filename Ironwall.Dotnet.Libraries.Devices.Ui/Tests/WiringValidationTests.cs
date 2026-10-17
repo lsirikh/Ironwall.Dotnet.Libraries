@@ -1,0 +1,301 @@
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Xunit;
+
+namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
+
+/// <summary>
+/// 결선 검증(wiring-fence-view FR-14 · 옛 device-wiring-setup FR-23 ~ FR-26) — 무엇이 저장을 막고 무엇이 알리기만 하는가.
+/// 문장은 <b>무엇이 · 어디가 · 어떻게</b> 세 조각이어야 한다(WS L186-188).
+/// </summary>
+public class WiringValidationTests
+{
+    private const string SMART = "SmartController";
+
+    /// <summary>센서 <paramref name="count"/> 대 — 저장된 결선 없이. 링이면 번호순 제안으로 체인에 붙는다.</summary>
+    private static WiringBoard Board(int count, string? controllerType = SMART, string type = "SmartSensor2", int? channelOffset = null,
+                                     int placed = 0)
+    {
+        var board = new WiringBoard();
+        board.Load(Enumerable.Range(0, count).Select(i => (
+            Id: 100 + i,
+            Channel: channelOffset is null ? (int?)null : (int?)(i + channelOffset.Value),
+            Facts: new SensorFacts(1101 + i, $"북측 {i + 1}구간 센서", type, "북측 7구간"),
+            Placement: i < placed ? new WiringPlacement(1, i + 1) : (WiringPlacement?)null,
+            Issue: (string?)null,
+            Groups: (IReadOnlyList<int>?)null)), controllerType);
+        return board;
+    }
+
+    /// <summary>링 체인에 전부 붙이고 제안을 적용한 보드.</summary>
+    private static WiringBoard Ring(int count, int? channelOffset = null)
+    {
+        var board = Board(count, channelOffset: channelOffset);
+        board.AcceptSuggestions();
+        return board;
+    }
+
+    #region - Evaluate -
+    [Fact]
+    public void should_report_nothing_when_a_ring_has_every_sensor_on_one_chain()
+    {
+        // 옛 모델은 2차 선이 비면 "루프가 닫히지 않습니다"(치명)였다 — 링의 돌아오는 길은 센서 없는 리턴케이블이라 이것이 정상이다.
+        var board = Ring(4);
+
+        var issues = WiringValidation.Evaluate(board);
+
+        Assert.Empty(issues);
+        Assert.False(WiringValidation.BlocksSave(issues));
+    }
+
+    [Fact]
+    public void should_notify_but_not_block_when_sensors_are_still_unplaced()
+    {
+        var board = Ring(3);
+        board.Unplace(board.Rows[2].Key);
+
+        var issues = WiringValidation.Evaluate(board);
+
+        var unplaced = Assert.Single(issues.Where(i => i.Code == WiringValidation.CODE_UNPLACED));
+        Assert.Equal(WiringIssueLevel.Info, unplaced.Level);           // FR-14 ① 알림
+        Assert.Contains("1대", unplaced.Message);
+        Assert.False(WiringValidation.BlocksSave(issues));
+    }
+
+    [Fact]
+    public void should_warn_over_the_product_limit_when_a_smart_ring_has_more_than_34()
+    {
+        Assert.DoesNotContain(WiringValidation.Evaluate(Ring(34)), i => i.Code == WiringValidation.CODE_LIMIT);
+
+        var issues = WiringValidation.Evaluate(Ring(35));
+
+        // 35대 = 34대 초과 + 체인 약 204m(6m × 34) 로 200m 초과 — 둘 다 경고(한도 표 · v0.4 §1-C)
+        var limits = issues.Where(i => i.Code == WiringValidation.CODE_LIMIT).ToList();
+        Assert.All(limits, l => Assert.Equal(WiringIssueLevel.Warning, l.Level));
+        Assert.Contains(limits, l => l.Message.Contains("34대"));
+        Assert.Contains(limits, l => l.Message.Contains("200m"));
+        Assert.False(WiringValidation.BlocksSave(issues));
+    }
+
+    [Fact]
+    public void should_only_inform_when_smart_and_pids_sensors_share_a_controller()
+    {
+        // Arrange
+        var board = Ring(2);
+        board.Rows[1].Facts = board.Rows[1].Facts with { TypeText = "Fence" };      // 표에서 종류를 바꾸면 바로 따라온다
+
+        // Act
+        var issues = WiringValidation.Evaluate(board);
+
+        // Assert — 섞어 쓰기는 정상(옛 O-8 경고 폐기): 알림 하나 · 한도 경고 없음
+        var mix = Assert.Single(issues.Where(i => i.Code == WiringValidation.CODE_MIX));
+        Assert.Equal(WiringIssueLevel.Info, mix.Level);
+        Assert.Equal(WiringLimitTable.MIXED_INFO, mix.Message);
+        Assert.DoesNotContain(issues, i => i.Code == WiringValidation.CODE_LIMIT);
+        Assert.False(WiringValidation.BlocksSave(issues));
+    }
+
+    [Fact]
+    public void should_not_inform_mix_when_only_smart_sensors_hang_on_a_controller()
+        => Assert.DoesNotContain(WiringValidation.Evaluate(Ring(3)), i => i.Code == WiringValidation.CODE_MIX);
+
+    [Fact]
+    public void should_warn_about_the_closed_up_gap_when_saved_orders_had_a_hole()
+    {
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            (Id: 1, Channel: (int?)null, Facts: new SensorFacts(1101, "센서 1", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 1),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)null, Facts: new SensorFacts(1102, "센서 2", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 3),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+        }, SMART);
+
+        var issues = WiringValidation.Evaluate(board);
+
+        var gap = Assert.Single(issues.Where(i => i.Code == WiringValidation.CODE_GAP));
+        Assert.Equal(WiringIssueLevel.Warning, gap.Level);
+        Assert.Contains("1차 2번 자리가 비어", gap.Message);
+        Assert.Contains("고장 구간", gap.Message);                      // 어떻게 확인하는지가 문장에 있다
+    }
+
+    [Fact]
+    public void should_block_when_a_saved_wiring_value_could_not_be_read()
+    {
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            (Id: 1, Channel: (int?)1, Facts: new SensorFacts(1101, "센서", "Fence", ""),
+             Placement: (WiringPlacement?)null, Issue: (string?)"순번 0 이 쓸 수 있는 범위 밖입니다", Groups: (IReadOnlyList<int>?)null),
+        });
+
+        var issues = WiringValidation.Evaluate(board);
+
+        Assert.Contains(issues, i => i.Code == WiringValidation.CODE_LOAD && i.Level == WiringIssueLevel.Critical);
+        Assert.True(WiringValidation.BlocksSave(issues));
+    }
+
+    [Fact]
+    public void should_block_when_two_sensors_claimed_the_same_saved_place()
+    {
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            (Id: 1, Channel: (int?)null, Facts: new SensorFacts(1101, "센서 1", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 1),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)null, Facts: new SensorFacts(1102, "센서 2", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 1),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+        }, SMART);
+
+        Assert.True(WiringValidation.BlocksSave(WiringValidation.Evaluate(board)));
+    }
+
+    [Fact]
+    public void should_note_but_not_block_when_bus_address_differs_from_order()
+    {
+        var board = Ring(2, channelOffset: 7);      // 주소 7 · 8 인데 순번은 1 · 2
+
+        var issues = WiringValidation.Evaluate(board);
+
+        var note = Assert.Single(issues.Where(i => i.Code == WiringValidation.CODE_CHANNEL));
+        Assert.Equal(WiringIssueLevel.Info, note.Level);
+        Assert.Contains("주소", note.Message);
+        Assert.False(WiringValidation.BlocksSave(issues));
+    }
+    #endregion
+
+    #region - Words -
+    [Fact]
+    public void should_write_the_ring_from_sensor_a_to_sensor_b_when_ring()
+    {
+        var text = WiringValidation.LoopText(Ring(3));
+
+        Assert.Contains("Ch1(A) ─▶ 아래 줄 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서", text);
+        Assert.Contains("먼 끝에서 꺾여 리턴선 ─▶ Ch2(B)", text);                         // 위 줄이 비면 리턴선(§1-0b ②)
+        Assert.DoesNotContain("리턴케이블로 함체", text);
+    }
+
+    [Fact]
+    public void should_write_one_ring_when_a_fence_controller_is_wired()
+    {
+        // Arrange — 옛 양쪽 가지 제어기(PIDS · 펜스센서)도 이제 링이다(v0.4 §1-C)
+        var board = Board(3, controllerType: "Controller", type: "Fence");
+        board.AcceptSuggestions();
+
+        // Act
+        var text = WiringValidation.LoopText(board);
+
+        // Assert
+        Assert.Contains("Ch1(A) ─▶ 아래 줄 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서", text);
+        Assert.DoesNotContain("왼쪽", text);
+    }
+
+    [Fact]
+    public void should_write_the_upper_lane_back_to_ch2_and_name_fault_sections_in_the_lane_chain_order_when_two_lanes_are_used()
+    {
+        // Arrange — 펜스 구성(제안)이 켜진 링 6대, 뒤 셋을 위 줄로
+        var board = Ring(6);
+        var layout = WiringFenceLayout.Create(Enumerable.Repeat(FencePanelSpec.Default(), 5),
+            board.Chain.Keys.Select((k, i) => (k, i)).ToDictionary(t => t.k, t => new SensorMountSpec(t.i, FenceMountSpot.PostTop)), null);
+        board.LoadFenceLayout(layout);
+        board.SetLanes(board.Chain.Keys.Skip(3).ToList(), FenceLane.Upper);
+
+        // Act
+        var text = WiringValidation.LoopText(board);
+        var hint = WiringValidation.FaultHint(board);
+
+        // Assert — 사슬 = 아래 1 · 2 · 3 → 위 6 · 5 · 4(먼 끝에서 돌아온다)
+        Assert.Contains("아래 줄 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서", text);
+        Assert.Contains("위 줄 4. 북측 6구간 센서 → 5. 북측 5구간 센서 → 6. 북측 4구간 센서 ─▶ Ch2(B)", text);
+        Assert.Contains("북측 6구간 센서", hint.Split(Environment.NewLine)[0]);               // 1차 4~5 = 사슬 4 · 5번째
+    }
+
+    [Fact]
+    public void should_say_empty_when_nothing_is_on_the_chain()
+        => Assert.Contains("(비어 있음)", WiringValidation.LoopText(new WiringBoard()));
+
+    [Fact]
+    public void should_show_both_port_examples_when_a_ring_has_five_or_more()
+    {
+        var hint = WiringValidation.FaultHint(Ring(6));
+
+        Assert.Contains("1차 4~5 → 북측 4구간 센서와 북측 5구간 센서 사이", hint);
+        Assert.Contains("2차 4~5 → 북측 3구간 센서와 북측 2구간 센서 사이", hint);   // B 쪽에서: 2차 4 = 위치 3 · 2차 5 = 위치 2
+    }
+
+    [Fact]
+    public void should_ask_for_more_sensors_when_the_chain_is_short()
+        => Assert.Contains("5대 이상", WiringValidation.FaultHint(Ring(2)));
+    #endregion
+
+    #region - Fault section (A/B numbering) -
+    [Fact]
+    public void should_count_first_from_sensor_a_when_describing_a_ring_fault_section()
+    {
+        var board = Ring(6);
+
+        Assert.Equal("1차 2~3 → 북측 2구간 센서와 북측 3구간 센서 사이", WiringValidation.DescribeFaultSection(board, 1, 2, 3));
+        Assert.Equal("1차 2번 = 북측 2구간 센서", WiringValidation.DescribeFaultSection(board, 1, 2, 2));
+    }
+
+    [Fact]
+    public void should_count_second_from_sensor_b_when_describing_a_ring_fault_section()
+    {
+        var board = Ring(6);
+
+        // 2차 n = 체인 위치 N+1−n — 같은 체인을 반대쪽 포트에서 센다.
+        Assert.Equal("2차 1번 = 북측 6구간 센서", WiringValidation.DescribeFaultSection(board, 2, 1, 1));
+        Assert.Equal("2차 2~3 → 북측 5구간 센서와 북측 4구간 센서 사이", WiringValidation.DescribeFaultSection(board, 2, 2, 3));
+        Assert.Equal("2차 6번 = 북측 1구간 센서", WiringValidation.DescribeFaultSection(board, 2, 6, 6));
+    }
+
+    [Fact]
+    public void should_count_from_both_ports_when_describing_a_fence_controller_fault_section()
+    {
+        // Arrange — 펜스 제어기도 링: 1차는 Sensor A 쪽, 2차는 Sensor B 쪽에서 센다
+        var board = Board(3, controllerType: "Controller", type: "Fence");
+        board.AcceptSuggestions();
+
+        // Act · Assert
+        Assert.Equal("1차 1~2 → 북측 1구간 센서와 북측 2구간 센서 사이", WiringValidation.DescribeFaultSection(board, 1, 1, 2));
+        Assert.Equal("2차 1번 = 북측 3구간 센서", WiringValidation.DescribeFaultSection(board, 2, 1, 1));
+    }
+
+    [Fact]
+    public void should_name_fault_sections_by_saved_orders_while_load_proposals_are_not_applied()
+    {
+        // 저장 1 · 3(빈 2) + 저장 없음 1대 → 화면은 [1, 2(당김), 3(제안)]. 장애 번호는 서버의 번호다(L2).
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            (Id: 1, Channel: (int?)null, Facts: new SensorFacts(1101, "센서 1", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 1),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)null, Facts: new SensorFacts(1102, "센서 2", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 3),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 3, Channel: (int?)null, Facts: new SensorFacts(1103, "센서 3", "SmartSensor2", ""), Placement: (WiringPlacement?)null,
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+        }, SMART);
+
+        Assert.Equal("1차 3번 = 센서 2", WiringValidation.DescribeFaultSection(board, 1, 3, 3));
+        Assert.Contains("밖입니다", WiringValidation.DescribeFaultSection(board, 1, 2, 2));    // 저장된 2번은 비어 있다
+
+        board.AcceptProposals();
+
+        Assert.Equal("1차 2번 = 센서 2", WiringValidation.DescribeFaultSection(board, 1, 2, 2));
+        Assert.Equal("1차 3번 = 센서 3", WiringValidation.DescribeFaultSection(board, 1, 3, 3));
+    }
+
+    [Fact]
+    public void should_say_out_of_range_when_the_fault_section_is_beyond_the_wiring()
+    {
+        var board = Ring(3);
+
+        Assert.Contains("밖입니다", WiringValidation.DescribeFaultSection(board, 1, 4, 5));
+        Assert.Contains("밖입니다", WiringValidation.DescribeFaultSection(board, 2, 3, 4));
+        Assert.Contains("없어", WiringValidation.DescribeFaultSection(new WiringBoard(), 1, 1, 2));
+    }
+    #endregion
+}

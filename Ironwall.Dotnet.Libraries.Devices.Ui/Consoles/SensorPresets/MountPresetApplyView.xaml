@@ -1,0 +1,38 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.MountPresetApplyView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--  [위치 프리셋 적용…](sensor-mount-preset W4 주석 1 · FR-16) — 범위 + 모델별 프리셋. 결선맵 되돌리기 한 걸음  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.SensorPresets.Apply"
+		HelpKey="Devices.Wiring.MountPreset"
+		PrimaryAutomationId="Devices.SensorPresets.Apply.Apply"
+		PrimaryInvoked="OnApply"
+		PrimaryText="적용"
+		SecondaryAutomationId="Devices.SensorPresets.Apply.Cancel"
+		SecondaryInvoked="OnCancel"
+		Size="Medium"
+		Title="위치 프리셋 적용">
+		<StackPanel>
+			<TextBlock FontWeight="SemiBold" Text="범위" />
+			<RadioButton Margin="0,4,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Apply.Selected" Content="고른 센서" GroupName="Scope" IsChecked="{Binding IsSelectedScope}" Style="{DynamicResource Console.RadioButton}" />
+			<RadioButton Margin="0,2,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Apply.SameModel" Content="같은 모델 전체" GroupName="Scope" IsChecked="{Binding IsSameModelScope}" Style="{DynamicResource Console.RadioButton}" />
+			<RadioButton Margin="0,2,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Apply.Controller" Content="이 제어기 전체" GroupName="Scope" IsChecked="{Binding IsControllerScope}" Style="{DynamicResource Console.RadioButton}" />
+			<TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Text="모델별 위치 프리셋" />
+			<ItemsControl AutomationProperties.AutomationId="Devices.SensorPresets.Apply.Rows" ItemsSource="{Binding Rows}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<DockPanel Margin="0,0,0,4">
+							<TextBlock Width="130" VerticalAlignment="Center" Text="{Binding Model.Name}" />
+							<ComboBox AutomationProperties.Name="{Binding Model.Name}" DisplayMemberPath="Name" ItemsSource="{Binding Presets}" SelectedItem="{Binding Selected}" />
+						</DockPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</StackPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

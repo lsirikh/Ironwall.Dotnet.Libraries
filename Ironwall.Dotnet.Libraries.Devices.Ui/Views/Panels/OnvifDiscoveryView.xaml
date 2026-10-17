@@ -1,0 +1,160 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Panels.OnvifDiscoveryView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--  [ONVIF 검색] 펼침 영역 — DataContext = OnvifDiscoveryViewModel. 옛 카메라 패널과 장비 창(콘솔) 카메라 레일이 같이 쓴다  -->
+	<UserControl.Resources>
+		<!--  어느 호스트에 붙어도 풀리게 여기서 둔다(장비 창은 앱 병합 사전에 기대지 않는다)  -->
+		<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+	</UserControl.Resources>
+	<Border
+		Margin="10,4,10,6"
+		Padding="8,6"
+		BorderBrush="{DynamicResource MaterialDesignDivider}"
+		BorderThickness="1"
+		CornerRadius="4">
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+
+			<!--  계정 · 검색 · 전부 조회 · 닫기  -->
+			<StackPanel Grid.Row="0" Orientation="Horizontal">
+				<TextBlock
+					VerticalAlignment="Center"
+					FontWeight="SemiBold"
+					Text="ONVIF 검색" />
+				<c:HelpTip
+					Margin="6,0,12,0"
+					VerticalAlignment="Center"
+					HelpKey="Devices.Camera.OnvifDiscovery"
+					Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
+				<TextBlock
+					Margin="0,0,6,0"
+					VerticalAlignment="Center"
+					Text="계정" />
+				<TextBox
+					Width="120"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Camera.Onvif.UserName"
+					AutomationProperties.Name="카메라 계정"
+					Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock
+					Margin="12,0,6,0"
+					VerticalAlignment="Center"
+					Text="비밀번호" />
+				<PasswordBox
+					Width="120"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Camera.Onvif.Password"
+					AutomationProperties.Name="카메라 비밀번호"
+					PasswordChanged="OnPasswordChanged" />
+				<Button
+					Margin="12,0,0,0"
+					AutomationProperties.AutomationId="Devices.Camera.Onvif.Search"
+					Content="다시 검색"
+					IsEnabled="{Binding CanSearch}"
+					Style="{DynamicResource Console.Button}">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickSearchButton" />
+					</i:Interaction.Behaviors>
+				</Button>
+				<Button
+					Margin="8,0,0,0"
+					AutomationProperties.AutomationId="Devices.Camera.Onvif.LookupAll"
+					Content="전부 조회"
+					Style="{DynamicResource Console.Button}">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickLookupAllButton" />
+					</i:Interaction.Behaviors>
+				</Button>
+				<ProgressBar
+					Width="18"
+					Height="18"
+					Margin="10,0,0,0"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}}" />
+				<Button
+					Margin="8,0,0,0"
+					AutomationProperties.AutomationId="Devices.Camera.Onvif.Close"
+					Style="{DynamicResource Console.Button.Icon}"
+					ToolTip="닫기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickCloseButton" />
+					</i:Interaction.Behaviors>
+					<md:PackIcon
+						Width="18"
+						Height="18"
+						Kind="Close" />
+				</Button>
+			</StackPanel>
+
+			<!--  상태 · 행동 알림  -->
+			<TextBlock
+				Grid.Row="1"
+				Margin="0,6,0,4"
+				AutomationProperties.AutomationId="Devices.Camera.Onvif.Status"
+				Text="{Binding StatusText}" />
+
+			<!--  찾은 카메라  -->
+			<DataGrid
+				Grid.Row="2"
+				MaxHeight="200"
+				AutomationProperties.AutomationId="Devices.Camera.Onvif.Results"
+				AutoGenerateColumns="False"
+				Background="Transparent"
+				CanUserAddRows="False"
+				CanUserDeleteRows="False"
+				HeadersVisibility="Column"
+				IsReadOnly="True"
+				ItemsSource="{Binding Items}"
+				RowHeaderWidth="0"
+				SelectionMode="Single">
+				<DataGrid.Columns>
+					<DataGridTextColumn Binding="{Binding Address}" Header="주소" />
+					<DataGridTextColumn Binding="{Binding NameDisplay}" Header="이름" />
+					<DataGridTextColumn Binding="{Binding ModelDisplay}" Header="제조사 · 모델" />
+					<DataGridTextColumn Binding="{Binding TypeDisplay}" Header="종류" />
+					<DataGridTextColumn Binding="{Binding StreamDisplay}" Header="영상" />
+					<DataGridTextColumn
+						Width="*"
+						Binding="{Binding StateText}"
+						Header="상태" />
+					<DataGridTemplateColumn Header="">
+						<DataGridTemplateColumn.CellTemplate>
+							<DataTemplate>
+								<StackPanel Orientation="Horizontal">
+									<Button
+										Content="조회"
+										IsEnabled="{Binding CanLookup}"
+										Style="{DynamicResource Console.Button.Mini}">
+										<i:Interaction.Behaviors>
+											<behavior:ButtonClickBehavior MethodName="OnClickLookupButton" />
+										</i:Interaction.Behaviors>
+									</Button>
+									<Button
+										Margin="4,0,0,0"
+										Content="추가"
+										IsEnabled="{Binding CanAdd}"
+										Style="{DynamicResource Console.Button.Mini}">
+										<i:Interaction.Behaviors>
+											<behavior:ButtonClickBehavior MethodName="OnClickAddButton" />
+										</i:Interaction.Behaviors>
+									</Button>
+								</StackPanel>
+							</DataTemplate>
+						</DataGridTemplateColumn.CellTemplate>
+					</DataGridTemplateColumn>
+				</DataGrid.Columns>
+			</DataGrid>
+		</Grid>
+	</Border>
+</UserControl>

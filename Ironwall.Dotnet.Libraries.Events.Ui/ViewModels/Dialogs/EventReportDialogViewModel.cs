@@ -1,11 +1,11 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using K4os.Compression.LZ4.Internal;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -20,7 +20,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
        Company      : Sensorway Co., Ltd.                                       
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
-    public abstract class EventReportDialogViewModel : BasePanelViewModel
+    public abstract class EventReportDialogViewModel : BasePanelViewModel, IHandle<ActionReportTemplatesChangedMessage>
+                                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage>
     {
         #region - Ctors -
         public EventReportDialogViewModel()
@@ -53,40 +54,178 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
                 _model = eventModel;
             }
 
-            if(user != null) 
+            if(user != null)
             {
                 _user = user;
             }
 
+            // 새 이벤트로 창을 연다 — 앞 이벤트의 '보내는 중' · '이미 조치됨' 표시를 넘겨받지 않는다.
+            _isSending = false;
+            _isHandledElsewhere = false;
+            _isDeletedOnServer = false;
+            _remoteWhileSending = false;
+            NotifyReportState();
+
             Refresh();
         }
 
+        /// <summary>
+        /// 원격 조치보고(다른 운영자 · 다른 GIS)가 이 창의 이벤트를 이미 조치했다 — [확인]을 끄고 까닭을 보인다(WP-1 ③).
+        /// 모른 채 [확인]을 누르면 서버에 같은 이벤트의 두 번째 조치가 생긴다. 보내는 중(자기 조치의 메아리일 수 있다)이면 무시한다.
+        /// </summary>
+        public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || !IsActive || _model is null) return Task.CompletedTask;
+            if (_model.Model?.Id != message.EventId
+                || Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.ListKeyOf(_model) != message.Kind) return Task.CompletedTask;   // 운영 창도(PRD v1.1)
+
+            // 서버에서 지워졌다(SYNC_DETECTION DELETED) — 메아리일 수 없으니 보내는 중이어도 곧바로 끈다. 보내면 서버가 "없는 이벤트" 로 거절한다.
+            if (message.DeletedOnServer)
+            {
+                _isHandledElsewhere = true;
+                _isDeletedOnServer = true;
+                _log?.Info($"[{GetType().Name}] 서버에서 삭제된 이벤트 — [확인] 끔: {message.Kind} {message.EventId}");
+                NotifyReportState();
+                return Task.CompletedTask;
+            }
+
+            // (B10) 보내는 중에 온 것은 자기 조치의 메아리일 수 있어 지금은 끄지 않는다 — 기억해 두었다가 송신이 실패하면 적용한다.
+            //   실패했으면 메아리일 수 없다(자기 조치가 없다). 종전엔 그냥 버려 [확인]이 다시 켜졌고, 남이 조치한 이벤트에 두 번째 조치를 만들 수 있었다.
+            if (_isSending)
+            {
+                _remoteWhileSending = true;
+                return Task.CompletedTask;
+            }
+
+            _isHandledElsewhere = true;
+            _log?.Info($"[{GetType().Name}] 다른 운영자가 이미 조치함 — [확인] 끔: {message.Kind} {message.EventId}");
+            NotifyReportState();
+            return Task.CompletedTask;
+        }
+
+        /// <summary>보내기 시작 · 끝 — [확인] 을 끄고 켠다(두 번 눌러 두 건 보내지 않게, WP-1 ⑬).</summary>
+        protected void SetSending(bool sending)
+        {
+            if (_isSending == sending) return;
+            _isSending = sending;
+            if (sending) _remoteWhileSending = false;
+            NotifyReportState();
+        }
+
+        /// <summary>
+        /// 송신이 실패로 끝났다 — 보내는 동안 같은 이벤트의 원격 조치가 왔다면 그것은 메아리가 아니라 남의 조치다(B10).
+        /// [확인]을 끄고 까닭을 보인다. 성공했으면 창이 닫히므로 부르지 않는다.
+        /// </summary>
+        protected void OnSendFailed()
+        {
+            if (!_remoteWhileSending) return;
+            _remoteWhileSending = false;
+            _isHandledElsewhere = true;
+            _log?.Info($"[{GetType().Name}] 보내는 동안 다른 운영자가 조치했고 이 창의 송신은 실패 — [확인] 끔");
+            NotifyReportState();
+        }
+
+        private void NotifyReportState()
+        {
+            NotifyOfPropertyChange(nameof(IsSending));
+            NotifyOfPropertyChange(nameof(IsHandledElsewhere));
+            NotifyOfPropertyChange(nameof(CanClickOk));
+            NotifyOfPropertyChange(nameof(DialogNotice));
+        }
+
+        /// <summary>
+        /// 창을 열 때 — 문구를 곧바로 채우고(마지막으로 받은 목록 · 없으면 기본 문구) 뒤이어 서버의
+        /// 조치보고 문구 관리 목록을 다시 읽어 바뀌었으면 갈아 끼운다(조치 트레이와 같은 목록 — 완성도 감사 E-6 #2).
+        /// </summary>
         private void IninializeDialog()
         {
-            int id = 1;
-            CollectionActionItem = new ObservableCollection<SelectableItemViewModel>
-                {
-                    new SelectableItemViewModel(id ++, "야생동물출현"),
-                    new SelectableItemViewModel(id ++, "강풍/폭우"),
-                    new SelectableItemViewModel(id ++, "울타리 점검/작업"),
-                    new SelectableItemViewModel(id ++, "침입발생 특경출동조치"),
-                    new SelectableItemViewModel(id ++, "오경보"),
-                };
-            EtcViewModel = new SelectableItemViewModel(id++, "기타");
-
-            EtcViewModel.PropertyChanged += ChangeSelectableItem;
-
-            CollectionActionItem.Apply((item) =>
-            {
-                item.PropertyChanged += ChangeSelectableItem;
-            });
-
-            SelectableItemViewModel = CollectionActionItem.FirstOrDefault();
-            if(SelectableItemViewModel != null)
-                SelectableItemViewModel.IsSelected = true;
-
+            var source = ResolvePhraseSource();
+            BuildItems((source?.LastKnown ?? new ActionReportPhraseSet(ActionReportPhraseSource.Fallback, false)).Phrases, keepSelection: false);
             Memo = string.Empty;
             Refresh();
+
+            if (source is not null) _ = RefreshPhrasesAsync(source);
+        }
+
+        /// <summary>
+        /// 창이 떠 있는 동안 다른 곳에서 문구 목록이 바뀌었다(서버 <c>SYNC_ACTION_REPORT_TEMPLATE</c>) — 다시 읽어 갈아 끼운다.
+        /// 단, 사람이 고른 문구가 새 목록에서 빠졌으면 <b>갈아 끼우지 않는다</b>(고른 것을 말없이 다른 문구로 바꾸지 않는다).
+        /// </summary>
+        /// <remarks>기다리지 않고 돌아간다 — 호스트의 NATS 처리 줄이 서버 왕복을 기다리지 않도록.</remarks>
+        public Task HandleAsync(ActionReportTemplatesChangedMessage message, CancellationToken cancellationToken)
+        {
+            if (!IsActive) return Task.CompletedTask;
+            var source = ResolvePhraseSource();
+            if (source is not null) PhraseRefreshTask = RefreshPhrasesAsync(source, protectSelection: true);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>가장 최근 알림이 시작한 문구 다시 읽기(시험용).</summary>
+        internal Task PhraseRefreshTask { get; private set; } = Task.CompletedTask;
+
+        private async Task RefreshPhrasesAsync(IActionReportPhraseSource source, bool protectSelection = false)
+        {
+            try
+            {
+                var set = await source.LoadAsync().ConfigureAwait(true);
+                var current = CollectionActionItem?.Select(i => i.Name).ToList() ?? new List<string?>();
+                if (!IsActive || set.Phrases.SequenceEqual(current)) return;
+                if (protectSelection && SelectableItemViewModel is { } chosen
+                    && !ReferenceEquals(chosen, EtcViewModel)
+                    && !set.Phrases.Contains(chosen.Name ?? string.Empty, StringComparer.Ordinal))
+                {
+                    _log?.Info($"[{GetType().Name}] 고른 문구 '{chosen.Name}' 이(가) 새 목록에 없어 창의 문구를 그대로 둡니다.");
+                    return;
+                }
+                Execute.OnUIThread(() =>
+                {
+                    BuildItems(set.Phrases, keepSelection: true);
+                    Refresh();
+                });
+            }
+            catch (Exception ex)
+            {
+                _log?.Warning($"[{GetType().Name}] 조치보고 문구를 갈아 끼우지 못했습니다 — 기본 문구를 씁니다: {ex.Message}");
+            }
+        }
+
+        /// <summary>문구 줄을 다시 세운다. 고른 문구가 새 목록에도 있으면 그대로 고른다.</summary>
+        private void BuildItems(IReadOnlyList<string> phrases, bool keepSelection)
+        {
+            var previous = keepSelection ? SelectableItemViewModel?.Name : null;
+
+            if (CollectionActionItem is not null)
+                foreach (var old in CollectionActionItem) old.PropertyChanged -= ChangeSelectableItem;
+            if (EtcViewModel is not null) EtcViewModel.PropertyChanged -= ChangeSelectableItem;
+            SelectableItemViewModel = null;
+
+            int id = 1;
+            var list = (phrases is { Count: > 0 } ? phrases : ActionReportPhraseSource.Fallback)
+                .Where(p => !string.Equals(p, ActionReportPhraseSource.EtcPhrase, StringComparison.Ordinal));
+            CollectionActionItem = new ObservableCollection<SelectableItemViewModel>(list.Select(p => new SelectableItemViewModel(id++, p)));
+            EtcViewModel = new SelectableItemViewModel(id++, ActionReportPhraseSource.EtcPhrase);
+
+            EtcViewModel.PropertyChanged += ChangeSelectableItem;
+            foreach (var item in CollectionActionItem) item.PropertyChanged += ChangeSelectableItem;
+
+            var pick = previous == ActionReportPhraseSource.EtcPhrase
+                ? EtcViewModel
+                : CollectionActionItem.FirstOrDefault(i => i.Name == previous) ?? CollectionActionItem.FirstOrDefault();
+            if (pick != null)
+            {
+                pick.IsSelected = true;           // ChangeSelectableItem 이 SelectableItemViewModel 을 맞춘다
+                SelectableItemViewModel = pick;
+            }
+        }
+
+        private IActionReportPhraseSource? ResolvePhraseSource()
+        {
+            try { return IoC.Get<IActionReportPhraseSource>(); }
+            catch (Exception ex)
+            {
+                _log?.Info($"[{GetType().Name}] 조치보고 문구 소스 미해석 — 기본 문구를 씁니다: {ex.Message}");
+                return null;
+            }
         }
 
         private void ChangeSelectableItem(object? sender, PropertyChangedEventArgs e)
@@ -123,6 +262,31 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         public ObservableCollection<SelectableItemViewModel>? CollectionActionItem { get; private set; }
         public EventCardBaseViewModel? Model => _model;
 
+        /// <summary>조치보고를 보내는 중 — [확인] 이 꺼지고 창 틀의 Enter 도 막힌다.</summary>
+        public bool IsSending => _isSending;
+
+        /// <summary>다른 운영자가 이 이벤트를 이미 조치했다(원격 ACTION_REPORT).</summary>
+        public bool IsHandledElsewhere => _isHandledElsewhere;
+
+        /// <summary>
+        /// [확인] 을 누를 수 있는가 — Caliburn 가드(<c>x:Name="ClickOk"</c> ↔ <c>CanClickOk</c>)라 단추의 켜짐이 여기서 정해진다.
+        /// 보내는 중이거나 이미 다른 곳에서 조치됐으면 끈다.
+        /// </summary>
+        public bool CanClickOk => !_isSending && !_isHandledElsewhere;
+
+        /// <summary>버튼 줄 왼쪽 안내 — 평소엔 사용법, 이미 조치됐으면 그 까닭, 보내는 중이면 기다리라는 말.</summary>
+        public string DialogNotice => _isDeletedOnServer ? DELETED_ON_SERVER_TEXT
+                                    : _isHandledElsewhere ? HANDLED_ELSEWHERE_TEXT
+                                    : _isSending ? SENDING_TEXT
+                                    : DEFAULT_NOTICE_TEXT;
+
+        /// <summary>원격 조치보고를 받은 창의 안내.</summary>
+        public const string HANDLED_ELSEWHERE_TEXT = "다른 운영자가 이미 조치했습니다. [확인]은 꺼졌습니다 — [취소]로 닫으세요.";
+        /// <summary>서버에서 지워진 이벤트(SYNC_DETECTION DELETED)를 든 창의 안내.</summary>
+        public const string DELETED_ON_SERVER_TEXT = "서버에서 삭제된 이벤트입니다. [확인]은 꺼졌습니다 — [취소]로 닫으세요.";
+        public const string SENDING_TEXT ="조치보고를 보내는 중입니다…";
+        public const string DEFAULT_NOTICE_TEXT = "문구를 고르고 [확인]을 누르세요. '기타'는 내용을 적어야 합니다.";
+
         // 속성 시현을 위한 ViewModel
         public BasePanelViewModel? SelectedItemEditor
         {
@@ -133,6 +297,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         #region - Attributes -
         protected EventCardBaseViewModel? _model;
         protected IAccountModel? _user;
+        private bool _isSending;
+        private bool _isHandledElsewhere;
+        private bool _isDeletedOnServer;     // 서버에서 지워졌다(SYNC_DETECTION DELETED) — 안내 문구만 다르다
+        private bool _remoteWhileSending;
         public BasePanelViewModel? _selectedItemEditor;
         #endregion
     }

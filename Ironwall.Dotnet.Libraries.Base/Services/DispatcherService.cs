@@ -30,4 +30,13 @@ public static class DispatcherService
         else
             await dispatchObject.BeginInvoke(action);
     }
+
+    public static async Task BeginInvoke(Action action, DispatcherPriority priority)
+    {
+        Dispatcher? dispatchObject = Application.Current != null ? Application.Current.Dispatcher : null;
+        if (dispatchObject == null || dispatchObject.CheckAccess())
+            action();
+        else
+            await dispatchObject.BeginInvoke(action, priority);
+    }
 }

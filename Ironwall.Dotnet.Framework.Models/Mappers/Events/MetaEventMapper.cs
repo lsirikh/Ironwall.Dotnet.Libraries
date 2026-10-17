@@ -22,7 +22,7 @@ namespace Ironwall.Dotnet.Framework.Models.Mappers
         public MetaEventMapper(IMetaEventModel model) : base (model)
         {
             EventGroup = model.EventGroup;
-            MessageType = (int)model.MessageType;
+            MessageType = model.MessageType;
             Device = model.Device.Id;
             Status = EnumHelper.GetStatusType(model.Status);
         }

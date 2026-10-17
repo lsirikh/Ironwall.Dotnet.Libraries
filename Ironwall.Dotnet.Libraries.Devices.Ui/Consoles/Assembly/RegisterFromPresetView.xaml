@@ -1,0 +1,267 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.RegisterFromPresetView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:asm="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:pw="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		프리셋으로 장비 만들기(device-assembly-preset FR-12 ~ FR-14). 정본 목업 L312-351.
+		왼쪽: 프리셋 고르기 + 프리셋이 담지 않는 개체 정보만. 오른쪽: 보낼 내용 — 이대로 나간다(POST 1건).
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<asm:CategoryTextConverter x:Key="CategoryText" />
+		<Style x:Key="Reg.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+	</UserControl.Resources>
+
+	<!--  T4 · L 720. 머리 · 버튼 줄은 틀이 댄다 — 창이 제 머리를 또 그리지 않는다. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Devices.Assembly.Register"
+		IsPrimaryEnabled="{Binding CanRegister}"
+		HelpKey="Devices.Assembly.Register"
+		Message="{Binding Message}"
+		PrimaryAutomationId="Devices.Assembly.Register.Submit"
+		PrimaryInvoked="OnRegister"
+		PrimaryText="등록"
+		SecondaryAutomationId="Devices.Assembly.Register.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Large"
+		Title="프리셋으로 장비 만들기">
+	<DockPanel LastChildFill="True">
+		<Grid MinHeight="320">
+			<Grid.ColumnDefinitions>
+				<!--  L 720 안에서 왼쪽 폼과 오른쪽 미리보기가 같이 살아야 한다 — 폼을 좁혀 미리보기에 자리를 준다.  -->
+				<ColumnDefinition Width="330" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+
+			<ScrollViewer Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
+				<StackPanel Margin="16,10">
+					<c:ConsoleSection Header="프리셋" Visibility="{Binding ShowsPresetList, Converter={StaticResource BoolToVisibility}}">
+						<StackPanel>
+							<c:ConsoleField ApiName="category_device" Header="카테고리">
+								<!--
+									항목의 화면 글자는 ItemTemplate 의 CategoryTextConverter 로 이미 한글이다. 그런데 데이터
+									템플릿으로 만든 ComboBoxItem 의 UIA 이름은 뷰가 그린 글자가 아니라 바인딩 원본(EnumDeviceCategory)
+									의 ToString() 으로 새는 WPF 관행이 있다 — 자동화 도구로는 "Enclosure" 처럼 영문 enum 이름이 잡힌다.
+									ItemContainerStyle 로 컨테이너 자신의 AutomationProperties.Name 을 같은 변환기로 명시한다.
+								-->
+								<ComboBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Category"
+									ItemsSource="{Binding Categories}"
+									SelectedItem="{Binding Category}">
+									<ComboBox.ItemTemplate>
+										<DataTemplate>
+											<TextBlock Text="{Binding Converter={StaticResource CategoryText}}" />
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+									<ComboBox.ItemContainerStyle>
+										<Style TargetType="ComboBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding Converter={StaticResource CategoryText}}" />
+										</Style>
+									</ComboBox.ItemContainerStyle>
+								</ComboBox>
+							</c:ConsoleField>
+							<ListBox
+								MaxHeight="150"
+								Margin="0,6,0,0"
+								AutomationProperties.AutomationId="Devices.Assembly.Register.Presets"
+								DisplayMemberPath="Name"
+								ItemsSource="{Binding Presets}"
+								SelectedItem="{Binding SelectedPreset}" />
+						</StackPanel>
+					</c:ConsoleSection>
+
+					<TextBlock
+						Margin="0,6,0,0"
+						FontSize="12.5"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding PresetSummary}"
+						TextWrapping="Wrap" />
+
+					<c:ConsoleSection Header="이 장비만의 것">
+						<StackPanel>
+							<!--  종류(type_<category>) — 프리셋에 담긴 값으로 채운다. 조립기에서 새로 만든 프리셋은 종류가 비어 있어
+							      센서 · 제어기 · 카메라 등록이 서버에서 거절됐다(실창 SC-CS-sensor-05, type_sensor 'NONE').  -->
+							<c:ConsoleField
+								ApiName="{Binding TypeAxisField}"
+								Header="{Binding TypeHeader}"
+								Visibility="{Binding ShowsType, Converter={StaticResource BoolToVisibility}}">
+								<ComboBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.type_axis"
+									DisplayMemberPath="Display"
+									ItemsSource="{Binding TypeOptions}"
+									SelectedValue="{Binding TypeCode}"
+									SelectedValuePath="Code">
+									<ComboBox.ItemContainerStyle>
+										<Style TargetType="ComboBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding Display}" />
+										</Style>
+									</ComboBox.ItemContainerStyle>
+								</ComboBox>
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="number_device" Header="장비번호 *">
+								<TextBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.number_device"
+									FontFamily="Consolas"
+									Style="{StaticResource Reg.TextBox}"
+									Text="{Binding DeviceNumber, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="name_device" Header="이름 *">
+								<TextBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.name_device"
+									Style="{StaticResource Reg.TextBox}"
+									Text="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="description" Header="설명">
+								<TextBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.description"
+									Style="{StaticResource Reg.TextBox}"
+									Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField
+								ApiName="controller_id"
+								Header="소속 제어기 *"
+								Visibility="{Binding ShowsController, Converter={StaticResource BoolToVisibility}}">
+								<!--  위 카테고리 콤보와 같은 이유 — DisplayMemberPath 항목의 UIA 이름은 모델 형식 이름이라 제어기 이름으로 명시한다  -->
+								<ComboBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.controller_id"
+									DisplayMemberPath="DeviceName"
+									ItemsSource="{Binding Controllers}"
+									SelectedItem="{Binding Controller}">
+									<ComboBox.ItemContainerStyle>
+										<Style TargetType="ComboBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding DeviceName}" />
+										</Style>
+									</ComboBox.ItemContainerStyle>
+								</ComboBox>
+							</c:ConsoleField>
+						</StackPanel>
+					</c:ConsoleSection>
+
+					<c:ConsoleSection
+						AxisName="connection"
+						Header="접속"
+						Visibility="{Binding ShowsConnection, Converter={StaticResource BoolToVisibility}}">
+						<StackPanel>
+							<c:ConsoleField ApiName="connection.ip_address" Header="IP">
+								<TextBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.ip_address"
+									FontFamily="Consolas"
+									Style="{StaticResource Reg.TextBox}"
+									Text="{Binding IpAddress, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="connection.ip_port" Header="포트">
+								<TextBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.ip_port"
+									FontFamily="Consolas"
+									Style="{StaticResource Reg.TextBox}"
+									Text="{Binding IpPort, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField
+								ApiName="connection.credentials.user_name"
+								Header="사용자명"
+								Visibility="{Binding ShowsCredentials, Converter={StaticResource BoolToVisibility}}">
+								<TextBox Style="{StaticResource Reg.TextBox}" Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField
+								ApiName="connection.credentials.user_password"
+								Header="비밀번호"
+								Visibility="{Binding ShowsCredentials, Converter={StaticResource BoolToVisibility}}">
+								<!--  BindPassword 가 BoundPassword 보다 먼저 와야 한다 — 순서가 바뀌면 붙는 순간 빈 값을 되써 넣는다  -->
+								<PasswordBox
+									Height="30"
+									Padding="6,0"
+									VerticalContentAlignment="Center"
+									pw:PasswordBoxAssistant.BindPassword="True"
+									pw:PasswordBoxAssistant.BoundPassword="{Binding UserPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource BorderBrush}"
+									Foreground="{DynamicResource TextPrimaryBrush}" />
+							</c:ConsoleField>
+						</StackPanel>
+					</c:ConsoleSection>
+
+					<ItemsControl
+						Margin="0,8,0,0"
+						Focusable="False"
+						ItemsSource="{Binding Problems}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<TextBlock
+									FontSize="12"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Text="{Binding StringFormat=⚠ {0}}"
+									TextWrapping="Wrap" />
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</StackPanel>
+			</ScrollViewer>
+
+			<Border
+				Grid.Column="1"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="1,0,0,0">
+				<DockPanel Margin="14,10" LastChildFill="True">
+					<StackPanel DockPanel.Dock="Top">
+						<TextBlock
+							Margin="0,0,0,8"
+							FontSize="13"
+							FontWeight="SemiBold"
+							Text="등록할 내용" />
+						<!--  U-18 D-10 10.3 — 사람이 읽는 요약을 먼저, 요청 본문(JSON)은 펼쳐야 보인다. 비밀번호 가림은 그대로다.  -->
+						<TextBox
+							Margin="0,0,0,8"
+							AutomationProperties.AutomationId="Devices.Assembly.Register.Summary"
+							Background="Transparent"
+							BorderThickness="0"
+							FontSize="12.5"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							IsReadOnly="True"
+							IsReadOnlyCaretVisible="False"
+							Text="{Binding RequestSummary, Mode=OneWay}"
+							TextWrapping="Wrap" />
+					</StackPanel>
+					<Expander
+						AutomationProperties.AutomationId="Devices.Assembly.Register.PreviewExpander"
+						Header="요청 본문 보기"
+						IsExpanded="False">
+						<Border
+							Background="{DynamicResource SurfaceSunkenBrush}"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="1"
+							CornerRadius="4">
+							<ScrollViewer HorizontalScrollBarVisibility="Auto" Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
+								<TextBlock
+									Margin="10"
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Preview"
+									FontFamily="Consolas"
+									FontSize="12"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding PreviewJson}" />
+							</ScrollViewer>
+						</Border>
+					</Expander>
+				</DockPanel>
+			</Border>
+		</Grid>
+	</DockPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

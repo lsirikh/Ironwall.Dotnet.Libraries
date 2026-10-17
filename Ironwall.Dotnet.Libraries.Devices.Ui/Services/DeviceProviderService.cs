@@ -1,0 +1,1280 @@
+﻿using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Base.Models;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Servers;
+
+namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+/****************************************************************************
+   Purpose      : Device Provider Service Implementation
+   Created By   : GHLee
+   Created On   : 11/21/2025 12:00:00 PM
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+
+   Description  : GOP API를 통한 Device 데이터 Fetching 및 Provider 업데이트
+                  - RESTful API 기반 데이터 조회 (IDeviceApiService)
+                  - Pagination 지원 (100개 단위)
+                  - Navigation Mapping (Controller ↔ Sensor 양방향 참조)
+                  - ILogService 기반 구조화된 로깅 (Info/Warning/Error)
+****************************************************************************/
+
+/// <summary>
+/// Device Provider 서비스 구현체
+/// <para>GOP API를 통해 Controller, Sensor, Camera를 조회하고 Provider에 캐싱합니다.</para>
+/// <para>TDD 방식으로 구현되었으며, 각 메서드는 독립적으로 테스트 가능합니다.</para>
+/// </summary>
+public class DeviceProviderService : IDeviceProviderService
+{
+    #region - Ctors -
+    /// <summary>
+    /// DeviceProviderService 생성자
+    /// </summary>
+    /// <param name="logService">로그 서비스 (nullable for null-safe calls)</param>
+    /// <param name="eventAggregator">이벤트 애그리게이터 (Splash Screen 메시지 전송용)</param>
+    /// <param name="apiService">Device API 서비스 (GOP RESTful API 호출)</param>
+    /// <param name="deviceProvider">통합 Device Provider</param>
+    /// <param name="controllerProvider">Controller Device Provider</param>
+    /// <param name="sensorProvider">Sensor Device Provider</param>
+    /// <param name="cameraProvider">Camera Device Provider</param>
+    public DeviceProviderService(
+        ILogService? logService,
+        IEventAggregator eventAggregator,
+        IDeviceApiService apiService,
+        DeviceProvider deviceProvider,
+        ControllerDeviceProvider controllerProvider,
+        SensorDeviceProvider sensorProvider,
+        CameraDeviceProvider cameraProvider,
+        DeviceGroupProvider deviceGroupProvider,
+        IServerApiService serverApiService,
+        ServerProvider serverProvider,
+        DeviceQueryPolicy? queryPolicy = null)
+    {
+        // FR-10 · FR-11: 쿼리 조립 분기는 정책 1곳에서만 판단한다.
+        // 미주입(테스트·과거 호출부)이면 6.3 기본 정책 — 현행 운영 동작이 그대로 유지된다.
+        _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
+        _log = logService;
+        _eventAggregator = eventAggregator;
+        _apiService = apiService;
+        _deviceProvider = deviceProvider;
+        _controllerProvider = controllerProvider;
+        _sensorProvider = sensorProvider;
+        _cameraProvider = cameraProvider;
+        _deviceGroupProvider = deviceGroupProvider;
+        _serverApiService = serverApiService;
+        _serverProvider = serverProvider;
+    }
+    #endregion
+
+    #region - Implementation of Interface -
+    /// <summary>
+    /// IService.ExecuteAsync 구현 - StartService를 호출합니다.
+    /// </summary>
+    public Task ExecuteAsync(CancellationToken token = default)
+    {
+        // 로그인 게이팅(Login_Gated_GIS_Init, PRD-GIS-INIT-01):
+        // 부팅 시 무조건 fetch 금지 — 토큰 없는 로그인 전 fetch는 서버 token 강화 시 401→빈 캐시→심볼 연계붕괴.
+        // 실제 fetch는 로그인 성공 후 ShellViewModel이 TriggerInitFetchAsync로 구동(ISessionLifecycle.LoginSucceeded 구독).
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(ExecuteAsync)} — 로그인 게이팅: 부팅 fetch 보류(로그인 후 트리거 대기)");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// IService.StopAsync 구현 - 서비스 중지 로직 (현재는 빈 구현)
+    /// </summary>
+    public Task StopAsync(CancellationToken token = default)
+    {
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(StopAsync)} called");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 서비스를 시작하고 모든 Device 데이터를 로딩합니다.
+    /// </summary>
+    public async Task StartService(CancellationToken token = default)
+    {
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(StartService)} started");
+
+        try
+        {
+            await FetchAllDevicesAsync(token);
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(StartService)} completed successfully");
+        }
+        catch (OperationCanceledException)
+        {
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(StartService)} canceled");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"{nameof(DeviceProviderService)}.{nameof(StartService)} failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 로그인 게이팅 — 로그인 성공 후 Device 전수 fetch + 캐시 구축을 시작합니다(트리거).
+    /// 재진입(재로그인) 시 진행 중 fetch를 취소하고 최신 데이터로 재시작합니다. 내부 CTS로 ForceLogout 취소 지원.
+    /// </summary>
+    public async Task TriggerInitFetchAsync(CancellationToken externalToken = default)
+    {
+        CancellationTokenSource cts;
+        lock (_fetchGate)
+        {
+            // 재진입(재로그인): 진행 중 fetch는 취소만 — 사용 중 CTS Dispose 금지(ObjectDisposedException 위험).
+            // Dispose는 각 호출이 자기 소유 CTS를 자기 작업 종료 후(finally) 수행.
+            _fetchCts?.Cancel();
+            cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
+            _fetchCts = cts;
+        }
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(TriggerInitFetchAsync)} — 로그인 후 Device fetch 시작");
+        try
+        {
+            await StartService(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(TriggerInitFetchAsync)} 취소됨(로그아웃/재로그인) — 커버 유지");
+        }
+        finally
+        {
+            lock (_fetchGate) { if (ReferenceEquals(_fetchCts, cts)) _fetchCts = null; }
+            cts.Dispose();
+        }
+        // 그 외 예외(예: 401/네트워크)는 상위(Conductor RunLoginInitAsync)로 전파 → 실패 안내+재로그인 복구 처리
+    }
+
+    /// <summary>진행 중 Device fetch를 취소합니다(강제 로그아웃/세션 만료 시). AllDevicesLoaded 미발화 → 커버 유지.</summary>
+    public void CancelInitFetch()
+    {
+        lock (_fetchGate) { _fetchCts?.Cancel(); }
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(CancelInitFetch)} — 진행 중 fetch 취소 요청");
+    }
+
+    /// <summary>
+    /// 모든 Device 데이터를 GOP API에서 조회하고 Provider를 업데이트합니다.
+    /// <para>호출 순서: Controllers → Sensors (with Navigation Mapping) → Cameras</para>
+    /// </summary>
+    public async Task FetchAllDevicesAsync(CancellationToken token = default)
+    {
+        try
+        {
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} started");
+
+            // ──────────── 0. Servers (스피커 드롭다운 — 디바이스 로드와 독립, 내부 try/catch라 실패해도 디바이스 로드 계속) ────────────
+            await FetchServersAsync(token);
+            await ReportFetchProgress(token, "서버", 1);
+
+            //_deviceProvider.Clear();
+            // ──────────── 1. Controllers (먼저 로딩) ────────────
+            var controllers = await FetchControllersAsync(token);
+            //_controllerProvider.Clear();
+            UpdateOrAddDevices(_deviceProvider, controllers);
+            // if (controllers?.Any() == true)
+            //     foreach (var item in controllers)
+            //         _deviceProvider.Add(item);
+
+            _log?.Info($"Controllers loaded: {controllers.Count} items");
+            await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "컨트롤러", 2);
+
+            // ──────────── 2. Sensors (Navigation Mapping) ────────────
+            var controllerDict = controllers.ToDictionary(c => c.Id, c => c);
+            var sensors = await FetchSensorsAsync(controllerDict, token);
+            //_sensorProvider.Clear();
+            UpdateOrAddDevices(_deviceProvider, sensors);
+            // if (sensors?.Any() == true)
+            //     foreach (var item in sensors)
+            //         _deviceProvider.Add(item);
+
+            _log?.Info($"Sensors loaded: {sensors.Count} items");
+            await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "센서", 3);
+
+            // ──────────── 3. Cameras ────────────
+            var cameras = await FetchCamerasAsync(token);
+            //_cameraProvider.Clear();
+            UpdateOrAddDevices(_deviceProvider, cameras);
+            // if (cameras?.Any() == true)
+            //     foreach (var item in cameras)
+            //         _deviceProvider.Add(item);
+
+            _log?.Info($"Cameras loaded: {cameras.Count} items");
+            await PublishSplashMessage("CameraProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "카메라", 4);
+
+            // ──────────── 4. Speakers ────────────
+            var speakers = await FetchSpeakersAsync(token);
+            UpdateOrAddDevices(_deviceProvider, speakers);
+
+            _log?.Info($"Speakers loaded: {speakers.Count} items");
+            await PublishSplashMessage("SpeakerProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "스피커", 5);
+
+            // ──────────── 5. Enclosures ────────────
+            var enclosures = await FetchEnclosuresAsync(token);
+            UpdateOrAddDevices(_deviceProvider, enclosures);
+
+            _log?.Info($"Enclosures loaded: {enclosures.Count} items");
+            await PublishSplashMessage("EnclosureProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "외함", 6);
+
+            // ──────────── 6. Gates ────────────
+            //  통문은 함체와 같은 개폐 형태를 갖는데 종전엔 이 벌크 로드가 없었다(2026-09-08 실기 발견).
+            //  그러면 통문 심볼의 LinkedDevice 가 영원히 null 이라 개폐 버튼이 항상 '장비 미연결'로 잠기고
+            //  부팅 시 문 상태 복원(FR-13)도 동작하지 않는다 — 단건 조회(SYNC_DEVICE)만으로는 부팅을 못 덮는다.
+            var gates = await FetchGatesAsync(token);
+            UpdateOrAddDevices(_deviceProvider, gates);
+
+            _log?.Info($"Gates loaded: {gates.Count} items");
+            await PublishSplashMessage("GateProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "통문", 7);
+
+            // ──────────── 7. Lamps ────────────
+            var lamps = await FetchLampsAsync(token);
+            UpdateOrAddDevices(_deviceProvider, lamps);
+
+            _log?.Info($"Lamps loaded: {lamps.Count} items");
+            await PublishSplashMessage("LampProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "램프", 8);
+
+            // ──────────── 8. DeviceGroups ────────────
+            await FetchDeviceGroupsAsync(token);
+            await ReportFetchProgress(token, "그룹", 9);
+
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
+
+            // FR-08a: 전체 Device 로딩 완료 → SymbolEventManager 일괄 동기화 트리거
+            // 로그인 게이팅: 여기까지 도달 = fetch 정상 완료 → 커버 제거 신호(AllDevicesLoaded). 취소 시엔 도달 전 throw → 미발화.
+            // 마지막 단계(8) 이후 발행 직전 취소가 끼어든 경우도 차단 — 로그아웃 상태서 stale 완료로 커버 내려가는 것 방지.
+            token.ThrowIfCancellationRequested();
+            await _eventAggregator.PublishOnUIThreadAsync(new AllDevicesLoadedMessage());
+        }
+        catch (OperationCanceledException)
+        {
+            // 로그인 게이팅: 로그아웃/재로그인으로 취소 — AllDevicesLoaded 미발화(커버 유지). 상위로 전파.
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} canceled — AllDevicesLoaded 미발화");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} failed: {ex.Message}");
+            throw;
+        }
+    }
+    #endregion
+
+    /// <summary>
+    /// 단일 Device를 API에서 재조회하여 Provider 캐시를 갱신합니다.
+    /// NatsSync SYNC_DEVICE 메시지 수신 시 호출됩니다.
+    /// </summary>
+    public async Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
+    {
+        try
+        {
+            // 어느 경로로 재조회할지는 "종류"가 아니라 "카테고리"가 정한다.
+            //   종전엔 옛 종류 이름을 하나하나 나열한 문자열 switch 였고 SmartMultisensor2·Fence_Group 이 빠져 있어
+            //   그 센서의 SYNC_DEVICE 가 조용히 무시됐다(device-console-v8 ISSUE-19). 해석은 공용 정본에 맡긴다.
+            var category = ResolveSyncCategory(typeDevice);
+            IBaseDeviceModel? updated = category switch
+            {
+                EnumDeviceCategory.Controller => await FetchSingleControllerAsync(resourceId, token),
+                EnumDeviceCategory.Sensor => await FetchSingleSensorAsync(resourceId, token),
+                EnumDeviceCategory.Camera => await FetchSingleCameraAsync(resourceId, token),
+                EnumDeviceCategory.Speaker => await FetchSingleSpeakerAsync(resourceId, token),
+                EnumDeviceCategory.Enclosure => await FetchSingleEnclosureAsync(resourceId, token),
+                EnumDeviceCategory.Gate => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
+                EnumDeviceCategory.Lamp => await FetchSingleLampAsync(resourceId, token),
+                _ => null
+            };
+
+            if (updated != null)
+            {
+                // (Id, 판별자) 로 찾는다 — (Id, DeviceType) 은 종류축이 바뀐 장비를 못 찾아 중복으로 추가했다(FR-04 와 같은 키).
+                var updatedKey = CategoryKeyOf(updated);
+                var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && CategoryKeyOf(d) == updatedKey);
+                if (existing is IBaseDeviceModel e)
+                {
+                    UpdateDeviceProperties(e, updated);
+
+                    // Sensor 단건 갱신 후 Controller 인스턴스를 Provider 실제 객체로 재연결
+                    if (e is SensorDeviceModel sensor)
+                    {
+                        var controllerId = sensor.Controller?.Id ?? 0;
+                        _log?.Info($"[SYNC-DIAG] Sensor({resourceId}) 갱신 후 Controller.Id={controllerId}, Controller.DeviceNumber={sensor.Controller?.DeviceNumber ?? -1}");
+                        if (controllerId > 0)
+                        {
+                            var ctrl = _deviceProvider.OfType<ControllerDeviceModel>().FirstOrDefault(c => c.Id == controllerId);
+                            if (ctrl != null)
+                            {
+                                sensor.Controller = ctrl;
+                                _log?.Info($"[SYNC-DIAG] Sensor({resourceId}) Controller 재연결 완료: Controller({ctrl.Id}, DeviceNumber={ctrl.DeviceNumber})");
+                            }
+                            else
+                                _log?.Warning($"[SYNC-DIAG] Sensor({resourceId}) Controller({controllerId}) Provider에 없음 — 재연결 실패");
+                        }
+                        else
+                            _log?.Warning($"[SYNC-DIAG] Sensor({resourceId}) Controller.Id=0 — API가 Controller를 미포함하여 반환");
+                    }
+
+                    // 제자리 갱신은 컬렉션 알림이 없다 — 그 모델을 보여 주는 화면(장비 콘솔의 행 · 상세)에 따로 알린다.
+                    _deviceProvider.NotifyDeviceUpdated(e);
+                }
+                else
+                    _deviceProvider.Add(updated);
+                _log?.Info($"FetchDeviceByIdAsync: {typeDevice}({resourceId}) 갱신 완료 → Status={updated.Status}");
+            }
+            return updated;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchDeviceByIdAsync({typeDevice}, {resourceId}) 실패: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>통문 단건 조회 — <c>GET /api/devices/gates/{id}</c>(FR-12).</summary>
+    private async Task<IBaseDeviceModel?> FetchSingleGateAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetGateByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleControllerAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetControllerByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
+    {
+        // (FR-10) 단건도 동일 — 7.0 에서 include_controller 는 422. 중첩 객체가 없어도
+        // FetchDeviceByIdAsync 가 Controller.Id 로 Provider 실제 인스턴스를 재연결한다.
+        var resp = await _apiService.GetSensorByIdAsync(
+            id,
+            includeController: _queryPolicy.CanUseIncludeControllerFlag,
+            token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleCameraAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetCameraByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleSpeakerAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetSpeakerByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleEnclosureAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetEnclosureByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleLampAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetLampByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel().WithResponseMeta(resp.Meta) : null;
+    }
+
+    /// <summary>
+    /// DeviceGroup 목록을 GOP API에서 조회하고 DeviceGroupProvider를 업데이트합니다.
+    /// </summary>
+    public async Task FetchDeviceGroupsAsync(CancellationToken token = default)
+    {
+        var allGroups = new List<DeviceGroupModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+
+        try
+        {
+            _log?.Info("FetchDeviceGroupsAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetDeviceGroupsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch device groups at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                    allGroups.Add(dto.ToDeviceGroupModel());
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _deviceGroupProvider.Clear();
+            foreach (var group in allGroups)
+                _deviceGroupProvider.Add(group);
+
+            _log?.Info($"DeviceGroups loaded: {allGroups.Count} items");
+            await PublishSplashMessage("DeviceGroupProvider의 정보를 모두 불러왔습니다...");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchDeviceGroupsAsync: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 방송서버 목록을 GOP API에서 조회하여 ServerProvider에 캐싱합니다(스피커 드롭다운 데이터소스).
+    /// <para>★API 실패 시 기존 캐시를 비우지 않음(Clear 생략) — stale-but-nonempty가 빈 드롭다운보다 안전.</para>
+    /// </summary>
+    public async Task FetchServersAsync(CancellationToken token = default)
+    {
+        var allServers = new List<IServerModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        bool fetchOk = true;
+
+        try
+        {
+            _log?.Info("FetchServersAsync() started");
+
+            while (true)
+            {
+                var response = await _serverApiService.GetServersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    view: _queryPolicy.View,     // (FR-10) 7.0+ 목록 기본은 view=basic → server_config 키째 누락
+                    token: token);
+
+                if (!response.Success)
+                {
+                    _log?.Error($"Failed to fetch servers at page {currentPage}: {response.Error?.Message}");
+                    fetchOk = false;   // API 실패 → 기존 캐시 보존(Clear 생략)
+                    break;
+                }
+                if (response.Data == null || response.Data.Count == 0)
+                    break;
+
+                foreach (var dto in response.Data)
+                    allServers.Add(dto.ToServerModel());
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            if (fetchOk)
+            {
+                _serverProvider.Clear();
+                foreach (var server in allServers)
+                    _serverProvider.Add(server);
+                _log?.Info($"Servers loaded: {allServers.Count} items");
+            }
+            else
+            {
+                _log?.Warning("FetchServersAsync: API 실패 — 기존 ServerProvider 캐시 보존(빈 드롭다운 방지)");
+            }
+            await PublishSplashMessage("ServerProvider의 정보를 모두 불러왔습니다...");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchServersAsync: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 단일 DeviceGroup을 API에서 재조회하여 DeviceGroupProvider를 갱신합니다.
+    /// NatsSync SYNC_DEVICE_GROUP action="CREATED" / "UPDATED" 수신 시 호출됩니다.
+    /// </summary>
+    public async Task FetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default)
+    {
+        try
+        {
+            var resp = await _apiService.GetDeviceGroupByIdAsync(resourceId, token: token);
+            if (resp.Success && resp.Data != null)
+            {
+                var model = resp.Data.ToDeviceGroupModel();
+                var existing = _deviceGroupProvider.FirstOrDefault(g => g.Id == resourceId);
+                if (existing != null)
+                {
+                    existing.Name = model.Name;
+                    existing.Description = model.Description;
+                    existing.DeviceCount = model.DeviceCount;
+                }
+                else
+                {
+                    _deviceGroupProvider.Add(model);
+                }
+                _log?.Info($"FetchDeviceGroupByIdAsync: DeviceGroup({resourceId}) 갱신 완료");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchDeviceGroupByIdAsync({resourceId}) 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// DeviceGroup을 DeviceGroupProvider 캐시에서 제거합니다.
+    /// NatsSync SYNC_DEVICE_GROUP action="DELETED" 수신 시 호출됩니다.
+    /// </summary>
+    public Task RemoveDeviceGroupByIdAsync(int resourceId)
+    {
+        try
+        {
+            var group = _deviceGroupProvider.FirstOrDefault(g => g.Id == resourceId);
+            if (group != null)
+            {
+                _deviceGroupProvider.Remove(group);
+                _log?.Info($"RemoveDeviceGroupByIdAsync: DeviceGroup({resourceId}) 제거 완료");
+            }
+            else
+            {
+                _log?.Warning($"RemoveDeviceGroupByIdAsync: DeviceGroup({resourceId}) 를 Provider에서 찾지 못함");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"RemoveDeviceGroupByIdAsync({resourceId}) 실패: {ex.Message}");
+        }
+        return Task.CompletedTask;
+    }
+
+    #region - Private Methods -
+    /// <summary>
+    /// GOP API를 통해 Controller 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<ControllerDeviceModel>> FetchControllersAsync(
+        CancellationToken token = default)
+    {
+        var allControllers = new List<ControllerDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchControllersAsync() started");
+
+            while (true)
+            {
+                // (FR-10) include_sensors 는 7.0 에서 제거된 키다 — 실으면 422 REMOVED_FIELD →
+                // response.Success=false → break → 제어기 전량 0건(장비 부트스트랩 전멸).
+                // 6.3 에서는 현행대로 true. 7.0 에서는 안 싣고, 센서 연결은 FetchSensorsAsync 의
+                // NavigationMappingHelper(controller_id FK 기준 양방향 재링크)가 그대로 담당한다.
+                var response = await _apiService.GetControllersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    includeSensors: _queryPolicy.CanUseIncludeSensorsFlag,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch controllers at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var controller = dto.ToControllerDeviceModel().WithResponseMeta(response.Meta);
+                    allControllers.Add(controller);
+                    totalFetched++;
+                }
+
+                // Progress reporting (every 100 items)
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Controllers loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchControllersAsync() completed: {totalFetched} items");
+            return allControllers;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchControllersAsync: {ex.Message}");
+            return allControllers; // Return partial data
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Sensor 목록을 조회하고 Controller와의 양방향 참조를 설정합니다 (Pagination 지원).
+    /// </summary>
+    /// <param name="controllerDict">Controller ID → ControllerDeviceModel Dictionary</param>
+    /// <param name="token">Cancellation Token</param>
+    private async Task<List<SensorDeviceModel>> FetchSensorsAsync(
+        Dictionary<int, ControllerDeviceModel> controllerDict,
+        CancellationToken token = default)
+    {
+        var allSensors = new List<SensorDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchSensorsAsync() started");
+
+            while (true)
+            {
+                // (FR-10) include_controller 도 7.0 에서 제거된 키 — 실으면 422 → 센서 전량 0건.
+                // 중첩 controller 객체가 없어도 ToSensorDeviceModel 이 controller_id(FK)로 Id 만 seed 하고,
+                // 아래 NavigationMappingHelper 가 controllerDict 의 실제 인스턴스로 재링크한다(동작 동일).
+                var response = await _apiService.GetSensorsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    includeController: _queryPolicy.CanUseIncludeControllerFlag,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch sensors at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var sensor = dto.ToSensorDeviceModel().WithResponseMeta(response.Meta);
+                    allSensors.Add(sensor);
+                    totalFetched++;
+                }
+
+                // Progress reporting (every 1000 items)
+                if (totalFetched % 1000 == 0)
+                    _log?.Info($"Sensors loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            // ──────────── Navigation Mapping (양방향 참조 설정) ────────────
+            int orphanedCount = NavigationMappingHelper.SetupBidirectionalReferences(
+                allSensors,
+                controllerDict,
+                _log);
+
+            _log?.Info($"FetchSensorsAsync() completed: {totalFetched} items (Orphaned: {orphanedCount})");
+            return allSensors;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchSensorsAsync: {ex.Message}");
+            return allSensors; // Return partial data
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Camera 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<CameraDeviceModel>> FetchCamerasAsync(
+        CancellationToken token = default)
+    {
+        var allCameras = new List<CameraDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchCamerasAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetCamerasAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch cameras at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var camera = dto.ToCameraDeviceModel().WithResponseMeta(response.Meta);
+                    allCameras.Add(camera);
+                    totalFetched++;
+                }
+
+                // Progress reporting (every 100 items)
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Cameras loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchCamerasAsync() completed: {totalFetched} items");
+            return allCameras;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchCamerasAsync: {ex.Message}");
+            return allCameras; // Return partial data
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Speaker 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<SpeakerDeviceModel>> FetchSpeakersAsync(
+        CancellationToken token = default)
+    {
+        var allSpeakers = new List<SpeakerDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchSpeakersAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetSpeakersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch speakers at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var speaker = dto.ToSpeakerDeviceModel().WithResponseMeta(response.Meta);
+                    allSpeakers.Add(speaker);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Speakers loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchSpeakersAsync() completed: {totalFetched} items");
+            return allSpeakers;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchSpeakersAsync: {ex.Message}");
+            return allSpeakers;
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Enclosure 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<EnclosureDeviceModel>> FetchEnclosuresAsync(
+        CancellationToken token = default)
+    {
+        var allEnclosures = new List<EnclosureDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchEnclosuresAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetEnclosuresAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch enclosures at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var enclosure = dto.ToEnclosureDeviceModel().WithResponseMeta(response.Meta);
+                    allEnclosures.Add(enclosure);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Enclosures loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchEnclosuresAsync() completed: {totalFetched} items");
+            return allEnclosures;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchEnclosuresAsync: {ex.Message}");
+            return allEnclosures;
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Gate(통문) 목록을 조회합니다 (Pagination 지원).
+    /// <para>서버 <c>GET /api/devices/gates</c> 는 <b>page 가 1부터</b>고 파라미터 이름이 <c>limit</c> 이다(VER-02 실측).</para>
+    /// <para>통문은 6.3.2 뒤에 생긴 자원이라 원격 운영 6.3.0~6.3.2 는 404 다(F1). 404/405 는 '이 판본 미지원' 정보 한 줄로 넘긴다.
+    /// 판본으로 아예 안 부르지 않는 이유: 계약 프로브는 6.x 를 <c>V6_3</c> 하나로 묶고, 통문이 생긴 정확한 패치 판본도 확정되지 않았다 —
+    /// 문자열 비교로 끊으면 통문이 있는 6.3.x 에서 통문 전체가 조용히 사라진다.</para>
+    /// </summary>
+    private async Task<List<GateDeviceModel>> FetchGatesAsync(
+        CancellationToken token = default)
+    {
+        var allGates = new List<GateDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchGatesAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetGatesAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success && IsResourceMissing(response.StatusCode))
+                        _log?.Info($"이 서버 판본({_queryPolicy.RawVersion ?? "알 수 없음"})은 통문 자원을 지원하지 않습니다 " +
+                                   $"(GET /api/devices/gates → HTTP {response.StatusCode}) — 통문 적재를 건너뛰고 계속합니다");
+                    else if (!response.Success)
+                        _log?.Error($"Failed to fetch gates at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var gate = dto.ToGateDeviceModel().WithResponseMeta(response.Meta);
+                    allGates.Add(gate);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Gates loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchGatesAsync() completed: {totalFetched} items");
+            return allGates;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchGatesAsync: {ex.Message}");
+            return allGates;
+        }
+    }
+
+    /// <summary>목록 경로 자체가 이 서버 판본에 없다(404 · 405) — 서버 오류 · 검증 실패와 구분한다.</summary>
+    private static bool IsResourceMissing(int statusCode) => statusCode is 404 or 405;
+
+    /// <summary>
+    /// GOP API를 통해 Lamp 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<LampDeviceModel>> FetchLampsAsync(
+        CancellationToken token = default)
+    {
+        var allLamps = new List<LampDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchLampsAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetLampsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch lamps at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var lamp = dto.ToLampDeviceModel().WithResponseMeta(response.Meta);
+                    allLamps.Add(lamp);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Lamps loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchLampsAsync() completed: {totalFetched} items");
+            return allLamps;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchLampsAsync: {ex.Message}");
+            return allLamps;
+        }
+    }
+
+    /// <summary>
+    /// Splash Screen 메시지를 발행합니다.
+    /// </summary>
+    private async Task PublishSplashMessage(string message)
+    {
+        if (_eventAggregator != null)
+            await _eventAggregator.PublishOnUIThreadAsync(
+                new SplashScreenMessage()
+                {
+                    Title = this.GetType().Name,
+                    Message = message
+                });
+    }
+
+    /// <summary>
+    /// 로그인 게이팅 — 커버 진행바용 Device fetch 단계 진행 알림 + 취소 체크포인트.
+    /// <para>각 단계 완료 후 호출. 취소 요청 시 ThrowIfCancellationRequested로 즉시 throw → AllDevicesLoaded 미발화(커버 유지).</para>
+    /// </summary>
+    private async Task ReportFetchProgress(CancellationToken token, string step, int index)
+    {
+        token.ThrowIfCancellationRequested();
+        if (_eventAggregator != null)
+            await _eventAggregator.PublishOnUIThreadAsync(new DeviceFetchProgressMessage(step, index, 8));
+    }
+    #endregion
+
+    #region - Attributes -
+    /// <summary>
+    /// DeviceProvider의 Device 객체들을 업데이트하거나 추가합니다 (Clear 대신 사용).
+    /// 기존 Device 객체의 참조를 유지하면서 속성만 업데이트합니다.
+    /// </summary>
+    /// <typeparam name="T">IBaseDeviceModel 구현 타입</typeparam>
+    /// <param name="provider">DeviceProvider 인스턴스</param>
+    /// <param name="newDevices">API에서 받은 새로운 Device 목록</param>
+    private void UpdateOrAddDevices<T>(DeviceProvider provider, List<T> newDevices) where T : IBaseDeviceModel
+    {
+        var existingDevices = provider.OfType<T>().ToList();
+        // 키는 (Id, 판별자) 다 — 종전 (Id, DeviceType) 은 다른 클라가 종류축만 바꿔도(Controller→IoController)
+        // 같은 장비를 "삭제 + 신규"로 봐 인스턴스를 갈아 끼웠고, 그 참조를 쥔 심볼·카드가 stale 해졌다.
+        // 판별자는 경로가 정하고 바뀌지 않는다(device-console-v8 FR-04).
+        var newDeviceDict = newDevices.ToDictionary(d => (d.Id, CategoryKeyOf(d)), d => d);
+
+        // 1. 기존 객체 업데이트 또는 삭제
+        foreach (var existing in existingDevices)
+        {
+            var key = (existing.Id, CategoryKeyOf(existing));
+            if (newDeviceDict.TryGetValue(key, out var newDevice))
+            {
+                UpdateDeviceProperties(existing, newDevice);  // 속성만 업데이트
+                newDeviceDict.Remove(key);
+            }
+            else
+            {
+                provider.Remove(existing);  // API에 없으면 삭제
+            }
+        }
+
+        // 2. 새로운 객체 추가
+        foreach (var newDevice in newDeviceDict.Values)
+        {
+            provider.Add(newDevice);
+        }
+    }
+
+    /// <summary>
+    /// 캐시 병합 키의 판별자 성분. 모델에 판별자가 실려 있으면 그것, 없으면(이 변경 이전에 만들어진 캐시 항목 ·
+    /// Draft 등 매핑을 거치지 않은 객체) <b>모델의 CLR 형</b>으로 정한다 — 형은 경로(카테고리)와 1:1 이다.
+    /// </summary>
+    private static EnumDeviceCategory CategoryKeyOf(IBaseDeviceModel device) => DeviceAxesMapper.CategoryOf(device);
+
+    /// <summary>
+    /// 기존 Device 객체의 속성을 새 Device 데이터로 업데이트합니다.
+    /// 참조를 유지하면서 속성만 복사합니다.
+    /// </summary>
+    /// <typeparam name="T">IBaseDeviceModel 구현 타입</typeparam>
+    /// <param name="existing">업데이트할 기존 Device</param>
+    /// <param name="newDevice">속성값을 복사해올 새 Device</param>
+    private void UpdateDeviceProperties<T>(T existing, T newDevice) where T : IBaseDeviceModel
+    {
+        // 공통 속성 업데이트
+        existing.DeviceName = newDevice.DeviceName;
+        // FR-D3: 리스트 참조 재할당 대신 in-place 갱신(기존 참조 유지) — DeviceGroups 참조를 잡고 있는
+        //   심볼/바인딩이 stale되지 않도록.
+        //   ★ newDevice.DeviceGroups==null 은 "소속 없음"이 아니라 "소속을 받지 못함"이다 — 비우지 않고 그대로 둔다.
+        //     종전엔 빈 목록으로 정리했고, 그 빈 목록이 다음 상세 저장의 group_ids:[] 가 되어 서버 소속을 전부 지웠다
+        //     (라이브 실측 2026-09-24 · 7.0+ 는 소속을 group_ids 로 싣는데 매핑이 device_groups 만 읽던 때).
+        if (newDevice.DeviceGroups != null)
+        {
+            if (existing.DeviceGroups == null)
+                existing.DeviceGroups = new List<int>(newDevice.DeviceGroups);
+            else
+            {
+                existing.DeviceGroups.Clear();
+                existing.DeviceGroups.AddRange(newDevice.DeviceGroups);
+            }
+            // 새로 받은 소속이 곧 서버와 맞춘 기준선이다 — 캐시에 남는 인스턴스로 옮긴다.
+            GroupMembershipBaseline.CopyFrom(newDevice, existing);
+        }
+        existing.DeviceNumber = newDevice.DeviceNumber;
+        existing.Status = newDevice.Status;
+        existing.DeviceType = newDevice.DeviceType;
+        existing.Version = newDevice.Version;
+        existing.Heading = newDevice.Heading;     // v4.4: 설치 방위각 — FetchAll 후 심볼 BaseBearing 갱신 반영(누락 버그)
+        existing.Altitude = newDevice.Altitude;   // v4.4: 설치 고도
+
+        // v7.0+ 표현 모델 — 축은 한 묶음(Axes)이라 참조 하나로 통째 갈린다(낱개로 두면 새 축마다 한 줄씩 빠뜨린다).
+        //   새 응답이 축 없이 왔으면(판본 전환·프로필 축소) 옛 축도 버린다 — null 도 그대로 덮는다.
+        existing.CategoryDevice = newDevice.CategoryDevice;
+        existing.TypeAxisCode = newDevice.TypeAxisCode;
+        existing.UnitId = newDevice.UnitId;
+        existing.Axes = newDevice.Axes;
+
+        // Type-Specific 속성 업데이트
+        if (existing is GateDeviceModel existingGate && newDevice is GateDeviceModel newGate)
+        {
+            // 종전엔 이 분기가 없었다 — 통문의 문 상태·활성·위치가 첫 로드 값으로 굳었다(device-console-v8 ISSUE-17).
+            existingGate.GateStatus = newGate.GateStatus;
+            existingGate.UrlsJson = newGate.UrlsJson;
+            existingGate.LinkInfoJson = newGate.LinkInfoJson;
+            existingGate.IsEnable = newGate.IsEnable;
+            existingGate.Location = newGate.Location;
+            existingGate.Latitude = newGate.Latitude;
+            existingGate.Longitude = newGate.Longitude;
+        }
+        else if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)
+        {
+            existingController.IpAddress = newController.IpAddress;
+            existingController.Port = newController.Port;
+            existingController.Devices = newController.Devices;
+            existingController.IsEnable = newController.IsEnable;
+            existingController.Location = newController.Location;
+            existingController.Latitude = newController.Latitude;
+            existingController.Longitude = newController.Longitude;
+        }
+        else if (existing is SensorDeviceModel existingSensor && newDevice is SensorDeviceModel newSensor)
+        {
+            existingSensor.Controller = newSensor.Controller;
+            existingSensor.IsEnable = newSensor.IsEnable;
+            existingSensor.Location = newSensor.Location;
+            existingSensor.Latitude = newSensor.Latitude;
+            existingSensor.Longitude = newSensor.Longitude;
+        }
+        else if (existing is CameraDeviceModel existingCamera && newDevice is CameraDeviceModel newCamera)
+        {
+            existingCamera.IpAddress = newCamera.IpAddress;
+            existingCamera.IpPort = newCamera.IpPort;
+            existingCamera.UserName = newCamera.UserName;
+            existingCamera.UserPassword = newCamera.UserPassword;
+            existingCamera.Mode = newCamera.Mode;
+            existingCamera.Category = newCamera.Category;
+            existingCamera.HardwareSpec = newCamera.HardwareSpec;
+            existingCamera.IsRecord = newCamera.IsRecord;
+            existingCamera.Urls = newCamera.Urls;
+            existingCamera.IsEnable = newCamera.IsEnable;
+            existingCamera.Location = newCamera.Location;
+            existingCamera.Latitude = newCamera.Latitude;
+            existingCamera.Longitude = newCamera.Longitude;
+        }
+        else if (existing is SpeakerDeviceModel existingSpeaker && newDevice is SpeakerDeviceModel newSpeaker)
+        {
+            existingSpeaker.SpeakerType = newSpeaker.SpeakerType;
+            existingSpeaker.Description = newSpeaker.Description;
+            existingSpeaker.IsEnable = newSpeaker.IsEnable;
+            existingSpeaker.Location = newSpeaker.Location;
+            existingSpeaker.Latitude = newSpeaker.Latitude;
+            existingSpeaker.Longitude = newSpeaker.Longitude;
+            existingSpeaker.Server = newSpeaker.Server;   // P0: 방송서버 갱신(누락 시 서버 삭제/재할당 후 유령서버 영구잔존)
+        }
+        else if (existing is EnclosureDeviceModel existingEnclosure && newDevice is EnclosureDeviceModel newEnclosure)
+        {
+            existingEnclosure.DoorStatus = newEnclosure.DoorStatus;
+            existingEnclosure.HeaterEnabled = newEnclosure.HeaterEnabled;
+            existingEnclosure.FanEnabled = newEnclosure.FanEnabled;
+            existingEnclosure.HeaterEnabledKnown = newEnclosure.HeaterEnabledKnown;   // 값 대입이 켠 "알려짐"을 재조회 값으로 되돌린다
+            existingEnclosure.FanEnabledKnown = newEnclosure.FanEnabledKnown;
+            existingEnclosure.ThresholdConfig = newEnclosure.ThresholdConfig;   // 임계값 — FetchAll 후 갱신 반영(누락 시 stale)
+            existingEnclosure.IsEnable = newEnclosure.IsEnable;
+            existingEnclosure.Location = newEnclosure.Location;
+            existingEnclosure.Latitude = newEnclosure.Latitude;
+            existingEnclosure.Longitude = newEnclosure.Longitude;
+        }
+        else if (existing is LampDeviceModel existingLamp && newDevice is LampDeviceModel newLamp)
+        {
+            existingLamp.IpAddress = newLamp.IpAddress;
+            existingLamp.IpPort = newLamp.IpPort;
+            existingLamp.UserName = newLamp.UserName;
+            existingLamp.UserPassword = newLamp.UserPassword;
+            existingLamp.Description = newLamp.Description;
+            existingLamp.IsEnable = newLamp.IsEnable;
+            existingLamp.Location = newLamp.Location;
+            existingLamp.Latitude = newLamp.Latitude;
+            existingLamp.Longitude = newLamp.Longitude;
+        }
+    }
+
+    /// <summary>
+    /// Device를 Provider 캐시에서 제거합니다.
+    /// NatsSync SYNC_DEVICE action="DELETED" 수신 시 호출됩니다.
+    /// </summary>
+    public Task RemoveDeviceByIdAsync(string typeDevice, int resourceId)
+    {
+        try
+        {
+            var normalized = NormalizeTypeDevice(typeDevice);
+            // (Id, 판별자) 로 찾는다. 종전엔 DeviceType 이름을 정규화 문자열과 비교했는데
+            //   "Speaker" ≠ IpSpeaker 라 스피커 삭제 통지가 영영 매칭되지 않았고, 종류축이 클라 enum 밖(SmartController)이면
+            //   어떤 장비도 못 찾았다. 카테고리를 못 읽는 통지만 옛 이름 비교로 떨어진다.
+            var category = ResolveSyncCategory(typeDevice);
+            var device = category != EnumDeviceCategory.None
+                ? _deviceProvider.FirstOrDefault(d => d.Id == resourceId && CategoryKeyOf(d) == category)
+                : _deviceProvider.FirstOrDefault(d => d.Id == resourceId
+                    && d.DeviceType.ToString().Equals(normalized, StringComparison.OrdinalIgnoreCase));
+            if (device != null)
+            {
+                // FR-D2: 제거 전 소속 그룹 스냅샷 확보 후 DeviceGroupProvider DeviceCount 감소(음수가드).
+                //   재조회(FetchDeviceGroupsAsync) 전까지 그룹 캐시 카운트가 stale(과대)되는 것 방지.
+                DecrementGroupCounts(device.DeviceGroups);
+                _deviceProvider.Remove(device);
+                _log?.Info($"RemoveDeviceByIdAsync: {normalized}({resourceId}) 제거 완료");
+            }
+            else
+            {
+                _log?.Warning($"RemoveDeviceByIdAsync: {normalized}({resourceId}) 를 Provider에서 찾지 못함");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"RemoveDeviceByIdAsync({typeDevice}, {resourceId}) 실패: {ex.Message}");
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// NATS body의 type_device 문자열을 내부 타입명으로 정규화합니다.
+    /// DBApi는 대문자("CAMERA")를 쓰고 API는 PascalCase("IpCamera")를 사용하므로 변환이 필요합니다.
+    /// </summary>
+    /// <summary>
+    /// (FR-D2) 삭제된 device의 소속 그룹들의 DeviceCount를 1씩 감소(음수가드).
+    /// 서버 재조회 전까지 그룹 캐시 카운트가 과대표시되는 stale를 즉시 보정한다.
+    /// groupIds=null/빈 리스트면 no-op. 그룹 미발견 시 경고 로그 후 skip.
+    /// </summary>
+    private void DecrementGroupCounts(List<int>? groupIds)
+    {
+        if (groupIds == null || groupIds.Count == 0) return;
+        foreach (var gid in groupIds)
+        {
+            var group = _deviceGroupProvider.FirstOrDefault(g => g.Id == gid);
+            if (group == null)
+            {
+                _log?.Warning($"DecrementGroupCounts: DeviceGroup({gid}) 를 Provider에서 찾지 못함 — skip");
+                continue;
+            }
+            group.DeviceCount = Math.Max(0, group.DeviceCount - 1);
+        }
+    }
+
+    /// <summary>
+    /// NATS <c>SYNC_DEVICE</c> 의 <c>type_device</c> 문자열 → 장비 카테고리.
+    /// 통지는 발신자마다 표기가 다르다 — DBApi 는 카테고리를 대문자로(<c>"CAMERA"</c>·<c>"SENSOR"</c>·<c>"GATE"</c>),
+    /// API 는 옛 종류 이름으로(<c>"IpCamera"</c>·<c>"Fence"</c>·<c>"SmartMultisensor2"</c>) 보낸다.
+    /// 둘 다 공용 정본(<see cref="DeviceTypeResolver"/>)으로 읽는다: 카테고리로 먼저, 안 되면 옛 종류에서 유도.
+    /// 어느 쪽으로도 못 읽으면 <see cref="EnumDeviceCategory.None"/> — 호출부가 통지를 무시한다.
+    /// </summary>
+    internal static EnumDeviceCategory ResolveSyncCategory(string? typeDevice)
+        => DeviceTypeResolver.ResolveCategory(typeDevice, typeDevice);
+
+    private static string NormalizeTypeDevice(string typeDevice) =>
+        typeDevice.ToUpperInvariant() switch
+        {
+            "CONTROLLER" => "Controller",
+            "FENCE" => "Fence",
+            "UNDERGROUND" => "Underground",
+            "IPCAMERA" or "CAMERA" => "IpCamera",
+            "SPEAKER" => "Speaker",
+            "ENCLOSURE" => "Enclosure",
+            "GATE" => "Gate",
+            "LAMP" => "Lamp",
+            _ => typeDevice  // 이미 정규화된 경우 그대로
+        };
+
+    private readonly ILogService? _log;
+    private readonly IEventAggregator _eventAggregator;
+    private readonly IDeviceApiService _apiService;
+    private readonly DeviceProvider _deviceProvider;
+    private readonly ControllerDeviceProvider _controllerProvider;
+    private readonly SensorDeviceProvider _sensorProvider;
+    private readonly CameraDeviceProvider _cameraProvider;
+    private readonly DeviceGroupProvider _deviceGroupProvider;
+    private readonly IServerApiService _serverApiService;
+    private readonly ServerProvider _serverProvider;
+
+    /// <summary>FR-10 · FR-11 — 서버 계약 세대별 쿼리 조립 정책(유일 분기점).</summary>
+    private readonly DeviceQueryPolicy _queryPolicy;
+
+    // 로그인 게이팅(Login_Gated_GIS_Init) — fetch 트리거/취소용 CTS (다중 스레드 접근: UI 트리거 + 배경 ForceLogout → _fetchGate lock)
+    private readonly object _fetchGate = new();
+    private CancellationTokenSource? _fetchCts;
+    #endregion
+}

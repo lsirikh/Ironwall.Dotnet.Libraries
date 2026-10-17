@@ -1,0 +1,1745 @@
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
+/****************************************************************************
+   Purpose      : 이벤트 맵핑 워크벤치 — 3-Pane 콘솔 화면
+   Created By   : Claude
+   Created On   : 2026-09-20
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+****************************************************************************/
+
+/// <summary>
+/// 이벤트 맵핑 워크벤치. ① 매핑 목록 ② 액션 보드(카메라·스피커·경광등 탭) ③ 장비 팔레트.
+/// </summary>
+/// <remarks>
+/// <para><b>싱글턴이 아니다</b> — 창을 열 때마다 새로 만든다. 싱글턴이면 두 번째로 열 때
+/// 죽은 시각 트리에 묶인 값이 남고, Draft 가 창을 넘어 살아남는다.</para>
+/// <para><b>드롭은 서버를 부르지 않는다.</b> 투입·해제·정렬은 전부 <see cref="MappingBoard"/> 에서 끝나고,
+/// 서버로 나가는 것은 [적용] 한 번뿐이다. 서버에 재정렬 API 가 없어서
+/// 드롭마다 보내면 20행 재배치가 20회 PATCH 가 되고 API 타임아웃이 곱해진다.</para>
+/// </remarks>
+public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler, IHandle<EventMappingsChangedMessage>, IHandle<CameraPresetsChangedMessage>
+{
+    /// <summary>콘솔 키 — 자동화 식별자와 설정 저장의 접두사.</summary>
+    public const string ConsoleKeyName = "Mapping";
+
+    /// <summary>다른 곳에서 맵핑이 바뀌었는데 적용하지 않은 편집이 있어 다시 읽지 않았을 때의 상태줄.</summary>
+    public const string EXTERNAL_CHANGE_NOTICE = "다른 곳에서 맵핑이 바뀌었습니다 — 적용하거나 되돌린 뒤 [다시 읽기]를 누르세요.";
+
+    /// <summary>다른 곳에서 바뀐 맵핑을 (손댄 것이 없어) 다시 읽어 실었을 때의 상태줄.</summary>
+    public const string EXTERNAL_RELOADED_NOTICE = "다른 곳에서 바뀐 맵핑을 다시 읽었습니다.";
+
+    /// <summary>권한 모듈 — v8.0 에서 <c>events</c> 가 아니라 <c>integrations</c> 다.</summary>
+    public const string PermissionModule = "integrations";
+
+    private readonly IMappingWorkbenchGateway _gateway;
+    private readonly IMappingDeviceSource _devices;
+    private readonly IPermissionService? _permissions;
+    private readonly IMappingPresetSource? _presets;
+    private readonly IMappingPresetEditor? _presetEditor;
+    private readonly MappingBoard _board = new();
+
+    private readonly Dictionary<MappingActionKind, List<MappingPaletteItemViewModel>> _paletteCache = new();
+    private readonly List<EventMappingReadDto> _allMappings = new();
+
+    private CancellationTokenSource? _loadToken;
+    private MappingListItemViewModel? _selectedMapping;
+    private MappingActionKind _selectedKind = MappingActionKind.Camera;
+    private ConsoleRailEntry? _selectedRail;
+    private string _searchText = string.Empty;
+    private string _paletteSearch = string.Empty;
+    private string _statusText = string.Empty;
+    private string _warningText = string.Empty;
+    private bool _isBusy;
+    private bool _isApplying;
+
+    private readonly IEventAggregator? _events;
+    private readonly CoalescingTrigger _externalChange;
+    private Task _externalChangeTask = Task.CompletedTask;
+    private bool _loadedOnce;
+    private bool _closed;
+
+    /// <summary>생성자.</summary>
+    /// <param name="gateway">서버 왕복.</param>
+    /// <param name="devices">장비 캐시(팔레트·이름 조인).</param>
+    /// <param name="permissions">권한. <c>null</c> 이면 편집 가능으로 본다(미리보기·시험용).</param>
+    /// <param name="events">있으면 창이 떠 있는 동안 <see cref="EventMappingsChangedMessage"/>(서버 <c>SYNC_EVENT_MAPPING</c>)를 듣는다.</param>
+    /// <param name="delay">알림 합치기 창의 지연(시험용). 생략하면 <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+    /// <param name="presets">카메라 프리셋 후보. 생략하면 <paramref name="gateway"/> 가 함께 구현하는지 본다(실제 게이트웨이는 구현한다).</param>
+    /// <param name="presetEditor">프리셋 관리 창의 서버 왕복. 생략하면 <paramref name="gateway"/> 가 함께 구현하는지 본다.</param>
+    public MappingWorkbenchViewModel(
+        IMappingWorkbenchGateway gateway,
+        IMappingDeviceSource devices,
+        IPermissionService? permissions = null,
+        IEventAggregator? events = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        IMappingPresetSource? presets = null,
+        IMappingPresetEditor? presetEditor = null)
+    {
+        _gateway = gateway;
+        _devices = devices;
+        _presets = presets ?? gateway as IMappingPresetSource;
+        _presetEditor = presetEditor ?? gateway as IMappingPresetEditor;
+        _permissions = permissions;
+        _events = events;
+        // 맵핑 저장 한 번이 알림을 여러 건 낼 수 있다(부모 + 하위 카메라 · 스피커 · 경광등) — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
+        _externalChange = new CoalescingTrigger(OnExternalChangeSettledAsync, delay: delay);
+
+        DisplayName = "이벤트 맵핑";
+        Detail = new ConsoleDetailPresenter { TypeName = "이벤트 맵핑" };
+        _board.Changed += OnBoardChanged;
+        BuildRail();
+    }
+
+    #region - 화면 상태 -
+    /// <summary>상세 칸 상태기계(적용 막대 · 이동 차단).</summary>
+    public ConsoleDetailPresenter Detail { get; }
+
+    /// <summary>레일 항목(종류 축 3개).</summary>
+    public ObservableCollection<ConsoleRailEntry> RailEntries { get; } = new();
+
+    /// <summary>왼쪽 매핑 목록(검색 적용 후).</summary>
+    public ObservableCollection<MappingListItemViewModel> Mappings { get; } = new();
+
+    /// <summary>가운데 보드 행(지금 고른 종류 축).</summary>
+    public ObservableCollection<MappingRowViewModel> BoardRows { get; } = new();
+
+    /// <summary>오른쪽 팔레트(검색 적용 후).</summary>
+    public ObservableCollection<MappingPaletteItemViewModel> PaletteItems { get; } = new();
+
+    /// <summary>장비그룹 후보.</summary>
+    public ObservableCollection<MappingGroupInfo> Groups { get; } = new();
+
+    /// <summary>카테고리 후보(닫힌 9값).</summary>
+    public IReadOnlyList<string> Categories => EventMappingRules.CATEGORIES;
+
+    /// <summary>보드에서 고른 행 — 해제·순서 버튼이 쓴다.</summary>
+    public ObservableCollection<MappingRowViewModel> SelectedBoardRows { get; } = new();
+
+    /// <summary>팔레트에서 고른 항목 — [추가 ▶] 가 쓴다.</summary>
+    public ObservableCollection<MappingPaletteItemViewModel> SelectedPaletteItems { get; } = new();
+
+    /// <summary>지금 고른 매핑.</summary>
+    public MappingListItemViewModel? SelectedMapping
+    {
+        get => _selectedMapping;
+        set
+        {
+            if (ReferenceEquals(_selectedMapping, value)) return;
+            // 미저장 변경이 있으면 매핑을 바꾸지 않는다 — 바꾸면 Draft 가 소리 없이 사라진다.
+            if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow))
+            {
+                NotifyOfPropertyChange();
+                return;
+            }
+            _selectedMapping = value;
+            IsCreatingMapping = false;
+            SeedForm(value?.Dto);
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(HasMapping));
+            NotifyOfPropertyChange(nameof(IsBoardEnabled));
+            NotifyOfPropertyChange(nameof(MappingTitle));
+            _ = LoadBoardAsync();
+        }
+    }
+
+    /// <summary>지금 고른 종류 축.</summary>
+    public MappingActionKind SelectedKind
+    {
+        get => _selectedKind;
+        private set
+        {
+            if (_selectedKind == value) return;
+            _selectedKind = value;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(BoardZoneKey));
+            NotifyOfPropertyChange(nameof(KindLabel));
+            RebuildBoardRows();
+            RebuildPalette();
+        }
+    }
+
+    /// <summary>레일 선택(종류 축과 한 몸이다).</summary>
+    public ConsoleRailEntry? SelectedRail
+    {
+        get => _selectedRail;
+        set
+        {
+            if (ReferenceEquals(_selectedRail, value)) return;
+            _selectedRail = value;
+            NotifyOfPropertyChange();
+            if (value?.Tag is MappingActionKind kind) SelectedKind = kind;
+        }
+    }
+
+    /// <summary>지금 보드가 받는 드롭존 키 — 종류가 바뀌면 같이 바뀐다.</summary>
+    public string BoardZoneKey => MappingKindText.BoardZone(SelectedKind);
+
+    /// <summary>팔레트 드롭존 키(해제 방향).</summary>
+    public string PaletteZoneKey => MappingKindText.PaletteZone;
+
+    /// <summary>지금 종류 축의 한국어 이름.</summary>
+    public string KindLabel => MappingKindText.Label(SelectedKind);
+
+    /// <summary>매핑을 골랐는가.</summary>
+    public bool HasMapping => _selectedMapping is not null;
+
+    /// <summary>보드 머리에 쓸 제목.</summary>
+    public string MappingTitle => _selectedMapping?.Name ?? "맵핑을 고르세요";
+
+    /// <summary>매핑 목록 검색어.</summary>
+    public string SearchText
+    {
+        get => _searchText;
+        set { _searchText = value ?? string.Empty; NotifyOfPropertyChange(); RebuildMappingList(); }
+    }
+
+    /// <summary>팔레트 검색어.</summary>
+    public string PaletteSearch
+    {
+        get => _paletteSearch;
+        set { _paletteSearch = value ?? string.Empty; NotifyOfPropertyChange(); RebuildPalette(); }
+    }
+
+    /// <summary>상태줄 문구.</summary>
+    public string StatusText
+    {
+        get => _statusText;
+        private set { _statusText = value; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>경고 줄 — 서버가 검사하지 않는 것들을 워크벤치가 대신 본다.</summary>
+    public string WarningText
+    {
+        get => _warningText;
+        private set { _warningText = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasWarning)); }
+    }
+
+    /// <summary>보여 줄 경고가 있는가.</summary>
+    public bool HasWarning => !string.IsNullOrEmpty(WarningText);
+
+    /// <summary>불러오는 중인가.</summary>
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set { _isBusy = value; NotifyOfPropertyChange(); RaiseCommandStates(); RaiseEmptyStates(); }
+    }
+
+    private bool _listLoadFailed;
+
+    /// <summary>맵핑 목록 빈 자리를 보일까 — 불러오는 동안에는 "없다" 고 말하지 않는다.</summary>
+    public bool IsMappingListEmpty => Mappings.Count == 0 && !IsBusy;
+
+    /// <summary>맵핑 목록 빈 자리 제목 — 못 불러온 것 · 한 건도 없는 것 · 검색에 걸린 것이 없는 것을 가른다.</summary>
+    public string MappingEmptyTitle =>
+        _listLoadFailed ? "맵핑 목록을 불러오지 못했습니다"
+        : _allMappings.Count == 0 ? "등록된 맵핑이 없습니다"
+        : "검색 조건에 맞는 맵핑이 없습니다";
+
+    /// <summary>맵핑 목록 빈 자리 힌트 — 다음에 무엇을 하면 되는지.</summary>
+    public string MappingEmptyHint =>
+        _listLoadFailed ? "[새로 고침]을 눌러 다시 시도하세요."
+        : _allMappings.Count == 0 ? (CanEdit ? "[맵핑 등록]으로 만드세요." : "편집 권한이 있는 사용자가 만들 수 있습니다.")
+        : "검색어를 바꿔 보세요.";
+
+    /// <summary>팔레트 빈 자리를 보일까.</summary>
+    public bool IsPaletteEmpty => PaletteItems.Count == 0;
+
+    /// <summary>팔레트 빈 자리 제목.</summary>
+    public string PaletteEmptyTitle => "조건에 맞는 장비가 없습니다";
+
+    /// <summary>팔레트 빈 자리 힌트.</summary>
+    public string PaletteEmptyHint => string.IsNullOrWhiteSpace(PaletteSearch)
+        ? $"등록된 {KindLabel} 장비가 없습니다."
+        : "검색어를 바꿔 보세요.";
+
+    private void RaiseEmptyStates()
+    {
+        NotifyOfPropertyChange(nameof(IsMappingListEmpty));
+        NotifyOfPropertyChange(nameof(MappingEmptyTitle));
+        NotifyOfPropertyChange(nameof(MappingEmptyHint));
+        NotifyOfPropertyChange(nameof(IsPaletteEmpty));
+        NotifyOfPropertyChange(nameof(PaletteEmptyHint));
+    }
+
+    /// <summary>적용하는 중인가 — 이 동안 화면 전체가 입력 잠금이다.</summary>
+    public bool IsApplying
+    {
+        get => _isApplying;
+        private set { _isApplying = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsInputEnabled)); NotifyOfPropertyChange(nameof(IsBoardEnabled)); RaiseCommandStates(); }
+    }
+
+    /// <summary>입력을 받을 수 있는가(적용 중에는 전부 잠근다 — 두 번 커밋하는 사고를 막는다).</summary>
+    public bool IsInputEnabled => !IsApplying;
+
+    /// <summary>
+    /// 액션 보드를 만질 수 있는가. <b>새 맵핑을 만드는 중에는 잠근다</b> —
+    /// 보드에 보이는 배선은 아직 <b>이전에 고른 맵핑</b>의 것이라, 그대로 두면 엉뚱한 맵핑에 장비를 넣게 된다.
+    /// </summary>
+    public bool IsBoardEnabled => IsInputEnabled && !IsCreatingMapping && HasMapping;
+    #endregion
+
+    #region - 권한 -
+    /// <summary>조회 권한.</summary>
+    public bool CanView => _permissions?.CanView(PermissionModule) ?? true;
+
+    /// <summary>편집 권한.</summary>
+    public bool CanEdit => (_permissions?.CanEdit(PermissionModule) ?? true) && !IsApplying;
+
+    /// <summary>해제 권한.</summary>
+    public bool CanDelete => (_permissions?.CanDelete(PermissionModule) ?? true) && !IsApplying;
+
+    /// <summary>읽기 전용인가 — 드래그 시작 자체를 막는다.</summary>
+    public bool IsReadOnly => !CanEdit;
+
+    /// <summary>
+    /// 손잡이로 끌기를 시작할 수 있는가 — <b>편집 권한만</b> 본다.
+    /// </summary>
+    /// <remarks>
+    /// 맵핑을 고르지 않았다고 끌기 자체를 끄면 손잡이가 죽은 것처럼 보이고 "왜 안 되지?" 를 말할 곳이 없다
+    /// (2026-09-29 실창 재현 — 맵핑 0건 화면에서 팔레트를 끌어도 아무 반응이 없었다). 끌기는 시작되고,
+    /// 보드가 거절(<see cref="Verdict"/>)하고, 놓으면 상태줄이 사유를 말한다(<see cref="Refused"/>).
+    /// </remarks>
+    public bool IsDragEnabled => CanEdit;
+
+    /// <summary>권한 안내 한 줄 — 상태줄 오른쪽. 권한 키 원문(<c>integrations:edit</c>)은 내지 않는다(감사 E-10 #1).</summary>
+    /// <remarks>적용 중에는 <see cref="CanEdit"/> 가 잠깐 꺼지므로 권한 자체(<see cref="IsReadOnly"/> 와 별개)를 본다.</remarks>
+    public string PermissionText => (_permissions?.CanEdit(PermissionModule) ?? true) ? "편집 가능" : "읽기 전용";
+    #endregion
+
+    #region - 생명주기 -
+    /// <inheritdoc/>
+    protected override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        if (_permissions is not null) _permissions.PermissionsChanged += OnPermissionsChanged;
+        OnPermissionsChanged();     // ★ 1회 직접 호출 — 빠뜨리면 첫 진입 버튼이 권한과 무관하게 살아 있다
+        Detail.Guard.Blocked += OnNavigationBlocked;
+        _closed = false;
+        _events?.SubscribeOnUIThread(this);   // 합치기 창의 실행이 UI 스레드로 돌아오게(목록 · 보드 컬렉션을 고친다)
+
+        await ReloadAsync();
+        await base.OnActivateAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+    {
+        if (_permissions is not null) _permissions.PermissionsChanged -= OnPermissionsChanged;
+        Detail.Guard.Blocked -= OnNavigationBlocked;
+        if (close)
+        {
+            _closed = true;
+            _events?.Unsubscribe(this);
+            _externalChange.Cancel();
+        }
+        _loadToken?.Cancel();
+        _loadToken = null;
+        Detail.Reset();
+        return base.OnDeactivateAsync(close, cancellationToken);
+    }
+
+    /// <summary>
+    /// 서버 <c>SYNC_EVENT_MAPPING</c> — 호스트가 옮겨 온다. 신호만 세고 곧바로 돌아간다(호스트의 NATS 처리 줄이 재조회를 기다리지 않도록).
+    /// </summary>
+    /// <remarks><c>ResourceId</c> 로 한 건만 읽지 않는다 — 늘 목록 전체를 다시 읽는다(알림 순서 · 건수에 기대지 않는다).</remarks>
+    public Task HandleAsync(EventMappingsChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (_closed) return Task.CompletedTask;
+        _externalChangeTask = _externalChange.Pulse();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 서버 <c>SYNC_PRESET</c>(G9) — 프리셋 후보 · 배선 행의 프리셋 이름 · 감시금지구역 표시가 낡았다. 표시만 해 두고 같은 합치기 창으로 다시 읽는다.
+    /// </summary>
+    public Task HandleAsync(CameraPresetsChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (_closed) return Task.CompletedTask;
+        Interlocked.Exchange(ref _presetsChanged, 1);
+        _externalChangeTask = _externalChange.Pulse();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>1 = SYNC_PRESET 을 받고 아직 다시 싣지 않았다(알림 스레드에서 켜고 화면 쪽에서 끈다).</summary>
+    private int _presetsChanged;
+
+    /// <summary>가장 최근 신호의 작업 — 시험이 창이 끝나기를 기다릴 때 쓴다.</summary>
+    internal Task ExternalChangeTask => _externalChangeTask;
+
+    private async Task OnExternalChangeSettledAsync(CancellationToken token)
+    {
+        if (_closed || !_loadedOnce) return;
+
+        // 불러오는 중 · 적용 중이면 창을 한 번 더 미룬다.
+        if (IsBusy || IsApplying)
+        {
+            _externalChangeTask = _externalChange.Pulse();
+            return;
+        }
+
+        // 프리셋이 바뀌었으면 후보 목록은 손댄 것과 무관하게 버린다 — 다음 행 선택이 서버에서 다시 받는다.
+        if (Volatile.Read(ref _presetsChanged) == 1) _presetCache.Clear();
+
+        // 사람이 손댄 것은 덮지 않는다 — 알리기만 하고 [다시 읽기]는 사람이 고른다(부대 편제 콘솔과 같은 규칙).
+        if (HasUnappliedWork)
+        {
+            StatusText = EXTERNAL_CHANGE_NOTICE;
+            return;
+        }
+
+        await RefreshFromServerAsync();
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// 미저장 변경이 있으면 닫히지 않는다 — 막대가 흔들리며 이유를 말한다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 단 <b>읽기 전용이면 붙잡지 않는다</b>. 저장할 길이 없는데 이탈까지 막으면
+    /// 창을 닫을 방법이 사라진다(권한이 중간에 회수된 경우).
+    /// </remarks>
+    public override Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(!_board.IsDirty || IsReadOnly || Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow));
+
+    private void OnPermissionsChanged()
+    {
+        NotifyOfPropertyChange(nameof(CanView));
+        NotifyOfPropertyChange(nameof(CanEdit));
+        NotifyOfPropertyChange(nameof(CanDelete));
+        NotifyOfPropertyChange(nameof(IsReadOnly));
+        NotifyOfPropertyChange(nameof(IsDragEnabled));
+        NotifyOfPropertyChange(nameof(PermissionText));
+        NotifyOfPropertyChange(nameof(BannerText));
+        NotifyOfPropertyChange(nameof(MappingEmptyHint));
+        Detail.IsReadOnly = IsReadOnly;
+        RaiseCommandStates();
+    }
+
+    private void OnNavigationBlocked(object? sender, ConsoleNavigation navigation)
+        => StatusText = ConsoleDetailStateMachine.BlockedNotice;
+    #endregion
+
+    #region - 불러오기 -
+    /// <summary>매핑 목록·장비 캐시를 새로 읽는다.</summary>
+    public async Task ReloadAsync()
+    {
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
+
+        IsBusy = true;
+        try
+        {
+            Groups.Clear();
+            foreach (var group in _devices.Groups()) Groups.Add(group);
+            _paletteCache.Clear();
+            _presetCache.Clear();       // 프리셋도 다시 받는다 — 그 사이 카메라에 프리셋이 생겼을 수 있다
+            Interlocked.Exchange(ref _presetsChanged, 0);
+
+            var result = await _gateway.ListMappingsAsync();
+            if (!result.IsSuccess)
+            {
+                // 🔴 실패에 캐시를 비우지 않는다 — 비우면 500/503 이 "0건" 으로 보인다.
+                StatusText = result.Message;
+                _listLoadFailed = true;
+                return;
+            }
+
+            _listLoadFailed = false;
+            _loadedOnce = true;
+            ApplyMappingList(result.Value);
+
+            await LoadBoardAsync();
+            StatusText = $"맵핑 {Mappings.Count}건";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>받아 온 목록으로 왼쪽 목록 · 선택 · 폼을 다시 세운다(동기 — 중간에 사람이 끼어들 틈이 없다).</summary>
+    private void ApplyMappingList(IReadOnlyList<EventMappingReadDto>? mappings)
+    {
+        _allMappings.Clear();
+        _allMappings.AddRange(mappings ?? Array.Empty<EventMappingReadDto>());
+        RebuildMappingList();
+
+        if (_selectedMapping is not null)
+        {
+            var again = Mappings.FirstOrDefault(m => m.Id == _selectedMapping.Id);
+            _selectedMapping = again;
+        }
+        _selectedMapping ??= Mappings.FirstOrDefault();
+        SeedForm(_selectedMapping?.Dto);
+        NotifyOfPropertyChange(nameof(SelectedMapping));
+        NotifyOfPropertyChange(nameof(HasMapping));
+        NotifyOfPropertyChange(nameof(IsBoardEnabled));
+        NotifyOfPropertyChange(nameof(MappingTitle));
+    }
+
+    /// <summary>한 맵핑의 하위 3종을 읽어 온 결과 — 읽기만 하고 화면은 건드리지 않는다.</summary>
+    private sealed record BoardFetch(
+        MappingCallResult<IReadOnlyList<MappingCameraReadDto>> Cameras,
+        MappingCallResult<IReadOnlyList<MappingSpeakerReadDto>> Speakers,
+        MappingCallResult<IReadOnlyList<MappingLampReadDto>> Lamps)
+    {
+        public bool IsSuccess => Cameras.IsSuccess && Speakers.IsSuccess && Lamps.IsSuccess;
+    }
+
+    private async Task<BoardFetch> FetchBoardAsync(int mappingId, CancellationToken token = default)
+    {
+        var cameras = await _gateway.ListCamerasAsync(mappingId, token);
+        var speakers = await _gateway.ListSpeakersAsync(mappingId, token);
+        var lamps = await _gateway.ListLampsAsync(mappingId, token);
+        return new BoardFetch(cameras, speakers, lamps);
+    }
+
+    /// <summary>읽어 온 하위 3종을 보드에 싣는다(동기).</summary>
+    private void ApplyBoard(MappingListItemViewModel mapping, BoardFetch fetch)
+    {
+        var problems = new List<string>();
+        if (fetch.Cameras.IsSuccess) _board.Load(MappingActionKind.Camera, (fetch.Cameras.Value ?? Array.Empty<MappingCameraReadDto>()).Select(MappingBoardRow.FromDto));
+        else problems.Add(fetch.Cameras.Message);
+
+        if (fetch.Speakers.IsSuccess) _board.Load(MappingActionKind.Speaker, (fetch.Speakers.Value ?? Array.Empty<MappingSpeakerReadDto>()).Select(MappingBoardRow.FromDto));
+        else problems.Add(fetch.Speakers.Message);
+
+        if (fetch.Lamps.IsSuccess) _board.Load(MappingActionKind.Lamp, (fetch.Lamps.Value ?? Array.Empty<MappingLampReadDto>()).Select(MappingBoardRow.FromDto));
+        else problems.Add(fetch.Lamps.Message);
+
+        mapping.CameraCount = _board.LiveRows(MappingActionKind.Camera).Count;
+        mapping.SpeakerCount = _board.LiveRows(MappingActionKind.Speaker).Count;
+        mapping.LampCount = _board.LiveRows(MappingActionKind.Lamp).Count;
+
+        if (problems.Count > 0) StatusText = string.Join(" · ", problems.Distinct());
+    }
+
+    /// <summary>보드를 다시 그린다(행 · 팔레트 · 레일 개수 · 경고).</summary>
+    private void RedrawBoard()
+    {
+        RebuildBoardRows();
+        RebuildPalette();
+        RefreshRailCounts();
+        UpdateWarnings();
+    }
+
+    private async Task LoadBoardAsync()
+    {
+        _loadToken?.Cancel();
+        var source = new CancellationTokenSource();
+        _loadToken = source;
+        var token = source.Token;
+
+        _board.Clear();
+        RebuildBoardRows();
+        RebuildPalette();
+
+        var mapping = _selectedMapping;
+        if (mapping is null)
+        {
+            UpdateWarnings();
+            return;
+        }
+
+        IsBusy = true;
+        var stale = false;
+        try
+        {
+            var fetch = await FetchBoardAsync(mapping.Id, token);
+
+            // 늦게 도착한 응답이 새 선택을 덮어쓰지 않게 한다.
+            // 🔴 여기서 그냥 return 하면 finally 가 돌아 IsBusy 를 끄고 목록을 다시 그린다 —
+            //    더 새 조회가 진행 중인데 옛 결과로 화면을 세우는 것과 같다. 그래서 '헛걸음' 으로 표시하고 나간다.
+            if (token.IsCancellationRequested || !ReferenceEquals(_loadToken, source)) { stale = true; return; }
+
+            ApplyBoard(mapping, fetch);
+        }
+        finally
+        {
+            if (!stale)
+            {
+                IsBusy = false;
+                RedrawBoard();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 서버 알림 뒤 — <b>먼저 읽기만 하고</b>, 기다린 뒤 다시 확인하고, 화면과 <b>실제로 다를 때만</b> 한 번에(동기로) 싣는다.
+    /// </summary>
+    /// <remarks>
+    /// <para>🔴 종전(헤디드 r16 SC-EMP-009 · 012): 알림마다 <see cref="ReloadAsync"/> 를 불렀다. 그 재조회는 서버를 기다리는 사이
+    /// 사람이 [◀ 해제] 한 것을 <c>LoadBoardAsync</c> 의 <c>_board.Clear()</c> 로 지웠다 — 알림은 대개 <b>우리 [적용] 의 메아리</b>였다.</para>
+    /// <para>이제 기다리는 동안 화면을 한 칸도 바꾸지 않는다. 다 읽은 뒤 손댄 것 · 적용 · 불러오기가 있으면 싣지 않는다.
+    /// 우리 적용의 메아리는 적용 끝의 재조회와 같은 상태라 "다르지 않음" 으로 끝난다 — 결과 문장도 그대로 남는다.</para>
+    /// </remarks>
+    private async Task RefreshFromServerAsync()
+    {
+        var mappingId = _selectedMapping?.Id;
+        var list = await _gateway.ListMappingsAsync();
+        var board = mappingId is int id ? await FetchBoardAsync(id) : null;
+        if (!list.IsSuccess || board is { IsSuccess: false }) return;   // 못 읽은 것을 바뀐 것으로 읽지 않는다
+
+        // ── 여기부터 동기 — 기다리는 사이 바뀐 것을 다시 본다 ──
+        if (_closed) return;
+        if (IsBusy || IsApplying || _selectedMapping?.Id != mappingId)
+        {
+            _externalChangeTask = _externalChange.Pulse();   // 다른 일이 끼어들었다 — 끝난 뒤 한 번 더
+            return;
+        }
+        if (HasUnappliedWork)
+        {
+            StatusText = EXTERNAL_CHANGE_NOTICE;
+            return;
+        }
+
+        var listChanged = !SameMappings(list.Value);
+        var boardChanged = board is not null && !SameBoard(board);
+        // 프리셋 변경(SYNC_PRESET)은 배선 행의 updated_at 을 바꾸지 않는다 — 프리셋 이름 · 🔒 를 새로 보이려면 비교 없이 싣는다.
+        var presetsChanged = Volatile.Read(ref _presetsChanged) == 1;
+        if (!listChanged && !boardChanged && !presetsChanged) return;   // 우리 적용의 메아리 · 이미 본 상태
+        Interlocked.Exchange(ref _presetsChanged, 0);
+
+        ApplyMappingList(list.Value);
+        if (_selectedMapping is null) { _board.Clear(); RedrawBoard(); }
+        else if (_selectedMapping.Id == mappingId && board is not null)
+        {
+            _loadToken?.Cancel();                    // 혹시 남은 옛 조회가 이 결과를 덮지 않게
+            _board.Clear();
+            ApplyBoard(_selectedMapping, board);
+            RedrawBoard();
+        }
+        else
+        {
+            await LoadBoardAsync();                  // 고른 맵핑이 지워져 다른 맵핑으로 옮겨 갔다 — 그 보드를 읽는다
+        }
+        StatusText = EXTERNAL_RELOADED_NOTICE;
+    }
+
+    /// <summary>적용하지 않은 것이 있다 — 다시 읽으면 사라진다(보드 Draft · 맵핑 본체 편집 · 등록 폼).</summary>
+    private bool HasUnappliedWork => _board.IsDirty || Detail.Tracker.IsDirty || HasMappingEdit;
+
+    private bool SameMappings(IReadOnlyList<EventMappingReadDto>? fresh)
+    {
+        var now = fresh ?? Array.Empty<EventMappingReadDto>();
+        if (now.Count != _allMappings.Count) return false;
+        var shown = _allMappings.ToDictionary(m => m.Id, m => m.UpdatedAt);
+        return now.All(m => shown.TryGetValue(m.Id, out var at) && string.Equals(at, m.UpdatedAt, StringComparison.Ordinal));
+    }
+
+    private bool SameBoard(BoardFetch fetch)
+    {
+        var fresh = new HashSet<(MappingActionKind, int, string?)>();
+        foreach (var dto in fetch.Cameras.Value ?? Array.Empty<MappingCameraReadDto>()) fresh.Add((MappingActionKind.Camera, dto.ConfigId, dto.UpdatedAt));
+        foreach (var dto in fetch.Speakers.Value ?? Array.Empty<MappingSpeakerReadDto>()) fresh.Add((MappingActionKind.Speaker, dto.ConfigId, dto.UpdatedAt));
+        foreach (var dto in fetch.Lamps.Value ?? Array.Empty<MappingLampReadDto>()) fresh.Add((MappingActionKind.Lamp, dto.ConfigId, dto.UpdatedAt));
+
+        var shown = new HashSet<(MappingActionKind, int, string?)>();
+        foreach (var kind in MappingBoard.Kinds)
+            foreach (var row in _board.Rows(kind))
+                shown.Add((kind, row.ConfigId, row.UpdatedAt));
+        return shown.SetEquals(fresh);
+    }
+    #endregion
+
+    #region - 목록·팔레트 다시 그리기 -
+    private void BuildRail()
+    {
+        RailEntries.Clear();
+        foreach (var kind in MappingBoard.Kinds)
+            RailEntries.Add(new ConsoleRailEntry(MappingKindText.Segment(kind), MappingKindText.Label(kind), new MappingConsoleIcon(IconOf(kind))) { Tag = kind });
+        _selectedRail = RailEntries.FirstOrDefault();
+    }
+
+    private static string IconOf(MappingActionKind kind) => kind switch
+    {
+        MappingActionKind.Camera => "Cctv",
+        MappingActionKind.Speaker => "Bullhorn",
+        MappingActionKind.Lamp => "AlarmLight",
+        _ => "HelpCircleOutline",
+    };
+
+    private void RefreshRailCounts()
+    {
+        foreach (var entry in RailEntries)
+        {
+            if (entry.Tag is not MappingActionKind kind) continue;
+            entry.ShowCount = true;
+            entry.Count = _board.LiveRows(kind).Count;
+            entry.BadCount = _board.BlockingOrphans(kind).Count;
+        }
+    }
+
+    private void RebuildMappingList()
+    {
+        var needle = SearchText.Trim();
+        var rows = _allMappings
+            .Where(m => needle.Length == 0
+                || (m.NameEvent ?? string.Empty).Contains(needle, StringComparison.CurrentCultureIgnoreCase)
+                || EventMappingRules.CategoryLabel(m.CategoryEventMapping).Contains(needle, StringComparison.CurrentCultureIgnoreCase))
+            .ToList();
+
+        // 지운 것만 빼고 없는 것만 넣는다 — 통째로 비우면 선택이 날아간다.
+        for (var i = Mappings.Count - 1; i >= 0; i--)
+            if (rows.All(r => r.Id != Mappings[i].Id)) Mappings.RemoveAt(i);
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var existing = Mappings.FirstOrDefault(m => m.Id == rows[i].Id);
+            if (existing is null) Mappings.Insert(Math.Min(i, Mappings.Count), new MappingListItemViewModel(rows[i]));
+            else existing.Replace(rows[i]);
+        }
+        RaiseEmptyStates();
+    }
+
+    /// <summary>
+    /// 보드 행 목록을 모델에 <b>맞춘다</b> — 통째로 다시 만들지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 예전 판은 바뀔 때마다 비우고 새 행 뷰모델로 다시 채웠다. 그러면 목록 컨테이너가 전부 새로 나와 <b>화면의 선택이 날아가고</b>
+    /// (상태줄은 "선택 N건" 인데 화면은 0 — [▲][▼][◀ 해제] 가 안 보이는 행에 걸린다), <c>Alt+↑↓</c> 는 한 번 움직인 뒤 쥘 행을 잃었다.
+    /// 끄는 도중에 다시 읽히면 잡은 행의 컨테이너도 사라졌다. 같은 모델 행은 같은 뷰모델을 그대로 쓰고
+    /// 자리만 옮긴다(<c>Move</c>) — 목록이 선택과 컨테이너를 지킨다. 행 상태(해제 · 추가)는 제자리에서 다시 알린다.
+    /// </remarks>
+    private void RebuildBoardRows()
+    {
+        var rows = _board.Rows(SelectedKind);
+        var live = new HashSet<MappingBoardRow>(rows, ReferenceEqualityComparer.Instance);
+        // 목록을 고치는 동안 뷰가 선택을 다시 써 넣는다 — 그 전에 붙들어 둔다.
+        var selected = SelectedBoardRows.Where(v => live.Contains(v.Row)).ToList();
+
+        for (var i = BoardRows.Count - 1; i >= 0; i--)
+            if (!live.Contains(BoardRows[i].Row)) BoardRows.RemoveAt(i);
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var at = IndexOfRow(row, i);
+            if (at < 0)
+            {
+                BoardRows.Insert(i, new MappingRowViewModel(row) { DeviceName = NameOf(row) });
+                continue;
+            }
+            if (at != i) BoardRows.Move(at, i);
+            var vm = BoardRows[i];
+            vm.DeviceName = NameOf(row);
+            vm.Refresh();           // 해제 · 추가 · 키(config_id) — 같은 행 객체라 바뀐 것을 제자리에서 알린다
+        }
+
+        SelectedBoardRows.Clear();
+        foreach (var vm in selected) SelectedBoardRows.Add(vm);
+
+        NotifyOfPropertyChange(nameof(BoardRows));
+        UpdateCameraEditor();
+        RaiseCommandStates();
+    }
+
+    private int IndexOfRow(MappingBoardRow row, int from)
+    {
+        for (var i = from; i < BoardRows.Count; i++)
+            if (ReferenceEquals(BoardRows[i].Row, row)) return i;
+        return -1;
+    }
+
+    private string NameOf(MappingBoardRow row)
+    {
+        if (row.DeviceId is not int id) return "연결 끊김";
+        var info = _devices.Find(row.Kind, id);
+        return info?.Name ?? $"#{id}";      // 캐시에 없으면 숫자로 — 지어내지 않는다
+    }
+
+    private void RebuildPalette()
+    {
+        if (!_paletteCache.TryGetValue(SelectedKind, out var cached))
+        {
+            cached = _devices.Devices(SelectedKind)
+                             .Select(d => new MappingPaletteItemViewModel(SelectedKind, d))
+                             .ToList();
+            _paletteCache[SelectedKind] = cached;
+        }
+
+        foreach (var item in cached) item.IsRegistered = _board.Contains(SelectedKind, item.Id);
+
+        // 통째로 비우지 않고 맞춘다 — 보드가 바뀔 때마다(끄는 도중 끝난 재조회 포함) 카드 컨테이너가 새로 나오면
+        // 잡고 있던 카드가 사라져 끌기가 끊기고, 팔레트에서 골라 둔 선택도 날아간다. 등록됨 표시는 위에서 제자리로 바꿨다.
+        var filtered = MappingPaletteFilter.Apply(cached, PaletteSearch);
+        var shown = new HashSet<MappingPaletteItemViewModel>(filtered, ReferenceEqualityComparer.Instance);
+        for (var i = PaletteItems.Count - 1; i >= 0; i--)
+            if (!shown.Contains(PaletteItems[i])) PaletteItems.RemoveAt(i);
+        for (var i = 0; i < filtered.Count; i++)
+        {
+            var at = PaletteItems.IndexOf(filtered[i]);
+            if (at < 0) PaletteItems.Insert(i, filtered[i]);
+            else if (at != i) PaletteItems.Move(at, i);
+        }
+        NotifyOfPropertyChange(nameof(PaletteItems));
+        RaiseEmptyStates();
+    }
+
+    private void OnBoardChanged(object? sender, EventArgs e)
+    {
+        RebuildBoardRows();
+        RebuildPalette();
+        RefreshRailCounts();
+        UpdateDirty();
+        UpdateWarnings();
+    }
+
+    private void UpdateDirty()
+    {
+        Detail.Tracker.Clear();
+        if (_board.TotalAdded > 0) Detail.Tracker.Touch("added", 0, _board.TotalAdded);
+        if (_board.TotalRemoved > 0) Detail.Tracker.Touch("removed", 0, _board.TotalRemoved);
+        if (_board.TotalEdited > 0) Detail.Tracker.Touch("edited", 0, _board.TotalEdited);
+        if (_board.TotalReordered > 0) Detail.Tracker.Touch("reordered", 0, _board.TotalReordered);
+
+        NotifyOfPropertyChange(nameof(DraftText));
+        NotifyOfPropertyChange(nameof(DraftShortText));
+        NotifyOfPropertyChange(nameof(IsDirty));
+        RaiseCommandStates();
+    }
+
+    private void UpdateWarnings()
+    {
+        var warnings = MappingWarnings.For(_selectedMapping?.Dto, _allMappings, _board, _devices);
+        WarningText = MappingWarnings.Summarize(warnings);
+        _blocked = MappingWarnings.Blocks(warnings);
+        RaiseCommandStates();
+    }
+
+    private bool _blocked;
+    #endregion
+
+    #region - Draft 요약 -
+    /// <summary>미저장 변경이 있는가.</summary>
+    public bool IsDirty => _board.IsDirty;
+
+    /// <summary>
+    /// 상태줄·적용 막대의 Draft 요약. <b>340px 안에 잘리지 않게</b> 0 인 항목은 적지 않는다.
+    /// </summary>
+    public string DraftText
+    {
+        get
+        {
+            if (!_board.IsDirty) return "변경 없음";
+            var parts = new List<string>();
+            if (_board.TotalAdded > 0) parts.Add($"추가 {_board.TotalAdded}");
+            if (_board.TotalRemoved > 0) parts.Add($"해제 {_board.TotalRemoved}");
+            if (_board.TotalEdited > 0) parts.Add($"수정 {_board.TotalEdited}");
+            if (_board.TotalReordered > 0) parts.Add($"정렬 {_board.TotalReordered}");
+            return "미저장 " + string.Join(" · ", parts);
+        }
+    }
+
+    /// <summary>적용 막대의 좁은 칸(약 200px)에 들어가는 짧은 요약.</summary>
+    public string DraftShortText => _board.IsDirty ? $"미저장 {_board.UnsavedCount}건" : "변경 없음";
+
+    /// <summary>
+    /// 적용 막대 머리에 띄우는 안내. 읽기 전용이면 <b>그 사실을 먼저</b> 말한다 —
+    /// 커널의 기본 배너는 상세 칸 선택 상태에 묶여 있어 이 창에서는 뜨지 않는다.
+    /// </summary>
+    public string BannerText => IsReadOnly
+        ? "이벤트 맵핑 편집 권한이 없어 읽기 전용으로 열었습니다."
+        : string.Empty;
+
+    /// <summary>선택 요약.</summary>
+    public string SelectionText => $"선택 {SelectedBoardRows.Count}건";
+    #endregion
+
+    #region - 조작(드래그와 버튼이 같은 경로를 쓴다) -
+    /// <summary>팔레트에서 고른 장비를 보드에 넣는다 — 드래그의 <b>키보드·버튼 짝</b>.</summary>
+    public void AddSelected() => AddDevices(SelectedPaletteItems.Select(i => i.Id).ToList(), -1);
+
+    /// <summary>장비를 보드에 넣는다. 드래그도 버튼도 결국 여기로 온다.</summary>
+    public void AddDevices(IReadOnlyList<int> deviceIds, int insertIndex)
+    {
+        if (!CanEdit || !HasMapping || deviceIds.Count == 0) return;
+
+        var (added, skipped) = _board.Add(SelectedKind, deviceIds, insertIndex);
+        if (added.Count == 0 && skipped.Count > 0)
+        {
+            StatusText = $"{skipped.Count}건은 이미 등록되어 있어 넣지 않았습니다.";
+            return;
+        }
+        StatusText = skipped.Count > 0
+            ? $"{added.Count}건 추가 — {skipped.Count}건은 이미 등록됨"
+            : $"{added.Count}건 추가";
+    }
+
+    /// <summary>고른 보드 행을 해제 표시한다 — 드래그백의 <b>키보드·버튼 짝</b>.</summary>
+    public void ReleaseSelected()
+    {
+        if (!CanDelete || SelectedBoardRows.Count == 0) return;
+        var rows = SelectedBoardRows.Select(r => r.Row).ToList();
+        _board.Remove(SelectedKind, rows);
+        StatusText = $"{rows.Count}건 해제 — [되돌리기] 로 되살릴 수 있습니다";
+    }
+
+    /// <summary>해제 표시를 되돌린다.</summary>
+    public void RestoreSelected()
+    {
+        if (!CanEdit || SelectedBoardRows.Count == 0) return;
+        _board.Restore(SelectedKind, SelectedBoardRows.Select(r => r.Row).ToList());
+    }
+
+    /// <summary>고른 행을 한 칸 위로 — <c>Alt+↑</c> 와 ▲ 버튼이 같이 쓴다.</summary>
+    public void MoveUp() => Step(-1);
+
+    /// <summary>고른 행을 한 칸 아래로.</summary>
+    public void MoveDown() => Step(1);
+
+    private void Step(int direction)
+    {
+        if (!CanEdit || SelectedBoardRows.Count != 1) return;
+        _board.Step(SelectedKind, SelectedBoardRows[0].Row, direction);
+    }
+
+    /// <summary>위로 옮길 수 있는가.</summary>
+    public bool CanMoveUp => CanEdit && SelectedBoardRows.Count == 1
+        && MappingPriority.StepTarget(_board.Rows(SelectedKind).ToList().IndexOf(SelectedBoardRows[0].Row), -1, _board.Rows(SelectedKind).Count) >= 0;
+
+    /// <summary>아래로 옮길 수 있는가.</summary>
+    public bool CanMoveDown => CanEdit && SelectedBoardRows.Count == 1
+        && MappingPriority.StepTarget(_board.Rows(SelectedKind).ToList().IndexOf(SelectedBoardRows[0].Row), 1, _board.Rows(SelectedKind).Count) >= 0;
+
+    /// <summary>추가 버튼을 누를 수 있는가.</summary>
+    public bool CanAddSelected => CanEdit && HasMapping && SelectedPaletteItems.Any(i => !i.IsRegistered);
+
+    /// <summary>해제 버튼을 누를 수 있는가.</summary>
+    public bool CanReleaseSelected => CanDelete && SelectedBoardRows.Any(r => !r.IsRemoved);
+
+    /// <summary>
+    /// 되돌리기를 누를 수 있는가 — <b>편집 권한을 묻지 않는다</b>.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 여기에 <c>CanEdit</c> 를 걸면 덫이 된다: 미저장 변경을 든 채 권한이 회수되면
+    /// 적용도 되돌리기도 못 하고, 이탈 차단 때문에 창도 못 닫는다. 되돌리기는 <b>지역 상태를 버리는 일</b>이라
+    /// 서버를 한 번도 부르지 않는다.
+    /// </remarks>
+    public bool CanRevert => !IsApplying && (_board.IsDirty || _board.CanUndo);
+
+    /// <summary>적용을 누를 수 있는가 — 고아가 있으면 막힌다.</summary>
+    public bool CanApply => CanEdit && HasMapping && _board.IsDirty && !_blocked && !IsApplying;
+
+    private void RaiseCommandStates()
+    {
+        NotifyOfPropertyChange(nameof(CanAddSelected));
+        NotifyOfPropertyChange(nameof(CanReleaseSelected));
+        NotifyOfPropertyChange(nameof(CanMoveUp));
+        NotifyOfPropertyChange(nameof(CanMoveDown));
+        NotifyOfPropertyChange(nameof(CanRevert));
+        NotifyOfPropertyChange(nameof(CanApply));
+        NotifyOfPropertyChange(nameof(SelectionText));
+        NotifyOfPropertyChange(nameof(IsDragEnabled));
+        NotifyOfPropertyChange(nameof(HasMappingEdit));
+        NotifyOfPropertyChange(nameof(CanSaveMapping));
+        NotifyOfPropertyChange(nameof(CanEditCameraRow));
+        NotifyOfPropertyChange(nameof(CanManagePresets));
+    }
+
+    /// <summary>보드 선택이 바뀌었다(뷰가 알려 준다).</summary>
+    public void OnSelectionChanged()
+    {
+        UpdateCameraEditor();
+        RaiseCommandStates();
+    }
+    #endregion
+
+    #region - 카메라 연동 설정(프리셋 · 지연) -
+    private readonly Dictionary<int, IReadOnlyList<MappingPresetInfo>> _presetCache = new();
+    private MappingRowViewModel? _cameraRow;
+    private int _presetLoadSerial;
+    private bool _rebuildingPresets;
+    private string _presetStatusText = string.Empty;
+    private Task _presetLoadTask = Task.CompletedTask;
+
+    /// <summary>프리셋 콤보 항목 — 맨 위는 늘 "없음", 이어서 <b>고른 카메라의</b> 프리셋.</summary>
+    public ObservableCollection<MappingPresetOption> PresetOptions { get; } = new();
+
+    /// <summary>설정 칸이 붙들고 있는 카메라 행(카메라 탭에서 행을 <b>하나</b> 골랐을 때만).</summary>
+    public MappingRowViewModel? EditingCameraRow => _cameraRow;
+
+    /// <summary>설정 칸을 보일까.</summary>
+    public bool HasCameraEditor => _cameraRow is not null;
+
+    /// <summary>설정 칸 머리.</summary>
+    public string CameraEditorTitle => _cameraRow is null ? string.Empty : $"{_cameraRow.DeviceName} 연동 설정";
+
+    /// <summary>설정 칸 값을 바꿀 수 있는가 — 해제 표시 · 끊긴 행은 바꾸지 않는다.</summary>
+    public bool CanEditCameraRow => CanEdit && IsBoardEnabled && _cameraRow is { IsRemoved: false, IsOrphan: false };
+
+    /// <summary>프리셋 목록 상태(불러오는 중 · 없음 · 실패). 정상이면 빈 문자열.</summary>
+    public string PresetStatusText
+    {
+        get => _presetStatusText;
+        private set { _presetStatusText = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasPresetStatus)); }
+    }
+
+    /// <summary>프리셋 상태 줄을 보일까.</summary>
+    public bool HasPresetStatus => PresetStatusText.Length > 0;
+
+    /// <summary>가장 최근 프리셋 조회 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task PresetLoadTask => _presetLoadTask;
+
+    /// <summary>타깃 프리셋 — 이벤트가 나면 카메라가 돌아갈 자리.</summary>
+    /// <remarks>
+    /// 목록을 다시 세우는 동안에는 <c>null</c> 이다 — 콤보는 항목이 비워지면 <c>null</c> 을 밀어 넣고 이 값을 곧바로 다시 읽는다.
+    /// 그때 목록 밖의 임시 항목을 주면 그것이 콤보에 남아, 다 세운 뒤 진짜 항목을 줘도 선택이 서지 않는다(EVT-DEMO-R26).
+    /// </remarks>
+    public MappingPresetOption? SelectedTargetPreset
+    {
+        get => !_rebuildingPresets && _cameraRow is { } vm ? OptionFor(vm.Row.TargetPresetId, vm.Row.TargetPresetName, vm.Row.TargetPresetRestricted) : null;
+        set
+        {
+            if (_rebuildingPresets || value is null || !CanEditCameraRow) return;
+            var row = _cameraRow!.Row;
+            if (row.TargetPresetId == value.Id) return;
+            row.TargetPresetId = value.Id;
+            row.TargetPresetName = value.Id is null ? null : value.Name;
+            row.TargetPresetRestricted = value.Id is not null && value.IsRestrictedZone;
+            CommitCameraEdit();
+        }
+    }
+
+    /// <summary>홈 프리셋 — 지연 뒤 돌아올 자리. 목록을 다시 세우는 동안에는 <c>null</c>(<see cref="SelectedTargetPreset"/> 참조).</summary>
+    public MappingPresetOption? SelectedHomePreset
+    {
+        get => !_rebuildingPresets && _cameraRow is { } vm ? OptionFor(vm.Row.HomePresetId, vm.Row.HomePresetName, false) : null;
+        set
+        {
+            if (_rebuildingPresets || value is null || !CanEditCameraRow) return;
+            var row = _cameraRow!.Row;
+            if (row.HomePresetId == value.Id) return;
+            row.HomePresetId = value.Id;
+            row.HomePresetName = value.Id is null ? null : value.Name;
+            CommitCameraEdit();
+        }
+    }
+
+    /// <summary>
+    /// 지연(초) — <b>PTZ 가 타깃 프리셋까지 돌아가는 데 기다리는 시간</b>(사용자 정의, 2026-10-04).
+    /// 머무는 시간이 아니다 — 카메라가 자리를 잡은 뒤 다음 동작으로 넘어가도록 이동 시간만큼 둔다.
+    /// </summary>
+    public int EditDelayTime
+    {
+        get => _cameraRow?.Row.DelayTime ?? 0;
+        set
+        {
+            if (!CanEditCameraRow) return;
+            var row = _cameraRow!.Row;
+            var next = Math.Max(EventMappingRules.DELAY_TIME_MIN, value);
+            if (row.DelayTime == next) { NotifyOfPropertyChange(); return; }
+            row.DelayTime = next;
+            CommitCameraEdit();
+        }
+    }
+
+    /// <summary>값을 바꿨다 — 행 상태를 다시 판정하고 보드에 알린다(Draft · 칩 · [적용]).</summary>
+    private void CommitCameraEdit()
+    {
+        _cameraRow!.Row.Refresh();
+        _board.Raise();
+        NotifyCameraValues();
+    }
+
+    /// <summary>고른 행에 맞춰 설정 칸을 세운다. 카메라가 바뀌었을 때만 프리셋을 새로 받는다.</summary>
+    private void UpdateCameraEditor()
+    {
+        var next = SelectedKind == MappingActionKind.Camera && SelectedBoardRows.Count == 1 ? SelectedBoardRows[0] : null;
+        if (ReferenceEquals(next, _cameraRow))
+        {
+            NotifyCameraEditor();
+            return;
+        }
+
+        _cameraRow = next;
+        _presetLoadSerial++;                    // 옛 조회가 늦게 와도 새 행을 덮지 않게
+        if (next?.Row.DeviceId is not int cameraId)
+        {
+            ShowPresets(Array.Empty<MappingPresetInfo>(), string.Empty);
+        }
+        else if (_presetCache.TryGetValue(cameraId, out var cached))
+        {
+            ShowPresets(cached, PresetStatusFor(next, cached));
+        }
+        else
+        {
+            _presetLoadTask = LoadPresetsAsync(next, cameraId, _presetLoadSerial);
+        }
+        NotifyCameraEditor();
+    }
+
+    private const string NoPresetNotice = "이 카메라에 등록된 프리셋이 없습니다.";
+
+    private async Task LoadPresetsAsync(MappingRowViewModel row, int cameraId, int serial)
+    {
+        ShowPresets(Array.Empty<MappingPresetInfo>(), "프리셋을 불러오는 중…");
+        if (_presets is null)
+        {
+            PresetStatusText = "프리셋 목록을 불러올 수 없습니다.";
+            return;
+        }
+
+        var result = await _presets.ListPresetsAsync(cameraId);
+        if (serial != _presetLoadSerial || !ReferenceEquals(row, _cameraRow)) return;    // 그 사이 다른 행을 골랐다
+
+        if (!result.IsSuccess)
+        {
+            // 실패를 "없음" 으로 읽지 않는다 — 지금 값은 자리 항목으로 남아 있고 사유만 말한다.
+            PresetStatusText = result.Message;
+            return;
+        }
+
+        // 다른 카메라의 프리셋은 서버가 422 로 거절한다 — 후보에 애초에 넣지 않는다.
+        var owned = (result.Value ?? Array.Empty<MappingPresetInfo>())
+            .Where(p => EventMappingRules.IsPresetOwnedBy(p.CameraId, cameraId))
+            .ToList();
+        _presetCache[cameraId] = owned;
+        ShowPresets(owned, PresetStatusFor(row, owned));
+    }
+
+    /// <summary>
+    /// 받은 목록에 대한 상태 줄. 행이 가리키는 프리셋이 목록에 없으면(관리 창에서 지웠다) 그것을 먼저 말한다 —
+    /// 콤보에는 자리 항목으로 남아 있어 그대로 [적용]하면 서버가 거절한다.
+    /// </summary>
+    private static string PresetStatusFor(MappingRowViewModel row, IReadOnlyList<MappingPresetInfo> presets)
+    {
+        bool Missing(int? id) => id is int value && presets.All(p => p.Id != value);
+        if (Missing(row.Row.TargetPresetId) || Missing(row.Row.HomePresetId))
+            return "고른 프리셋이 이 카메라에 없습니다. 다른 프리셋을 고르세요.";
+        return presets.Count == 0 ? NoPresetNotice : string.Empty;
+    }
+
+    /// <summary>
+    /// 프리셋 관리 창을 띄우는 길 — 런처가 <c>IWindowManager</c> 로 채운다. 비어 있으면 [프리셋 관리…] 를 감춘다.
+    /// </summary>
+    public Func<MappingPresetManagerViewModel, Task>? ShowPresetManager
+    {
+        get => _showPresetManager;
+        set { _showPresetManager = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanManagePresets)); }
+    }
+    private Func<MappingPresetManagerViewModel, Task>? _showPresetManager;
+
+    /// <summary>
+    /// 프리셋 관리 창이 카메라 ONVIF 프리셋을 읽는 길 — 런처가 채운다. 비어 있으면 그 창의 "카메라 프리셋" 칸이 감춰진다.
+    /// </summary>
+    public IMappingCameraPresetReader? CameraPresetReader { get; set; }
+
+    /// <summary>
+    /// 프리셋 관리 · ROI 설정 창의 카메라 실시간 영상 창구 — 런처가 채운다. 비어 있으면 두 창의 영상 상자가 감춰진다.
+    /// </summary>
+    public IMappingCameraVideo? CameraVideo { get; set; }
+
+    /// <summary>
+    /// 프리셋 관리 창이 ROI 설정 창을 띄우는 길 — 런처가 채운다. 비어 있으면 그 창의 [ROI 설정…] 이 감춰진다.
+    /// </summary>
+    public Func<MappingRoiEditorViewModel, Task>? ShowRoiEditor { get; set; }
+
+    /// <summary>[프리셋 관리…] 를 누를 수 있나 — 카메라 행 하나를 골랐고 창을 띄울 길이 있을 때.</summary>
+    public bool CanManagePresets => _showPresetManager is not null && _presetEditor is not null && IsBoardEnabled && _cameraRow?.Row.DeviceId is int;
+
+    /// <summary>가장 최근 프리셋 관리 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task PresetManagerTask { get; private set; } = Task.CompletedTask;
+
+    /// <summary>[프리셋 관리…] — 고른 카메라의 프리셋 관리 창을 연다.</summary>
+    public Task ManagePresetsAsync() => PresetManagerTask = ManagePresetsCoreAsync();
+
+    private async Task ManagePresetsCoreAsync()
+    {
+        if (!CanManagePresets) return;
+        var row = _cameraRow!;
+        var cameraId = row.Row.DeviceId!.Value;
+        var manager = new MappingPresetManagerViewModel(_presetEditor!, cameraId, row.DeviceName, CanEdit, CameraPresetReader, CameraVideo)
+        {
+            ShowRoiEditor = ShowRoiEditor,
+        };
+
+        try
+        {
+            await _showPresetManager!(manager);
+        }
+        catch (Exception)
+        {
+            // 창 하나가 못 떠도 워크벤치는 살아 있어야 한다.
+            PresetStatusText = "프리셋 관리 창을 열지 못했습니다.";
+            return;
+        }
+        if (!manager.HasChanges) return;
+
+        // 이름이 바뀐 프리셋은 보드 칩에도 — 이름은 Draft 판정에 들지 않는다(값이 바뀐 것이 아니다).
+        var fresh = manager.Presets.ToDictionary(p => p.Id);
+        var renamed = false;
+        foreach (var vm in BoardRows.Where(r => r.Row.DeviceId == cameraId))
+        {
+            if (vm.Row.TargetPresetId is int t && fresh.TryGetValue(t, out var target)
+                && (vm.Row.TargetPresetName != target.Name || vm.Row.TargetPresetRestricted != target.IsRestrictedZone))
+            {
+                vm.Row.TargetPresetName = target.Name;
+                vm.Row.TargetPresetRestricted = target.IsRestrictedZone;
+                renamed = true;
+            }
+            if (vm.Row.HomePresetId is int h && fresh.TryGetValue(h, out var home) && vm.Row.HomePresetName != home.Name)
+            {
+                vm.Row.HomePresetName = home.Name;
+                renamed = true;
+            }
+        }
+        if (renamed) _board.Raise();
+
+        // 프리셋 콤보를 다시 받는다 — 그 사이 다른 행을 골랐으면 캐시만 비워 둔다(다음 선택 때 받는다).
+        _presetCache.Remove(cameraId);
+        if (ReferenceEquals(row, _cameraRow))
+        {
+            _presetLoadSerial++;
+            _presetLoadTask = LoadPresetsAsync(row, cameraId, _presetLoadSerial);
+            await _presetLoadTask;
+        }
+    }
+
+    /// <summary>
+    /// 콤보 항목을 다시 세운다. <b>지금 행이 가진 프리셋은 목록에 없어도 넣는다</b> —
+    /// 빠지면 콤보가 빈칸으로 보이고, 사람이 손대지 않았는데도 값이 지워진 것처럼 보인다.
+    /// </summary>
+    private void ShowPresets(IReadOnlyList<MappingPresetInfo> presets, string status)
+    {
+        _rebuildingPresets = true;
+        try
+        {
+            PresetOptions.Clear();
+            PresetOptions.Add(MappingPresetOption.None);
+            foreach (var preset in presets)
+                PresetOptions.Add(new MappingPresetOption(preset.Id, preset.Name, preset.IsRestrictedZone));
+
+            if (_cameraRow is { } vm)
+            {
+                EnsureOption(vm.Row.TargetPresetId, vm.Row.TargetPresetName, vm.Row.TargetPresetRestricted);
+                EnsureOption(vm.Row.HomePresetId, vm.Row.HomePresetName, false);
+            }
+        }
+        finally
+        {
+            _rebuildingPresets = false;
+        }
+        PresetStatusText = status;
+        NotifyCameraValues();
+    }
+
+    private void EnsureOption(int? id, string? name, bool restricted)
+    {
+        if (id is not int value || PresetOptions.Any(o => o.Id == value)) return;
+        PresetOptions.Add(new MappingPresetOption(value, string.IsNullOrWhiteSpace(name) ? $"#{value}" : name!, restricted));
+    }
+
+    private MappingPresetOption OptionFor(int? id, string? name, bool restricted)
+    {
+        if (id is not int value) return MappingPresetOption.None;
+        return PresetOptions.FirstOrDefault(o => o.Id == value)
+            ?? new MappingPresetOption(value, string.IsNullOrWhiteSpace(name) ? $"#{value}" : name!, restricted);
+    }
+
+    private void NotifyCameraEditor()
+    {
+        NotifyOfPropertyChange(nameof(EditingCameraRow));
+        NotifyOfPropertyChange(nameof(HasCameraEditor));
+        NotifyOfPropertyChange(nameof(CameraEditorTitle));
+        NotifyOfPropertyChange(nameof(CanEditCameraRow));
+        NotifyOfPropertyChange(nameof(CanManagePresets));
+        NotifyCameraValues();
+    }
+
+    private void NotifyCameraValues()
+    {
+        NotifyOfPropertyChange(nameof(SelectedTargetPreset));
+        NotifyOfPropertyChange(nameof(SelectedHomePreset));
+        NotifyOfPropertyChange(nameof(EditDelayTime));
+    }
+    #endregion
+
+    #region - 맵핑 속성 폼 (본체는 호출 1회라 즉시 전송한다) -
+    private bool _isCreatingMapping;
+    private string _editName = string.Empty;
+    private int? _editGroupId;
+    private string _editCategory = EventMappingRules.CATEGORY_NONE;
+    private string _editDescription = string.Empty;
+    private bool _editStatus = true;
+    private string _formError = string.Empty;
+
+    /// <summary>새 맵핑을 만드는 중인가.</summary>
+    public bool IsCreatingMapping
+    {
+        get => _isCreatingMapping;
+        private set { _isCreatingMapping = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(SaveMappingText)); NotifyOfPropertyChange(nameof(IsBoardEnabled)); RaiseFormStates(); }
+    }
+
+    /// <summary>이벤트 이름.</summary>
+    public string EditName { get => _editName; set { _editName = value ?? string.Empty; NotifyOfPropertyChange(); RaiseFormStates(); } }
+
+    /// <summary>장비그룹. <c>null</c> 은 "미지정" 이다.</summary>
+    public int? EditGroupId { get => _editGroupId; set { _editGroupId = value; NotifyOfPropertyChange(); RaiseFormStates(); } }
+
+    /// <summary>이벤트 카테고리(와이어 값).</summary>
+    public string EditCategory { get => _editCategory; set { _editCategory = value ?? EventMappingRules.CATEGORY_NONE; NotifyOfPropertyChange(); RaiseFormStates(); } }
+
+    /// <summary>설명.</summary>
+    public string EditDescription { get => _editDescription; set { _editDescription = value ?? string.Empty; NotifyOfPropertyChange(); RaiseFormStates(); } }
+
+    /// <summary>운용 여부(<c>status</c>).</summary>
+    public bool EditStatus { get => _editStatus; set { _editStatus = value; NotifyOfPropertyChange(); RaiseFormStates(); } }
+
+    /// <summary>폼 검증 실패 사유 — 사용자에게 그대로 보여도 되는 한국어다.</summary>
+    public string MappingFormError { get => _formError; private set { _formError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasFormError)); } }
+
+    /// <summary>보여 줄 검증 오류가 있는가.</summary>
+    public bool HasFormError => !string.IsNullOrEmpty(MappingFormError);
+
+    /// <summary>저장 버튼 문구.</summary>
+    public string SaveMappingText => IsCreatingMapping ? "등록" : "맵핑 저장";
+
+    /// <summary>맵핑 본체에 바뀐 값이 있는가.</summary>
+    public bool HasMappingEdit
+    {
+        get
+        {
+            if (IsCreatingMapping) return true;
+            var dto = _selectedMapping?.Dto;
+            if (dto is null) return false;
+            return !string.Equals(EventMappingRules.NormalizeText(EditName), EventMappingRules.NormalizeText(dto.NameEvent), StringComparison.Ordinal)
+                || EditGroupId != dto.DeviceGroupId
+                || !string.Equals(EditCategory, dto.CategoryEventMapping ?? EventMappingRules.CATEGORY_NONE, StringComparison.Ordinal)
+                || !string.Equals(EventMappingRules.NormalizeText(EditDescription), EventMappingRules.NormalizeText(dto.Description), StringComparison.Ordinal)
+                || EditStatus != dto.Status;
+        }
+    }
+
+    /// <summary>맵핑 저장 버튼을 누를 수 있는가.</summary>
+    public bool CanSaveMapping =>
+        CanEdit && HasMappingEdit
+        && EventMappingRules.TryValidateMapping(EditName, EditCategory, EditDescription, out _);
+
+    /// <summary>새 맵핑 만들기를 시작한다 — 아직 서버에 가지 않는다.</summary>
+    public void BeginCreateMapping()
+    {
+        if (!CanEdit) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+
+        IsCreatingMapping = true;
+        EditName = string.Empty;
+        EditGroupId = null;
+        EditCategory = EventMappingRules.CATEGORY_NONE;
+        EditDescription = string.Empty;
+        EditStatus = true;
+        MappingFormError = string.Empty;
+        StatusText = "새 맵핑의 이름과 조건을 정한 뒤 [등록]을 누르세요.";
+    }
+
+    /// <summary>새 맵핑 만들기를 접는다.</summary>
+    public void CancelCreateMapping()
+    {
+        IsCreatingMapping = false;
+        SeedForm(_selectedMapping?.Dto);
+        MappingFormError = string.Empty;
+    }
+
+    /// <summary>
+    /// 맵핑 본체를 저장한다 — 생성이면 <c>POST</c>, 수정이면 <c>PATCH</c>. <b>호출 1회라 즉시 보낸다</b>.
+    /// </summary>
+    /// <remarks>
+    /// 배선(액션 보드)은 호출이 여러 번으로 번지므로 Draft + [적용] 이지만,
+    /// 본체는 한 번이라 봉투 규약대로 바로 보낸다.
+    /// </remarks>
+    public async Task SaveMappingAsync()
+    {
+        if (!CanSaveMapping) return;
+        if (!EventMappingRules.TryValidateMapping(EditName, EditCategory, EditDescription, out var error))
+        {
+            MappingFormError = error ?? "입력값을 확인하세요.";
+            return;
+        }
+        MappingFormError = string.Empty;
+
+        IsApplying = true;
+        try
+        {
+            if (IsCreatingMapping)
+            {
+                var body = MappingRequestBuilder.CreateMapping(EditName, EditGroupId, EditCategory, EditDescription, EditStatus);
+                var created = await _gateway.CreateMappingAsync(body);
+                if (!created.IsSuccess) { MappingFormError = created.Message; return; }
+
+                IsCreatingMapping = false;
+                _allMappings.Add(created.Value!);
+                RebuildMappingList();
+                _selectedMapping = Mappings.FirstOrDefault(m => m.Id == created.Value!.Id);
+                NotifyOfPropertyChange(nameof(SelectedMapping));
+                NotifyOfPropertyChange(nameof(HasMapping));
+            NotifyOfPropertyChange(nameof(IsBoardEnabled));
+                NotifyOfPropertyChange(nameof(MappingTitle));
+                StatusText = "맵핑을 등록했습니다.";
+                await LoadBoardAsync();
+                return;
+            }
+
+            var current = _selectedMapping;
+            if (current is null) return;
+
+            var patch = MappingRequestBuilder.PatchMapping(current.Dto, EditName, EditGroupId, EditCategory, EditDescription, EditStatus);
+            if (patch.IsEmpty) { StatusText = "바뀐 값이 없습니다."; return; }
+
+            var saved = await _gateway.PatchMappingAsync(current.Id, patch);
+            if (!saved.IsSuccess) { MappingFormError = saved.Message; return; }
+
+            current.Replace(saved.Value!);
+            var index = _allMappings.FindIndex(m => m.Id == current.Id);
+            if (index >= 0) _allMappings[index] = saved.Value!;
+            SeedForm(saved.Value);
+            StatusText = "맵핑을 저장했습니다.";
+            UpdateWarnings();
+        }
+        finally
+        {
+            IsApplying = false;
+            RaiseFormStates();
+        }
+    }
+
+    private void SeedForm(EventMappingReadDto? dto)
+    {
+        _editName = dto?.NameEvent ?? string.Empty;
+        _editGroupId = dto?.DeviceGroupId;
+        _editCategory = dto?.CategoryEventMapping ?? EventMappingRules.CATEGORY_NONE;
+        _editDescription = dto?.Description ?? string.Empty;
+        _editStatus = dto?.Status ?? true;
+
+        NotifyOfPropertyChange(nameof(EditName));
+        NotifyOfPropertyChange(nameof(EditGroupId));
+        NotifyOfPropertyChange(nameof(EditCategory));
+        NotifyOfPropertyChange(nameof(EditDescription));
+        NotifyOfPropertyChange(nameof(EditStatus));
+        RaiseFormStates();
+    }
+
+    private void RaiseFormStates()
+    {
+        NotifyOfPropertyChange(nameof(HasMappingEdit));
+        NotifyOfPropertyChange(nameof(CanSaveMapping));
+    }
+
+    /// <summary>툴바 [맵핑 등록] — 뷰가 부른다.</summary>
+    public Task CreateMappingAsync()
+    {
+        BeginCreateMapping();
+        return Task.CompletedTask;
+    }
+    #endregion
+
+    #region - 되돌리기 · 적용 -
+    /// <summary>미저장 변경을 전부 버린다. <b>서버를 한 번도 부르지 않는다.</b></summary>
+    public async Task RevertAsync()
+    {
+        if (!CanRevert) return;
+
+        Detail.Tracker.Clear();
+        await LoadBoardAsync();
+        Detail.Settle("변경을 되돌렸습니다.");
+        StatusText = "변경을 되돌렸습니다.";
+    }
+
+    /// <summary>
+    /// 미저장 변경을 서버에 보낸다 — <b>축마다 ① 해제 ② 등록 ③ 수정</b>.
+    /// </summary>
+    /// <remarks>
+    /// <para>보내기 전에 <b>매핑을 다시 읽어 대조</b>한다. 그 사이 누가 고쳤으면
+    /// <b>아무것도 보내지 않고</b> 새로 고치기를 권한다 — 조용한 덮어쓰기가 가장 나쁜 결과다.</para>
+    /// <para>끝난 뒤에는 <b>재조회</b>로 화면을 다시 세운다. 낙관적 반영으로 끝내지 않는다.</para>
+    /// </remarks>
+    public async Task ApplyAsync()
+    {
+        if (!CanApply || _selectedMapping is null) return;
+        if (IsApplying) return;                       // 연타 가드 — 같은 변경을 두 번 보내지 않는다
+
+        var mapping = _selectedMapping;
+        IsApplying = true;
+        var outcome = new MappingCommitOutcome();
+        try
+        {
+            var fresh = await _gateway.GetMappingAsync(mapping.Id);
+            if (!fresh.IsSuccess)
+            {
+                outcome.Abort(fresh.Message);
+                StatusText = outcome.ToMessage();
+                return;
+            }
+            if (!string.Equals(fresh.Value!.UpdatedAt, mapping.Dto.UpdatedAt, StringComparison.Ordinal))
+            {
+                outcome.Abort(DriftNotice);
+                StatusText = outcome.ToMessage();
+                return;
+            }
+
+            // 🔴 부모만 보면 놓친다. 서버의 onupdate 는 <b>그 행에만</b> 걸려 있어
+            //    (app/models/integration.py:53 · :142 · :202 · :283) 배선을 고쳐도 맵핑 본체는 그대로다.
+            //    그래서 하위 3종을 다시 읽어 <b>행마다</b> 대조한다.
+            var childDrift = await HasChildDriftAsync(mapping.Id);
+            if (childDrift)
+            {
+                outcome.Abort(DriftNotice);
+                StatusText = outcome.ToMessage();
+                return;
+            }
+
+            foreach (var vm in BoardRows) vm.ClearFailure();
+
+            var plan = MappingCommitPlan.From(_board);
+            foreach (var kindPlan in plan.Kinds)
+            {
+                if (!kindPlan.HasWork) continue;
+                await ApplyKindAsync(mapping.Id, kindPlan, outcome);
+            }
+
+            // 서버 원문은 화면에 내지 않는다 — 진단용으로만 남긴다.
+            foreach (var raw in outcome.RawFailureDetails)
+                System.Diagnostics.Trace.WriteLine($"[MappingWorkbench] apply item failed: {raw}");
+
+            StatusText = outcome.ToMessage();
+        }
+        catch (Exception ex)
+        {
+            // 예외 원문은 사용자에게 내지 않는다. Draft 는 그대로 둔다.
+            outcome.Abort("적용 중 오류가 났습니다. 변경은 그대로 남아 있습니다.");
+            StatusText = outcome.ToMessage();
+            System.Diagnostics.Trace.WriteLine($"[MappingWorkbench] apply failed: {ex.Message}");
+        }
+        finally
+        {
+            IsApplying = false;
+            if (!outcome.IsAborted)
+            {
+                // 성공한 것만 화면에서 정리하고, 진실은 재조회로 확정한다.
+                _board.ClearUndo();                    // ★ 비우지 않으면 되돌리기가 id=0 행을 되살려 중복 등록한다
+                Detail.Tracker.Clear();
+
+                // 🔴 실패한 <b>새 행</b>은 서버에 없다 — 재조회가 통째로 지워 버린다.
+                //    "실패 N건은 화면에 남았습니다" 라고 말했으면 실제로 남겨야 한다.
+                var stranded = outcome.FailedRows
+                    .Where(r => r.State == MappingDraftState.Added && !r.IsPersisted)
+                    .ToList();
+
+                await LoadBoardAsync();
+                Readd(stranded);
+                MarkFailures(outcome);
+
+                // 부분 실패면 아직 깨끗하지 않다 — 보낼 것이 남아 있다.
+                if (outcome.HasFailure) UpdateDirty();
+                else Detail.Settle(outcome.ToMessage());
+            }
+        }
+    }
+
+    private async Task ApplyKindAsync(int mappingId, MappingKindPlan plan, MappingCommitOutcome outcome)
+    {
+        foreach (var chunk in plan.ReleaseChunks)
+        {
+            var rows = _board.Rows(plan.Kind).Where(r => chunk.Contains(r.ConfigId)).ToList();
+            var result = await _gateway.BulkUnassignAsync(mappingId, plan.Kind, chunk);
+            if (!result.IsSuccess) { outcome.AcceptPatch(rows.FirstOrDefault() ?? MappingBoardRow.NewFor(plan.Kind, 0), false, result.Message); continue; }
+            outcome.AcceptRelease(rows, result.Value!);
+        }
+
+        foreach (var chunk in plan.CreateChunks)
+        {
+            var rows = chunk.Select(c => c.Row).ToList();
+            var items = chunk.Select(c => c.Item).ToList();
+            var result = await _gateway.BulkCreateAsync(mappingId, plan.Kind, items);
+            if (!result.IsSuccess)
+            {
+                foreach (var row in rows) outcome.AcceptPatch(row, false, result.Message);
+                continue;
+            }
+            outcome.AcceptCreate(rows, result.Value!);
+        }
+
+        foreach (var (row, configId, body) in plan.Patches)
+        {
+            var result = await _gateway.PatchConfigAsync(mappingId, plan.Kind, configId, body);
+            outcome.AcceptPatch(row, result.IsSuccess, result.Message);
+        }
+    }
+
+    /// <summary>
+    /// 실패한 행에 배지를 단다 — <b>(종류, 장비) 짝</b>으로 찾는다.
+    /// </summary>
+    /// <remarks>장비 id 만 보면 카메라 5번의 실패가 스피커 5번 행에 배지를 단다(축이 다르면 id 공간도 다르다).</remarks>
+    private void MarkFailures(MappingCommitOutcome outcome)
+    {
+        if (!outcome.HasFailure) return;
+        var note = outcome.FailureNotes.FirstOrDefault();
+        var failed = outcome.FailedRows
+            .Where(r => r.DeviceId is not null)
+            .Select(r => (r.Kind, Device: r.DeviceId!.Value))
+            .ToHashSet();
+
+        foreach (var vm in BoardRows)
+        {
+            if (vm.Row.DeviceId is not int id) continue;
+            if (failed.Contains((vm.Row.Kind, id))) vm.MarkFailure(note);
+        }
+    }
+
+    /// <summary>재조회가 지워 버린 <b>실패한 새 행</b>을 보드에 되돌려 놓는다.</summary>
+    private void Readd(IReadOnlyList<MappingBoardRow> stranded)
+    {
+        if (stranded.Count == 0) return;
+        foreach (var group in stranded.GroupBy(r => r.Kind))
+        {
+            var ids = group.Select(r => r.DeviceId ?? 0).Where(id => id > 0).ToList();
+            if (ids.Count > 0) _board.Add(group.Key, ids);
+        }
+        _board.ClearUndo();     // 되돌리기 칸에 재조회 이전 상태를 남기지 않는다
+    }
+
+    /// <summary>동시 편집 안내 — 부모든 배선이든 같은 문구를 쓴다.</summary>
+    private const string DriftNotice =
+        "다른 사용자가 이 맵핑을 바꿨습니다. 새로 고친 뒤 다시 시도하세요. 변경한 내용은 그대로 있습니다.";
+
+    /// <summary>
+    /// 배선 행이 내가 읽은 뒤에 바뀌었는가 — <c>config_id</c> 별 <c>updated_at</c> 대조.
+    /// </summary>
+    /// <remarks>
+    /// 행이 <b>사라졌거나</b>(다른 사람이 해제) <b>시각이 달라졌으면</b> 드리프트다.
+    /// 새로 생긴 행은 내 변경과 충돌하지 않으므로 보지 않는다.
+    /// </remarks>
+    private async Task<bool> HasChildDriftAsync(int mappingId)
+    {
+        var cameras = await _gateway.ListCamerasAsync(mappingId);
+        var speakers = await _gateway.ListSpeakersAsync(mappingId);
+        var lamps = await _gateway.ListLampsAsync(mappingId);
+        if (!cameras.IsSuccess || !speakers.IsSuccess || !lamps.IsSuccess) return false;   // 못 읽은 것을 드리프트로 읽지 않는다
+
+        var seen = new Dictionary<(MappingActionKind, int), string?>();
+        foreach (var dto in cameras.Value ?? Array.Empty<MappingCameraReadDto>())
+            seen[(MappingActionKind.Camera, dto.ConfigId)] = dto.UpdatedAt;
+        foreach (var dto in speakers.Value ?? Array.Empty<MappingSpeakerReadDto>())
+            seen[(MappingActionKind.Speaker, dto.ConfigId)] = dto.UpdatedAt;
+        foreach (var dto in lamps.Value ?? Array.Empty<MappingLampReadDto>())
+            seen[(MappingActionKind.Lamp, dto.ConfigId)] = dto.UpdatedAt;
+
+        foreach (var kind in MappingBoard.Kinds)
+        {
+            foreach (var row in _board.Rows(kind))
+            {
+                if (!row.IsPersisted) continue;
+                if (!seen.TryGetValue((kind, row.ConfigId), out var now)) return true;      // 남이 지웠다
+                if (!string.Equals(now, row.UpdatedAt, StringComparison.Ordinal)) return true;
+            }
+        }
+        return false;
+    }
+    #endregion
+
+    #region - 드래그 판정 -
+    /// <inheritdoc/>
+    /// <remarks>드래그 중 끊임없이 불린다 — 서버를 부르지 않고 목록을 새로 만들지도 않는다.</remarks>
+    public bool CanDrop(DragPayload payload, DropTarget target) => Verdict(payload, target).IsAllowed;
+
+    /// <summary>드롭 판정 + 사유. 화면이 거절 사유를 말할 수 있게 갈라 둔다.</summary>
+    public MappingDropVerdict Verdict(DragPayload payload, DropTarget target)
+    {
+        if (IsApplying) return MappingDropVerdict.Block("적용하는 중입니다.");
+        if (IsCreatingMapping) return MappingDropVerdict.Block("새 맵핑을 먼저 등록하세요.");
+
+        if (target.ZoneKey == MappingKindText.PaletteZone)
+        {
+            var rows = payload.Items.OfType<MappingRowViewModel>().ToList();
+            if (rows.Count != payload.Items.Count) return MappingDropVerdict.Block("보드의 행만 해제할 수 있습니다.");
+            return MappingEligibility.BoardToPalette(IsReadOnly, CanDelete, rows.Count);
+        }
+
+        var zoneKind = MappingBoard.Kinds.FirstOrDefault(k => MappingKindText.BoardZone(k) == target.ZoneKey);
+        if (MappingKindText.BoardZone(zoneKind) != target.ZoneKey) return MappingDropVerdict.Block("여기에는 놓을 수 없습니다.");
+        if (!HasMapping)
+            return MappingDropVerdict.Block(_allMappings.Count == 0 ? MappingEligibility.NoMappingYetReason : MappingEligibility.NoMappingReason);
+
+        if (payload.Items.Count > 0 && payload.Items.All(i => i is MappingPaletteItemViewModel))
+        {
+            var items = payload.Items.Cast<MappingPaletteItemViewModel>().ToList();
+            var sourceKind = items[0].Kind;
+            var fresh = MappingEligibility.NewDeviceIds(_board, zoneKind, items.Select(i => i.Id)).Count;
+            return MappingEligibility.PaletteToBoard(sourceKind, zoneKind, IsReadOnly, HasMapping, fresh);
+        }
+
+        if (payload.Items.Count > 0 && payload.Items.All(i => i is MappingRowViewModel))
+        {
+            var rows = payload.Items.Cast<MappingRowViewModel>().ToList();
+            return MappingEligibility.BoardReorder(rows[0].Kind, zoneKind, IsReadOnly, rows.Count);
+        }
+
+        return MappingDropVerdict.Block("여기에는 놓을 수 없습니다.");
+    }
+
+    /// <summary>
+    /// 거절된 자리에서 놓았다(커널이 알린다) — 사유를 상태줄에 말한다. 아무것도 바꾸지 않는다.
+    /// </summary>
+    /// <remarks>끄는 동안에는 보드가 형태(삽입선 없음)로만 답한다. 놓는 순간 말없이 사라지면 "왜 안 들어가지?" 가 남는다.</remarks>
+    public void Refused(DragPayload payload, DropTarget target)
+    {
+        var verdict = Verdict(payload, target);
+        if (!verdict.IsAllowed && !string.IsNullOrEmpty(verdict.Reason)) StatusText = verdict.Reason;
+    }
+
+    /// <inheritdoc/>
+    public void Drop(DragPayload payload, DropTarget target)
+    {
+        var verdict = Verdict(payload, target);
+        if (!verdict.IsAllowed)
+        {
+            StatusText = verdict.Reason;    // 거절을 조용히 삼키지 않는다
+            return;
+        }
+
+        if (target.ZoneKey == MappingKindText.PaletteZone)
+        {
+            var rows = payload.Items.OfType<MappingRowViewModel>().Select(r => r.Row).ToList();
+            _board.Remove(SelectedKind, rows);
+            StatusText = $"{rows.Count}건 해제 — [되돌리기] 로 되살릴 수 있습니다";
+            return;
+        }
+
+        var index = target.IsReorder ? target.InsertionIndex : -1;
+
+        if (payload.Items.All(i => i is MappingPaletteItemViewModel))
+        {
+            AddDevices(payload.Items.Cast<MappingPaletteItemViewModel>().Select(i => i.Id).ToList(), index);
+            return;
+        }
+
+        var moving = payload.Items.OfType<MappingRowViewModel>().Select(r => r.Row).ToList();
+        _board.Move(SelectedKind, moving, index < 0 ? _board.Rows(SelectedKind).Count : index);
+    }
+    #endregion
+}
+
+/// <summary>
+/// 레일 아이콘 토큰 — <b>이름만</b> 담는다.
+/// </summary>
+/// <remarks>
+/// 뷰모델이 <c>PackIcon</c> 요소를 들고 있으면 창을 다시 열 때 죽은 시각 트리에 묶인 요소를 다시 붙이게 된다.
+/// 그리는 것은 뷰의 <c>DataTemplate</c> 몫이다.
+/// </remarks>
+/// <param name="Kind">MaterialDesign 아이콘 이름.</param>
+public sealed record MappingConsoleIcon(string Kind)
+{
+    /// <summary>접힌 레일의 툴팁이 문자열을 찾을 때를 위해.</summary>
+    public override string ToString() => Kind;
+}

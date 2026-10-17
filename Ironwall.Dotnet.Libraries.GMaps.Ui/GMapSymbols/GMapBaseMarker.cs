@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Windows;
-using System.Windows.Threading;
 using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -30,8 +29,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         _log = log;
         _model = symbolModel;
 
-        // 기본 설정
-        ZIndex = 10;
+        // 기본 설정 — 모델의 ZOrder 사용
+        ZIndex = symbolModel.ZOrder;
         UpdateOffset();
 
         // 가상 메서드들 호출
@@ -39,7 +38,11 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         CreateMarkerShape();
         InitializeCommands();
 
-        _log?.Info($"마커 생성: {symbolModel.Title} ({symbolModel.Latitude:F6}, {symbolModel.Longitude:F6})");
+        // Shape 생성 후 Panel.ZIndex 동기화
+        if (Shape is System.Windows.UIElement shapeElement)
+            System.Windows.Controls.Panel.SetZIndex(shapeElement, ZIndex);
+
+        //_log?.Info($"마커 생성: {symbolModel.Title} ({symbolModel.Latitude:F6}, {symbolModel.Longitude:F6})");
     }
     #endregion
     #region - Dispose Pattern -
@@ -56,33 +59,19 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         try
         {
             if (!_disposed && disposing)
-
             {
-                // Managable resources was disposed...
-                if (_monitorTimer != null)
-                {
-                    _monitorTimer.Stop();
-                    _monitorTimer.Tick -= MonitorTick;
-                    _monitorTimer = null;
-                }
-
-                if (_eventToken != null)
-                {
-                    _eventToken.Cancel();
-                    _eventToken.Dispose();
-                    _eventToken = null;
-                }
-
-                // 관리 리소스 정리
+                // 플래그를 먼저 세워 어도너의 IsDisposed 게이트가 _model=null 이전에 닫히게 함
+                // (TOCTOU NRE 방어 — Overlay_Title P2-04).
+                _disposed = true;
                 _model = default(T);
                 Clear();
             }
-
-            // Dispose flag set true
             _disposed = true;
         }
-        catch
+        catch (Exception ex)
         {
+            // 무음 삼킴 금지(P2-05) — Dispose 실패 원인 추적 가능하게 최소 로그.
+            System.Diagnostics.Debug.WriteLine($"GMapBaseMarker.Dispose 실패: {ex.Message}");
         }
     }
 
@@ -108,14 +97,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     /// </summary>
     protected virtual void InitializeMarker()
     {
-        if (Category == EnumMarkerCategory.PIDS_EQUIPMENT)
-        {
-            _eventToken = new CancellationTokenSource();
-            _monitorTimer = new DispatcherTimer();
-            _monitorTimer.Interval = TimeSpan.FromSeconds(1);
-            _monitorTimer.Tick += MonitorTick;
-            StartTimer();
-        }
     }
 
     /// <summary>
@@ -129,8 +110,10 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
 
             ConfigureMarkerControl(markerControl);
             Shape = markerControl;
-
-            _log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
+            //기본적으로 시현하는 것을 기본으로 한다.
+            IsVisible = true;
+            EnableShapeAnimation = false;
+            //_log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
         }
         catch (Exception ex)
         {
@@ -144,8 +127,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     /// </summary>
     protected virtual void ConfigureMarkerControl(UIElement marker)
     {
-        if (!(marker is GMapMarkerCustomControl control)) return;
-
         // 마커 모양 설정
         //control.Width = _model.Width;
         //control.Height = _model.Height;
@@ -157,15 +138,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     /// </summary>
     protected virtual void OnStatusChanged(EnumOperationState status)
     {
-        switch (status)
-        {
-            case EnumOperationState.ACTIVE:
-                StartTimer();
-                break;
-            case EnumOperationState.DEACTIVE:
-                StopTimer();
-                break;
-        }
     }
 
     /// <summary>
@@ -196,7 +168,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             };
 
             Shape = rect;
-            _log?.Info($"마커 '{_model.Title}' 대체 Shape 생성 완료");
+            //_log?.Info($"마커 '{_model.Title}' 대체 Shape 생성 완료");
         }
         catch (Exception ex)
         {
@@ -215,7 +187,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             _model.UpdatePosition(newPosition);
 
             OnPropertyChanged(nameof(Position));
-            _log?.Info($"마커 '{Title}' 위치 업데이트: ({newPosition.Lat:F6}, {newPosition.Lng:F6})");
+            //_log?.Info($"마커 '{Title}' 위치 업데이트: ({newPosition.Lat:F6}, {newPosition.Lng:F6})");
         }
         catch (Exception ex)
         {
@@ -241,7 +213,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             OnPropertyChanged(nameof(Width));
             OnPropertyChanged(nameof(Height));
 
-            _log?.Info($"마커 '{Title}' 크기 업데이트: {Width:F0}x{Height:F0}");
+            //_log?.Info($"마커 '{Title}' 크기 업데이트: {Width:F0}x{Height:F0}");
         }
         catch (Exception ex)
         {
@@ -258,8 +230,11 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         {
             DispatcherService.Invoke(() =>
             {
-                element.Width = width;
-                element.Height = height;
+                // SetCurrentValue — 3D 컨트롤은 Width/Height 가 OneWay 바인딩(WritesBackRenderSize=false)이라
+                // 로컬값 대입(element.Width = …)이 바인딩을 영구 제거해 이후 속성창 크기 입력이 무시된다(D-1).
+                // SetCurrentValue 는 바인딩을 보존한 채 현재값만 바꾸고, 2D(TwoWay)에서는 종전과 동일하게 동작한다.
+                element.SetCurrentValue(FrameworkElement.WidthProperty, width);
+                element.SetCurrentValue(FrameworkElement.HeightProperty, height);
             });
         }
     }
@@ -273,7 +248,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         {
             _model.SetBearing(newBearing);
             OnPropertyChanged(nameof(Bearing));
-            _log?.Info($"마커 '{Title}' 회전 업데이트: {Bearing:F1}°");
+            //_log?.Info($"마커 '{Title}' 회전 업데이트: {Bearing:F1}°");
         }
         catch (Exception ex)
         {
@@ -284,34 +259,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     #endregion
     #region - Processes -
     #endregion
-    #region - Timer Methods -
-
-    protected virtual void StartTimer()
-    {
-        if (_monitorTimer != null && !_monitorTimer.IsEnabled)
-        {
-            _monitorTimer.Start();
-            _refreshTime = DateTime.Now;
-        }
-    }
-
-    protected virtual void StopTimer()
-    {
-        if (_monitorTimer != null && _monitorTimer.IsEnabled)
-        {
-            _monitorTimer.Stop();
-        }
-    }
-
-    private void MonitorTick(object? sender, EventArgs e)
-    {
-        if (DateTime.Now > _refreshTime + TimeSpan.FromSeconds(TIMEOUT))
-        {
-            OperationState = EnumOperationState.DEACTIVE;
-        }
-    }
-
-    #endregion
     #region - Command Methods -
 
     protected virtual bool CanExecuteShowProperties(object arg) => true;
@@ -321,7 +268,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     }
 
     #endregion
-
     #region - Helper Methods -
 
     /// <summary>
@@ -361,9 +307,52 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         get => _model.Title;
         set
         {
+            //_log?.Info($"[GMapCustomMarker] Title 변경: '{Title}' -> '{value}'");
+            //_log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Title = value;
             OnPropertyChanged(nameof(Title));
         }
+    }
+    public double TitleSize
+    {
+        get => _model.TitleSize;
+        set
+        {
+            _model.TitleSize = value;
+            OnPropertyChanged(nameof(TitleSize));
+        }
+    }
+
+    // ── 라벨 스타일 — 모델 위임 + INPC(어도너 즉시 재렌더·속성패널 TwoWay) (Overlay_Title FR-05·13) ──
+    public EnumColorType TitleColor
+    {
+        get => _model.TitleColor;
+        set { if (_model.TitleColor != value) { _model.TitleColor = value; OnPropertyChanged(nameof(TitleColor)); } }
+    }
+    public EnumColorType TitleBackground
+    {
+        get => _model.TitleBackground;
+        set { if (_model.TitleBackground != value) { _model.TitleBackground = value; OnPropertyChanged(nameof(TitleBackground)); } }
+    }
+    public string TitleFontFamily
+    {
+        get => _model.TitleFontFamily;
+        set { if (_model.TitleFontFamily != value) { _model.TitleFontFamily = value ?? string.Empty; OnPropertyChanged(nameof(TitleFontFamily)); } }
+    }
+    public bool TitleBold
+    {
+        get => _model.TitleBold;
+        set { if (_model.TitleBold != value) { _model.TitleBold = value; OnPropertyChanged(nameof(TitleBold)); } }
+    }
+    public bool TitleItalic
+    {
+        get => _model.TitleItalic;
+        set { if (_model.TitleItalic != value) { _model.TitleItalic = value; OnPropertyChanged(nameof(TitleItalic)); } }
+    }
+    public double TitleMaxWidth
+    {
+        get => _model.TitleMaxWidth;
+        set { if (System.Math.Abs(_model.TitleMaxWidth - value) > 0.001) { _model.TitleMaxWidth = value; OnPropertyChanged(nameof(TitleMaxWidth)); } }
     }
 
     public EnumOperationState OperationState
@@ -421,6 +410,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         get => _model.Width;
         set
         {
+            //_log?.Info($"[GMapCustomMarker] Width 변경: {Width} -> {value}");
+            //_log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Width = value;
             OnPropertyChanged(nameof(Width));
             UpdateOffset();
@@ -432,6 +423,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         get => _model.Height;
         set
         {
+            //_log?.Info($"[GMapCustomMarker] Width 변경: {Height} -> {value}");
+            //_log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Height = value;
             OnPropertyChanged(nameof(Height));
             UpdateOffset();
@@ -472,6 +465,17 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    /// <summary>레이어 마스터 가시성(조건2) — 모델 Visible 연동(영속). false=심볼 전체 숨김. 속성창 ShowShape/ShowTitle(조건3)과 독립.</summary>
+    public bool Visible
+    {
+        get => _model.Visible;
+        set
+        {
+            _model.Visible = value;
+            OnPropertyChanged(nameof(Visible));
+        }
+    }
+
     public bool ShowTitle
     {
         get => _model.ShowTitle;
@@ -480,6 +484,18 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             _model.ShowTitle = value;
             OnPropertyChanged(nameof(ShowTitle));
         }
+    }
+
+    /// <summary>라벨 상대 오프셋 — 모델 연동(영속). LabelAdorner가 읽고 드래그 시 갱신(Symbol_Label_Decouple).</summary>
+    public double LabelOffsetX
+    {
+        get => _model?.LabelOffsetX ?? 0d;
+        set { if (_model != null) _model.LabelOffsetX = value; OnPropertyChanged(nameof(LabelOffsetX)); }
+    }
+    public double LabelOffsetY
+    {
+        get => _model?.LabelOffsetY ?? 0d;
+        set { if (_model != null) _model.LabelOffsetY = value; OnPropertyChanged(nameof(LabelOffsetY)); }
     }
 
     public EnumColorType FillColor
@@ -512,6 +528,18 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    int IEditableMarker.ZOrder
+    {
+        get => ZIndex;  // GMapMarker.ZIndex (GMap.NET ItemContainerStyle 바인딩 → 렌더 순서)
+        set
+        {
+            ZIndex = value;  // GMap.NET PropertyChanged → ItemContainerStyle 바인딩 갱신
+            _model.ZOrder = value;
+            if (Shape is System.Windows.UIElement shapeEl)
+                System.Windows.Controls.Panel.SetZIndex(shapeEl, value);
+        }
+    }
+
     public bool IsSelected
     {
         get => _isSelected;
@@ -522,13 +550,54 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    public bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            _isVisible = value;
+            OnPropertyChanged(nameof(IsVisible));
+        }
+    }
+
+    public bool IsLayerEnabled
+    {
+        get => _isLayerEnabled;
+        set
+        {
+            _isLayerEnabled = value;
+            OnPropertyChanged(nameof(IsLayerEnabled));
+        }
+    }
+
+    /// <summary>잠금 상태 — 모델 IsLocked 연동(영속). 맵 클릭 차단은 GMapCustomControl 히트테스트/선택 가드가 처리.</summary>
+    public bool IsLocked
+    {
+        get => _model?.IsLocked ?? false;
+        set
+        {
+            if (_model != null) _model.IsLocked = value;
+            OnPropertyChanged(nameof(IsLocked));
+        }
+    }
+
+    public bool EnableShapeAnimation
+    {
+        get => _enableShapeAnimation;
+        set 
+        {
+            _enableShapeAnimation = value;
+            OnPropertyChanged(nameof(EnableShapeAnimation));
+        }
+    }
+
 
     /// <summary>
     /// 강타입 모델 속성
     /// </summary>
     public T Model => _model;
     public RelayCommand? ShowPropertyCommand { get; protected set; }
-    
+    public bool IsDisposed => _disposed;
     #endregion
     #region - Attributes -
     public event System.Action? StatusChanged;
@@ -536,12 +605,10 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     protected ILogService? _log;
     protected T _model;
 
-    protected DispatcherTimer? _monitorTimer;
-    protected const int TIMEOUT = 60 * 60;
-    protected DateTime _refreshTime;
     protected bool _disposed = false;
-
-    protected CancellationTokenSource? _eventToken;
     protected bool _isSelected;
+    private bool _enableShapeAnimation;
+    private bool _isVisible;
+    private bool _isLayerEnabled = true;
     #endregion
 }

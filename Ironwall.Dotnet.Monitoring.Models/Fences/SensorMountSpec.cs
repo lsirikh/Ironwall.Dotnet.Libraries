@@ -1,0 +1,98 @@
+﻿using Newtonsoft.Json;
+using System;
+
+namespace Ironwall.Dotnet.Monitoring.Models.Fences;
+
+/// <summary>
+/// 센서 한 대의 설치 자리(fence-wiring-editor FR-07) — 어느 망(또는 기둥) · 어느 자리 · 높이 조정 · 보는 쪽.
+/// </summary>
+/// <param name="Panel">
+/// 기둥 자리(<see cref="FenceMountSpot.PostTop"/> · <see cref="FenceMountSpot.PostMiddle"/>)면 <b>기둥 번호</b>(0…망 수 — 망 i 의 왼쪽 기둥이 i),
+/// 그 밖이면 <b>망 번호</b>(0…망 수−1).
+/// </param>
+/// <param name="Spot">자리(줄 안에서 높이 · 기둥/망을 고른다).</param>
+/// <param name="Lane">아래 줄 · 위 줄(FR-18) — 자리와 별개. 옛 문서(schema 1)에는 없어 아래 줄로 읽는다.</param>
+/// <param name="HeightOffsetM">자리 높이에서 더 올리거나(+) 내린(−) 거리(m).</param>
+/// <param name="FacesBack">
+/// 보는 쪽이 뒤(펜스 내부)인가 — 저장 문서에만 싣는다(지도가 읽을 몫). 결선 창에서는 서버의 <c>spec.wiring.facing</c> 이 정본이라
+/// 편집 중에는 늘 <c>false</c> 로 둔다.
+/// </param>
+public sealed record SensorMountSpec(
+    [property: JsonProperty("panel")] int Panel,
+    [property: JsonProperty("spot")] FenceMountSpot Spot,
+    [property: JsonProperty("height_offset_m")] double HeightOffsetM = 0,
+    [property: JsonProperty("faces_back")] bool FacesBack = false,
+    [property: JsonProperty("lane")] FenceLane Lane = FenceLane.Lower,
+    [property: JsonProperty("column")] FenceColumn Column = FenceColumn.Center)
+{
+    public const double MIN_OFFSET_M = -3.0;
+    public const double MAX_OFFSET_M = 3.0;
+
+    #region - 센서 설치 위치 · 속성 프리셋(sensor-mount-preset D1 — 더하기만) -
+    /// <summary>센서 모델 id(<see cref="Presets.SensorModel.Id"/>) — 없으면 장비 종류의 기본 모델.</summary>
+    [JsonProperty("model_id", NullValueHandling = NullValueHandling.Ignore)]
+    public int? ModelId { get; init; }
+
+    /// <summary>위치 프리셋 id — 있으면 자리는 "프리셋 + <see cref="MountOverride"/>" 로 계산한다(<see cref="Presets.SensorMountResolver"/>).</summary>
+    [JsonProperty("mount_preset_id", NullValueHandling = NullValueHandling.Ignore)]
+    public int? MountPresetId { get; init; }
+
+    /// <summary>그 자리에서만 따로 고친 값(있는 칸만).</summary>
+    [JsonProperty("mount_override", NullValueHandling = NullValueHandling.Ignore)]
+    public Presets.SensorMountOverride? MountOverride { get; init; }
+
+    /// <summary>속성 프리셋 id — 없으면 모델의 ★기본.</summary>
+    [JsonProperty("attr_preset_id", NullValueHandling = NullValueHandling.Ignore)]
+    public int? AttrPresetId { get; init; }
+
+    /// <summary>
+    /// 사용자가 위치 프리셋을 골라(적용 · 따로 고친 값 · 붙는 점 끌기) 세운 자리인가 — 참일 때만 결선 펜스 보기가 "프리셋 + 따로 고친 값" 으로 그리고 붙는 점 끌기를 쓴다.
+    /// 저장 때 옛 자리를 이관(FR-19)한 자리 · 이 칸이 없는 옛 문서는 9자리 계산이 정본이다(기존 키 · 끌기 계약 — 2026-10-13 실창 회귀).
+    /// </summary>
+    [JsonProperty("mount_preset_chosen", NullValueHandling = NullValueHandling.Ignore)]
+    public bool? MountPresetChosen { get; init; }
+
+    /// <summary>위치 프리셋으로 서는 센서인가.</summary>
+    [JsonIgnore]
+    public bool HasMountPreset => MountPresetId is > 0;
+
+    /// <summary>사용자가 고른 위치 프리셋으로 서는 센서인가(<see cref="MountPresetChosen"/>) — 이관만 된 자리는 거짓.</summary>
+    [JsonIgnore]
+    public bool IsPresetChosen => HasMountPreset && MountPresetChosen == true;
+    #endregion
+
+    /// <summary>기둥에 다는 자리인가(<see cref="Panel"/> 이 기둥 번호).</summary>
+    [JsonIgnore]
+    public bool IsPostSpot => IsPost(Spot);
+
+    /// <summary>기둥에 다는 자리인가.</summary>
+    public static bool IsPost(FenceMountSpot spot) => spot is FenceMountSpot.PostTop or FenceMountSpot.PostMiddle;
+
+    /// <summary>담에 다는 자리인가.</summary>
+    public static bool IsWall(FenceMountSpot spot) => spot is FenceMountSpot.WallTop or FenceMountSpot.WallFace or FenceMountSpot.WallBottom;
+
+    /// <summary>높이 조정을 범위 안으로(0.05m 단위).</summary>
+    public static double ClampOffset(double metres)
+        => double.IsFinite(metres) ? Math.Round(Math.Clamp(metres, MIN_OFFSET_M, MAX_OFFSET_M) * 20) / 20 : 0;
+
+    /// <summary>망(담) 칸 안의 자리인가 — 열(<see cref="Column"/>)이 뜻을 갖는다(기둥 자리는 늘 가운데).</summary>
+    [JsonIgnore]
+    public bool IsPanelSpot => !IsPostSpot;
+
+    /// <summary>열 이름 — 왼쪽 · 가운데 · 오른쪽.</summary>
+    public static string ColumnText(FenceColumn column) => column switch { FenceColumn.Left => "왼쪽", FenceColumn.Right => "오른쪽", _ => "가운데" };
+
+    /// <summary>자리 이름(한글).</summary>
+    public static string SpotText(FenceMountSpot spot) => spot switch
+    {
+        FenceMountSpot.PostMiddle => "기둥 중간",
+        FenceMountSpot.PanelCenter => "망 가운데",
+        FenceMountSpot.WallTop => "담 위",
+        FenceMountSpot.WallFace => "담 앞면",
+        FenceMountSpot.PanelBottom => "망 아래",
+        FenceMountSpot.PanelTop => "망 위",
+        FenceMountSpot.WallBottom => "담 아래",
+        FenceMountSpot.RazorCoil => "윤형 코일",
+        _ => "기둥 위",
+    };
+}

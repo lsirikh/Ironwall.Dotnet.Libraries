@@ -1,0 +1,233 @@
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+
+namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Presets;
+/****************************************************************************
+   Purpose      : 처음 실행 때 심어 주는 본보기 프리셋 다섯(설계 정본 AS 의 예시 그대로).
+   Created By   : GHLee
+   Created On   : 9/19/2026
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+****************************************************************************/
+
+/// <summary>
+/// 설계 정본(<c>device-component-assembly-preset-storyboard.html</c>)이 보여 주는 <b>다섯</b>을 그대로 심는다.
+/// </summary>
+/// <remarks>
+/// <para><b>Id 가 고정 글자</b>인 이유: 다시 심어도 같은 줄이라 늘어나지 않는다. Guid 로 만들면 파일이
+/// 한 번 깨질 때마다 "표준 옥외 함체" 가 하나씩 늘어난다.</para>
+/// <para><see cref="DevicePreset.UpdatedAt"/> 도 <b>고정 시각</b>이다 — 씨앗은 심은 때가 아니라 만든 때를 갖는다.
+/// 그래야 두 PC 의 씨앗이 같은 글자가 된다.</para>
+/// <para>씨앗은 <b>읽을 때마다 새로 만든다</b>. 안에 든 <see cref="JObject"/> 는 고칠 수 있는 물건이라
+/// 한 벌을 돌려 쓰면 한 곳의 편집이 모두에게 번진다.</para>
+/// </remarks>
+public static class DevicePresetSeeds
+{
+    /// <summary>씨앗이 만들어진 때(고정).</summary>
+    public static DateTimeOffset SeededAt { get; } =
+        new(2026, 9, 19, 0, 0, 0, TimeSpan.FromHours(9));
+
+    public const string EnclosureStandardId = "seed-enclosure-standard";
+    /// <summary>표준 제어기 — Id 글자는 옛 "IO 제어기 16채널" 그대로다(손대지 않은 옛 씨앗이 새 판으로 바뀌도록).</summary>
+    public const string ControllerStandardId = "seed-controller-io16";
+    public const string GateSlidingId = "seed-gate-sliding";
+    public const string CameraPtzColdId = "seed-camera-ptz-cold";
+    public const string SensorFenceId = "seed-sensor-fence";
+
+    /// <summary>본보기 다섯.</summary>
+    public static IReadOnlyList<DevicePreset> All => new[]
+    {
+        EnclosureStandard(), ControllerStandard(), GateSliding(), CameraPtzCold(), SensorFence(),
+    };
+
+    /// <summary>
+    /// 서버에 맞는 본보기 다섯 — <paramref name="serialPorts"/>(서버 8.0.8 이상)면 표준 제어기가 RS485 2 단자까지 담는다.
+    /// 아니면 <see cref="All"/> 그대로(그 전 서버 카탈로그에는 <c>RS485_PORT</c> 가 없어 등록이 막힌다).
+    /// </summary>
+    public static IReadOnlyList<DevicePreset> AllFor(bool serialPorts) => !serialPorts ? All : new[]
+    {
+        EnclosureStandard(), ControllerWithSerialPorts(), GateSliding(), CameraPtzCold(), SensorFence(),
+    };
+
+    /// <summary>표준 옥외 함체 — 도어 · 온습도 · 히터 · 팬 · UPS.</summary>
+    private static DevicePreset EnclosureStandard() => new()
+    {
+        Id = EnclosureStandardId,
+        Name = "표준 옥외 함체",
+        Category = EnumDeviceCategory.Enclosure,
+        TypeAxisCode = "Outdoor",
+        Description = "도어·온습도·히터·팬·UPS",
+        UpdatedAt = SeededAt,
+        IsSeed = true,
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("DOOR_SENSOR", "door", "전면 도어"),
+            Component("TEMPERATURE_SENSOR", "temp", "내부 상단"),
+            Component("HUMIDITY_SENSOR", "humid", "내부 상단"),
+            Component("HEATER", "heater", "하단"),
+            Component("FAN", "fan", "상단 배기"),
+            Component("UPS", "ups", "하단 트레이"),
+            Component("NETWORK_INTERFACE", "nic", null),
+        },
+        Thresholds = JObject.Parse("""
+            { "temperature": { "high": 45, "low": -10 }, "humidity": { "high": 85, "low": null } }
+            """),
+        ComponentOverrides = JObject.Parse("""
+            { "heater": { "enabled": true }, "fan": { "enabled": true } }
+            """),
+    };
+
+    /// <summary>
+    /// 표준 제어기 — 실제 단자 그대로: 접점 2 + 이더넷 1. (실물에는 RS485 2 도 있다 — 아래 remarks.)
+    /// </summary>
+    /// <remarks>
+    /// <para>예전 씨앗은 "IO 제어기 16채널"(접점 16 + NIC)이었는데 실제 제어기와 맞지 않았다 — 사용자 확인(2026-10-02):
+    /// "제어기에는 2개의 RS485 와 1개의 이더넷, 2개의 접점이 있다".</para>
+    /// <para><b>RS485 두 포트는 서버 8.0.8 부터 담는다</b>(<see cref="ControllerWithSerialPorts"/>) — 그 전 서버 부품 카탈로그에는
+    /// RS485 포트 부품 유형이 없다(서버에서 RS485 는 센서의 <c>connection.type</c> 일 뿐이고, 제어기에 달 수 있는 부품은
+    /// CONTACT_INPUT · NETWORK_INTERFACE 둘뿐). Id 는 그대로 둔다 — 손대지 않은 옛 씨앗이
+    /// <see cref="RefreshIfUntouched(DevicePreset, bool)"/> 로 서버에 맞는 판으로 바뀐다.</para>
+    /// </remarks>
+    private static DevicePreset ControllerStandard() => new()
+    {
+        Id = ControllerStandardId,
+        Name = "표준 제어기 (접점 2 · 이더넷)",
+        Category = EnumDeviceCategory.Controller,
+        TypeAxisCode = "IoController",
+        Description = "접점 2 + 이더넷 1 (RS485 2 는 서버 부품 유형 대기)",
+        UpdatedAt = SeededAt,
+        IsSeed = true,
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("CONTACT_INPUT", "ci_1", "접점 단자 1", 1),
+            Component("CONTACT_INPUT", "ci_2", "접점 단자 2", 2),
+            Component("NETWORK_INTERFACE", "nic", "이더넷 포트"),
+        },
+    };
+
+    /// <summary>
+    /// 표준 제어기(서버 8.0.8 이상) — 실물 그대로 RS485 2 · 이더넷 1 · 접점 2. 단자 차례는 GIS 가 서버에 보낸 요청 그대로다.
+    /// </summary>
+    /// <remarks>
+    /// Id · 심은 시각이 <see cref="ControllerStandard"/> 와 같다 — 손대지 않은 씨앗은 서버 판본에 따라 두 판 사이를 오간다.
+    /// 포트 번호는 <c>channel</c>, 보레이트 등은 부품 <c>spec</c> 자리다(재정의 아님) — 현장마다 달라 씨앗에는 싣지 않는다.
+    /// </remarks>
+    private static DevicePreset ControllerWithSerialPorts() => ControllerStandard() with
+    {
+        Name = "표준 제어기 (RS485 2 · 접점 2 · 이더넷)",
+        Description = "RS485 2 + 이더넷 1 + 접점 2",
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("RS485_PORT", "rs485_1", "RS485 단자 1", 1),
+            Component("RS485_PORT", "rs485_2", "RS485 단자 2", 2),
+            Component("NETWORK_INTERFACE", "nic", "이더넷 포트"),
+            Component("CONTACT_INPUT", "ci_1", "접점 단자 1", 1),
+            Component("CONTACT_INPUT", "ci_2", "접점 단자 2", 2),
+        },
+    };
+
+    /// <summary>슬라이딩 통문 — 구동부 · 도어센서 · 리미트 2. 문 부품의 key 가 함체와 다르다(<c>actuator</c>).</summary>
+    private static DevicePreset GateSliding() => new()
+    {
+        Id = GateSlidingId,
+        Name = "슬라이딩 통문",
+        Category = EnumDeviceCategory.Gate,
+        TypeAxisCode = "Sliding",
+        Description = "구동부·도어센서·리미트 2",
+        UpdatedAt = SeededAt,
+        IsSeed = true,
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("DOOR_ACTUATOR", "actuator", "문틀 상부", 2),
+            Component("DOOR_SENSOR", "door", "문틀 측면"),
+            Component("LIMIT_SWITCH", "limit_open", "열림단", 3),
+            Component("LIMIT_SWITCH", "limit_close", "닫힘단", 4),
+            Component("NETWORK_INTERFACE", "nic", null),
+        },
+    };
+
+    /// <summary>PTZ 카메라 (한랭지) — PTZ · IR · 와이퍼 · 히터.</summary>
+    private static DevicePreset CameraPtzCold() => new()
+    {
+        Id = CameraPtzColdId,
+        Name = "PTZ 카메라 (한랭지)",
+        Category = EnumDeviceCategory.Camera,
+        TypeAxisCode = "PTZ",
+        Description = "PTZ·IR·와이퍼·히터",
+        UpdatedAt = SeededAt,
+        IsSeed = true,
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("PTZ_UNIT", "ptz", null),
+            Component("IR_LED", "ir", "전면"),
+            Component("WIPER", "wiper", "전면"),
+            Component("HEATER", "heater", "하우징"),
+            Component("NETWORK_INTERFACE", "nic", null),
+        },
+        // camera_mode 는 영상 모드(NORMAL · STABILIZATION · BLC · NIGHT_ENHANCE)다 — "AUTO" 는 주야간 모드의 값이라
+        // 서버가 422(VALUE_NOT_ALLOWED)로 거절했다(라이브 하네스 asm.R5a, 8.0.2 실측). 주야간 모드만 AUTO 를 받는다.
+        Modes = JObject.Parse("""
+            { "camera_mode": "NORMAL", "day_night_mode": "AUTO", "is_record": true }
+            """),
+        ComponentOverrides = JObject.Parse("""
+            { "heater": { "enabled": true } }
+            """),
+    };
+
+    /// <summary>펜스 진동 센서 — 진동 감지부 + NIC.</summary>
+    private static DevicePreset SensorFence() => new()
+    {
+        Id = SensorFenceId,
+        Name = "펜스 진동 센서",
+        Category = EnumDeviceCategory.Sensor,
+        TypeAxisCode = "Fence",
+        Description = "진동 감지부 + NIC",
+        UpdatedAt = SeededAt,
+        IsSeed = true,
+        Components = new List<ComponentDefinitionModel>
+        {
+            Component("VIBRATION_SENSOR", "vib", "펜스 상단"),
+            Component("NETWORK_INTERFACE", "nic", null),
+        },
+    };
+
+    /// <summary>Id 로 지금 판의 씨앗을 새로 만든다. 씨앗이 아니면 null.</summary>
+    public static DevicePreset? Find(string? id) => Find(id, serialPorts: false);
+
+    /// <summary>Id 로 서버에 맞는 판의 씨앗을 새로 만든다(<see cref="AllFor"/>). 씨앗이 아니면 null.</summary>
+    public static DevicePreset? Find(string? id, bool serialPorts)
+        => string.IsNullOrWhiteSpace(id) ? null : AllFor(serialPorts).FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// 파일에서 읽은 씨앗이 <b>손대지 않은 그대로</b>면(씨앗 표시 + 심은 시각 그대로) 지금 판의 씨앗으로 바꾼다.
+    /// </summary>
+    /// <remarks>
+    /// 씨앗은 첫 실행 때 파일에 한 번 쓰이고 다시 심지 않는다 — 씨앗의 값이 틀렸다면(예: 카메라 <c>camera_mode:"AUTO"</c>,
+    /// 서버 422) 고쳐도 이미 쓰인 파일에는 옛 값이 남는다. 이름을 바꾸거나 저장한 적이 있으면 <see cref="DevicePreset.UpdatedAt"/> 이
+    /// 바뀌거나 씨앗 표시가 꺼지므로 사용자의 손이 닿은 줄은 건드리지 않는다.
+    /// </remarks>
+    public static DevicePreset RefreshIfUntouched(DevicePreset preset) => RefreshIfUntouched(preset, serialPorts: false);
+
+    /// <summary><see cref="RefreshIfUntouched(DevicePreset)"/> 의 서버 판본 판 — <paramref name="serialPorts"/> 면 8.0.8 씨앗으로.</summary>
+    public static DevicePreset RefreshIfUntouched(DevicePreset preset, bool serialPorts)
+    {
+        if (preset is null || !preset.IsSeed || preset.UpdatedAt != SeededAt) return preset!;
+        var current = Find(preset.Id, serialPorts);
+        return current is null || current.Category != preset.Category ? preset : current;
+    }
+
+    private static ComponentDefinitionModel Component(string type, string key, string? position, int? channel = null)
+        => new()
+        {
+            Key = key,
+            Type = type,
+            Position = string.IsNullOrEmpty(position) ? null : position,
+            Channel = channel,
+        };
+}

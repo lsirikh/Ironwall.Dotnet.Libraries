@@ -82,6 +82,8 @@ langCode switch
          EnumDeviceType.IpSpeaker => UnitConst_en.SPEAKER,
          EnumDeviceType.Radar => UnitConst_en.RADAR,
          EnumDeviceType.OpticalCable => UnitConst_en.OPTICAL_CABLE,
+         EnumDeviceType.Enclosure => UnitConst_en.ENCLOSURE,
+         EnumDeviceType.Lamp => UnitConst_en.LAMP,
          _ => "알 수 없음"
      },
      LanguageConst.KOREAN => enumId switch
@@ -99,6 +101,8 @@ langCode switch
          EnumDeviceType.IpSpeaker => UnitConst_kr.SPEAKER,
          EnumDeviceType.Radar => UnitConst_kr.RADAR,
          EnumDeviceType.OpticalCable => UnitConst_kr.OPTICAL_CABLE,
+         EnumDeviceType.Enclosure => UnitConst_kr.ENCLOSURE,
+         EnumDeviceType.Lamp => UnitConst_kr.LAMP,
          _ => "Unknown"
      },
      _ => enumId switch
@@ -116,6 +120,8 @@ langCode switch
          EnumDeviceType.IpSpeaker => UnitConst.SPEAKER,
          EnumDeviceType.Radar => UnitConst.RADAR,
          EnumDeviceType.OpticalCable => UnitConst.OPTICAL_CABLE,
+         EnumDeviceType.Enclosure => UnitConst.ENCLOSURE,
+         EnumDeviceType.Lamp => UnitConst.LAMP,
          _ => "Unknown"
      }
  };

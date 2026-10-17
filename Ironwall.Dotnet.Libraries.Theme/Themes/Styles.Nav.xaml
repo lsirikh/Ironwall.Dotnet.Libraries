@@ -1,0 +1,92 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!--
+        IMPL-14 — 네비게이션/툴바/상태 토큰 스타일셋 (FR-06, FR-08).
+        툴바 아이콘버튼/토글 · NavRail 탭 · StatusBadge(severity hue-lock).
+        keyed only. 툴바 토글/배지는 토큰 기반 self-contained 템플릿(상태색 명시 제어).
+    -->
+
+    <!-- ═══════════════ 툴바 아이콘 버튼 ═══════════════ -->
+
+    <Style x:Key="ModernToolbarButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+    </Style>
+
+    <!-- 툴바 토글(Active 상태) — 토큰 기반 템플릿 -->
+    <Style x:Key="ModernToolbarToggle" TargetType="ToggleButton">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border
+                        x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{DynamicResource RadiusSmall}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════ NavRail 탭 ═══════════════ -->
+
+    <Style x:Key="ModernNavRailItem" TargetType="TabItem" BasedOn="{StaticResource MaterialDesignNavigationRailTabItem}">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="md:ColorZoneAssist.Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+
+    <!-- ═══════════════ StatusBadge (severity hue-lock, FR-08) ═══════════════ -->
+
+    <!-- 공통 배지 컨테이너 -->
+    <Style x:Key="StatusBadgeBase" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusSmall}" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
+    <Style x:Key="StatusBadgeCritical" TargetType="Border" BasedOn="{StaticResource StatusBadgeBase}">
+        <Setter Property="Background" Value="{DynamicResource StatusCriticalBrush}" />
+    </Style>
+    <Style x:Key="StatusBadgeWarning" TargetType="Border" BasedOn="{StaticResource StatusBadgeBase}">
+        <Setter Property="Background" Value="{DynamicResource StatusWarningBrush}" />
+    </Style>
+    <Style x:Key="StatusBadgeNormal" TargetType="Border" BasedOn="{StaticResource StatusBadgeBase}">
+        <Setter Property="Background" Value="{DynamicResource StatusNormalBrush}" />
+    </Style>
+    <Style x:Key="StatusBadgeInfo" TargetType="Border" BasedOn="{StaticResource StatusBadgeBase}">
+        <Setter Property="Background" Value="{DynamicResource StatusInfoBrush}" />
+    </Style>
+
+    <!-- 배지 위 텍스트(흰색 고정) -->
+    <Style x:Key="StatusBadgeText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+
+</ResourceDictionary>

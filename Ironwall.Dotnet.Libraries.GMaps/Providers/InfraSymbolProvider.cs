@@ -1,0 +1,40 @@
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Defines;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using System;
+using System.Diagnostics;
+
+namespace Ironwall.Dotnet.Libraries.GMaps.Providers;
+/****************************************************************************
+   Purpose      :                                                          
+   Created By   : GHLee                                                
+   Created On   : 9/19/2025 9:57:14 PM                                                    
+   Department   : SW Team                                                   
+   Company      : Sensorway Co., Ltd.                                       
+   Email        : lsirikh@naver.com                                         
+****************************************************************************/
+[DebuggerDisplay("Count = {CollectionEntity.Count}")]
+
+public class InfraSymbolProvider : BaseSymbolProvider<IInfraSymbolModel>
+{
+    #region - Ctors -
+    public InfraSymbolProvider(ILogService log, SymbolProvider provider) : base(log, provider)
+    {
+
+    }
+    #endregion
+    #region - Implementation of Interface -
+    #endregion
+    #region - Overrides -
+    #endregion
+    #region - Binding Methods -
+    #endregion
+    #region - Processes -
+    #endregion
+    #region - IHanldes -
+    #endregion
+    #region - Properties -
+    #endregion
+    #region - Attributes -
+    #endregion
+}

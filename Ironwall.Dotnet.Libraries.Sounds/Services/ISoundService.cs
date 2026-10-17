@@ -15,6 +15,20 @@ namespace Ironwall.Dotnet.Libraries.Sounds.Services;
 /// </summary>
 public interface ISoundService
 {
+    /*──────────────────────── 이벤트 ────────────────────────*/
+
+    /// <summary>
+    /// 탐지 사운드 재생 사이클이 정상 완료되었을 때 발생한다.
+    /// 취소(CancellationToken)로 중단된 경우에는 발생하지 않는다.
+    /// </summary>
+    event Action? OnDetectionPlaybackCompleted;
+
+    /// <summary>
+    /// 장애 사운드 재생 사이클이 정상 완료되었을 때 발생한다.
+    /// 취소(CancellationToken)로 중단된 경우에는 발생하지 않는다.
+    /// </summary>
+    event Action? OnMalfunctionPlaybackCompleted;
+
     /*──────────────────────── 상태 ────────────────────────*/
 
     /// <summary>
@@ -130,4 +144,11 @@ public interface ISoundService
     /// 진행 중인 재생 작업들이 안전하게 취소될 때까지 대기한다.
     /// </summary>
     Task StopAllSoundsAsync();
+
+    /// <summary>
+    /// 현재 재생을 즉시 중지한 후 지정 이벤트 타입의 사운드를 재생한다.
+    /// 내부적으로 _switchSemaphore로 직렬화하여 타입 전환 경쟁 조건을 방지한다.
+    /// 취소(CancellationToken)로 중단된 경우 재생을 시작하지 않는다.
+    /// </summary>
+    Task StopAndPlayAsync(EnumEventType eventType, CancellationToken ct = default);
 }

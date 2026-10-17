@@ -1,0 +1,841 @@
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
+using System.Diagnostics;
+using System.Globalization;
+using System.Windows.Threading;
+
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+/****************************************************************************
+   Purpose      : UUID 기반 글로벌 이벤트 큐 + 그룹 역인덱스 + 공유 타이머
+   Created By   : GHLee
+   Created On   : 2026-03-08
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+****************************************************************************/
+public class EventQueueManager : IEventQueueManager, IDisposable
+{
+    #region - Ctors -
+    public EventQueueManager(ILogService? log = null, IEventSetupModel? eventSetupModel = null)
+    {
+        _log = log;
+        _eventSetupModel = eventSetupModel;
+        _entries = new Dictionary<string, EventEntry>();
+        _groupIndex = new Dictionary<int, HashSet<string>>();
+        _deviceIndex = new Dictionary<(int Id, EnumDeviceType Type), HashSet<string>>();
+    }
+    #endregion
+
+    #region - IEventQueueManager -
+    public string Enqueue(EventEntry entry, string? externalEntryId = null)
+    {
+        entry.EntryId = !string.IsNullOrWhiteSpace(externalEntryId)
+            ? externalEntryId
+            : Guid.NewGuid().ToString();
+        entry.EnqueuedAt = DateTime.Now;
+
+        bool isFirstDeviceEvent = false;
+        var groupFirstEvents = new List<(int GroupId, EnumEventType EventType)>();
+        var groupTransitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        var autoRecoveryIds = new List<string>();
+        // 제어기-소유 자동복구로 상태가 바뀐 '제어기 자신' 심볼 전이(수신 엔트리 키와 별개).
+        var controllerTransitions = new List<(int DeviceId, EnumDeviceType DeviceType,
+                                              EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        var devicePrev = EnumCompositeEventStatus.Normal;
+        var deviceNext = EnumCompositeEventStatus.Normal;
+        bool deviceStateChanged = false;
+
+        lock (_gate)
+        {
+            var deviceKey = (entry.DeviceId, entry.DeviceType);
+
+            // 1. 영향 그룹 ID 수집 + 자동복구 Fault 엔트리 수집 (scratch 재사용)
+            _scratchAffectedGroupIds.Clear();
+            if (entry.GroupIds != null)
+                foreach (var gid in entry.GroupIds)
+                    _scratchAffectedGroupIds.Add(gid);
+
+            _scratchFaultIds.Clear();
+            if (entry.EventType == EnumEventType.Intrusion
+                && _deviceIndex.TryGetValue(deviceKey, out var existingDevIds))
+            {
+                foreach (var id in existingDevIds)
+                {
+                    if (_entries.TryGetValue(id, out var fe) && fe.EventType == EnumEventType.Fault)
+                    {
+                        _scratchFaultIds.Add(id);
+                        if (fe.GroupIds != null)
+                            foreach (var gid in fe.GroupIds)
+                                _scratchAffectedGroupIds.Add(gid);
+                    }
+                }
+            }
+
+            // 1-b. 제어기-소유 자동복구: 탐지 센서가 소속된 제어기의 블랙아웃 Fault 수집
+            //      (Controller_Fault_AutoRecovery_Extension FR-03). same-deviceKey와 키가 달라
+            //      제거는 제어기 자신 deviceKey로 별도 처리(아래 3-b).
+            _scratchControllerFaultIds.Clear();
+            if (entry.EventType == EnumEventType.Intrusion
+                && entry.OwningControllerId is int ownCtrl && ownCtrl > 0
+                && _deviceIndex.TryGetValue((ownCtrl, EnumDeviceType.Controller), out var ctrlDevIds))
+            {
+                foreach (var id in ctrlDevIds)
+                {
+                    if (_entries.TryGetValue(id, out var ce)
+                        && ce.EventType == EnumEventType.Fault
+                        && ce.IsControllerBlackout)
+                    {
+                        _scratchControllerFaultIds.Add(id);
+                        if (ce.GroupIds != null)
+                            foreach (var gid in ce.GroupIds)
+                                _scratchAffectedGroupIds.Add(gid);
+                    }
+                }
+            }
+
+            // 2. prev 상태 스냅샷 (모든 조작 전, scratch 재사용)
+            _scratchPrevGroupStates.Clear();
+            foreach (var gid in _scratchAffectedGroupIds)
+                _scratchPrevGroupStates[gid] = ComputeGroupState(gid);
+            devicePrev = ComputeDeviceState(deviceKey);
+
+            // 2-b. 제어기 '자신' 키의 prev 스냅샷 — 3-b가 제어기 블랙아웃 Fault를 제어기 자기
+            //      deviceKey로 제거하는데, 종전엔 그 키의 전이를 발화하지 않아 그룹만 풀리고
+            //      제어기 심볼은 Blackout으로 남았다(자기 심볼 미복원). 제거 전에 스냅샷 필수.
+            //      수신 엔트리와 같은 키면 아래 device 전이가 이미 담당하므로 제외(중복 발화 방지).
+            _scratchPrevControllerStates.Clear();
+            foreach (var faultId in _scratchControllerFaultIds)
+            {
+                if (!_entries.TryGetValue(faultId, out var ce)) continue;
+                var ck = (ce.DeviceId, ce.DeviceType);
+                if (ck == deviceKey || _scratchPrevControllerStates.ContainsKey(ck)) continue;
+                _scratchPrevControllerStates[ck] = ComputeDeviceState(ck);
+            }
+
+            // 3. Fault 엔트리 원자 제거 (자동복구)
+            foreach (var faultId in _scratchFaultIds)
+            {
+                if (_entries.TryGetValue(faultId, out var faultEntry))
+                {
+                    if (faultEntry.GroupIds != null)
+                    {
+                        foreach (var gid in faultEntry.GroupIds)
+                        {
+                            if (_groupIndex.TryGetValue(gid, out var gEntryIds))
+                            {
+                                gEntryIds.Remove(faultId);
+                                if (gEntryIds.Count == 0)
+                                    _groupIndex.Remove(gid);
+                            }
+                        }
+                    }
+                    _entries.Remove(faultId);
+                }
+                if (_deviceIndex.TryGetValue(deviceKey, out var devIds))
+                {
+                    devIds.Remove(faultId);
+                    if (devIds.Count == 0)
+                        _deviceIndex.Remove(deviceKey);
+                }
+                autoRecoveryIds.Add(faultId);
+            }
+
+            // 3-b. 제어기 블랙아웃 Fault 원자 제거 — 자신 deviceKey로 정리(위 3의 incoming 키와 다름)
+            foreach (var faultId in _scratchControllerFaultIds)
+            {
+                if (_entries.TryGetValue(faultId, out var ctrlFault))
+                {
+                    if (ctrlFault.GroupIds != null)
+                    {
+                        foreach (var gid in ctrlFault.GroupIds)
+                        {
+                            if (_groupIndex.TryGetValue(gid, out var gCtrlIds))
+                            {
+                                gCtrlIds.Remove(faultId);
+                                if (gCtrlIds.Count == 0)
+                                    _groupIndex.Remove(gid);
+                            }
+                        }
+                    }
+                    var ctrlKey = (ctrlFault.DeviceId, ctrlFault.DeviceType);
+                    if (_deviceIndex.TryGetValue(ctrlKey, out var ctrlDevSet))
+                    {
+                        ctrlDevSet.Remove(faultId);
+                        if (ctrlDevSet.Count == 0)
+                            _deviceIndex.Remove(ctrlKey);
+                    }
+                    _entries.Remove(faultId);
+                }
+                autoRecoveryIds.Add(faultId);
+            }
+
+            // 4. 글로벌 저장소 등록
+            _entries[entry.EntryId] = entry;
+
+            // 5. 그룹 역인덱스 등록 (TryGetValue 단일 조회)
+            if (entry.GroupIds != null)
+            {
+                foreach (var groupId in entry.GroupIds)
+                {
+                    if (!_groupIndex.TryGetValue(groupId, out var groupEntrySet))
+                    {
+                        groupEntrySet = new HashSet<string>();
+                        _groupIndex[groupId] = groupEntrySet;
+                    }
+                    var wasEmpty = groupEntrySet.Count == 0;
+                    groupEntrySet.Add(entry.EntryId);
+                    if (wasEmpty)
+                        groupFirstEvents.Add((groupId, entry.EventType));
+                }
+            }
+
+            // 6. 개별 심볼 역인덱스 등록 (TryGetValue 단일 조회)
+            if (!_deviceIndex.TryGetValue(deviceKey, out var deviceEntrySet))
+            {
+                deviceEntrySet = new HashSet<string>();
+                _deviceIndex[deviceKey] = deviceEntrySet;
+            }
+            isFirstDeviceEvent = deviceEntrySet.Count == 0;
+            deviceEntrySet.Add(entry.EntryId);
+
+            // 7. next 상태 계산 (모든 등록 후)
+            foreach (var gid in _scratchAffectedGroupIds)
+            {
+                var prev = _scratchPrevGroupStates[gid];
+                var next = ComputeGroupState(gid);
+                if (prev != next)
+                    groupTransitions.Add((gid, prev, next));
+            }
+
+            deviceNext = ComputeDeviceState(deviceKey);
+            deviceStateChanged = devicePrev != deviceNext;
+
+            // 7-b. 제어기 자신 키의 next 계산 → 변화분만 전이 목록에 적재(발화는 lock 밖).
+            foreach (var kv in _scratchPrevControllerStates)
+            {
+                var ctrlNext = ComputeDeviceState(kv.Key);
+                if (kv.Value != ctrlNext)
+                    controllerTransitions.Add((kv.Key.Item1, kv.Key.Item2, kv.Value, ctrlNext));
+            }
+        }
+
+        // 계측(PERF-002 · 014): 큐 적재 시각 + 이 아래 동기 전이(심볼 관리자)가 이 이벤트로 찍히게 스레드 문맥을 세운다.
+        using var perfContext = PerfTrace.IsEnabled ? BeginPerf(entry, PerfStages.Enqueued) : default;
+
+        // 이벤트 발화는 lock 밖에서 (데드락 방지)
+        var onAutoRecovery = OnAutoRecovery;
+        var onGroupFirst = OnGroupFirstEvent;
+        var onGroupStateChanged = OnGroupStateChanged;
+        var onDeviceStateChanged = OnDeviceStateChanged;
+        var onDeviceFirst = OnDeviceFirstEvent;
+        var onAnyEnqueue = OnAnyEnqueue;
+
+        foreach (var faultId in autoRecoveryIds)
+            onAutoRecovery?.Invoke(faultId);
+
+        foreach (var (groupId, eventType) in groupFirstEvents)
+            onGroupFirst?.Invoke(groupId, eventType);
+
+        foreach (var (groupId, prev, next) in groupTransitions)
+            onGroupStateChanged?.Invoke(groupId, prev, next);
+
+        if (deviceStateChanged)
+            onDeviceStateChanged?.Invoke(entry.DeviceId, entry.DeviceType, devicePrev, deviceNext);
+
+        // 제어기 자신 심볼 복원 — 그룹(구역)만 풀리고 제어기 아이콘은 검은색으로 남던 갭 해소.
+        foreach (var (ctrlId, ctrlType, prev, next) in controllerTransitions)
+            onDeviceStateChanged?.Invoke(ctrlId, ctrlType, prev, next);
+
+        if (isFirstDeviceEvent)
+            onDeviceFirst?.Invoke(entry.DeviceId, entry.DeviceType, entry.EventType);
+
+        onAnyEnqueue?.Invoke(entry.EventType);
+        RaiseActiveCountChanged();   // 인디케이터 라이브 갱신(GMap_Map_Instruments)
+        RaiseEntryEnqueued(entry);   // 이벤트 창 트리거(camera-popup-modes T-06) — 중복 걸러진 뒤의 한 건
+
+        return entry.EntryId;
+    }
+
+    public void Dequeue(string entryId)
+    {
+        var groupEmptyEvents = new List<int>();
+        var groupTransitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        (int DeviceId, EnumDeviceType DeviceType) deviceKey = default;
+        bool isDeviceEmpty = false;
+        var devicePrev = EnumCompositeEventStatus.Normal;
+        var deviceNext = EnumCompositeEventStatus.Normal;
+        bool deviceStateChanged = false;
+        EventEntry? removedEntry = null;
+
+        lock (_gate)
+        {
+            if (!_entries.TryGetValue(entryId, out var entry)) return;
+            removedEntry = entry;
+
+            deviceKey = (entry.DeviceId, entry.DeviceType);
+
+            // 1. prev 상태 스냅샷 (제거 전) — scratch 재사용 (_gate 보호 범위 내)
+            Debug.Assert(Monitor.IsEntered(_gate));
+            _scratchPrevGroupStates.Clear();
+            if (entry.GroupIds != null)
+                foreach (var groupId in entry.GroupIds)
+                    _scratchPrevGroupStates[groupId] = ComputeGroupState(groupId);
+            devicePrev = ComputeDeviceState(deviceKey);
+
+            // 2. 글로벌 저장소에서 제거
+            _entries.Remove(entryId);
+
+            // 3. 그룹 역인덱스에서 제거 + 전이 판단
+            if (entry.GroupIds != null)
+            {
+                foreach (var groupId in entry.GroupIds)
+                {
+                    if (_groupIndex.TryGetValue(groupId, out var entryIds))
+                    {
+                        entryIds.Remove(entryId);
+                        var next = ComputeGroupState(groupId);
+
+                        if (entryIds.Count == 0)
+                        {
+                            groupEmptyEvents.Add(groupId);
+                            _groupIndex.Remove(groupId);
+                        }
+
+                        if (_scratchPrevGroupStates.TryGetValue(groupId, out var prev) && prev != next)
+                            groupTransitions.Add((groupId, prev, next));
+                    }
+                }
+            }
+
+            // 4. 개별 심볼 역인덱스에서 제거
+            if (_deviceIndex.TryGetValue(deviceKey, out var deviceEntryIds))
+            {
+                deviceEntryIds.Remove(entryId);
+                if (deviceEntryIds.Count == 0)
+                {
+                    isDeviceEmpty = true;
+                    _deviceIndex.Remove(deviceKey);
+                }
+            }
+
+            deviceNext = ComputeDeviceState(deviceKey);
+            deviceStateChanged = devicePrev != deviceNext;
+        }
+
+        // 계측(PERF-006): 조치 · 자동정리로 빠진 이벤트의 문맥 — 아래 복원 전이가 이 이벤트로 찍힌다.
+        using var perfContext = PerfTrace.IsEnabled && removedEntry is not null ? BeginPerf(removedEntry, null) : default;
+
+        // 이벤트 발화는 lock 밖에서
+        var onGroupEmpty = OnGroupEmpty;
+        var onGroupStateChanged = OnGroupStateChanged;
+        var onDeviceStateChanged = OnDeviceStateChanged;
+        var onDeviceEmpty = OnDeviceEmpty;
+
+        foreach (var groupId in groupEmptyEvents)
+            onGroupEmpty?.Invoke(groupId);
+
+        foreach (var (groupId, prev, next) in groupTransitions)
+            onGroupStateChanged?.Invoke(groupId, prev, next);
+
+        if (deviceStateChanged)
+            onDeviceStateChanged?.Invoke(deviceKey.DeviceId, deviceKey.DeviceType, devicePrev, deviceNext);
+
+        if (isDeviceEmpty)
+            onDeviceEmpty?.Invoke(deviceKey.DeviceId, deviceKey.DeviceType);
+
+        RaiseActiveCountChanged();   // 동일-상태 dequeue도 카운트 반영(GMap_Map_Instruments)
+    }
+
+    /// <summary>
+    /// (EB3) 특정 장비에 속한 모든 이벤트 엔트리를 제거한다. 장비 삭제(NATS DELETED) 시 호출하면
+    /// 고아 이벤트 카드가 남지 않는다. _deviceIndex 스냅샷 후 Dequeue 에 위임 — 그룹/디바이스 인덱스,
+    /// 상태 전이, 심볼 이벤트 정리를 검증된 단일 경로로 처리한다.
+    /// 주(선행의존): 실제 호출 트리거(DeviceNatsSyncService 의 DELETED 분기)는 DeviceApi PRD(C1)에서
+    /// 연결된다. 현재는 메서드만 제공(dormant) — 회귀 위험 없음.
+    /// </summary>
+    public void RemoveByDevice(int deviceId, EnumDeviceType deviceType)
+    {
+        List<string> entryIds;
+        lock (_gate)
+        {
+            if (!_deviceIndex.TryGetValue((deviceId, deviceType), out var set) || set.Count == 0)
+                return;
+            entryIds = set.ToList();   // 스냅샷 — Dequeue 가 _deviceIndex 를 변경하므로 먼저 복사
+        }
+
+        foreach (var entryId in entryIds)
+            Dequeue(entryId);
+
+        _log?.Info($"[EB3] RemoveByDevice: Device({deviceId},{deviceType}) — {entryIds.Count}개 엔트리 제거");
+    }
+
+    public void DequeueAll()
+    {
+        var groupStates = new List<(int GroupId, EnumCompositeEventStatus State)>();
+        var deviceKeys = new List<(int Id, EnumDeviceType Type)>();
+        var deviceStates = new List<(int Id, EnumDeviceType Type, EnumCompositeEventStatus Prev)>();
+
+        lock (_gate)
+        {
+            foreach (var groupId in _groupIndex.Keys)
+                groupStates.Add((groupId, ComputeGroupState(groupId)));
+
+            foreach (var dk in _deviceIndex.Keys)
+                deviceStates.Add((dk.Id, dk.Type, ComputeDeviceState(dk)));
+
+            deviceKeys = _deviceIndex.Keys.Select(k => (k.Id, k.Type)).ToList();
+
+            _entries.Clear();
+            _groupIndex.Clear();
+            _deviceIndex.Clear();
+        }
+
+        var onGroupEmpty = OnGroupEmpty;
+        var onGroupStateChanged = OnGroupStateChanged;
+        var onDeviceStateChanged = OnDeviceStateChanged;
+        var onDeviceEmpty = OnDeviceEmpty;
+
+        foreach (var (groupId, _) in groupStates)
+            onGroupEmpty?.Invoke(groupId);
+
+        foreach (var (groupId, prev) in groupStates)
+            if (prev != EnumCompositeEventStatus.Normal)
+                onGroupStateChanged?.Invoke(groupId, prev, EnumCompositeEventStatus.Normal);
+
+        foreach (var (id, type, prev) in deviceStates)
+            if (prev != EnumCompositeEventStatus.Normal)
+                onDeviceStateChanged?.Invoke(id, type, prev, EnumCompositeEventStatus.Normal);
+
+        foreach (var (id, type) in deviceKeys)
+            onDeviceEmpty?.Invoke(id, type);
+
+        RaiseActiveCountChanged();   // 전체 비움 → (0,0) 통지(GMap_Map_Instruments)
+    }
+
+    public EventEntry? GetEntry(string entryId)
+    {
+        lock (_gate)
+            return _entries.TryGetValue(entryId, out var entry) ? entry : null;
+    }
+
+    /// <summary>
+    /// 활성 탐지/장애 건수 재집계 (D-01/03). _gate 보호 하 _entries를 EventType별 카운트.
+    /// <b>탐지 = 장애(Fault)가 아닌 모든 엔트리</b>(침입 · 접점 ON/OFF · 사전경보 Alert · 강풍 …) — 알람 배선(EventUiModule.WireSoundAlarm)이
+    /// Fault 외 전부를 탐지 소리로 울리므로 "울리는 것 = 세는 것" 이어야 한다(WP-8 H1). 종전엔 Intrusion 만 세어
+    /// 접점 · 사전경보가 들어오자마자 (0,0) 통지로 소리가 꺼졌고, 접점이 남았는데 침입만 조치해도 꺼졌다.
+    /// 통문 · 함체 접점은 큐에 들어오지 않으므로(DetectionNatsSyncService FR-13 ③ — 개폐 형태로만 유도) 여기 세이지 않는다.
+    /// </summary>
+    public (int Detection, int Fault) GetActiveCounts()
+    {
+        lock (_gate)
+        {
+            int det = 0, flt = 0;
+            foreach (var e in _entries.Values)
+            {
+                if (e.EventType == EnumEventType.Fault) flt++;
+                else det++;
+            }
+            return (det, flt);
+        }
+    }
+
+    /// <summary>
+    /// 활성 카운트 변경 통지 — 각 mutator 끝(lock 밖)에서 호출. 핸들러 없으면 재집계도 생략.
+    /// <para><b>최신값이 마지막에 도착한다(WP-8 M4)</b> — 종전엔 계산과 전달 사이에 순서가 없어, UI 스레드 Dequeue 가 계산한 (0,0) 이
+    /// NATS 스레드 Enqueue 의 (0,1) 보다 늦게 도착해 활성 장애가 있는데 소리를 껐다.
+    /// 이제 한 번에 한 스레드만 전달하고(<c>_countPumping</c>), 전달 중에 바뀐 것은 표시(<c>_countDirty</c>)만 남긴 채 돌아간다 —
+    /// 전달하는 스레드가 표시를 보고 <b>큐를 다시 읽어</b> 한 번 더 전달한다. 전달은 어떤 잠금도 쥐지 않는다(핸들러 재진입 · 교착 없음).
+    /// 중간값은 합쳐질 수 있으나(건수는 상태이지 사건이 아니다) 마지막으로 전달된 값은 언제나 큐의 실제 값이다.</para>
+    /// </summary>
+    private void RaiseActiveCountChanged()
+    {
+        if (OnActiveCountChanged == null) return;
+        Interlocked.Exchange(ref _countDirty, 1);
+        while (Interlocked.CompareExchange(ref _countPumping, 1, 0) == 0)
+        {
+            try
+            {
+                while (Interlocked.Exchange(ref _countDirty, 0) == 1)
+                {
+                    var handler = OnActiveCountChanged;
+                    if (handler == null) break;
+                    var (det, flt) = GetActiveCounts();
+                    handler.Invoke(det, flt);
+                }
+            }
+            finally
+            {
+                Volatile.Write(ref _countPumping, 0);
+            }
+            // 전달을 내려놓는 순간 다른 스레드가 표시만 하고 떠났을 수 있다 — 표시가 남았으면 다시 맡는다(잃어버린 깨움 방지).
+            if (Volatile.Read(ref _countDirty) == 0) break;
+        }
+    }
+
+    public int GetTotalQueueCount()
+    {
+        lock (_gate)
+            return _entries.Count;
+    }
+
+    public bool HasEventsForGroup(int groupId)
+    {
+        lock (_gate)
+            return _groupIndex.TryGetValue(groupId, out var entryIds) && entryIds.Count > 0;
+    }
+
+    public bool HasEventsForDevice(int deviceId, EnumDeviceType deviceType)
+    {
+        lock (_gate)
+            return _deviceIndex.TryGetValue((deviceId, deviceType), out var entryIds) && entryIds.Count > 0;
+    }
+
+    public EventEntry? FindEntryByDevice(int deviceId, EnumDeviceType deviceType)
+    {
+        lock (_gate)
+        {
+            var key = (deviceId, deviceType);
+            if (!_deviceIndex.TryGetValue(key, out var entryIds) || entryIds.Count == 0)
+                return null;
+
+            EventEntry? oldest = null;
+            foreach (var id in entryIds)
+                if (_entries.TryGetValue(id, out var e))
+                    if (oldest == null || e.EnqueuedAt < oldest.EnqueuedAt)
+                        oldest = e;
+            return oldest;
+        }
+    }
+
+    /// <summary>서버 이벤트 ID(EventEntry.EventId) + EventType로 활성 entry 조회 (제거하지 않음). 없으면 null.
+    /// EventId 전용 역인덱스는 없으므로 _gate 하 _entries 순회(활성 이벤트 수만큼, 소규모) — 순수 조회, 상태전이/이벤트 발화 없음.
+    /// 탐지/장애는 독립 id 시퀀스 → <paramref name="eventType"/> 필수 판별(숫자 EventId 충돌 방어). eventId ≤ 0(미설정)은 항상 null.</summary>
+    public EventEntry? FindEntryByEventId(int eventId, EnumEventType eventType)
+    {
+        if (eventId <= 0) return null;
+        lock (_gate)
+        {
+            foreach (var e in _entries.Values)
+                if (e.EventId == eventId && e.EventType == eventType)
+                    return e;
+            return null;
+        }
+    }
+
+    /// <summary>그룹의 현재 복합상태를 EQM 실제 활성 엔트리 기준으로 재계산해 반환(SSOT 읽기). 상태변경·이벤트 발화 없음.
+    /// FR-03 심볼 재계산 복원용 — 조치보고/복구 시 잔여 활성 이벤트를 반영(맹목 Normal 금지). 엔트리 없으면 Normal.</summary>
+    public EnumCompositeEventStatus GetGroupState(int groupId)
+    {
+        lock (_gate) return ComputeGroupState(groupId);
+    }
+
+    /// <summary>개별 디바이스의 현재 복합상태를 EQM 실제 활성 엔트리 기준으로 재계산해 반환(SSOT 읽기). 상태변경·이벤트 발화 없음.</summary>
+    public EnumCompositeEventStatus GetDeviceState(int deviceId, EnumDeviceType deviceType)
+    {
+        lock (_gate) return ComputeDeviceState((deviceId, deviceType));
+    }
+
+    /// <summary>그룹에 등록된 활성 엔트리 **스냅샷**을 반환(순수 읽기, 상태변경·이벤트 발화 없음).
+    /// 그룹 심볼 더블클릭 조치보고(GMap_PidsGroup_DoubleClick_ActionReport FR-03)가 '최선착 이벤트'를
+    /// 고르기 위해 사용한다. 호출측이 목록을 순회하는 동안 EQM이 변해도 안전하도록 lock 안에서 복사한다
+    /// (엔트리 인스턴스 자체는 공유 — 읽기 전용으로만 다룰 것). 그룹 없으면 빈 리스트.</summary>
+    public IReadOnlyList<EventEntry> GetEntriesByGroup(int groupId)
+    {
+        lock (_gate)
+        {
+            if (!_groupIndex.TryGetValue(groupId, out var entryIds) || entryIds.Count == 0)
+                return Array.Empty<EventEntry>();
+
+            var result = new List<EventEntry>(entryIds.Count);
+            foreach (var id in entryIds)
+                if (_entries.TryGetValue(id, out var entry))
+                    result.Add(entry);
+            return result;
+        }
+    }
+
+    /// <summary>지정 제어기의 블랙아웃 Fault 엔트리를 자동복구(Dequeue + OnAutoRecovery 발화)한다.
+    /// 제어기 통신 복구(SYNC_DEVICE ACTIVATED) 트리거용 — Controller_Fault_AutoRecovery_Extension FR-04.
+    /// 대상 엔트리가 없으면 no-op하고 false(멱등). Dequeue가 그룹 재계산으로 검정을 해제하고,
+    /// OnAutoRecovery가 조치보고 경로(HandleAutoRecoveryAsync)를 실행한다. NATS 콜백 스레드에서 호출 가능.</summary>
+    public bool TryAutoRecoverController(int controllerId)
+    {
+        string? faultId = null;
+        lock (_gate)
+        {
+            if (_deviceIndex.TryGetValue((controllerId, EnumDeviceType.Controller), out var ids))
+            {
+                foreach (var id in ids)
+                {
+                    if (_entries.TryGetValue(id, out var e)
+                        && e.EventType == EnumEventType.Fault
+                        && e.IsControllerBlackout)
+                    {
+                        faultId = id;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (faultId == null) return false;
+
+        Dequeue(faultId);                    // 엔트리 제거 + 그룹/디바이스 재계산(검정 해제)
+        OnAutoRecovery?.Invoke(faultId);     // 조치보고 경로 발화(lock 밖)
+        _log?.Info($"[자동복구] 제어기 복구 → 블랙아웃 조치보고: controller={controllerId}, entry={faultId}");
+        return true;
+    }
+    #endregion
+
+    #region - SharedTimer -
+    public void StartSharedTimer()
+    {
+        if (_sharedTimer != null) return;
+
+        _sharedTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _sharedTimer.Tick += (_, _) => OnSharedTimerTick();
+        _sharedTimer.Start();
+    }
+
+    public void StopSharedTimer()
+    {
+        if (_sharedTimer == null) return;
+
+        _sharedTimer.Stop();
+        _sharedTimer = null;
+    }
+
+    public void OnSharedTimerTick()
+    {
+        // 종류별 kill-switch: 탐지 = IsAutoEventDiscard("탐지 이벤트 해제"), 장애 = IsMalfunctionAutoEventDiscard("장애 이벤트 해제").
+        //   종전엔 탐지 스위치 하나가 전체를 막아, 탐지 해제를 끄면 장애 자동 조치보고까지 멈췄다(WP-1 ⑥).
+        //   설정을 틱마다 다시 읽는다 — 운영 중 토글이 이미 큐에 있는 엔트리에도 바로 먹는다.
+        var detectionOn = _eventSetupModel?.IsAutoEventDiscard ?? true;
+        var faultOn = _eventSetupModel?.IsMalfunctionAutoEventDiscard ?? true;
+        if (!detectionOn && !faultOn)
+            return;
+
+        var now = DateTime.Now;
+        _expiredScratch.Clear();
+
+        lock (_gate)
+        {
+            foreach (var e in _entries.Values)
+            {
+                if (!e.IsAutoReportEnabled) continue;
+                if (!(e.EventType == EnumEventType.Fault ? faultOn : detectionOn)) continue;
+                if (e.AutoReportInFlight) continue;
+                if (now < e.NextRetryAfter) continue;
+                if ((now - e.EnqueuedAt).TotalSeconds < e.TimeoutSeconds) continue;
+                _expiredScratch.Add(e);
+            }
+
+            if (_expiredScratch.Count > 1)
+                _expiredScratch.Sort((a, b) => a.EnqueuedAt.CompareTo(b.EnqueuedAt));
+
+            var fireCount = Math.Min(_expiredScratch.Count, MaxDequeuePerTick);
+            for (var i = 0; i < fireCount; i++)
+                _expiredScratch[i].AutoReportInFlight = true;
+
+            if (_expiredScratch.Count > MaxDequeuePerTick)
+                _expiredScratch.RemoveRange(MaxDequeuePerTick, _expiredScratch.Count - MaxDequeuePerTick);
+        }
+
+        var onAutoReport = OnAutoReport;
+        foreach (var entry in _expiredScratch)
+        {
+            _log?.Info($"[AutoTimeout] 자동조치보고 발화: Device({entry.DeviceId},{entry.DeviceType}) elapsed={(DateTime.Now - entry.EnqueuedAt).TotalSeconds:F1}s timeout={entry.TimeoutSeconds}s");
+            try { onAutoReport?.Invoke(entry); }
+            catch (Exception ex)
+            {
+                _log?.Error($"OnAutoReport 발화 예외: {ex.Message}");
+                entry.AutoReportInFlight = false;
+            }
+        }
+    }
+    #endregion
+
+    #region - IDisposable -
+    public void Dispose()
+    {
+        StopSharedTimer();
+        lock (_gate)
+        {
+            _entries.Clear();
+            _groupIndex.Clear();
+            _deviceIndex.Clear();
+        }
+        OnGroupFirstEvent = null;
+        OnGroupEmpty = null;
+        OnGroupStateChanged = null;
+        OnDeviceFirstEvent = null;
+        OnDeviceEmpty = null;
+        OnAutoReport = null;
+        OnAnyEnqueue = null;
+        OnEntryEnqueued = null;
+        OnActiveCountChanged = null;
+        OnDeviceStateChanged = null;
+        OnAutoRecovery = null;
+    }
+    #endregion
+
+    #region - Private -
+    /// <summary>
+    /// 계측 — <paramref name="stage"/> 가 있으면 한 줄 찍고, 이 엔트리(종류 + 서버 번호)를 현재 스레드 문맥으로 세운다.
+    /// 전이 콜백(심볼 관리자)은 이 스레드에서 동기로 불리므로 그 단계가 이 이벤트로 남는다. 계측이 켜졌을 때만 부른다.
+    /// </summary>
+    private static PerfTrace.ContextScope BeginPerf(EventEntry entry, string? stage)
+    {
+        var kind = EventCardKind.Of(entry.EventType);
+        var id = entry.EventId > 0 ? entry.EventId.ToString(CultureInfo.InvariantCulture) : null;
+        if (stage is not null)
+            PerfTrace.Mark(stage, kind, id, PerfTrace.Extra(("entry", entry.EntryId), ("device", entry.DeviceId),
+                                                            ("device_type", entry.DeviceType.ToString()), ("type", entry.EventType.ToString())));
+        return PerfTrace.BeginContext(kind, id);
+    }
+
+    /// <summary>_entries + _groupIndex 기반으로 그룹 복합 상태 계산 (SSOT: _entries)</summary>
+    private EnumCompositeEventStatus ComputeGroupState(int groupId)
+    {
+        Debug.Assert(Monitor.IsEntered(_gate));
+
+        if (!_groupIndex.TryGetValue(groupId, out var entryIds) || entryIds.Count == 0)
+            return EnumCompositeEventStatus.Normal;
+
+        bool hasBlackout = false;
+        bool hasFault = false;
+        bool hasDetection = false;
+
+        foreach (var id in entryIds)
+        {
+            if (_entries.TryGetValue(id, out var entry))
+            {
+                if (entry.IsControllerBlackout) hasBlackout = true;
+                if (entry.EventType == EnumEventType.Fault)
+                    hasFault = true;
+                else
+                    hasDetection = true;   // 탐지 계열 전부(침입 · 접점 · 사전경보) — GetActiveCounts 와 같은 규칙(ComputeDeviceState 설명)
+            }
+        }
+
+        // 단일 우선순위 지점(GMap_Controller_Blackout): Blackout > FaultedDetecting > Faulted > Detecting > Normal.
+        return ControllerBlackoutModel.Resolve(hasBlackout, hasFault, hasDetection);
+    }
+
+    /// <summary>_entries + _deviceIndex 기반으로 디바이스 복합 상태 계산 (SSOT: _entries)</summary>
+    /// <remarks>
+    /// <b>탐지 = 장애(Fault)가 아닌 모든 엔트리</b> — 활성 건수(<see cref="GetActiveCounts"/>) · 탐지 소리 · 이벤트 창(EventWindowPlanning)과 같은 규칙.
+    /// 종전엔 침입(Intrusion)만 탐지로 쳐서, 접점 센서 ContactOn · 사전경보(Alert) 가 오면 카드 · 소리 · 신호등 수는 올라가는데
+    /// 지도 심볼과 구역선은 초록(정상) 그대로였다(카탈로그 EVM-021 · EVM-051, 2026-10-08 헤드리스 시험으로 확인).
+    /// 통문 · 함체 접점은 큐에 들어오지 않으므로(DetectionNatsSyncService — 개폐 형태로만) 여기 오지 않는다.
+    /// </remarks>
+    private EnumCompositeEventStatus ComputeDeviceState((int Id, EnumDeviceType Type) deviceKey)
+    {
+        Debug.Assert(Monitor.IsEntered(_gate));
+
+        if (!_deviceIndex.TryGetValue(deviceKey, out var entryIds) || entryIds.Count == 0)
+            return EnumCompositeEventStatus.Normal;
+
+        bool hasBlackout = false;
+        bool hasFault = false;
+        bool hasDetection = false;
+
+        foreach (var id in entryIds)
+        {
+            if (_entries.TryGetValue(id, out var entry))
+            {
+                if (entry.IsControllerBlackout) hasBlackout = true;
+                if (entry.EventType == EnumEventType.Fault)
+                    hasFault = true;
+                else
+                    hasDetection = true;   // 탐지 계열 전부(침입 · 접점 · 사전경보) — 위 설명
+            }
+        }
+
+        // 단일 우선순위 지점(GMap_Controller_Blackout): Blackout > FaultedDetecting > Faulted > Detecting > Normal.
+        return ControllerBlackoutModel.Resolve(hasBlackout, hasFault, hasDetection);
+    }
+    #endregion
+
+    #region - Events -
+    /// <summary>그룹에 첫 이벤트 등록 시 (0→1 전이)</summary>
+    public event Action<int, EnumEventType>? OnGroupFirstEvent;
+
+    /// <summary>그룹의 이벤트가 모두 제거 시 (N→0 전이)</summary>
+    public event Action<int>? OnGroupEmpty;
+
+    /// <summary>그룹 복합 상태 전이 시 (groupId, prev, next)</summary>
+    public event Action<int, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnGroupStateChanged;
+
+    /// <summary>개별 심볼에 첫 이벤트 등록 시 (0→1 전이)</summary>
+    public event Action<int, EnumDeviceType, EnumEventType>? OnDeviceFirstEvent;
+
+    /// <summary>개별 심볼의 이벤트가 모두 제거 시 (N→0 전이)</summary>
+    public event Action<int, EnumDeviceType>? OnDeviceEmpty;
+
+    /// <summary>자동 조치보고 타임아웃 시 발화 (EventEntry 전달 — Dequeue는 핸들러 책임)</summary>
+    public event Action<EventEntry>? OnAutoReport;
+
+    /// <summary>Enqueue 호출 시마다 발생 (0→1 전이 여부와 무관). EventType 전달.</summary>
+    public event Action<EnumEventType>? OnAnyEnqueue;
+
+    /// <summary>
+    /// Enqueue 된 엔트리 한 건(카메라 팝업 이벤트 창 트리거, camera-popup-modes T-06). 부른 스레드(보통 NATS 처리 줄)에서
+    /// lock 밖으로 발화한다 — 구독자는 곧바로 돌아가야 한다. 구독자 예외는 여기서 삼키고 로그만 남긴다(팝업 때문에 큐가 멈추지 않게, FR-27).
+    /// 인터페이스에 넣지 않는다(목 · 가짜 구현을 깨지 않게) — 구성 콜백이 구체 타입으로 잇는다.
+    /// </summary>
+    public event Action<EventEntry>? OnEntryEnqueued;
+
+    private void RaiseEntryEnqueued(EventEntry entry)
+    {
+        var handlers = OnEntryEnqueued;
+        if (handlers is null) return;
+        foreach (Action<EventEntry> h in handlers.GetInvocationList())
+        {
+            try { h(entry); }
+            catch (Exception ex) { _log?.Error($"[EventQueue] OnEntryEnqueued 구독자 실패: {ex.GetType().Name} {ex.Message}"); }
+        }
+    }
+
+    /// <summary>개별 디바이스 복합 상태 전이 시 (deviceId, deviceType, prev, next)</summary>
+    public event Action<int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnDeviceStateChanged;
+
+    /// <summary>Fault 자동복구 완료 시 발화 (faultEntryId). 이미 Dequeue 처리 완료.</summary>
+    public event Action<string>? OnAutoRecovery;
+
+    /// <summary>활성 탐지/장애 건수 변경 (detection, fault) — GMap_Map_Instruments 인디케이터 소스.</summary>
+    public event Action<int, int>? OnActiveCountChanged;
+    #endregion
+
+    #region - Properties -
+    public int MaxDequeuePerTick { get; set; } = 5;
+    #endregion
+
+    #region - Attributes -
+    private readonly ILogService? _log;
+    private readonly IEventSetupModel? _eventSetupModel;
+    private readonly Dictionary<string, EventEntry> _entries;
+    private readonly Dictionary<int, HashSet<string>> _groupIndex;
+    private readonly Dictionary<(int Id, EnumDeviceType Type), HashSet<string>> _deviceIndex;
+    private readonly object _gate = new();
+    // 활성 건수 통지 직렬화(WP-8 M4) — 1 = 지금 한 스레드가 전달 중 / 1 = 전달 뒤 다시 읽어야 할 변경이 있다.
+    private int _countPumping;
+    private int _countDirty;
+    private DispatcherTimer? _sharedTimer;
+    // lock 전용 scratch 재사용 필드 — OnSharedTimerTick/Enqueue 내부에서만 사용
+    private readonly List<EventEntry> _expiredScratch = new();
+    private readonly HashSet<int> _scratchAffectedGroupIds = new();
+    private readonly List<string> _scratchFaultIds = new();
+    private readonly List<string> _scratchControllerFaultIds = new();
+    private readonly Dictionary<int, EnumCompositeEventStatus> _scratchPrevGroupStates = new();
+    /// <summary>제어기-소유 자동복구로 정리될 '제어기 자신' 키의 prev 상태(전이 발화용, scratch 재사용).</summary>
+    private readonly Dictionary<(int, EnumDeviceType), EnumCompositeEventStatus> _scratchPrevControllerStates = new();
+    #endregion
+}

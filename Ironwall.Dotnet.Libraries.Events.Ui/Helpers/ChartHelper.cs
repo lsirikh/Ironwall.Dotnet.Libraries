@@ -7,9 +7,11 @@ using System;
 using LiveChartsCore.Drawing;
 using LiveChartsCore.Kernel;
 using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
-using System.IO.Pipelines;
 using LiveChartsCore.SkiaSharpView.Drawing;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Media.Animation;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
     /****************************************************************************
@@ -22,6 +24,38 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
     ****************************************************************************/
     public static class ChartHelper
     {
+        /// <summary>
+        /// StartDate~EndDate 구간의 시간 라벨 배열을 생성한다.
+        /// 48시간 이하: 1시간 단위 ("yyyy-MM-dd HH"), 48시간 초과: 1일 단위 ("yyyy-MM-dd")
+        /// </summary>
+        public static string[] GenerateHourlyLabels(DateTime start, DateTime end)
+        {
+            var totalHours = (end - start).TotalHours;
+            var labels = new List<string>();
+
+            if (totalHours > 48)
+            {
+                var current = start.Date;
+                var endDate = end.Date;
+                while (current <= endDate)
+                {
+                    labels.Add(current.ToString("yyyy-MM-dd"));
+                    current = current.AddDays(1);
+                }
+            }
+            else
+            {
+                var current = new DateTime(start.Year, start.Month, start.Day, start.Hour, 0, 0);
+                while (current <= end)
+                {
+                    labels.Add(current.ToString("yyyy-MM-dd HH"));
+                    current = current.AddHours(1);
+                }
+            }
+
+            return labels.ToArray();
+        }
+
         /// <summary>
         /// 1개의 값 → Pie(ISeries) 로 변환
         /// </summary>
@@ -36,7 +70,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                 Stroke = new SolidColorPaint(stroke),
                 DataLabelsPosition = PolarLabelsPosition.Middle,
                 DataLabelsSize = 13,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                // 세그먼트 위 라벨은 잉크색 — 흰색은 노랑/녹 세그먼트에서 대비 미달(SIM-B153~157)
+                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesInk, 2),
             };
             pie.PointMeasured += Pie_PointMeasured;
             return pie;
@@ -78,7 +113,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                 Fill = new SolidColorPaint(color),
                 Stroke= new SolidColorPaint(stroke),
                 DataLabelsSize = 12,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesInk, 2),
                 DataLabelsRotation = 90,
                 DataLabelsPosition = DataLabelsPosition.Middle,
             };
@@ -92,11 +127,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
             var delay = point.Context.Entity.MetaData!.EntityIndex * perPointDelay;
             var speed = (float)point.Context.Chart.AnimationsSpeed.TotalMilliseconds + delay;
 
-            // the animation takes a function, that represents the progress of the animation
-            // the parameter is the progress of the animation, it goes from 0 to 1
-            // the function must return a value from 0 to 1, where 0 is the initial state
-            // and 1 is the end state
-
             point.Visual?.SetTransition(
                 new Animation(progress =>
                 {
@@ -107,6 +137,160 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                         : EasingFunctions.BuildCustomElasticOut(1.5f, 0.60f)((progress - d) / (1 - d));
                 },
                 TimeSpan.FromMilliseconds(speed)));
+        }
+
+        // ────────────────────────── Statistics API Chart Builders ──────────────────────────
+
+        // 시리즈명 한글화(SIM-S001~005) — 범례·툴팁 노출 문자열. 서버 필터 코드(DET/MAL/...)와 분리(표시 전용).
+        private static readonly (string Name, SKColor Color, Func<EventTrendItemDto, int> Selector)[] TrendCategories =
+        {
+            ("센서 탐지",   new SKColor(255, 205, 0),   item => item.SensorDetection),
+            ("카메라 탐지", new SKColor(255, 100, 100), item => item.CameraDetection),
+            ("장애",        new SKColor(30, 144, 255),  item => item.Malfunction),
+            ("연결",        new SKColor(155, 89, 182),  item => item.Connection),
+            ("조치",        new SKColor(50, 205, 50),   item => item.Action)
+        };
+
+        /// <summary>
+        /// EventTrendDto → LineSeries 5개 + xLabels 배열
+        /// </summary>
+        public static (List<ISeries> Series, string[] XLabels) BuildLineSeriesFromTrend(
+            EventTrendDto trend, DateTime startDate, DateTime endDate)
+        {
+            var series = new List<ISeries>();
+            string[] xLabels;
+
+            if (trend.Series == null || trend.Series.Count == 0)
+            {
+                xLabels = GenerateHourlyLabels(startDate, endDate);
+                foreach (var cat in TrendCategories)
+                {
+                    series.Add(new LineSeries<int>
+                    {
+                        Name = cat.Name,
+                        LineSmoothness = 0.5,
+                        GeometrySize = 8,
+                        Stroke = new SolidColorPaint(cat.Color, 3),
+                        GeometryStroke = new SolidColorPaint(cat.Color, 3),
+                        GeometryFill = new SolidColorPaint(Darken(cat.Color, 0.5f)),
+                        Fill = null,
+                        Values = new int[xLabels.Length]
+                    });
+                }
+                return (series, xLabels);
+            }
+
+            xLabels = trend.Series.Select(s => s.TimeBucket).ToArray();
+
+            foreach (var cat in TrendCategories)
+            {
+                var values = trend.Series.Select(cat.Selector).ToArray();
+                series.Add(new LineSeries<int>
+                {
+                    Name = cat.Name,
+                    LineSmoothness = 0.5,
+                    GeometrySize = 8,
+                    Stroke = new SolidColorPaint(cat.Color, 3),
+                    GeometryStroke = new SolidColorPaint(cat.Color, 3),
+                    GeometryFill = new SolidColorPaint(Darken(cat.Color, 0.5f)),
+                    Fill = null,
+                    Values = values
+                });
+            }
+
+            return (series, xLabels);
+        }
+
+        /// <summary>
+        /// EventByDeviceDto → ColumnSeries (막대 그래프) + xLabels (장치명)
+        /// eventTypes 필터: "DET" → sensor_detection, "MAL" → malfunction, "CON" → connection, "ACT" → action
+        /// </summary>
+        public static (List<ISeries> Series, string[] XLabels) BuildBarSeriesFromByDevice(
+            EventByDeviceDto byDevice, string[] eventTypes)
+        {
+            var series = new List<ISeries>();
+
+            // Controller 기반 (센서/장애/연결)
+            var controllers = byDevice.Controllers ?? new List<ControllerStatsDto>();
+            var controllerLabels = controllers.Select(c => c.ControllerName).ToArray();
+
+            if (controllerLabels.Length == 0)
+                controllerLabels = new[] { "데이터 없음" };
+
+            if (eventTypes.Contains("DET"))
+            {
+                var values = controllers.Select(c => (double)c.SensorDetection).ToList();
+                if (values.Count == 0) values.Add(0);
+                series.Add(MakeBar("탐지", values, new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            if (eventTypes.Contains("MAL"))
+            {
+                var values = controllers.Select(c => (double)c.Malfunction).ToList();
+                if (values.Count == 0) values.Add(0);
+                series.Add(MakeBar("장애", values, new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            if (eventTypes.Contains("CON"))
+            {
+                var values = controllers.Select(c => (double)c.Connection).ToList();
+                if (values.Count == 0) values.Add(0);
+                series.Add(MakeBar("연결", values, new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            if (eventTypes.Contains("ACT"))
+            {
+                var values = controllers.Select(c => (double)c.Action).ToList();
+                if (values.Count == 0) values.Add(0);
+                series.Add(MakeBar("조치", values, new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            return (series, controllerLabels);
+        }
+
+        /// <summary>
+        /// EventSummaryDto → PieSeries (원형 그래프)
+        /// eventTypes 필터: "DET" → sensor+camera, "MAL", "CON", "ACT"
+        /// </summary>
+        public static List<ISeries> BuildPieSeriesFromSummary(EventSummaryDto summary, string[] eventTypes)
+        {
+            var series = new List<ISeries>();
+
+            if (eventTypes.Contains("DET"))
+            {
+                series.Add(MakePie("탐지",
+                    summary.SensorDetection + summary.CameraDetection,
+                    new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            if (eventTypes.Contains("MAL"))
+            {
+                series.Add(MakePie("장애", summary.Malfunction,
+                    new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            if (eventTypes.Contains("CON"))
+            {
+                series.Add(MakePie("연결", summary.Connection,
+                    new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            if (eventTypes.Contains("ACT"))
+            {
+                series.Add(MakePie("조치", summary.Action,
+                    new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
+            }
+
+            return series;
+        }
+
+        private static SKColor Darken(SKColor color, float factor)
+        {
+            return new SKColor(
+                (byte)(color.Red * factor),
+                (byte)(color.Green * factor),
+                (byte)(color.Blue * factor),
+                color.Alpha);
         }
     }
 }

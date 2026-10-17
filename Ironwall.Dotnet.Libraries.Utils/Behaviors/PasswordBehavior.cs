@@ -76,11 +76,23 @@ public sealed class PasswordBehavior : Behavior<PasswordBox>
     {
         AssociatedObject.PasswordChanged += OnPwdChanged;    // View → VM
         // 행 재사용 시 VM 값으로 초기화
-        AssociatedObject.Password = Password ?? string.Empty;
+        //AssociatedObject.Password = Password ?? string.Empty;
+        // VM의 초기값을 View에 반영
+        if (!string.IsNullOrEmpty(Password))
+        {
+            try
+            {
+                _syncing = true;
+                AssociatedObject.Password = Password;
+            }
+            finally
+            {
+                _syncing = false;
+            }
+        }
     }
 
-    protected override void OnDetaching()
-        => AssociatedObject.PasswordChanged -= OnPwdChanged;
+    protected override void OnDetaching() => AssociatedObject.PasswordChanged -= OnPwdChanged;
     #endregion
 
     /*------------- View → VM -------------*/
@@ -96,11 +108,13 @@ public sealed class PasswordBehavior : Behavior<PasswordBox>
     }
 
     /*------------- VM → View -------------*/
-    private static void OnPasswordFromVm(
-        DependencyObject d, DependencyPropertyChangedEventArgs e)
+    private static void OnPasswordFromVm(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var bh = (PasswordBehavior)d;
         if (bh._syncing) return;                             // 재귀 차단
+
+        // AssociatedObject가 null인지 체크
+        if (bh.AssociatedObject == null) return;
 
         bh.AssociatedObject.Password = e.NewValue as string ?? string.Empty;
     }

@@ -9,6 +9,7 @@ using Ironwall.Dotnet.Monitoring.Models.Maps;
 using MySql.Data.MySqlClient;
 using System;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Threading;
 
@@ -174,6 +175,10 @@ internal class GMapDbService : TaskService, IGMapDbService
                 _log?.Info("Map DB 연결 종료 완료");
             }
         }
+        catch (IOException)
+        {
+            // 앱 종료 시 소켓 선종료 후 MySQL close 패킷 전송 실패 — 정상 패턴, 무시
+        }
         catch (Exception ex)
         {
             _log?.Error($"DB 연결 종료 실패: {ex.Message}");
@@ -233,6 +238,8 @@ internal class GMapDbService : TaskService, IGMapDbService
                     `ProcessedAt`           DATETIME,
                     `ProcessingTimeMinutes` INT,
                     `QualityScore`          DECIMAL(3,2),
+                    `MbtilesPath`           VARCHAR(500) NULL,
+                    `StorageType`           VARCHAR(20) NULL DEFAULT 'PngDirectory',
                     CONSTRAINT `FK_CustomMaps_Maps`
                         FOREIGN KEY (`MapId`) REFERENCES `Maps` (`Id`)
                         ON DELETE CASCADE
@@ -293,12 +300,206 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "GeoControlPoints 테이블 생성…" });
 
+            const string createMapRoisSql = @"
+                CREATE TABLE IF NOT EXISTS `MapRois` (
+                    `Id`          INT AUTO_INCREMENT PRIMARY KEY,
+                    `Title`       VARCHAR(100) NOT NULL,
+                    `Latitude`    DECIMAL(10,8) NOT NULL,
+                    `Longitude`   DECIMAL(11,8) NOT NULL,
+                    `Altitude`    DECIMAL(10,2) DEFAULT 0,
+                    `Zoom`        DECIMAL(3,1) DEFAULT 15.0,   -- zoom-float-halfstep FR-14: 하프스텝(17.5) 저장 (Symbols/Images.Zoom과 동형)
+                    `MapId`       INT NOT NULL,
+                    `CreatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    CONSTRAINT `FK_MapRois_Maps`
+                        FOREIGN KEY (`MapId`) REFERENCES `Maps` (`Id`)
+                        ON DELETE CASCADE,
+                    INDEX `IX_MapRois_MapId` (`MapId`)
+                );";
+
+            await _conn.ExecuteAsync(createMapRoisSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MapRois 테이블 생성…" });
+
+            const string createMapLayersSql = @"
+                CREATE TABLE IF NOT EXISTS `MapLayers` (
+                    `Id`          INT AUTO_INCREMENT PRIMARY KEY,
+                    `Name`        VARCHAR(100) NOT NULL,
+                    `LayerType`   VARCHAR(20) NOT NULL,
+                    `Category`    VARCHAR(50),
+                    `IsVisible`   BOOLEAN DEFAULT TRUE,
+                    `Opacity`     DECIMAL(3,2) DEFAULT 1.0,
+                    `ZOrder`      INT DEFAULT 0,
+                    `MapId`       INT,
+                    `FilePath`    VARCHAR(500),
+                    `CreatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `IX_MapLayers_Type` (`LayerType`),
+                    INDEX `IX_MapLayers_Category` (`Category`)
+                );";
+
+            await _conn.ExecuteAsync(createMapLayersSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MapLayers 테이블 생성…" });
+
+            // 카메라별 RTSP 팝업 위치(Geo 앵커) — 다중 클라이언트 공유, CameraId 단독 PK
+            const string createCameraPopupPositionsSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraPopupPositions` (
+                    `CameraId`    INT PRIMARY KEY,
+                    `Latitude`    DECIMAL(10,8) NOT NULL,
+                    `Longitude`   DECIMAL(11,8) NOT NULL,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                );";
+
+            await _conn.ExecuteAsync(createCameraPopupPositionsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "CameraPopupPositions 테이블 생성…" });
+
+            // 카메라 팝업 제어 허브 위치(화면 좌표, 단일 행 Id=1 고정) — CameraPopup_ControlHub. 드래그 이동 위치 기억.
+            const string createCameraPopupHubPositionSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraPopupHubPosition` (
+                    `Id`        INT PRIMARY KEY,
+                    `X`         DOUBLE NOT NULL,
+                    `Y`         DOUBLE NOT NULL,
+                    `UpdatedAt` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                );";
+
+            await _conn.ExecuteAsync(createCameraPopupHubPositionSql);
+
+            // 카메라 PTZ 프리셋(로컬 DB) — pan/tilt/zoom + space URI, (CameraId, PresetName) 유니크
+            const string createCameraPtzPresetsSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraPtzPresets` (
+                    `Id`           INT AUTO_INCREMENT PRIMARY KEY,
+                    `CameraId`     INT NOT NULL,
+                    `PresetName`   VARCHAR(100) NOT NULL,
+                    `IsHome`       TINYINT(1) NOT NULL DEFAULT 0,
+                    `Pan`          DOUBLE NOT NULL,
+                    `Tilt`         DOUBLE NOT NULL,
+                    `Zoom`         DOUBLE NOT NULL DEFAULT 0,
+                    `PanTiltSpace` VARCHAR(255) NULL,
+                    `ZoomSpace`    VARCHAR(255) NULL,
+                    `UpdatedAt`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY `uq_camera_preset` (`CameraId`, `PresetName`)
+                );";
+
+            await _conn.ExecuteAsync(createCameraPtzPresetsSql);
+
+            // 추적 좌표 영속(로컬 자체 DB, 2026-06-25 결정) — NATS 수신분 기록 + Playback 시간범위 조회
+            const string createCameraTrackPointsSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraTrackPoints` (
+                    `Id`           INT AUTO_INCREMENT PRIMARY KEY,
+                    `CameraId`     INT NOT NULL,
+                    `TrackId`      VARCHAR(64) NOT NULL,
+                    `Label`        VARCHAR(32) NULL,
+                    `ThreatLevel`  VARCHAR(16) NULL,
+                    `Latitude`     DECIMAL(10,8) NOT NULL,
+                    `Longitude`    DECIMAL(11,8) NOT NULL,
+                    `DistanceM`    DOUBLE NULL,
+                    `SpeedMps`     DOUBLE NULL,
+                    `ObservedAt`   DATETIME(3) NOT NULL,
+                    `CreatedAt`    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY `ux_track_dedup` (`CameraId`, `TrackId`, `ObservedAt`),  -- 재전송/중복 메시지 dedup
+                    INDEX `ix_track_camera_obs` (`CameraId`, `ObservedAt`),
+                    INDEX `ix_track_track_obs` (`TrackId`, `ObservedAt`)
+                );";
+            await _conn.ExecuteAsync(createCameraTrackPointsSql);
+
+            // 기존 테이블(UNIQUE 없던 버전) 1회 마이그레이션 — 중복 제거 후 UNIQUE 추가(best-effort, 비치명)
+            try
+            {
+                var hasUx = await _conn.ExecuteScalarAsync<int>(@"
+                    SELECT COUNT(*) FROM information_schema.STATISTICS
+                     WHERE table_schema = DATABASE() AND table_name = 'CameraTrackPoints'
+                       AND index_name = 'ux_track_dedup';");
+                if (hasUx == 0)
+                {
+                    await _conn.ExecuteAsync(@"
+                        DELETE t1 FROM `CameraTrackPoints` t1
+                          JOIN `CameraTrackPoints` t2
+                            ON t1.`CameraId`=t2.`CameraId` AND t1.`TrackId`=t2.`TrackId`
+                           AND t1.`ObservedAt`=t2.`ObservedAt` AND t1.`Id` > t2.`Id`;");
+                    await _conn.ExecuteAsync(
+                        "ALTER TABLE `CameraTrackPoints` ADD UNIQUE KEY `ux_track_dedup` (`CameraId`,`TrackId`,`ObservedAt`);");
+                }
+            }
+            catch (Exception ex) { _log?.Warning($"[GMapDb] CameraTrackPoints dedup 마이그레이션 건너뜀: {ex.Message}"); }
+
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "CameraPtzPresets/CameraTrackPoints 테이블 생성…" });
+
+            // MBTiles 컬럼 마이그레이션 (기존 DB에 컬럼이 없으면 추가)
+            await MigrateCustomMapsTableAsync();
+
+            // MapRois.Zoom INT→DECIMAL(3,1) 타입 승격 (zoom-float-halfstep FR-14, idempotent)
+            await MigrateMapRoisZoomColumnAsync();
+
             _log?.Info("Map 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)
         {
             _log?.Error($"DB 스키마 생성 실패: {ex.Message}");
             throw;
+        }
+    }
+
+    /// <summary>기존 CustomMaps 테이블에 MBTiles 관련 컬럼 추가 (idempotent)</summary>
+    private async Task MigrateCustomMapsTableAsync()
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync();
+            var columns = (await conn.QueryAsync<string>(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='CustomMaps' AND TABLE_SCHEMA=DATABASE();"))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!columns.Contains("MbtilesPath"))
+                await conn.ExecuteAsync("ALTER TABLE CustomMaps ADD COLUMN MbtilesPath VARCHAR(500) NULL;");
+
+            if (!columns.Contains("StorageType"))
+                await conn.ExecuteAsync("ALTER TABLE CustomMaps ADD COLUMN StorageType VARCHAR(20) NULL DEFAULT 'PngDirectory';");
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"CustomMaps 마이그레이션 경고 (무시 가능): {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 기존 DB의 MapRois.Zoom(INT)을 DECIMAL(3,1)로 승격 (zoom-float-halfstep FR-14, idempotent).
+    /// information_schema 선조회 + TABLE_SCHEMA=DATABASE() 한정(타 DB 합집합 오판 방지 — 36b81fb 교훈).
+    /// 정수 기존 값은 타입 승격만으로 보존된다(15 → 15.0). 이미 DECIMAL이면 스킵.
+    /// </summary>
+    private async Task MigrateMapRoisZoomColumnAsync()
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync();
+            var columnType = await conn.QueryFirstOrDefaultAsync<string>(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_NAME='MapRois' AND COLUMN_NAME='Zoom' AND TABLE_SCHEMA=DATABASE();");
+
+            if (columnType == null)
+            {
+                _log?.Warning("[SchemaGuard] MapRois.Zoom 컬럼 미발견 — 마이그레이션 스킵");
+                return;
+            }
+
+            if (columnType.StartsWith("decimal", StringComparison.OrdinalIgnoreCase))
+            {
+                _log?.Info($"[SchemaGuard] MapRois.Zoom 이미 {columnType} — 타입 교정 스킵");
+                return;
+            }
+
+            await conn.ExecuteAsync("ALTER TABLE `MapRois` MODIFY COLUMN `Zoom` DECIMAL(3,1) DEFAULT 15.0;");
+            _log?.Info($"[SchemaGuard] MapRois.Zoom {columnType} → DECIMAL(3,1) 타입 교정 적용");
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"MapRois.Zoom 마이그레이션 경고 (무시 가능 — 하프스텝 저장만 절단됨): {ex.Message}");
         }
     }
 
@@ -387,7 +588,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                         c.OriginalHeight, c.OriginalFileSize, c.TotalTileCount, c.TilesDirectorySize,
                         c.PixelResolutionX, c.PixelResolutionY, c.ResolutionUnit, c.GeoReferenceMethod,
                         c.GeoTransformMatrix, c.ControlPointCount, c.ProcessedAt, c.ProcessingTimeMinutes,
-                        c.QualityScore
+                        c.QualityScore, c.MbtilesPath, c.StorageType
                 FROM    Maps m
                 JOIN    CustomMaps c ON c.MapId = m.Id
                 WHERE   m.ProviderType = 'Custom'
@@ -444,7 +645,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                         c.OriginalHeight, c.OriginalFileSize, c.TotalTileCount, c.TilesDirectorySize,
                         c.PixelResolutionX, c.PixelResolutionY, c.ResolutionUnit, c.GeoReferenceMethod,
                         c.GeoTransformMatrix, c.ControlPointCount, c.ProcessedAt, c.ProcessingTimeMinutes,
-                        c.QualityScore
+                        c.QualityScore, c.MbtilesPath, c.StorageType
                 FROM    Maps m
                 JOIN    CustomMaps c ON c.MapId = m.Id
                 WHERE   m.Id = @Id AND m.ProviderType = 'Custom';";
@@ -521,11 +722,11 @@ internal class GMapDbService : TaskService, IGMapDbService
                 (MapId, SourceImagePath, TilesDirectoryPath, OriginalWidth, OriginalHeight,
                  OriginalFileSize, TotalTileCount, TilesDirectorySize, PixelResolutionX, PixelResolutionY,
                  ResolutionUnit, GeoReferenceMethod, GeoTransformMatrix, ControlPointCount,
-                 ProcessedAt, ProcessingTimeMinutes, QualityScore)
+                 ProcessedAt, ProcessingTimeMinutes, QualityScore, MbtilesPath, StorageType)
                 VALUES (@MapId, @SourceImagePath, @TilesDirectoryPath, @OriginalWidth, @OriginalHeight,
                         @OriginalFileSize, @TotalTileCount, @TilesDirectorySize, @PixelResolutionX, @PixelResolutionY,
                         @ResolutionUnit, @GeoReferenceMethod, @GeoTransformMatrix, @ControlPointCount,
-                        @ProcessedAt, @ProcessingTimeMinutes, @QualityScore);";
+                        @ProcessedAt, @ProcessingTimeMinutes, @QualityScore, @MbtilesPath, @StorageType);";
 
             await conn.ExecuteAsync(customSql, new
             {
@@ -545,7 +746,9 @@ internal class GMapDbService : TaskService, IGMapDbService
                 model.ControlPointCount,
                 model.ProcessedAt,
                 model.ProcessingTimeMinutes,
-                model.QualityScore
+                model.QualityScore,
+                model.MbtilesPath,
+                StorageType = model.StorageType.ToString()
             }, tx);
 
             // 3. ControlPoints 삽입 (있다면)
@@ -602,7 +805,8 @@ internal class GMapDbService : TaskService, IGMapDbService
                     PixelResolutionY = @PixelResolutionY, ResolutionUnit = @ResolutionUnit,
                     GeoReferenceMethod = @GeoReferenceMethod, GeoTransformMatrix = @GeoTransformMatrix,
                     ControlPointCount = @ControlPointCount, ProcessedAt = @ProcessedAt,
-                    ProcessingTimeMinutes = @ProcessingTimeMinutes, QualityScore = @QualityScore
+                    ProcessingTimeMinutes = @ProcessingTimeMinutes, QualityScore = @QualityScore,
+                    MbtilesPath = @MbtilesPath, StorageType = @StorageType
                 WHERE MapId = @Id;";
 
             var param = new
@@ -638,7 +842,9 @@ internal class GMapDbService : TaskService, IGMapDbService
                 model.ControlPointCount,
                 model.ProcessedAt,
                 model.ProcessingTimeMinutes,
-                model.QualityScore
+                model.QualityScore,
+                model.MbtilesPath,
+                StorageType = model.StorageType.ToString()
             };
 
             int mapAffected = await conn.ExecuteAsync(mapSql, param, tx);
@@ -973,6 +1179,63 @@ internal class GMapDbService : TaskService, IGMapDbService
             throw;
         }
     }
+
+    public async Task UpdateDefinedMapMetadataAsync(
+        int mapId,
+        double minLat, double maxLat,
+        double minLng, double maxLng,
+        int minZoom, int maxZoom,
+        CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE Maps SET
+                    MinLatitude = @MinLat, MaxLatitude = @MaxLat,
+                    MinLongitude = @MinLng, MaxLongitude = @MaxLng,
+                    MinZoomLevel = @MinZoom, MaxZoomLevel = @MaxZoom,
+                    UpdatedAt = NOW()
+                WHERE Id = @MapId;";
+
+            await conn.ExecuteAsync(sql, new { MapId = mapId, MinLat = minLat, MaxLat = maxLat, MinLng = minLng, MaxLng = maxLng, MinZoom = minZoom, MaxZoom = maxZoom });
+            _log?.Info($"UpdateDefinedMapMetadataAsync 완료 - MapId={mapId}, Zoom={minZoom}~{maxZoom}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"DefinedMap 메타데이터 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> UpdateMapZoomRangeAsync(int mapId, int minZoom, int maxZoom, CancellationToken token = default)
+    {
+        // zoom-float-halfstep FR-20: 설정정보>지도설정 편집 전용 — 줌 범위 2컬럼만 갱신(bounds 불변).
+        if (minZoom < 0 || maxZoom <= minZoom)
+        {
+            _log?.Warning($"UpdateMapZoomRangeAsync 거부 — 유효하지 않은 범위 Min={minZoom}, Max={maxZoom} (MapId={mapId})");
+            return false;
+        }
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE Maps SET
+                    MinZoomLevel = @MinZoom, MaxZoomLevel = @MaxZoom,
+                    UpdatedAt = NOW()
+                WHERE Id = @MapId;";
+
+            var rows = await conn.ExecuteAsync(sql, new { MapId = mapId, MinZoom = minZoom, MaxZoom = maxZoom });
+            _log?.Info($"UpdateMapZoomRangeAsync 완료 - MapId={mapId}, Zoom={minZoom}~{maxZoom} (rows={rows})");
+            return rows > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"지도 줌 범위 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
     #endregion
 
     #region - GeoControlPoint CRUD -
@@ -1139,9 +1402,662 @@ internal class GMapDbService : TaskService, IGMapDbService
     private DefinedMapProvider _definedMapProvider;
     private CancellationTokenSource? _cancellationTokenSource;
 
-    // GeoControlPointProvider 제거! 
+    // GeoControlPointProvider 제거!
     private MySqlConnection? _conn;
     private readonly SemaphoreSlim _processGate = new(1, 1);
+    #endregion
+
+    #region - MapRoi CRUD -
+
+    public async Task<List<IMapRoiModel>?> FetchMapRoisAsync(int mapId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT Id, Title, Latitude, Longitude, Altitude, Zoom, MapId, CreatedAt, UpdatedAt
+                FROM MapRois
+                WHERE MapId = @MapId
+                ORDER BY Id ASC;";
+
+            var rows = await conn.QueryAsync<MapRoiSQL>(sql, new { MapId = mapId });
+
+            return rows.Select(r => (IMapRoiModel)new MapRoiModel
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                Altitude = (double)r.Altitude,
+                Zoom = (double)r.Zoom,   // DECIMAL(3,1) → double (FR-14)
+                MapId = r.MapId,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 조회 실패 (MapId={mapId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<IMapRoiModel?> FetchMapRoiAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT Id, Title, Latitude, Longitude, Altitude, Zoom, MapId, CreatedAt, UpdatedAt
+                FROM MapRois
+                WHERE Id = @Id;";
+
+            var r = await conn.QueryFirstOrDefaultAsync<MapRoiSQL>(sql, new { Id = id });
+            if (r == null) return null;
+
+            return new MapRoiModel
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                Altitude = (double)r.Altitude,
+                Zoom = (double)r.Zoom,   // DECIMAL(3,1) → double (FR-14)
+                MapId = r.MapId,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 단건 조회 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<int> InsertMapRoiAsync(IMapRoiModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO MapRois (Title, Latitude, Longitude, Altitude, Zoom, MapId)
+                VALUES (@Title, @Latitude, @Longitude, @Altitude, @Zoom, @MapId);
+                SELECT LAST_INSERT_ID();";
+
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Title,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.MapId
+            });
+
+            model.Id = id;
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> UpdateMapRoiTitleAsync(int id, string title, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "UPDATE MapRois SET Title = @Title WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id, Title = title });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi Title 변경 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> DeleteMapRoiAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "DELETE FROM MapRois WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 삭제 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - CameraPopupPosition CRUD (카메라 RTSP 팝업 위치) -
+
+    /// <summary>카메라 팝업 위치를 Upsert(없으면 INSERT, 있으면 UPDATE). UpdatedAt는 컬럼 기본값으로 자동 갱신.</summary>
+    public async Task<bool> UpsertCameraPopupPositionAsync(ICameraPopupPositionModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO CameraPopupPositions (CameraId, Latitude, Longitude)
+                VALUES (@CameraId, @Latitude, @Longitude)
+                ON DUPLICATE KEY UPDATE Latitude = @Latitude, Longitude = @Longitude;";
+
+            int ret = await conn.ExecuteAsync(sql, new
+            {
+                model.CameraId,
+                model.Latitude,
+                model.Longitude
+            });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 Upsert 실패 (CameraId={model.CameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>카메라 Id로 저장된 팝업 위치를 조회. 없으면 null.</summary>
+    public async Task<ICameraPopupPositionModel?> GetCameraPopupPositionAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT CameraId, Latitude, Longitude, UpdatedAt
+                FROM CameraPopupPositions
+                WHERE CameraId = @CameraId;";
+
+            var r = await conn.QueryFirstOrDefaultAsync<CameraPopupPositionSQL>(sql, new { CameraId = cameraId });
+            if (r == null) return null;
+
+            return new CameraPopupPositionModel
+            {
+                CameraId = r.CameraId,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                UpdatedAt = r.UpdatedAt
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 조회 실패 (CameraId={cameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>모든 카메라 팝업 위치를 조회(앱 시작 시 일괄 로드용).</summary>
+    public async Task<List<ICameraPopupPositionModel>?> FetchCameraPopupPositionsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT CameraId, Latitude, Longitude, UpdatedAt
+                FROM CameraPopupPositions;";
+
+            var rows = await conn.QueryAsync<CameraPopupPositionSQL>(sql);
+            return rows.Select(r => (ICameraPopupPositionModel)new CameraPopupPositionModel
+            {
+                CameraId = r.CameraId,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 전체 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>카메라 Id로 저장된 팝업 위치를 삭제.</summary>
+    public async Task<bool> DeleteCameraPopupPositionAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "DELETE FROM CameraPopupPositions WHERE CameraId = @CameraId;";
+            int ret = await conn.ExecuteAsync(sql, new { CameraId = cameraId });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 삭제 실패 (CameraId={cameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /*────────────────────── CameraPopupHubPosition (제어 허브 위치, 단일 행 Id=1) ──────────*/
+
+    /// <summary>제어 허브 화면 좌표(X,Y)를 Upsert(단일 행 Id=1). 드래그 종료 시 호출. (CameraPopup_ControlHub FR-08)</summary>
+    public async Task UpsertCameraPopupHubPositionAsync(double x, double y, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO CameraPopupHubPosition (Id, X, Y) VALUES (1, @X, @Y)
+                ON DUPLICATE KEY UPDATE X = @X, Y = @Y;";
+            await conn.ExecuteAsync(sql, new { X = x, Y = y });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"허브 위치 Upsert 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>저장된 제어 허브 화면 좌표 조회. 없으면 null(→ 기본 우하단 도킹). (CameraPopup_ControlHub FR-08)</summary>
+    public async Task<CameraPopupHubPositionDto?> GetCameraPopupHubPositionAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "SELECT X, Y FROM CameraPopupHubPosition WHERE Id = 1;";
+            return await conn.QueryFirstOrDefaultAsync<CameraPopupHubPositionDto>(sql);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"허브 위치 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /*────────────────────── CameraTrackPoints (추적 좌표 영속, 로컬 DB) ──────────*/
+
+    /// <summary>추적 좌표 일괄 저장(수신 batch). 반환=삽입 행수.</summary>
+    public async Task<int> InsertTrackPointsAsync(IEnumerable<ITrackPointModel> points, CancellationToken token = default)
+    {
+        try
+        {
+            var rows = points?.ToList() ?? new List<ITrackPointModel>();
+            if (rows.Count == 0) return 0;
+            await using var conn = await OpenConnectionAsync(token);
+            // INSERT IGNORE — ux_track_dedup(CameraId,TrackId,ObservedAt) 중복은 조용히 skip(재전송 dedup)
+            const string sql = @"
+                INSERT IGNORE INTO CameraTrackPoints (CameraId, TrackId, Label, ThreatLevel, Latitude, Longitude, DistanceM, SpeedMps, ObservedAt)
+                VALUES (@CameraId, @TrackId, @Label, @ThreatLevel, @Latitude, @Longitude, @DistanceM, @SpeedMps, @ObservedAt);";
+            return await conn.ExecuteAsync(sql, rows.Select(p => new
+            {
+                p.CameraId, p.TrackId, p.Label, p.ThreatLevel, p.Latitude, p.Longitude, p.DistanceM, p.SpeedMps, p.ObservedAt
+            }));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"추적 좌표 저장 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>시간범위 추적 좌표 조회(observed_at ASC). cameraId null이면 전체 카메라.</summary>
+    public async Task<List<ITrackPointModel>?> FetchTrackPointsAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                SELECT Id, CameraId, TrackId, Label, ThreatLevel, Latitude, Longitude, DistanceM, SpeedMps, ObservedAt
+                FROM CameraTrackPoints
+                WHERE ObservedAt >= @From AND ObservedAt <= @To
+                  AND (@CameraId IS NULL OR CameraId = @CameraId)
+                ORDER BY ObservedAt ASC;";
+            var rows = await conn.QueryAsync<TrackPointSQL>(sql, new { CameraId = cameraId, From = fromUtc, To = toUtc });
+            return rows.Select(MapTrackPoint).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"추적 좌표 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>보존정책 — 기준 시각 이전 좌표 삭제. 반환=삭제 행수.</summary>
+    public async Task<int> DeleteTrackPointsBeforeAsync(DateTime cutoffUtc, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            return await conn.ExecuteAsync("DELETE FROM CameraTrackPoints WHERE ObservedAt < @Cutoff;", new { Cutoff = cutoffUtc });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"추적 좌표 보존삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    private sealed class TrackPointSQL
+    {
+        public int Id { get; set; }
+        public int CameraId { get; set; }
+        public string TrackId { get; set; } = string.Empty;
+        public string? Label { get; set; }
+        public string? ThreatLevel { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double? DistanceM { get; set; }
+        public double? SpeedMps { get; set; }
+        public DateTime ObservedAt { get; set; }
+    }
+
+    private static ITrackPointModel MapTrackPoint(TrackPointSQL r) => new TrackPointModel
+    {
+        Id = r.Id,
+        CameraId = r.CameraId,
+        TrackId = r.TrackId,
+        Label = r.Label,
+        ThreatLevel = r.ThreatLevel,
+        Latitude = r.Latitude,
+        Longitude = r.Longitude,
+        DistanceM = r.DistanceM,
+        SpeedMps = r.SpeedMps,
+        ObservedAt = r.ObservedAt,
+    };
+
+    /*────────────────────── CameraPtzPresets (PTZ 프리셋, 로컬 DB) ──────────────*/
+
+    /// <summary>카메라의 PTZ 프리셋 목록 조회(Home 우선, 이름 순).</summary>
+    public async Task<List<IPtzPresetModel>?> FetchPtzPresetsAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                SELECT Id, CameraId, PresetName, IsHome, Pan, Tilt, Zoom, PanTiltSpace, ZoomSpace, UpdatedAt
+                FROM CameraPtzPresets
+                WHERE CameraId = @CameraId
+                ORDER BY IsHome DESC, PresetName ASC;";
+            var rows = await conn.QueryAsync<PtzPresetSQL>(sql, new { CameraId = cameraId });
+            return rows.Select(MapPtzPreset).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ 프리셋 조회 실패 (CameraId={cameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>PTZ 프리셋 Upsert((CameraId, PresetName) 유니크 → 동일 이름 덮어쓰기). IsHome은 SetHome으로 별도 관리.</summary>
+    public async Task<bool> UpsertPtzPresetAsync(IPtzPresetModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO CameraPtzPresets (CameraId, PresetName, IsHome, Pan, Tilt, Zoom, PanTiltSpace, ZoomSpace)
+                VALUES (@CameraId, @PresetName, @IsHome, @Pan, @Tilt, @Zoom, @PanTiltSpace, @ZoomSpace)
+                ON DUPLICATE KEY UPDATE
+                    Pan = @Pan, Tilt = @Tilt, Zoom = @Zoom,
+                    PanTiltSpace = @PanTiltSpace, ZoomSpace = @ZoomSpace;";
+            int ret = await conn.ExecuteAsync(sql, new
+            {
+                model.CameraId, model.PresetName, model.IsHome,
+                model.Pan, model.Tilt, model.Zoom, model.PanTiltSpace, model.ZoomSpace
+            });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ 프리셋 저장 실패 (CameraId={model.CameraId}, {model.PresetName}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>PTZ 프리셋 삭제(Id).</summary>
+    public async Task<bool> DeletePtzPresetAsync(int presetId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "DELETE FROM CameraPtzPresets WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = presetId });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ 프리셋 삭제 실패 (Id={presetId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>카메라의 Home 프리셋을 지정(presetId만 IsHome=1, 나머지 0 — 단일 SQL CASE, 카메라당 1개 보장).</summary>
+    public async Task<bool> SetHomePtzPresetAsync(int cameraId, int presetId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE CameraPtzPresets
+                SET IsHome = CASE WHEN Id = @PresetId THEN 1 ELSE 0 END
+                WHERE CameraId = @CameraId;";
+            int ret = await conn.ExecuteAsync(sql, new { CameraId = cameraId, PresetId = presetId });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ Home 설정 실패 (CameraId={cameraId}, PresetId={presetId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    private static IPtzPresetModel MapPtzPreset(PtzPresetSQL r) => new PtzPresetModel
+    {
+        Id = r.Id,
+        CameraId = r.CameraId,
+        PresetName = r.PresetName,
+        IsHome = r.IsHome,
+        Pan = r.Pan,
+        Tilt = r.Tilt,
+        Zoom = r.Zoom,
+        PanTiltSpace = r.PanTiltSpace,
+        ZoomSpace = r.ZoomSpace,
+        UpdatedAt = r.UpdatedAt
+    };
+
+    #endregion
+
+    #region - MapLayer CRUD -
+
+    public async Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "SELECT * FROM MapLayers ORDER BY LayerType, ZOrder ASC, Id ASC;";
+            var rows = await conn.QueryAsync<MapLayerSQL>(sql);
+            return rows.Select(r => (IMapLayerModel)new MapLayerModel
+            {
+                Id = r.Id, Name = r.Name, LayerType = r.LayerType, Category = r.Category,
+                IsVisible = r.IsVisible, Opacity = (double)r.Opacity, ZOrder = r.ZOrder,
+                MapId = r.MapId, FilePath = r.FilePath, CreatedAt = r.CreatedAt, UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 조회 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<int> InsertMapLayerAsync(IMapLayerModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO MapLayers (Name, LayerType, Category, IsVisible, Opacity, ZOrder, MapId, FilePath)
+                VALUES (@Name, @LayerType, @Category, @IsVisible, @Opacity, @ZOrder, @MapId, @FilePath);
+                SELECT LAST_INSERT_ID();";
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Name, model.LayerType, model.Category, model.IsVisible,
+                model.Opacity, model.ZOrder, model.MapId, model.FilePath
+            });
+            model.Id = id;
+            return id;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 삽입 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> UpdateMapLayerAsync(IMapLayerModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"UPDATE MapLayers
+                                 SET Name = @Name, IsVisible = @IsVisible, Opacity = @Opacity,
+                                     ZOrder = @ZOrder, FilePath = @FilePath
+                                 WHERE Id = @Id;";
+            return await conn.ExecuteAsync(sql, new
+            {
+                model.Id, model.Name, model.IsVisible,
+                model.Opacity, model.ZOrder, model.FilePath
+            }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 업데이트 실패 (Id={model.Id}): {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "UPDATE MapLayers SET IsVisible = @IsVisible WHERE Id = @Id;";
+            return await conn.ExecuteAsync(sql, new { Id = id, IsVisible = isVisible }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer Visibility 변경 실패 (Id={id}): {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> UpdateMapLayerOpacityAsync(int id, double opacity, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "UPDATE MapLayers SET Opacity = @Opacity WHERE Id = @Id;";
+            return await conn.ExecuteAsync(sql, new { Id = id, Opacity = opacity }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer Opacity 변경 실패 (Id={id}): {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> DeleteMapLayerAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            return await conn.ExecuteAsync("DELETE FROM MapLayers WHERE Id = @Id;", new { Id = id }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 삭제 실패 (Id={id}): {ex.Message}"); throw; }
+    }
+
+    /// <summary>
+    /// 레이어 순서 일괄 기록(D-36) — 한 트랜잭션 · 행마다 매개변수 바인딩(값을 SQL 문자열에 이어 붙이지 않는다).
+    /// 예전 '위로/아래로' 는 두 행을 따로 UPDATE 해서 가운데서 끊기면 순서가 반쯤 바뀐 채 남았다.
+    /// </summary>
+    /// <remarks>
+    /// 일치 행 수로 존재를 판정한다 — MySql.Data 기본(UseAffectedRows=false)은 <b>찾은 행</b> 수를 돌려주므로
+    /// 값이 그대로인 행도 1 이다. 0 이면 그 행이 없다(다른 세션이 지움) → 전부 되돌리고 false.
+    /// </remarks>
+    public async Task<bool> BatchUpdateMapLayerZOrderAsync(IReadOnlyList<(int Id, int ZOrder)> changes, CancellationToken token = default)
+    {
+        if (changes == null || changes.Count == 0) return true;
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var tx = await conn.BeginTransactionAsync(token);
+        try
+        {
+            const string sql = "UPDATE MapLayers SET ZOrder = @ZOrder WHERE Id = @Id;";
+            foreach (var (id, zOrder) in changes)
+            {
+                var matched = await conn.ExecuteAsync(new CommandDefinition(sql, new { Id = id, ZOrder = zOrder }, tx, cancellationToken: token));
+                if (matched == 0)
+                {
+                    await tx.RollbackAsync(CancellationToken.None);
+                    _log?.Warning($"MapLayer 순서 일괄 기록 취소 — Id={id} 행 없음(다른 세션이 지웠을 수 있음), {changes.Count}건 전부 되돌림");
+                    return false;
+                }
+            }
+            await tx.CommitAsync(token);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync(CancellationToken.None);
+            _log?.Error($"MapLayer 순서 일괄 기록 실패 ({changes.Count}건, 전부 되돌림): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task SeedDefaultSymbolLayersAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            var defaults = new[]
+            {
+                ("카메라",       "PidsCamera",     50),
+                ("센서",         "PidsSensor",     50),
+                ("스피커",       "PidsSpeaker",    50),
+                ("컨트롤러",     "PidsController", 50),
+                ("조명",         "PidsLamp",       50),
+                ("함체",         "PidsEnclosure",  50),
+                ("PIDS 그룹",   "PidsGroup",      40),
+                ("군사부호",     "Military",       30),
+                ("기하학 도형",  "Geometric",      20),
+                ("선/경계",      "Line",           20),
+                ("인프라",       "Infra",          20),
+                ("핀(단일)",     "Basic",          20),
+            };
+
+            const string checkSql = "SELECT COUNT(*) FROM MapLayers WHERE LayerType = 'Symbol' AND Category = @Category;";
+            const string insertSql = @"INSERT INTO MapLayers (Name, LayerType, Category, IsVisible, Opacity, ZOrder)
+                                       VALUES (@Name, 'Symbol', @Category, TRUE, 1.0, @ZOrder);";
+
+            int added = 0;
+            foreach (var (name, category, zorder) in defaults)
+            {
+                var count = await conn.ExecuteScalarAsync<int>(checkSql, new { Category = category });
+                if (count == 0)
+                {
+                    await conn.ExecuteAsync(insertSql, new { Name = name, Category = category, ZOrder = zorder });
+                    added++;
+                }
+            }
+
+            if (added > 0)
+                _log?.Info($"기본 심볼 레이어 {added}개 추가 완료");
+        }
+        catch (Exception ex) { _log?.Error($"기본 레이어 생성 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<int> GetNextZOrderAsync(string layerType, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "SELECT COALESCE(MAX(ZOrder), 0) + 1 FROM MapLayers WHERE LayerType = @LayerType;";
+            return await conn.ExecuteScalarAsync<int>(sql, new { LayerType = layerType });
+        }
+        catch (Exception ex) { _log?.Error($"GetNextZOrder 실패: {ex.Message}"); return 1; }
+    }
+
     #endregion
 }
 
@@ -1194,6 +2110,8 @@ internal sealed class CustomMapSQL
     public DateTime? ProcessedAt { get; set; }
     public int? ProcessingTimeMinutes { get; set; }
     public decimal? QualityScore { get; set; }
+    public string? MbtilesPath { get; set; }
+    public string? StorageType { get; set; }
 
     public CustomMapModel ToDomain(MapSQL mapSql) => new()
     {
@@ -1231,6 +2149,7 @@ internal sealed class CustomMapSQL
         ProcessedAt = ProcessedAt,
         ProcessingTimeMinutes = ProcessingTimeMinutes,
         QualityScore = (double?)QualityScore,
+        MbtilesPath = MbtilesPath,
         ControlPoints = new List<IGeoControlPointModel>() // 별도로 로드
     };
 }
@@ -1312,5 +2231,67 @@ internal sealed class GeoControlPointSQL
         AccuracyMeters = (double?)AccuracyMeters,
         Description = Description
     };
+}
+
+/// <summary>
+/// MapRois 테이블 DTO
+/// </summary>
+internal sealed class MapRoiSQL
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public decimal Altitude { get; set; }
+    public decimal Zoom { get; set; }   // zoom-float-halfstep FR-14: DECIMAL(3,1) 컬럼 대응(하프스텝)
+    public int MapId { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>CameraPopupPositions 테이블 DTO</summary>
+internal sealed class CameraPopupPositionSQL
+{
+    public int CameraId { get; set; }
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>CameraPopupHubPosition 조회 결과(제어 허브 화면 좌표). 인터페이스 반환용 public.</summary>
+public sealed class CameraPopupHubPositionDto
+{
+    public double X { get; set; }
+    public double Y { get; set; }
+}
+
+/// <summary>CameraPtzPresets 테이블 DTO</summary>
+internal sealed class PtzPresetSQL
+{
+    public int Id { get; set; }
+    public int CameraId { get; set; }
+    public string PresetName { get; set; } = string.Empty;
+    public bool IsHome { get; set; }
+    public double Pan { get; set; }
+    public double Tilt { get; set; }
+    public double Zoom { get; set; }
+    public string? PanTiltSpace { get; set; }
+    public string? ZoomSpace { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+internal sealed class MapLayerSQL
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string LayerType { get; set; } = string.Empty;
+    public string? Category { get; set; }
+    public bool IsVisible { get; set; }
+    public decimal Opacity { get; set; }
+    public int ZOrder { get; set; }
+    public int? MapId { get; set; }
+    public string? FilePath { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
 #endregion

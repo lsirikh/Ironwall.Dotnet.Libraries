@@ -1,0 +1,283 @@
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
+
+/// <summary>
+/// 속성 폼의 칸 하나 — 명세(<see cref="DevicePropertySpec"/>) 한 줄이 칸 하나가 된다.
+/// </summary>
+/// <remarks>
+/// 칸은 <b>행을 직접 고치지 않는다.</b> 입력은 칸 안에만 머물고, [적용] · [등록] 때 폼이 손댄 칸만 골라 행에 쓴다.
+/// 그래서 [되돌리기] 는 칸을 원래 글로 돌려놓는 것으로 끝난다(행을 복원할 일이 없다).
+/// </remarks>
+public sealed class PropertyFieldViewModel : PropertyChangedBase
+{
+    public const string MultiIdentityReason = "여러 대를 골랐을 때는 바꿀 수 없습니다.";
+    public const string ReadOnlyReason = "편집 권한이 없습니다.";
+    public const string CreateOnlyReason = "등록할 때만 정할 수 있습니다.";
+    public const string AfterCreateReason = "등록한 뒤에 정할 수 있습니다.";
+
+    private readonly DirtyFieldTracker _tracker;
+    private string _originalText = string.Empty;
+    private string _text = string.Empty;
+    private PropertyOption? _selectedOption;
+    private string? _error;
+    private bool _isLoading;
+
+    public PropertyFieldViewModel(DevicePropertySpec spec, DirtyFieldTracker tracker)
+    {
+        Spec = spec ?? throw new ArgumentNullException(nameof(spec));
+        _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
+    }
+
+    public DevicePropertySpec Spec { get; }
+    public string Key => Spec.Key;
+    public string Label => Spec.Label;
+
+    /// <summary>머리글 — 등록 때 꼭 채워야 하는 칸은 별표를 단다(색이 아니라 글자로).</summary>
+    public string HeaderText => IsRequired ? Spec.Label + " *" : Spec.Label;
+    public string ApiPath => Spec.ApiPath;
+    public string? Note => Spec.Note;
+
+    /// <summary>고른 행들의 값이 서로 다르다.</summary>
+    public bool IsMixed { get; private set; }
+
+    /// <summary>이 칸의 축을 서버가 보내지 않았다(값이 없는 것과 다르다).</summary>
+    public bool IsNotReceived { get; private set; }
+
+    public bool IsLocked { get; private set; }
+
+    /// <summary>잠긴 까닭 — 잠긴 칸은 까닭 없이 보이지 않는다.</summary>
+    public string? LockReason { get; private set; }
+
+    public bool IsRequired { get; private set; }
+
+    public IReadOnlyList<PropertyOption> Options { get; private set; } = Array.Empty<PropertyOption>();
+
+    /// <summary>화면이 고를 편집기 — 잠겼으면 무엇이든 읽기 전용으로 그린다.</summary>
+    public DevicePropertyEditor EffectiveEditor => IsLocked ? DevicePropertyEditor.ReadOnly : Spec.Editor;
+
+    public string Placeholder => IsMixed ? ConsoleDetailStateMachine.MixedValuesText : string.Empty;
+
+    /// <summary>
+    /// 읽기 전용으로 보일 글(여러 값이면 그 표기). 선택 칸이 잠겨(다중편집·읽기전용 등) 콤보 대신
+    /// 평문으로 그릴 때도, 이미 만들어 둔 <see cref="Options"/> 의 한글 표시를 그대로 재사용한다 —
+    /// 잠긴 enum 칸만 raw 이름("ACTIVATED" 등)으로 새는 세 번째 표시 경로를 만들지 않는다.
+    /// </summary>
+    public string DisplayText
+    {
+        get
+        {
+            if (IsMixed) return ConsoleDetailStateMachine.MixedValuesText;
+            if (string.IsNullOrEmpty(_text) && Spec.EmptyDisplay is not null) return Spec.EmptyDisplay;
+            if (Spec.Editor == DevicePropertyEditor.Choice && Options.Count > 0)
+            {
+                var match = Options.FirstOrDefault(o => string.Equals(o.Text, _text, StringComparison.OrdinalIgnoreCase));
+                if (match is not null) return match.Display;
+            }
+            return IsUnknownFixedValue ? Helpers.DeviceEnumDisplay.UnknownValue : _text;
+        }
+    }
+
+    /// <summary>
+    /// 고정 표시 사전에 없는 저장 값이다 — 화면에는 "알 수 없음", 원문은 <see cref="RawToolTip"/> 로만 보인다
+    /// (운영자 화면에 영문 코드를 내지 않는다).
+    /// </summary>
+    private bool IsUnknownFixedValue
+        => Spec.OptionSource == DevicePropertyOptionSource.Fixed && !string.IsNullOrEmpty(_text)
+           && !Options.Any(o => string.Equals(o.Text, _text, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>표시 사전에 없는 값의 원문(툴팁). 알아본 값이면 null.</summary>
+    public string? RawToolTip => IsUnknownFixedValue ? $"저장된 값: {_text}" : null;
+
+    public bool IsTouched => _tracker.IsTouched(Key);
+
+    public string? Error
+    {
+        get => _error;
+        set { if (_error == value) return; _error = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasError)); }
+    }
+
+    public bool HasError => !string.IsNullOrEmpty(_error);
+
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            var next = value ?? string.Empty;
+            if (_text == next) return;
+            _text = next;
+            OnEdited();
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(DisplayText));
+            NotifyOfPropertyChange(nameof(RawToolTip));
+            NotifyOfPropertyChange(nameof(BoolValue));
+        }
+    }
+
+    /// <summary>참/거짓 칸. 여러 값이면 null(가운데 상태).</summary>
+    public bool? BoolValue
+    {
+        get => bool.TryParse(_text, out var parsed) ? parsed : null;
+        set
+        {
+            if (value.HasValue) { Text = value.Value ? "true" : "false"; return; }
+
+            // 여러 값일 때 상자는 세 상태다 — 사용자가 "가운데"로 돌리면 null 이 온다. 값으로 쓸 수 없으니 받지 않되,
+            // 알리지 않으면 상자만 가운데에 남고 칸은 옛 값을 쥔 채 어긋난다.
+            NotifyOfPropertyChange();
+        }
+    }
+
+    public PropertyOption? SelectedOption
+    {
+        get => _selectedOption;
+        set
+        {
+            if (Equals(_selectedOption, value)) return;
+            _selectedOption = value;
+            NotifyOfPropertyChange();
+            if (_isLoading || value is null) return;
+            // 객체로만 쓰는 항목(제어기 · 서버)은 글이 없다 — 보이는 이름을 글로 삼아 "바뀌었다"를 잡는다.
+            Text = value.Text ?? value.Display;
+        }
+    }
+
+    /// <summary>적용 때 객체로 써야 하는 값. 글로 쓰는 칸이면 null.</summary>
+    public object? PendingObject => _selectedOption?.Value;
+
+    /// <summary>행 뷰모델이 아니라 축 값 부분 수정(<see cref="DevicePropertySpec.AxisWritePath"/>)으로 보내는 칸인가.</summary>
+    public bool WritesAxis => Spec.AxisWritePath is not null;
+
+    /// <summary>객체로 쓰는 칸인가(제어기 · 서버).</summary>
+    public bool WritesObject => Spec.OptionSource is DevicePropertyOptionSource.Controllers or DevicePropertyOptionSource.Servers;
+
+    /// <summary>
+    /// 고른 행들로 칸을 채운다. 손댄 표시는 폼이 미리 지운다.
+    /// </summary>
+    public void Load(IReadOnlyList<object> rows, IReadOnlyList<PropertyOption> options, bool isCreating, bool isReadOnly, bool isNotReceived)
+    {
+        _isLoading = true;
+        try
+        {
+            var texts = rows.Select(row => DevicePropertyAccessor.ReadText(row, Spec)).ToList();
+            var mixed = MixedValue<string>.Of(texts);
+
+            IsMixed = mixed.IsMixed;
+            _originalText = mixed.IsMixed ? string.Empty : mixed.Value ?? string.Empty;
+            _text = _originalText;
+            _error = null;
+            IsNotReceived = isNotReceived;
+            IsRequired = isCreating && Spec.IsRequiredOnCreate;
+            Options = options;
+
+            var (locked, reason) = ResolveLock(rows.Count, isCreating, isReadOnly);
+            IsLocked = locked;
+            // 표시 전용 칸은 까닭을 띄우지 않는다 — 자물쇠만으로 충분하다(명세 ShowLockReason).
+            LockReason = locked && reason == Spec.LockReason && !Spec.ShowLockReason ? null : reason;
+
+            _selectedOption = IsMixed ? null : MatchOption(rows.Count > 0 ? DevicePropertyAccessor.Read(rows[0], Spec) : null);
+        }
+        finally { _isLoading = false; }
+
+        Refresh();
+    }
+
+    /// <summary>원래 글로 돌려놓는다.</summary>
+    public void Revert()
+    {
+        _isLoading = true;
+        try
+        {
+            _text = _originalText;
+            _error = null;
+            _selectedOption = IsMixed ? null : Options.FirstOrDefault(o => string.Equals(o.Text ?? o.Display, _originalText, StringComparison.Ordinal));
+        }
+        finally { _isLoading = false; }
+
+        Refresh();
+    }
+
+    /// <summary>값을 검증한다. 문제가 있으면 칸에 적고 false.</summary>
+    public bool Validate(bool isCreating)
+    {
+        if (IsLocked) { Error = null; return true; }
+
+        // 객체로 쓰는 칸은 글 검증이 뜻이 없다 — 등록 때 비어 있으면 안 된다는 것만 본다.
+        if (WritesObject)
+        {
+            Error = isCreating && Spec.IsRequiredOnCreate && PendingObject is null ? $"{Label}을(를) 고르세요." : null;
+            return !HasError;
+        }
+
+        Error = DevicePropertyAccessor.Validate(Spec, _text, isCreating);
+        return !HasError;
+    }
+
+    /// <summary>행 하나에 이 칸의 값을 쓴다. 못 썼으면 까닭을 칸에 남긴다.</summary>
+    public bool WriteTo(object row)
+    {
+        string? error;
+        var written = WritesObject
+            ? DevicePropertyAccessor.TryWriteObject(row, Spec, PendingObject, out error)
+            : DevicePropertyAccessor.TryWrite(row, Spec, _text, out error);
+
+        if (!written) Error = error ?? "값을 쓸 수 없습니다.";
+        return written;
+    }
+
+    private void OnEdited()
+    {
+        if (_isLoading) return;
+        // 글자 수 상한은 서버로 보내기 전(Commit)까지 기다리지 않고 타이핑 중에 바로 알린다 — [등록]/[적용]을 누른 뒤에야
+        // 알면 다른 칸까지 다 채운 뒤 되돌아가야 한다. 필수·형식 검증(정수·소수 등)은 지금처럼 Commit 때만 본다 —
+        // 등록 중 빈 칸은 마저 채우기 전까지 정상이라 타이핑 도중에 "필수입니다"를 띄우면 소음이 된다.
+        Error = ValidateMaxLength();
+        _tracker.Touch(Key, _originalText, _text, hasOriginal: !IsMixed);
+        NotifyOfPropertyChange(nameof(IsTouched));
+    }
+
+    /// <summary>글자 수 상한만의 즉시 검증(<see cref="DevicePropertyAccessor.Validate"/> 의 MaxLength 분기와 같은 문구). 상한이 없으면 null.</summary>
+    private string? ValidateMaxLength()
+        => Spec.MaxLength.HasValue && _text.Length > Spec.MaxLength.Value
+            ? $"{Label} 값은 {Spec.MaxLength.Value}자를 넘을 수 없습니다."
+            : null;
+
+    private (bool, string?) ResolveLock(int rowCount, bool isCreating, bool isReadOnly)
+    {
+        if (Spec.Writable == DevicePropertyWritable.No || Spec.Editor == DevicePropertyEditor.ReadOnly) return (true, Spec.LockReason);
+        // 축 값 부분 수정은 서버에 있는 장비 id 가 있어야 보낼 수 있다 — 등록 중에는 잠근다(등록 뒤 상세에서 고친다).
+        if (isCreating && Spec.AxisWritePath is not null) return (true, AfterCreateReason);
+        if (Spec.Writable == DevicePropertyWritable.CreateOnly && !isCreating) return (true, Spec.LockReason ?? CreateOnlyReason);
+        if (isReadOnly) return (true, ReadOnlyReason);
+        if (rowCount > 1 && !Spec.AllowMultiEdit) return (true, MultiIdentityReason);
+        return (false, null);
+    }
+
+    private PropertyOption? MatchOption(object? rawValue)
+    {
+        if (Options.Count == 0) return null;
+        if (rawValue is not null)
+        {
+            var byValue = Options.FirstOrDefault(o => o.Value is not null && IsSameEntity(o.Value, rawValue));
+            if (byValue is not null) return byValue;
+        }
+        return Options.FirstOrDefault(o => string.Equals(o.Text, _text, StringComparison.Ordinal))
+            ?? Options.FirstOrDefault(o => string.Equals(o.Display, _text, StringComparison.Ordinal));
+    }
+
+    // 제어기 · 서버는 같은 것이라도 인스턴스가 다를 수 있다(목록은 provider 에서, 행의 값은 조회 응답에서 온다) — Id 로 맞춘다.
+    // 이름으로 맞추면 이름이 같은 두 대를 구분하지 못한다.
+    private static bool IsSameEntity(object a, object b)
+    {
+        if (ReferenceEquals(a, b) || Equals(a, b)) return true;
+        var idA = a.GetType().GetProperty("Id")?.GetValue(a);
+        var idB = b.GetType().GetProperty("Id")?.GetValue(b);
+        return idA is int x && idB is int y && x == y && x > 0;
+    }
+}

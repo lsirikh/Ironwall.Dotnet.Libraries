@@ -1,0 +1,345 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingRoiEditorView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:video="clr-namespace:Ironwall.Dotnet.Libraries.CameraPopup.Wpf;assembly=Ironwall.Dotnet.Libraries.CameraPopup"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
+	<!--
+		프리셋 ROI 설정 — 프리셋 관리 창 폼의 [ROI 설정…] 으로 연다. T4 · L 720(프리셋 관리 창과 같은 틀).
+		왼쪽 ROI 목록 · 오른쪽 그리기 캔버스 + 폼. 캔버스: 클릭=점(선이 이어진다) · 첫 점 클릭=닫기 · 닫은 뒤 꼭짓점 끌기.
+		저장 · 삭제는 바로 서버로 간다. 색상은 전부 DynamicResource 토큰(라이트/다크).
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+	</UserControl.Resources>
+
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Events.Mapping.Rois"
+		HelpKey="Events.Mapping.Rois"
+		IsBusy="{Binding IsBusy, Mode=OneWay}"
+		Message="{Binding Message, Mode=OneWay}"
+		MessageSeverity="{Binding MessageSeverity, Mode=OneWay}"
+		PrimaryText=""
+		SecondaryAutomationId="Integrations.Rois.Close"
+		SecondaryInvoked="OnClose"
+		SecondaryText="닫기"
+		Size="Large"
+		Title="{Binding Title, Mode=OneWay}">
+		<Grid MinHeight="520">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="200" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+
+			<!--  ① ROI 목록  -->
+			<DockPanel LastChildFill="True">
+				<Button
+					Margin="0,0,0,8"
+					HorizontalAlignment="Left"
+					AutomationProperties.AutomationId="Integrations.Rois.New"
+					Click="OnNew"
+					Content="＋ 새 ROI"
+					DockPanel.Dock="Top"
+					IsEnabled="{Binding CanBeginNew}"
+					Style="{DynamicResource Console.Button}" />
+				<Grid>
+					<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+					<ListBox
+						Padding="4"
+						AutomationProperties.AutomationId="Integrations.Rois.List"
+						Background="Transparent"
+						ItemsSource="{Binding Rois}"
+						SelectedItem="{Binding SelectedRoi, Mode=TwoWay}">
+						<ListBox.ItemContainerStyle>
+							<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+								<Setter Property="AutomationProperties.Name" Value="{Binding Display}" />
+								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Rois.Row.{0}}" />
+							</Style>
+						</ListBox.ItemContainerStyle>
+						<ListBox.ItemTemplate>
+							<DataTemplate>
+								<StackPanel Margin="2,2">
+									<TextBlock
+										FontSize="13"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{Binding Display}"
+										TextTrimming="CharacterEllipsis" />
+									<TextBlock
+										FontSize="11"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Text="{Binding Subtitle}" />
+								</StackPanel>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+					<TextBlock
+						Margin="12"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsHitTestVisible="False"
+						Text="등록된 ROI 가 없습니다"
+						TextWrapping="Wrap"
+						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
+				</Grid>
+			</DockPanel>
+
+			<!--  ② 캔버스 + 폼 — 고른 ROI 또는 새 ROI  -->
+			<DockPanel Grid.Column="1" Margin="12,0,0,0" LastChildFill="True">
+				<!--  영상 줄 — 캔버스 바탕의 카메라 실시간 영상 상태 · [다시 시도] · [프리셋 자리로 이동]  -->
+				<DockPanel
+					Margin="0,0,0,6"
+					DockPanel.Dock="Top"
+					LastChildFill="True"
+					Visibility="{Binding HasVideo, Converter={StaticResource BoolToVis}}">
+					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Integrations.Rois.VideoRetry"
+							Click="OnRetryVideo"
+							Content="다시 시도"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding Video.CanRetry, Converter={StaticResource BoolToVis}}" />
+						<Button
+							AutomationProperties.AutomationId="Integrations.Rois.GotoPreset"
+							Click="OnGotoPreset"
+							Content="프리셋 자리로 이동"
+							IsEnabled="{Binding CanGotoPreset}"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding HasGotoPreset, Converter={StaticResource BoolToVis}}" />
+					</StackPanel>
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Rois.VideoStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding Video.Headline, Mode=OneWay}"
+						TextWrapping="Wrap" />
+				</DockPanel>
+
+				<!--  그리기 도구 줄 — 왼쪽 상태 · 오른쪽 도구  -->
+				<DockPanel
+					Margin="0,0,0,6"
+					DockPanel.Dock="Top"
+					LastChildFill="True"
+					Visibility="{Binding HasForm, Converter={StaticResource BoolToVis}}">
+					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Integrations.Rois.Undo"
+							Click="OnUndo"
+							Content="마지막 점 지우기"
+							IsEnabled="{Binding CanUndoPoint}"
+							Style="{DynamicResource Console.Button}" />
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Integrations.Rois.ClosePolygon"
+							Click="OnClosePolygon"
+							Content="닫기"
+							IsEnabled="{Binding CanClosePolygon}"
+							Style="{DynamicResource Console.Button}" />
+						<Button
+							AutomationProperties.AutomationId="Integrations.Rois.Redraw"
+							Click="OnRedraw"
+							Content="다시 그리기"
+							IsEnabled="{Binding CanRedraw}"
+							Style="{DynamicResource Console.Button}" />
+					</StackPanel>
+					<!--  TextBlock 은 UIA 트리에 안 나온다 — 평평한 읽기 전용 TextBox 로 계측 가능하게 둔다.  -->
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Rois.DrawStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding DrawStatus, Mode=OneWay}" />
+				</DockPanel>
+
+				<!--  폼 — 캔버스 아래  -->
+				<c:ConsoleSection
+					Margin="0,10,0,0"
+					AutomationProperties.AutomationId="Integrations.Rois.Form"
+					AxisName="preset-rois"
+					DockPanel.Dock="Bottom"
+					Header="{Binding FormTitle}"
+					Visibility="{Binding HasForm, Converter={StaticResource BoolToVis}}">
+					<StackPanel IsEnabled="{Binding CanEdit}">
+						<c:ConsoleField ApiName="name" Header="이름">
+							<TextBox
+								Height="32"
+								Padding="8,0"
+								VerticalContentAlignment="Center"
+								md:HintAssist.IsFloating="False"
+								md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+								AutomationProperties.AutomationId="Integrations.Rois.NameBox"
+								MaxLength="100"
+								Style="{StaticResource MaterialDesignOutlinedTextBox}"
+								Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
+						</c:ConsoleField>
+						<c:ConsoleField ApiName="resolution_width · resolution_height" Header="기준 해상도">
+							<StackPanel Orientation="Horizontal">
+								<TextBox
+									Width="90"
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Rois.WidthBox"
+									MaxLength="6"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditWidth, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBlock
+									Margin="8,0"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="×" />
+								<TextBox
+									Width="90"
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Rois.HeightBox"
+									MaxLength="6"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditHeight, UpdateSourceTrigger=PropertyChanged}" />
+							</StackPanel>
+						</c:ConsoleField>
+						<c:ConsoleField ApiName="is_enable" Header="사용">
+							<ToggleButton
+								HorizontalAlignment="Left"
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Integrations.Rois.EnableToggle"
+								IsChecked="{Binding EditEnabled}"
+								Style="{DynamicResource Console.ToggleSwitch}" />
+						</c:ConsoleField>
+
+						<TextBox
+							Margin="0,4,0,0"
+							AutomationProperties.AutomationId="Integrations.Rois.FormError"
+							Background="Transparent"
+							BorderThickness="0"
+							FontSize="11"
+							Foreground="{DynamicResource StatusCriticalBrush}"
+							IsReadOnly="True"
+							Text="{Binding ValidationText, Mode=OneWay}"
+							TextWrapping="Wrap"
+							Visibility="{Binding HasValidationText, Converter={StaticResource BoolToVis}}" />
+
+						<!--  저장 줄 — 왼쪽이 삭제, 오른쪽이 저장  -->
+						<StackPanel
+							Margin="0,8,0,0"
+							HorizontalAlignment="Right"
+							Orientation="Horizontal">
+							<Button
+								Margin="0,0,8,0"
+								AutomationProperties.AutomationId="Integrations.Rois.Delete"
+								Click="OnDelete"
+								Content="삭제"
+								IsEnabled="{Binding CanDelete}"
+								Style="{DynamicResource Console.Button.Danger}" />
+							<Button
+								AutomationProperties.AutomationId="Integrations.Rois.Save"
+								Click="OnSave"
+								Content="{Binding SaveText}"
+								IsEnabled="{Binding CanSave}"
+								Style="{DynamicResource Console.Button.Primary}" />
+						</StackPanel>
+
+						<!--  삭제 확인 줄 — 색만이 아니라 세로 바 + 글로 알린다  -->
+						<Border
+							Margin="0,8,0,0"
+							Padding="10,6"
+							AutomationProperties.AutomationId="Integrations.Rois.DeleteConfirm"
+							Background="{DynamicResource TintWarningBrush}"
+							BorderBrush="{DynamicResource StatusWarningBrush}"
+							BorderThickness="4,1,1,1"
+							CornerRadius="4"
+							Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVis}}">
+							<DockPanel LastChildFill="True">
+								<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+									<Button
+										Margin="8,0,8,0"
+										AutomationProperties.AutomationId="Integrations.Rois.DeleteCancel"
+										Click="OnCancelDelete"
+										Content="취소"
+										Style="{DynamicResource Console.Button}" />
+									<Button
+										AutomationProperties.AutomationId="Integrations.Rois.DeleteConfirmButton"
+										Click="OnConfirmDelete"
+										Content="삭제"
+										Style="{DynamicResource Console.Button.Danger}" />
+								</StackPanel>
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding DeleteConfirmText}"
+									TextWrapping="Wrap" />
+							</DockPanel>
+						</Border>
+					</StackPanel>
+				</c:ConsoleSection>
+
+				<!--  캔버스 — 기준 해상도 비율로 가운데 맞춘다. 고른 것이 없어도 다른 ROI 를 보여 준다.
+				      바탕 영상: 숨은 HostedVideoView 가 호스트 프레임을 비트맵으로 복사하고, 캔버스가 그 비트맵을 그림 칸에 깐다.  -->
+				<Grid>
+					<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+					<video:HostedVideoView
+						x:Name="RoiVideoFrame"
+						Width="0"
+						Height="0"
+						FrameSource="{Binding Video.FrameSource}"
+						IsHitTestVisible="False"
+						Visibility="Hidden" />
+					<local:MappingRoiCanvas
+						MinHeight="220"
+						Margin="6"
+						AutomationProperties.AutomationId="Integrations.Rois.Canvas"
+						Backdrop="{DynamicResource SurfaceBrush}"
+						Editor="{Binding}"
+						GridBrush="{DynamicResource BorderBrush}"
+						OtherBrush="{DynamicResource TextSecondaryBrush}"
+						ShapeBrush="{DynamicResource PrimaryBrush}"
+						VideoImage="{Binding Source, ElementName=RoiVideoFrame}" />
+					<TextBlock
+						Margin="12"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsHitTestVisible="False"
+						Text="ROI 를 고르거나 [＋ 새 ROI]를 누르세요"
+						TextWrapping="Wrap">
+						<TextBlock.Style>
+							<Style TargetType="TextBlock">
+								<Setter Property="Visibility" Value="Visible" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding HasForm}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
+				</Grid>
+			</DockPanel>
+		</Grid>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

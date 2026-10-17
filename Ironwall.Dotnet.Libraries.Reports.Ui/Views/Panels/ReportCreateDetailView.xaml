@@ -1,0 +1,233 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportCreateDetailView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	AutomationProperties.AutomationId="Reports.Create.Root">
+	<!--
+		새 보고서 — T2(레일 · 섹션 폼 · 아래 고정 저장 막대)다(설계 정본 L1531 · L1499).
+		폼은 상세 칸에 서고, 바닥 막대의 [생성] · [비우기] 는 콘솔이 맡는다.
+		왼쪽 목록 칸에는 최근 생성 이력이 진행률과 함께 보인다 — 요청한 것이 어떻게 되는지 같은 화면에서 본다.
+		서버 계약(닫힌 어휘 · aware ISO8601)은 한 글자도 바꾸지 않는다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+		<Style x:Key="Form.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+	</UserControl.Resources>
+
+	<StackPanel>
+		<c:ConsoleSection Header="보고서 종류">
+			<StackPanel>
+				<c:ConsoleField ApiName="report_type" Header="유형">
+					<StackPanel>
+						<RadioButton
+							AutomationProperties.AutomationId="Reports.Create.StandardRadio"
+							Content="표준 전체 — 모든 섹션"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="ReportKind"
+							IsChecked="{Binding CreateViewModel.IsStandard}"
+							Style="{StaticResource Console.RadioButton}" />
+						<RadioButton
+							Margin="0,4,0,0"
+							AutomationProperties.AutomationId="Reports.Create.TemplateRadio"
+							Content="템플릿 기반 — 저장한 구성"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="ReportKind"
+							IsChecked="{Binding CreateViewModel.IsTemplateBased}"
+							Style="{StaticResource Console.RadioButton}" />
+					</StackPanel>
+				</c:ConsoleField>
+
+				<c:ConsoleField
+					ApiName="template_id"
+					Header="템플릿"
+					IsLocked="{Binding CreateViewModel.IsStandard}"
+					LockReason="{Binding CreateViewModel.TemplateLockReason}">
+					<StackPanel>
+						<ComboBox
+							Height="30"
+							AutomationProperties.AutomationId="Reports.Create.TemplateComboBox"
+							DisplayMemberPath="Name"
+							FontSize="13"
+							IsEnabled="{Binding CreateViewModel.IsTemplateBased}"
+							ItemsSource="{Binding CreateViewModel.Templates}"
+							SelectedItem="{Binding CreateViewModel.SelectedTemplate}" />
+						<TextBlock
+							Margin="0,4,0,0"
+							FontSize="11"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="저장된 템플릿이 없습니다. 왼쪽 [템플릿]에서 먼저 만드세요."
+							TextWrapping="Wrap">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding CreateViewModel.HasTemplates}" Value="False">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+					</StackPanel>
+				</c:ConsoleField>
+
+				<c:ConsoleField ApiName="title" Header="제목 *">
+					<TextBox
+						AutomationProperties.AutomationId="Reports.Create.TitleTextBox"
+						Style="{StaticResource Form.TextBox}"
+						Text="{Binding CreateViewModel.Title, UpdateSourceTrigger=PropertyChanged}" />
+				</c:ConsoleField>
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<c:ConsoleSection Header="기간">
+			<StackPanel>
+				<c:ConsoleField ApiName="period_type" Header="방식">
+					<StackPanel>
+						<RadioButton
+							AutomationProperties.AutomationId="Reports.Create.PresetRadio"
+							Content="정해진 기간"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="ReportPeriod"
+							IsChecked="{Binding CreateViewModel.IsPreset}"
+							Style="{StaticResource Console.RadioButton}" />
+						<RadioButton
+							Margin="0,4,0,0"
+							AutomationProperties.AutomationId="Reports.Create.CustomRangeRadio"
+							Content="직접 지정"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="ReportPeriod"
+							IsChecked="{Binding CreateViewModel.IsCustomRange}"
+							Style="{StaticResource Console.RadioButton}" />
+					</StackPanel>
+				</c:ConsoleField>
+
+				<c:ConsoleField
+					ApiName="period_type"
+					Header="기간"
+					Visibility="{Binding CreateViewModel.IsPreset, Converter={StaticResource BoolToVisibility}}">
+					<ComboBox
+						Height="30"
+						AutomationProperties.AutomationId="Reports.Create.PeriodComboBox"
+						DisplayMemberPath="Display"
+						FontSize="13"
+						ItemsSource="{Binding CreateViewModel.Periods}"
+						SelectedItem="{Binding CreateViewModel.SelectedPeriod}" />
+				</c:ConsoleField>
+
+				<!--
+					R23 — 시작 · 종료를 한 줄에 128 + 128 로 나란히 두면 값 칸(도킹 380 → 약 246, 서랍 360 → 약 226)보다
+					넓어(약 276) 종료일 칸이 잘렸다. 두 줄로 쌓고 칸 폭을 값 칸에 맞춘다 — 어느 폭에서도 잘리지 않는다.
+				-->
+				<c:ConsoleField
+					ApiName="start_date · end_date"
+					Header="시작 · 종료"
+					Visibility="{Binding CreateViewModel.IsCustomRange, Converter={StaticResource BoolToVisibility}}">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							Margin="0,0,8,0"
+							VerticalAlignment="Center"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="시작" />
+						<!--
+							B7(#51) — WPF DatePicker(MDIX 기본 달력 · Teal)를 커널 단일 날짜 칸(c:DateTimeField)으로. 날짜만 · 글자로도 적는다(yyyy-MM-dd).
+							식별자 · 이름은 그대로(칸 자신이 이 AutomationId 로 나오고, 안쪽 글자 칸이 Edit 로 나온다 — AppSweep T-ACT009).
+							옛 피커처럼 비울 수 있다(뷰모델 DateTime?) — 비우거나 역전(종료 &lt; 시작)하면 [생성] 때 뷰모델이 막는다(검증은 그대로 뷰모델).
+						-->
+						<c:DateTimeField
+							Grid.Row="0"
+							Grid.Column="1"
+							Height="30"
+							HorizontalAlignment="Left"
+							AllowEmpty="True"
+							AutomationProperties.AutomationId="Reports.Create.StartDatePicker"
+							AutomationProperties.Name="시작일"
+							Value="{Binding CreateViewModel.StartDate}" />
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="0"
+							Margin="0,6,8,0"
+							VerticalAlignment="Center"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="종료" />
+						<c:DateTimeField
+							Grid.Row="1"
+							Grid.Column="1"
+							Height="30"
+							Margin="0,6,0,0"
+							HorizontalAlignment="Left"
+							AllowEmpty="True"
+							AutomationProperties.AutomationId="Reports.Create.EndDatePicker"
+							AutomationProperties.Name="종료일"
+							Value="{Binding CreateViewModel.EndDate}" />
+					</Grid>
+				</c:ConsoleField>
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<c:ConsoleSection
+			AxisName="severity_filter"
+			CountText="{Binding CreateViewModel.SeveritySummary}"
+			Header="심각도"
+			HelpKey="Reports.Create.Severity">
+			<StackPanel>
+				<ItemsControl
+					AutomationProperties.AutomationId="Reports.Create.SeverityList"
+					Focusable="False"
+					ItemsSource="{Binding CreateViewModel.Severities}">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<WrapPanel />
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<CheckBox
+								Margin="0,0,12,4"
+								AutomationProperties.AutomationId="{Binding Value, StringFormat=Reports.Create.Severity.{0}}"
+								Content="{Binding Display}"
+								IsChecked="{Binding IsSelected}"
+								Style="{StaticResource Console.CheckBox}" />
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+				<!--  "아무것도 고르지 않으면 전 심각도 · 시스템 이벤트 계열에만" 은 절 "?" 로 옮겼다(help-callout H-3)  -->
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<!--  진행 — 요청 뒤 폴링 상태. 팝업이 아니라 인라인이다.  -->
+		<ProgressBar
+			Height="4"
+			Margin="0,10,0,0"
+			Background="{DynamicResource SurfaceSunkenBrush}"
+			Foreground="{DynamicResource PrimaryBrush}"
+			Maximum="100"
+			Minimum="0"
+			Value="{Binding CreateViewModel.GenProgress, Mode=OneWay}"
+			Visibility="{Binding CreateViewModel.IsGenerating, Converter={StaticResource BoolToVisibility}}" />
+	</StackPanel>
+</UserControl>

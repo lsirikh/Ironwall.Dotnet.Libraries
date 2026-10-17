@@ -1,0 +1,149 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraSettingView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	d:DesignHeight="500"
+	d:DesignWidth="800"
+	mc:Ignorable="d">
+	<Grid Margin="16">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="3*" />
+			<ColumnDefinition Width="7*" />
+		</Grid.ColumnDefinitions>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<TextBlock
+			Grid.Row="0"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="날씨 모드" />
+		<ComboBox
+			Grid.Row="0"
+			Grid.Column="1"
+			ItemsSource="{Binding WeatherModeOptions}"
+			SelectedItem="{Binding WeatherMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="1"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="카메라 모드" />
+		<ComboBox
+			Grid.Row="1"
+			Grid.Column="1"
+			ItemsSource="{Binding CameraModeOptions}"
+			SelectedItem="{Binding CameraMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="2"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="히터" />
+		<ComboBox
+			Grid.Row="2"
+			Grid.Column="1"
+			ItemsSource="{Binding OnOffOptions}"
+			SelectedItem="{Binding Heater, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="3"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="팬" />
+		<ComboBox
+			Grid.Row="3"
+			Grid.Column="1"
+			ItemsSource="{Binding OnOffOptions}"
+			SelectedItem="{Binding Fan, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="4"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="전조등" />
+		<ComboBox
+			Grid.Row="4"
+			Grid.Column="1"
+			ItemsSource="{Binding OnOffOptions}"
+			SelectedItem="{Binding Headlight, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="5"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="주야간 모드" />
+		<ComboBox
+			Grid.Row="5"
+			Grid.Column="1"
+			ItemsSource="{Binding DayNightModeOptions}"
+			SelectedItem="{Binding DayNightMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="6"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="포커스 모드" />
+		<ComboBox
+			Grid.Row="6"
+			Grid.Column="1"
+			ItemsSource="{Binding FocusModeOptions}"
+			SelectedItem="{Binding FocusMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="7"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="조리개 모드" />
+		<ComboBox
+			Grid.Row="7"
+			Grid.Column="1"
+			ItemsSource="{Binding IrisModeOptions}"
+			SelectedItem="{Binding IrisMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="8"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="추적" />
+		<ComboBox
+			Grid.Row="8"
+			Grid.Column="1"
+			ItemsSource="{Binding TrackingOptions}"
+			SelectedItem="{Binding Tracking, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+
+		<TextBlock
+			Grid.Row="9"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="팔레트" />
+		<ComboBox
+			Grid.Row="9"
+			Grid.Column="1"
+			ItemsSource="{Binding PaletteOptions}"
+			SelectedItem="{Binding Palette, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
+	</Grid>
+</UserControl>

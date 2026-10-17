@@ -77,11 +77,15 @@ public abstract class BaseEventViewModel<T> : BaseCustomViewModel<T>
         set { _index = value; NotifyOfPropertyChange(() => Index); }
     }
 
+    /// <summary>신규(미저장) Draft 여부 — Id≤0. 편집 가능 여부 제어용(예: Action 원본이벤트는 생성 시에만 지정 가능, 사후 불변).</summary>
+    public bool IsDraft => _model != null && _model.Id <= 0;
+
     public EnumEventType MessageType
     {
         get { return _model.MessageType; }
         set
         {
+            if (!IsDraft) return;   // type_event 불변(패널 고정/서버 정책): 기존 행 변경 차단 — SelectionView 일괄적용 등 프로그래matic 경로 포함
             SetModelProperty(value, _model.MessageType, v => _model.MessageType = v);
         }
     }
@@ -91,6 +95,7 @@ public abstract class BaseEventViewModel<T> : BaseCustomViewModel<T>
         get { return _model.DateTime; }
         set
         {
+            if (!IsDraft) return;   // created_at 불변(서버 E-07): 기존 행 발생시각 변경 차단(2차 방어 — CommitEdit/프로그래matic 포함, 거짓 IsEdited 방지)
             SetModelProperty(value, _model.DateTime, v => _model.DateTime = v);
         }
     }
@@ -101,7 +106,7 @@ public abstract class BaseEventViewModel<T> : BaseCustomViewModel<T>
     public bool IsEdited
     {
         get { return _isEdited; }
-        private set
+        internal set   // 저장 성공 후 패널이 행별 리셋(부분실패 보존 시 재-PUT 누적 방지). 값 변경은 SetProperty/SetModelProperty가 true로 설정.
         {
             _isEdited = value;
             NotifyOfPropertyChange();

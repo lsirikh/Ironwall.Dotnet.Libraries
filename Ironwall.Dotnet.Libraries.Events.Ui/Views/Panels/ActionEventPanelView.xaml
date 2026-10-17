@@ -5,6 +5,7 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -20,25 +21,30 @@
 	<UserControl.Resources>
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+		<!--  탐지/장애 패널과 동일 — enum 표시 한글화(표시 전용, ConvertBack 미지원). 저장/전송 값은 raw enum 유지.  -->
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
+	<!--  events-console FR-02: 목록을 가두던 고정 높이(바깥 Grid Width/Height · 안쪽 DataGrid Height)를 없았다.
+	     ⚠ 이 뷰는 새 콘솔이 호스팅하지 않는다 — 콘솔은 패널의 ViewModelProvider 를 제 그리드에 직접 묶는다.
+	     고친 것은 이 뷰를 다시 쓰게 될 때를 위한 정리이고, 보이는 수정은 콘솔 그리드 쪽이다.  -->
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 		<StackPanel Grid.Row="0" Orientation="Vertical">
+			<!--  날짜 피커: EventDashboardView로 이관 — Column 0~7 숨김  -->
 			<Grid Grid.Row="0" Margin="10,0">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
 					<ColumnDefinition Width="70" />
 					<ColumnDefinition Width="10" />
 					<ColumnDefinition Width="70" />
@@ -50,24 +56,28 @@
 				<TextBlock
 					Grid.Row="0"
 					Grid.Column="0"
+					Visibility="Collapsed"
 					Style="{StaticResource TextBlockTitle}"
-					Text="From" />
+					Text="시작" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="1"
 					Margin="5"
+					Visibility="Collapsed"
 					FontSize="15"
 					FontWeight="Bold"
 					SelectedDateTime="{Binding StartDate, Mode=TwoWay, StringFormat={}{yyyy-MM-dd HH:mm:ss}, UpdateSourceTrigger=PropertyChanged}" />
 				<TextBlock
 					Grid.Row="0"
 					Grid.Column="2"
+					Visibility="Collapsed"
 					Style="{StaticResource TextBlockTitle}"
-					Text="To" />
+					Text="종료" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="3"
 					Margin="5"
+					Visibility="Collapsed"
 					DisplayDateStart="{Binding EndDateDisplay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					FontSize="15"
 					FontWeight="Bold"
@@ -77,11 +87,12 @@
 					x:Name="ClickSearch"
 					Grid.Row="0"
 					Grid.Column="4"
-					Style="{StaticResource IconButtonStyle}">
+					Visibility="Collapsed"
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Search" />
 					</Button.Content>
 				</Button>
@@ -89,11 +100,12 @@
 					x:Name="ClickCancel"
 					Grid.Row="0"
 					Grid.Column="6"
-					Style="{StaticResource IconButtonStyle}">
+					Visibility="Collapsed"
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Cancel" />
 					</Button.Content>
 				</Button>
@@ -102,30 +114,30 @@
 				<!--  Add Button  -->
 				<Button
 					Grid.Column="8"
-					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					IsEnabled="{Binding CanInsertEvent}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="추가하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="AddBox" />
 				</Button>
 
 				<!--  Remove Button  -->
 				<Button
 					Grid.Column="10"
-					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					IsEnabled="{Binding CanDeleteEvent}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="삭제하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="MinusBox" />
 				</Button>
 
@@ -133,7 +145,7 @@
 				<Button
 					Grid.Column="12"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="갱신하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickReloadButton" />
@@ -141,17 +153,18 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
-								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="20"
+					Height="20"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="CircleArrows"
-								ToolTip="갱신하기"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="20"
+					Height="20"
+					Kind="CircleArrows"
+					ToolTip="갱신하기"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						</Grid>
 					</Button.Content>
 
@@ -163,35 +176,34 @@
 					Margin="2,2"
 					VerticalAlignment="Center"
 					md:RippleAssist.IsCentered="True"
-					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource MaterialDesignIconButton}"
+					IsEnabled="{Binding CanSaveEvent}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-				Width="100"
-				Height="20"
-				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
-				Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="20"
+					Height="20"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsSaving, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="Floppy"
-								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="20"
+					Height="20"
+					Kind="Floppy"
+					ToolTip="저장하기"
+					Visibility="{Binding IsSaving, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 						</Grid>
 					</Button.Content>
 				</Button>
 			</Grid>
 		</StackPanel>
-		<Grid
-			Grid.Row="1"
-			Width="800"
-			Height="310">
+		<Grid Grid.Row="1">
 			<ProgressBar
 				Width="50"
 				Height="50"
@@ -204,7 +216,11 @@
 		<DataGrid
 			x:Name="DataGridUsers"
 			Grid.Row="1"
-			Height="310"
+			Background="Transparent"
+			Margin="10 0"
+			BorderThickness="1"
+			HeadersVisibility="Column"
+			RowHeaderWidth="0"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
 			ItemsSource="{Binding ViewModelProvider}"
@@ -213,13 +229,14 @@
 			<i:Interaction.Behaviors>
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:ActionEventSelectedItemBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
+				<behavior_inner:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -236,9 +253,10 @@
 				</DataGridTextColumn>
 
 				<!--  MessageType  -->
-				<DataGridTemplateColumn
+				<!--<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Message Type"
+					IsReadOnly="True"
+					Header="이벤트 종류"
 					SortMemberPath="MessageType">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -278,13 +296,13 @@
 							</ComboBox>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
+				</DataGridTemplateColumn>-->
 
 
 				<!--  OriginEvent  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="OriginEvent"
+					Header="원본 이벤트"
 					SortMemberPath="OriginEvent">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -296,7 +314,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding OriginEvent.MessageType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding OriginEvent.MessageType, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -306,6 +324,9 @@
 								VerticalAlignment="Center"
 								HorizontalContentAlignment="Center"
 								IsEditable="False"
+								IsEnabled="{Binding IsDraft}"
+								ToolTip="원본 이벤트는 생성 시에만 지정할 수 있고, 저장 후에는 변경할 수 없습니다."
+								ToolTipService.ShowOnDisabled="True"
 								ItemsSource="{Binding Data.EventProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
 								SelectedItem="{Binding OriginEvent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 								<ComboBox.ItemsPanel>
@@ -315,7 +336,7 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding MessageType}" TextAlignment="Center" />
+										<TextBlock Text="{Binding MessageType, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}" TextAlignment="Center" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>
@@ -326,10 +347,77 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
+	
+				<!--  썸네일 (원본 탐지 detail.thumbnail) — 탐지 origin=이미지, 장애/부재=Default. 호버 시 원본 툴팁  -->
+				<DataGridTemplateColumn
+					CanUserSort="False"
+					Header="썸네일"
+					IsReadOnly="True">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<Grid
+								Width="52"
+								Height="36"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center">
+								<!--  기본 이미지(뒤): 썸네일 없음/장애 origin/로드 실패 시 노출  -->
+								<md:PackIcon
+									Width="18"
+									Height="18"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Opacity="0.4"
+									Kind="ImageOffOutline" />
+								<!--  썸네일(앞): 탐지 origin + 후보 존재 시만. 로드 전/실패면 빈 렌더 → 뒤 Default 노출  -->
+								<Border ClipToBounds="True" CornerRadius="3">
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="Visibility" Value="Visible" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HasOriginThumbnail}" Value="False">
+													<Setter Property="Visibility" Value="Collapsed" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+									<Image
+										MaxHeight="34"
+										RenderOptions.BitmapScalingMode="HighQuality"
+										Source="{Binding OriginThumbnail, Mode=OneWay}"
+										Stretch="Uniform"
+										ToolTipService.InitialShowDelay="300"
+										ToolTipService.ShowDuration="30000">
+										<Image.ToolTip>
+											<ToolTip
+												Background="{DynamicResource SurfaceAltBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												Padding="4">
+												<Image
+													MaxWidth="360"
+													MaxHeight="270"
+													RenderOptions.BitmapScalingMode="HighQuality"
+													Source="{Binding OriginThumbnail, Mode=OneWay}"
+													Stretch="Uniform" />
+											</ToolTip>
+										</Image.ToolTip>
+									</Image>
+								</Border>
+							</Grid>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+
 				<!--  User  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="User"
+					Header="사용자"
 					SortMemberPath="User">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -358,7 +446,7 @@
 				<!--  Content  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Content"
+					Header="내용"
 					SortMemberPath="Content">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -387,7 +475,7 @@
 				<!--  DateTime  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="DateTime"
+					Header="발생시각"
 					SortMemberPath="DateTime">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -407,6 +495,9 @@
 						<DataTemplate>
 							<TextBox
 								VerticalAlignment="Center"
+								IsEnabled="{Binding IsDraft}"
+								ToolTipService.ShowOnDisabled="True"
+								ToolTip="이벤트 발생 시각은 변경할 수 없습니다(추적성 보존). 신규 행에서만 지정 가능합니다."
 								Text="{Binding DateTime, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>
@@ -417,14 +508,27 @@
 
 			</DataGrid.Columns>
 		</DataGrid>
-		<StackPanel
+		<DockPanel
 			Grid.Row="2"
-			Margin="0,10,0,0"
-			Orientation="Horizontal">
-
-			<TextBlock Text="선택된 항목 : " />
-			<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
-		</StackPanel>
+			Margin="10,5,10,5">
+			<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+				<TextBlock VerticalAlignment="Center" Text="선택된 항목 : " />
+				<TextBlock VerticalAlignment="Center" Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+			<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+				<ProgressBar
+					Width="16"
+					Height="16"
+					Margin="0,0,8,0"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsLoadingMore, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
+				<TextBlock
+					VerticalAlignment="Center"
+					Text="{Binding LoadedCountText, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+		</DockPanel>
 	</Grid>
 </UserControl>
 

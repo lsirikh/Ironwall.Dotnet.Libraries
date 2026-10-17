@@ -1,0 +1,650 @@
+- generic [active] [ref=e1]:
+  - heading "PIDS 그룹 3D 철망 · 통문(개폐) · 함체(개폐) — 와이어프레임 스토리보드" [level=1] [ref=e2]
+  - generic [ref=e3]:
+    - text: "v0.1 Draft · 2026-09-07 · 상태: 사용자 확인 중 · D2 확정(통문 = 신규 enum + 전용 3D 심볼, 17:2x) · 근거 정본:"
+    - code [ref=e4]: docs/analyses/symbol-3d-wip-propagation-analysis.md
+    - text: §8-5 · 3D 하우징 PRD v2.6 · 관련 규칙
+    - code [ref=e5]: drag-first-ux.md
+    - text: "· 사용자 요청(2026-09-07): \"선을 드래그해서 그리면 설정 간격(2/3/5m)으로 철망이 3D 로 쭉 이어지고, 통문·함체는 이벤트에 따라 열림/닫힘 형태가 바뀌면 좋겠다 — HTML 스토리보드로 먼저 확인\""
+  - generic [ref=e6]:
+    - button "다크" [ref=e7] [cursor=pointer]
+    - button "라이트" [ref=e8] [cursor=pointer]
+    - generic [ref=e9]: 두 테마 모두에서 상태 구분이 색이 아니라 형태(펄스·문짝 각도·굵기)로도 읽히는지 확인용
+  - heading "0. 현행 사실 — 여기서 출발한다" [level=2] [ref=e10]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - text: PIDS 그룹 = 2D 폴리라인. 점은
+      - code [ref=e13]: pidsgrouppoints(GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+      - text: ", 그룹 속성은"
+      - code [ref=e14]: pidsgroupsymbols(LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+      - text: . 로컬 DB 17개 그룹. 기둥 간격 같은 설정은 어디에도 없다.
+    - generic [ref=e15]:
+      - text: 상태 6종은 이미 있다 —
+      - code [ref=e16]: CompositeStatus
+      - text: Normal / Detecting(빨강 펄스) / Faulted(주황) / FaultedDetecting(교차 깜빡임) / Connection(청록) / Blackout(검정·굵기 4). 철망은 이 상태를 구간에 입히면 된다.
+    - generic [ref=e17]:
+      - text: 개폐 이벤트는 이미 온다 —
+      - code [ref=e18]: EnumDeviceType.Contact(접점 센서)
+      - text: +
+      - code [ref=e19]: EnumEventType.ContactOn(86)/ContactOff(102)
+      - text: +
+      - code [ref=e20]: EnumDetectionType.CONTACT_SENSOR
+      - text: . 통문(門)은 현재 별도 장비 타입이 없다 →
+      - generic [ref=e21]:
+        - text: "D2 결정: 신규"
+        - code [ref=e22]: EnumDeviceType.Gate = 21
+        - text: (통문) + 전용 3D 심볼 신설
+      - text: (§5-B 영향면). 함체는
+      - code [ref=e23]: EnumDeviceType.Enclosure(19)
+      - text: + 3D 모델 키
+      - code [ref=e24]: enclosure
+      - text: 가 이미 있다.
+    - generic [ref=e25]:
+      - text: "이벤트→마커 애니메이션 체인(2026-09-07 실측): DETECT →"
+      - code [ref=e26]: EventStatus=Detecting
+      - text: "→ 3D 템플릿 트리거 → 3링 펄스(2s 주기). 장애는 배지 색만. 형태(문짝 각도) 전환은 새 DP(예:"
+      - code [ref=e27]: DoorState
+      - text: )가 필요하다.
+  - generic [ref=e28]: "전사 방침 드래그 1순위: 라인은 \"점 찍기\" 대신 드래그로 긋고(경로 단순화 후 점 생성) 점 찍기는 폴백. 단, 맵 위 좌드래그는 팬이 선점하고 있어(DragButton=Left) 드로잉 모드에서만 팬을 양보해야 한다 — 현행 라인 드로잉 HUD 가 이미 이 모드 전환을 쓴다."
+  - heading "0-B. \"우리 지도가 3D 를 표현할 구조가 아니지 않나?\" — 맞다. 그래서 이렇게 한다" [level=2] [ref=e29]
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - text: 지도는 2D 다. GMap.NET 타일 지도(톱다운)이고 지형·고도·원근이 없다. 지금 "3D"라고 부르는 것은
+      - generic [ref=e32]:
+        - text: 마커 하나하나 안에 든
+        - code [ref=e33]: Viewport3D
+      - text: (
+      - code [ref=e34]: HousingVisual
+      - text: )가 화면 고정 35° 피치로 그린 로우폴리 형상이다. 지면은 평면 그대로, 건물끼리 가림도 없다 → 정확히는 2.5D 오버레이(3D 하우징 PRD 의 전제, 회전은 5축 분해로 지도 회전과 동기).
+    - generic [ref=e35]: 철망도 같은 방식으로만 가능하다. 그룹(폴리라인) 마커의 Viewport3D 안에서 라인을 따라 피치를 준 압출 형상(기둥·철망·센서 노드)을 그린다. 지도가 3D 가 되는 게 아니라, 라인 위에 "세워 보이는" 오버레이가 얹히는 것이다. 톱다운 타일 위에 세워진 건물 하우징과 같은 어휘라 시각적 일관성은 유지된다.
+  - table [ref=e36]:
+    - rowgroup [ref=e37]:
+      - row [ref=e38]:
+        - columnheader "가능" [ref=e39]
+        - columnheader "불가능(이 구조에선)" [ref=e40]
+        - columnheader "설계 결과" [ref=e41]
+      - row [ref=e42]:
+        - cell "라인 따라 기둥·철망·센서 노드 압출, 상태색·펄스, 통문 절개, 지도 회전 동기(yaw = 변 방위 − θ)" [ref=e43]
+        - cell "지형 기복·경사면 추종, 건물/철망 상호 가림, 카메라 틸트·시점 변경, 그림자 정합" [ref=e44]
+        - cell "철망 높이는 화면 픽셀 기준 h·(줌 배율), 지면점은 라인 위 · 고도(Altitude)는 1차 무시 · LOD 로 먼 줌에선 2D 라인 복귀" [ref=e45]
+      - row [ref=e46]:
+        - cell "그룹 1개 = Viewport3D 1개(지오메트리 병합)" [ref=e47]
+        - cell "수천 기둥을 마커 개별 Viewport3D 로 — 렌더 비용 폭발" [ref=e48]
+        - cell "변 단위 메시 병합 + 가시 변만 그리기(뷰포트 컬링) — 1km/3m = 333 기둥 기준 성능 목표 60fps" [ref=e49]
+  - heading "1. 시나리오 A — 펜스 라인을 그으면 3D 철망이 이어진다" [level=2] [ref=e50]
+  - generic [ref=e51]:
+    - generic [ref=e52]: "1"
+    - generic [ref=e53]: "팔레트 'PIDS 그룹' → 지도에서 드래그로 긋기(폴백: 클릭으로 점 찍기, Enter 완료, Esc 취소). 드래그 궤적은 Douglas-Peucker(ε=지도 2px)로 단순화해 점이 된다."
+  - generic [ref=e54]:
+    - generic [ref=e55]: "2"
+    - generic [ref=e56]: "완료 즉시 각 변의 실거리(m, haversine)를 간격 s(2/3/5m)로 나눠 형상을 세운다. 간격의 의미는 두 가지(사용자 지적): ① 기둥 간격 — 구조물(기둥+철망), 꺾이는 점엔 코너 기둥 ② 펜스 센서 장착 간격 — 철망 위에 감지 노드(펜스 센서 하우징)가 s 마다 붙는 형태. 두 형태는 같은 라인에서 형태 토글로 전환하며, 센서 모드에선 노드 순서가 그룹 내 센서 순번과 매핑돼 구간 상태(탐지한 센서와 그 좌우 패널만 펄스, D4)가 가능하다. 잔여 구간은 기둥 모드 = 균등 분배, 센서 모드 = 정확 간격(마지막 노드는 코너 전)."
+  - generic [ref=e57]:
+    - generic [ref=e58]: "3"
+    - generic [ref=e59]: 이벤트는 구간 단위로 입힌다 — 탐지 센서가 커버하는 구간(그룹 내 센서 순서·구간 매핑이 없으면 그룹 전체)의 철망이 빨강 펄스. 장애 주황, 블랙아웃 검정+굵기.
+  - generic [ref=e60]:
+    - heading "A-1 · 톱다운 지도 뷰 (인터랙티브) — 간격을 바꿔 보십시오" [level=4] [ref=e61]
+    - generic [ref=e62]:
+      - generic [ref=e63]: 기둥 간격 s
+      - button "2 m" [ref=e64] [cursor=pointer]
+      - button "3 m" [ref=e65] [cursor=pointer]
+      - button "5 m" [ref=e66] [cursor=pointer]
+      - generic [ref=e67]: 기둥 74개 / 219m
+      - generic [ref=e68]: 형태
+      - button "기둥 간격" [ref=e69] [cursor=pointer]
+      - button "펜스 센서 장착" [ref=e70] [cursor=pointer]
+      - generic [ref=e71]: 상태
+      - combobox [ref=e72]:
+        - option "Normal" [selected]
+        - 'option "Detecting (기둥: 구간 2 전체 / 센서: 노드 1개 + 좌우 패널)"'
+        - option "Faulted"
+        - option "Blackout"
+      - generic [ref=e73]:
+        - checkbox "통문 스냅(구간 3)" [ref=e74]
+        - text: 통문 스냅(구간 3)
+      - generic [ref=e75]: · 축척 0.25 m/px(줌 ≈ 19) 가정
+    - img [ref=e76]:
+      - generic [ref=e146]: L=66.0m · 기둥 n=22 · 실간격 3.00m
+      - generic [ref=e214]: L=66.2m · 기둥 n=22 · 실간격 3.01m
+      - generic [ref=e303]: L=86.3m · 기둥 n=29 · 실간격 2.98m
+      - generic [ref=e305]: P1
+      - generic [ref=e307]: P2
+      - generic [ref=e309]: P3
+      - generic [ref=e311]: P4
+      - generic [ref=e312]: "형태: 기둥 간격 · 상태: normal · 간격 3m · 총 219m · 기둥 74개"
+    - generic [ref=e313]:
+      - generic [ref=e314]: 기둥
+      - generic [ref=e316]: 펜스 센서 노드
+      - generic [ref=e318]: 철망 패널
+      - generic [ref=e320]: Detecting(펄스)
+      - generic [ref=e322]: Faulted
+      - generic [ref=e324]: Blackout
+      - generic [ref=e326]: 그룹 점(편집 핸들)
+    - generic [ref=e328]: 점을 드래그해 옮기면 기둥이 즉시 재배치된다(간격은 유지, 개수만 변함). 닫힌 경로(IsClosedPath)면 마지막 변도 철망으로 잇는다.
+  - generic [ref=e329]:
+    - generic [ref=e330]:
+      - 'heading "A-2 · 35° 피치 3D 스트립 — 기둥 + 철망 + 코너 (형태 토글 연동: 센서 모드면 철망 위 감지 노드)" [level=4] [ref=e331]'
+      - img [ref=e332]:
+        - generic [ref=e409]: 기둥 높이 = 철망 높이 h(기본 2.4m) · 코너 기둥 굵기 1.5×
+        - generic [ref=e410]: "Detecting 구간: 패널 격자 빨강 + 위쪽 링 펄스(2s) — 기존 3링 펄스와 같은 주기"
+      - generic [ref=e411]:
+        - text: 패널은
+        - code [ref=e412]: HousingVisual
+        - text: 과 같은 Viewport3D 파이프라인(피치 35°, yaw=변 방위−θ)으로 그린다. 1km/3m = 333 기둥이므로 그룹 1개 = Viewport3D 1개, 기둥·패널은 지오메트리 병합(인스턴싱)이 전제다.
+    - generic [ref=e413]:
+      - heading "A-3 · 줌 LOD(권장 — D3)" [level=4] [ref=e414]
+      - table [ref=e415]:
+        - rowgroup [ref=e416]:
+          - row [ref=e417]:
+            - columnheader "실효 줌" [ref=e418]
+            - columnheader "표현" [ref=e419]
+            - columnheader "이유" [ref=e420]
+          - row [ref=e421]:
+            - cell "≥ 18.0" [ref=e422]
+            - cell "기둥 + 철망 3D (상태색·펄스 구간)" [ref=e423]
+            - cell "3m 간격이 12px 이상 — 판별 가능" [ref=e424]
+          - row [ref=e425]:
+            - cell "16.0 ~ 17.5" [ref=e426]
+            - cell "기둥 점 + 굵은 라인(현행 2D 색)" [ref=e427]
+            - cell "간격 3~6px — 철망 격자는 노이즈" [ref=e428]
+          - row [ref=e429]:
+            - cell "< 16.0" [ref=e430]
+            - cell "현행 2D 폴리라인 그대로" [ref=e431]
+            - cell "변경 0 — 회귀 위험 0" [ref=e432]
+      - generic [ref=e433]: 최소표시줌 게이트(D-21 수정)는 실효줌 기준이므로 하프스텝에서도 LOD 가 즉시 바뀐다.
+      - heading "A-4 · 기둥 배치 규칙(순수 함수 — 헤드리스 테스트 대상)" [level=4] [ref=e434]
+      - table [ref=e435]:
+        - rowgroup [ref=e436]:
+          - row [ref=e437]:
+            - columnheader "입력" [ref=e438]
+            - columnheader "규칙" [ref=e439]
+          - row [ref=e440]:
+            - cell "변 길이 L, 간격 s" [ref=e441]
+            - cell "n = max(1, round(L/s)) 패널, 실간격 L/n (균등) — 옵션 \"정확 간격\"이면 floor(L/s) + 잔여 패널" [ref=e442]
+          - row [ref=e443]:
+            - cell "꺾임점" [ref=e444]
+            - cell "항상 코너 기둥. 내각 < 100° 면 코너 기둥 굵기 1.5×" [ref=e445]
+          - row [ref=e446]:
+            - cell "센서 모드" [ref=e447]
+            - cell [ref=e448]:
+              - text: 노드 n = floor(L/s), 정확 간격(잔여는 마지막 패널) · 노드 k ↔ 그룹 센서 순번 k 매핑(
+              - code [ref=e449]: LinkedDeviceGroup
+              - text: 내 Number 순) · 탐지 센서 k 의 커버 구간 = [k−½, k+½]·s → 그 패널만 펄스(D4)
+          - row [ref=e450]:
+            - cell "통문 스냅" [ref=e451]
+            - cell "통문 중심이 변에서 1.5m 이내면 변 위로 투영·스냅, 통문 폭 w 만큼 패널 제거" [ref=e452]
+          - row [ref=e453]:
+            - cell "닫힌 경로" [ref=e454]
+            - cell "마지막→첫 점 변 포함" [ref=e455]
+          - row [ref=e456]:
+            - cell "고도(Altitude)" [ref=e457]
+            - 'cell "점별 고도 차를 기둥 밑점 Z 로 — 경사 철망(1차: 무시, 2차 옵션)" [ref=e458]'
+  - 'heading "2. 시나리오 B — 통문(通門): 닫힘 ↔ 열림, 이벤트가 형태를 바꾼다" [level=2] [ref=e459]'
+  - generic [ref=e460]:
+    - generic [ref=e461]:
+      - heading "B-1 · 닫힘(기본) — ContactOff 또는 이벤트 없음" [level=4] [ref=e462]
+      - img [ref=e463]:
+        - generic [ref=e472]: 배지 초록 · 문짝 0°
+    - generic [ref=e473]:
+      - heading "B-2 · 열림 — ContactOn (탐지 아님, 정보 상태)" [level=4] [ref=e474]
+      - img [ref=e475]:
+        - generic [ref=e485]: 배지 청록(Open) · 문짝 −80° · 400ms ease 회전
+    - generic [ref=e486]:
+      - heading "B-3 · 열림 + 탐지(Intrusion) / 장애" [level=4] [ref=e487]
+      - img [ref=e488]:
+        - generic [ref=e498]: 형태(열림)는 유지, 색·펄스가 위에 얹힌다 — 형태 ≠ 상태색
+  - generic [ref=e499]:
+    - generic [ref=e500]:
+      - heading "B-4 · 팔레트 / 속성창 목업" [level=4] [ref=e501]
+      - generic [ref=e502]:
+        - generic [ref=e503]: 고정형 카메라FIXED
+        - generic [ref=e504]: 접점 센서3D
+        - generic [ref=e505]: 통문GATE · EnumDeviceType.Gate
+        - generic [ref=e506]: 함체3D · 개폐
+      - generic [ref=e507]:
+        - generic [ref=e508]:
+          - text: 통문 속성 (장비 타입 = 통문
+          - code [ref=e509]: EnumDeviceType.Gate = 21
+          - text: · 3D 모델 키
+          - code [ref=e510]: gate
+          - text: ) — 사용자 결정 반영
+        - generic [ref=e511]:
+          - generic [ref=e512]: 장비 연결
+          - generic [ref=e513]: "통문 #3 (Gate)"
+        - generic [ref=e514]:
+          - generic [ref=e515]: 모델 변형
+          - generic [ref=e516]: 양개(2짝) ▾
+          - generic [ref=e517]: 외개(1짝)/양개/슬라이딩 — 통문 타입 전용 변형
+        - generic [ref=e518]:
+          - generic [ref=e519]: 통문 폭 (m)
+          - generic [ref=e520]: "4.0"
+        - generic [ref=e521]:
+          - generic [ref=e522]: 열림 방향
+          - generic [ref=e523]: 안쪽 ▾
+        - generic [ref=e524]:
+          - generic [ref=e525]: 열림 판정
+          - generic [ref=e526]: ContactOn = 열림 ▾
+          - generic [ref=e527]: 현장 배선 반전 시 ContactOff = 열림
+        - generic [ref=e528]:
+          - generic [ref=e529]: 펜스 스냅
+          - generic [ref=e530]: ☑ 가까운 펜스 라인에 붙이기
+    - generic [ref=e531]:
+      - heading "B-5 · 상태 원천과 우선순위 (D2 결정 대상)" [level=4] [ref=e532]
+      - table [ref=e533]:
+        - rowgroup [ref=e534]:
+          - row [ref=e535]:
+            - columnheader "원천" [ref=e536]
+            - columnheader "DoorState" [ref=e537]
+            - columnheader "비고" [ref=e538]
+          - row [ref=e539]:
+            - cell [ref=e540]:
+              - code [ref=e541]: ContactOn
+              - text: 이벤트 (
+              - code [ref=e542]: device.type_device="Gate"
+              - text: )
+            - cell "Open" [ref=e543]
+            - cell [ref=e544]:
+              - text: 이벤트 큐 Enqueue 시. 카드가 생기므로 "열림 = 관제 대상"으로 취급.
+              - generic [ref=e545]:
+                - text: 서버가 통문 장비를
+                - code [ref=e546]: type_device="Gate"
+                - text: 로 등록·발행해야
+              - text: 심볼 조회 키 (Id, DeviceType) 가 맞는다
+          - row [ref=e547]:
+            - cell [ref=e548]:
+              - code [ref=e549]: ContactOff
+              - text: 이벤트
+            - cell "Closed" [ref=e550]
+            - cell "Open 카드 자동/수동 조치보고와 무관하게 형태만 닫힘" [ref=e551]
+          - row [ref=e552]:
+            - cell "기동 시" [ref=e553]
+            - cell "Unknown → Closed" [ref=e554]
+            - 'cell "서버에 마지막 접점 상태 조회 API 가 없으면 닫힘 가정(정직 표기: 라벨에 \"?\")" [ref=e555]'
+          - row [ref=e556]:
+            - cell "Blackout / Fault" [ref=e557]
+            - cell "형태 유지" [ref=e558]
+            - cell "색·배지만. 형태는 마지막 접점 상태" [ref=e559]
+      - generic [ref=e560]: "우선순위(색): Blackout > Faulted > Detecting > Open(정보) > Normal. 형태(각도)는 색과 독립."
+  - 'heading "3. 시나리오 C — 함체(Enclosure): 도어 열림/닫힘" [level=2] [ref=e561]'
+  - generic [ref=e562]:
+    - generic [ref=e563]:
+      - heading "C-1 · 닫힘(현행 모델)" [level=4] [ref=e564]
+      - img [ref=e565]:
+        - generic [ref=e574]: 도어 0° · 배지 초록
+    - generic [ref=e575]:
+      - heading "C-2 · 도어 열림 — 함체 접점(도어 탬퍼) ContactOn" [level=4] [ref=e576]
+      - img [ref=e577]:
+        - generic [ref=e588]: 도어 −75° · 내부 노출(경고 톤) · 배지 앰버
+    - generic [ref=e589]:
+      - heading "C-3 · 열림 + 장애(FAULT_ETC) / 블랙아웃" [level=4] [ref=e590]
+      - img [ref=e591]:
+        - generic [ref=e600]: 형태 유지 · 접지 링 검정 굵게(블랙아웃 어휘 재사용)
+  - generic [ref=e601]:
+    - text: 함체 도어 접점이 별도 장비(Contact)인지 함체 자체의 상태인지 서버 계약 확인 필요(D5). 현행
+    - code [ref=e602]: EnumFaultType
+    - text: 엔 도어 항목이 없고
+    - code [ref=e603]: FAULT_ETC
+    - text: 만 있다. 서버가 함체 열림을 MALFUNCTION(FAULT_ETC + detail)로 보내면 detail 문자열 파싱이 되어 취약하다 → 접점 이벤트(ContactOn/Off)로 받는 쪽을 권장.
+  - 'heading "3-D. 시나리오 D — 차량(VEHICLES): \"다 없어진 것 같다\"에 대한 답" [level=2] [ref=e604]'
+  - generic [ref=e605]:
+    - generic [ref=e606]:
+      - text: 없어진 게 아니라 처음부터 없었다.
+      - code [ref=e607]: EnumMarkerCategory.VEHICLES
+      - text: 는 있지만 배치 경로(
+      - code [ref=e608]: ExecuteAddSelectedSymbol
+      - text: case)가 비어 있어 '추가'를 눌러도 아무 일도 없었고, 9/3 커밋
+      - code [ref=e609]: e84feb2
+      - text: (VF-15)가 이 무음 실패를 막으려 카테고리 콤보에서 숨겼다(
+      - code [ref=e610]: UnsupportedMarkerCategories
+      - text: ). 새 팔레트 4탭에도 없고 DB 에 차량 심볼·테이블도 0.
+    - generic [ref=e611]:
+      - text: 3D 하우징 PRD 가 의도적으로 분리했다(G-4) — 차량 5종은 생성·저장·속성창·부팅 로드 SQL(
+      - code [ref=e612]: GMapDbSymbolService.cs:1035
+      - text: 이
+      - code [ref=e613]: BASIC_SHAPES
+      - text: 만 읽음)·집계까지 새로 깔아야 해서 "별도 PRD". 3D 스토리보드 §1-B 엔 승용차·트럭·순찰차(SUV)·보트·드론 5종 로우폴리 모델이 참고용으로 이미 그려져 있다.
+  - generic [ref=e614]:
+    - heading "D-1 · 필요한 배관(전부 신규) — 이 PRD 에 흡수하는 안(권장)" [level=4] [ref=e615]
+    - table [ref=e616]:
+      - rowgroup [ref=e617]:
+        - row [ref=e618]:
+          - columnheader "층" [ref=e619]
+          - columnheader "필요 작업" [ref=e620]
+          - columnheader "비고" [ref=e621]
+        - row [ref=e622]:
+          - cell "팔레트" [ref=e623]
+          - cell "'차량' 탭 + 5셀(3D 미리보기) · 드래그 배치" [ref=e624]
+          - cell "3D 스토리보드 §1-B 모델 재사용" [ref=e625]
+        - row [ref=e626]:
+          - cell "모델/DB" [ref=e627]
+          - cell [ref=e628]:
+            - code [ref=e629]: VehicleSymbolModel
+            - text: (종류·색·방향·번호판 텍스트) +
+            - code [ref=e630]: VehicleSymbols
+            - text: 테이블 + 부팅 로드 SQL 카테고리 확장 + 집계 7종
+          - cell "서버 동기 대상 아님(로컬 심볼)" [ref=e631]
+        - row [ref=e632]:
+          - cell "3D" [ref=e633]
+          - cell [ref=e634]:
+            - code [ref=e635]: HousingModels
+            - text: 에
+            - code [ref=e636]: "vehicle.{car,truck,patrol,boat,drone}"
+            - text: · yaw = 진행 방향(Bearing)
+          - cell "회전은 하우징 전체(D-11 규칙)" [ref=e637]
+        - row [ref=e638]:
+          - cell "속성창" [ref=e639]
+          - cell "공통 절 + 차량 절(종류·색·방향·이동 가능 여부)" [ref=e640]
+          - cell [ref=e641]:
+            - code [ref=e642]: PropertyPanelFactory
+            - text: 매핑 추가
+        - row [ref=e643]:
+          - cell "이벤트" [ref=e644]
+          - cell "없음(장비 아님). 추적(Tracking) 타겟과의 결합은 범위 밖" [ref=e645]
+          - cell "추적 타겟 3D 는 3D PRD G-10 현행 유지" [ref=e646]
+    - generic [ref=e647]: "D9(결정): 차량을 ① 이 스토리보드/PRD 에 4번째 시나리오로 흡수(권장 — 팔레트·3D 파이프라인이 같은 릴리스에 열림) ② 3D PRD 원안대로 별도 PRD ③ 보류. 5종 중 1차 범위(권장: 승용차·트럭·순찰차 3종, 보트·드론은 2차)도 함께 결정."
+  - heading "4. 이벤트 → 형태 상태 머신" [level=2] [ref=e648]
+  - generic [ref=e649]:
+    - img [ref=e651]:
+      - generic [ref=e653]:
+        - generic [ref=e655]: Closed (기본)
+        - generic [ref=e657]: Open
+        - generic [ref=e659]: Unknown(기동)
+        - generic [ref=e660]: ContactOn
+        - generic [ref=e661]: ContactOff
+        - generic [ref=e663]: 조회 API 없음 → Closed 가정
+        - generic [ref=e664]: "전이 애니메이션: 문짝 회전 0°↔−80°, 400ms CubicEase · 형태는 이벤트 큐 Dequeue(조치보고)와 무관"
+        - generic [ref=e665]: 색 레이어(CompositeStatus)는 기존 그대로 위에 얹힌다 — 두 축을 섞지 않는다
+    - generic [ref=e666]:
+      - heading "배선(예정) — 기존 체인에 DP 1개만 추가" [level=4] [ref=e667]
+      - table [ref=e668]:
+        - rowgroup [ref=e669]:
+          - row [ref=e670]:
+            - columnheader "단계" [ref=e671]
+            - columnheader "현행" [ref=e672]
+            - columnheader "추가" [ref=e673]
+          - row [ref=e674]:
+            - cell "NATS 수신" [ref=e675]
+            - cell [ref=e676]:
+              - code [ref=e677]: DetectionNatsSyncService
+              - text: cmd=DETECT,
+              - code [ref=e678]: type_event
+              - text: 파싱
+            - cell [ref=e679]:
+              - code [ref=e680]: ContactOn/ContactOff
+              - text: 는 이미
+              - code [ref=e681]: EnumEventType
+              - text: 파싱 통과 — 큐에 들어온다
+          - row [ref=e682]:
+            - cell "상태 계산" [ref=e683]
+            - cell [ref=e684]:
+              - code [ref=e685]: EventQueueManager → SymbolEventManager → CompositeStatus
+            - cell [ref=e686]:
+              - code [ref=e687]: DoorState
+              - text: 를 같은 콜백에서 파생(ContactOn→Open, ContactOff→Closed)
+          - row [ref=e688]:
+            - cell "모델" [ref=e689]
+            - cell [ref=e690]:
+              - code [ref=e691]: PidsSymbolModel.CompositeStatus → EventStatus
+            - cell [ref=e692]:
+              - code [ref=e693]: PidsSymbolModel.DoorState
+              - text: (비영속) +
+              - code [ref=e694]: GMapPidsMarker
+              - text: PropertyChanged
+          - row [ref=e695]:
+            - cell "컨트롤/템플릿" [ref=e696]
+            - cell [ref=e697]:
+              - code [ref=e698]: GMapMarker3DHousingControl
+              - text: +
+              - code [ref=e699]: Housing3DMarkerStyle.xaml
+              - text: 트리거
+            - cell [ref=e700]:
+              - code [ref=e701]: DoorState
+              - text: DP →
+              - code [ref=e702]: HousingVisual.DoorAngle
+              - text: (0/−80) 애니메이션
+          - row [ref=e703]:
+            - cell "3D 모델" [ref=e704]
+            - cell [ref=e705]:
+              - code [ref=e706]: HousingModels
+              - text: enclosure / fence
+            - cell [ref=e707]:
+              - code [ref=e708]: gate
+              - text: (신규) ·
+              - code [ref=e709]: enclosure
+              - text: 에 힌지 파트 ·
+              - code [ref=e710]: fencerun
+              - text: (철망 런, 그룹 전용)
+  - heading "5. 데이터 · 계약 영향" [level=2] [ref=e711]
+  - table [ref=e712]:
+    - rowgroup [ref=e713]:
+      - row [ref=e714]:
+        - columnheader "대상" [ref=e715]
+        - columnheader "변경" [ref=e716]
+        - columnheader "마이그레이션" [ref=e717]
+      - row [ref=e718]:
+        - cell [ref=e719]:
+          - code [ref=e720]: PidsGroupSymbols
+        - cell [ref=e721]:
+          - text: +
+          - code [ref=e722]: PostSpacingM DECIMAL(4,1) NULL
+          - text: (NULL=전역 기본) · +
+          - code [ref=e723]: FenceHeightM DECIMAL(3,1) NULL
+          - text: · +
+          - code [ref=e724]: Render3D TINYINT
+          - text: (그룹별 끄기)
+        - cell [ref=e725]:
+          - code [ref=e726]: COLUMN_SPECS
+          - text: ADD 자가치유(기존 패턴, DetectionRange 와 동일)
+      - row [ref=e727]:
+        - cell [ref=e728]:
+          - code [ref=e729]: PidsSymbols
+        - cell [ref=e730]:
+          - code [ref=e731]: ModelVariant
+          - text: 에 "gate" 값 추가(스키마 무변경) · +
+          - code [ref=e732]: GateWidthM
+          - text: · +
+          - code [ref=e733]: OpenOnContactOn TINYINT
+        - cell "ADD 2열" [ref=e734]
+      - row [ref=e735]:
+        - cell "appsettings" [ref=e736]
+        - cell [ref=e737]:
+          - code [ref=e738]: AppSettings.Symbol3D.FencePostSpacingM
+          - text: (기본 3) ·
+          - code [ref=e739]: FenceHeightM
+          - text: (2.4)
+        - cell "템플릿·설치본 동기(사용자 통지 필요 — 메인 솔루션)" [ref=e740]
+      - row [ref=e741]:
+        - cell "서버/NATS" [ref=e742]
+        - cell "없음 — ContactOn/Off 기존 계약" [ref=e743]
+        - cell "—" [ref=e744]
+      - row [ref=e745]:
+        - cell "도어 상태 초기값" [ref=e746]
+        - cell "조회 API 없음 → 기동 시 Closed(라벨 \"?\")" [ref=e747]
+        - cell "서버에 \"마지막 접점 상태\" 엔드포인트 요청 검토(D5)" [ref=e748]
+  - heading "5-B. 통문 enum 신설 영향면 (사용자 결정 D2 반영 · 2026-09-07 실측 grep)" [level=2] [ref=e749]
+  - table [ref=e750]:
+    - rowgroup [ref=e751]:
+      - row [ref=e752]:
+        - columnheader "층" [ref=e753]
+        - columnheader "파일(분기 수)" [ref=e754]
+        - columnheader "작업" [ref=e755]
+      - row [ref=e756]:
+        - cell "Enum" [ref=e757]
+        - cell [ref=e758]:
+          - code [ref=e759]: Ironwall.Dotnet.Libraries.Enums/EnumDeviceType.cs
+        - cell [ref=e760]:
+          - code [ref=e761]: Gate = 21
+          - text: 추가(마지막 값
+          - code [ref=e762]: SmartMultisensor2 = 20
+          - text: ) · 한글 표시명
+          - code [ref=e763]: Events.Ui/Converters/EnumKoreanMap.cs
+          - text: (21)
+      - row [ref=e764]:
+        - cell "서버 계약" [ref=e765]
+        - cell [ref=e766]:
+          - text: GOP API
+          - code [ref=e767]: devices.type_device
+          - text: · NATS
+          - code [ref=e768]: body.device.type_device
+        - cell [ref=e769]:
+          - text: "\"Gate\" 값 신설이 선행(테스트 서버"
+          - code [ref=e770]: pids-api-server
+          - text: 부터). 없으면
+          - code [ref=e771]: Enum.TryParse
+          - text: 실패로 이벤트 폐기(
+          - code [ref=e772]: DetectionNatsSyncService.cs:111
+          - text: )
+      - row [ref=e773]:
+        - cell "장비 모델" [ref=e774]
+        - cell [ref=e775]:
+          - code [ref=e776]: Monitoring.Models/Helpers/DeviceModelConverter.cs
+          - text: (20) ·
+          - code [ref=e777]: Devices.Ui
+          - text: 대시보드(9)
+        - cell "Gate 를 센서 계열(ISensorDeviceModel, 제어기 소속)로 변환 · 대시보드 집계 열 추가" [ref=e778]
+      - row [ref=e779]:
+        - cell "필터/트리" [ref=e780]
+        - cell [ref=e781]:
+          - code [ref=e782]: GMaps.Ui/Helpers/DeviceFilterHelper.cs
+          - text: (32) ·
+          - code [ref=e783]: LayerTreeBuilder
+        - cell "카테고리 필터·레이어 트리에 통문 노출" [ref=e784]
+      - row [ref=e785]:
+        - cell "팔레트/모델" [ref=e786]
+        - cell [ref=e787]:
+          - code [ref=e788]: GMaps.Ui/Models/SymbolPaletteItem.cs
+          - text: (19) ·
+          - code [ref=e789]: Symbols3D/HousingModels.cs
+          - text: (15)
+        - cell [ref=e790]:
+          - text: PIDS 탭 '통문' 셀 +
+          - code [ref=e791]: DeviceKey(Gate) = "gate"
+          - text: + 모델(기둥 2·가로대·문짝 2, 힌지 파트 =
+          - code [ref=e792]: DoorAngle
+          - text: )
+      - row [ref=e793]:
+        - cell "2D 폴백" [ref=e794]
+        - cell [ref=e795]:
+          - code [ref=e796]: GMapMarkerPidsFallbackControl.cs
+          - text: (10) ·
+          - code [ref=e797]: GMapMarkerPidsControl.cs
+          - text: (12) ·
+          - code [ref=e798]: PidsMarkerStyle.xaml
+        - cell [ref=e799]:
+          - text: 3D OFF 시 아이콘(
+          - code [ref=e800]: PackIconKind.Gate
+          - text: 유무 확인, 없으면 DoorClosed/DoorOpen 2종) + 열림/닫힘 트리거
+      - row [ref=e801]:
+        - cell "VM/이벤트" [ref=e802]
+        - cell [ref=e803]:
+          - code [ref=e804]: MapViewModel.cs
+          - text: (40) ·
+          - code [ref=e805]: Events.Ui/…/EventInfoViewModel.cs
+          - text: (18)
+        - cell [ref=e806]:
+          - text: 장비 심볼 등록·카드 표기에 Gate 포함 ·
+          - code [ref=e807]: DoorState
+          - text: 파생(ContactOn/Off)
+      - row [ref=e808]:
+        - cell "DB" [ref=e809]
+        - cell [ref=e810]:
+          - code [ref=e811]: pidssymbols.DeviceType
+          - text: (문자열 "Gate") ·
+          - code [ref=e812]: PidsSymbols.ModelVariant
+        - cell [ref=e813]:
+          - text: 스키마 무변경(문자열) · 하네스
+          - code [ref=e814]: DbProbe.PidsDeviceTypeByTitle
+          - text: 갱신
+      - row [ref=e815]:
+        - cell "테스트" [ref=e816]
+        - cell [ref=e817]:
+          - code [ref=e818]: Events.Ui/Tests/UnitTest.cs
+          - text: (70) ·
+          - code [ref=e819]: GMaps.Ui/Tests/DeviceFilterHelperTests.cs
+          - text: (27) 등 5파일
+        - cell "enum 전수 순회 테스트에 Gate 케이스 추가" [ref=e820]
+  - generic [ref=e821]: 함체(Enclosure=19)는 enum 이 이미 있으므로 도어 상태(DoorState)와 힌지 파트만 추가한다. 통문·함체 모두 형태 축(DoorState)과 색 축(CompositeStatus)을 분리한다.
+  - heading "6. 결정 필요 — 사용자" [level=2] [ref=e822]
+  - table [ref=e823]:
+    - rowgroup [ref=e824]:
+      - row [ref=e825]:
+        - columnheader "#" [ref=e826]
+        - columnheader "질문" [ref=e827]
+        - columnheader "권장" [ref=e828]
+        - columnheader "영향" [ref=e829]
+      - row [ref=e830]:
+        - cell "D1" [ref=e831]
+        - cell "기둥 간격 기본값과 선택지" [ref=e832]
+        - cell "3m 기본, 선택 2/3/5 + 사용자 입력(1.0~10.0)" [ref=e833]
+        - cell "속성창·전역 설정 2곳" [ref=e834]
+      - row [ref=e835]:
+        - cell "D2" [ref=e836]
+        - cell "통문을 접점 센서의 모델 변형으로 할지, 신규 장비 타입으로 할지" [ref=e837]
+        - cell [ref=e838]:
+          - generic [ref=e839]:
+            - text: "✅ 결정(사용자 17:2x): 신규 enum"
+            - code [ref=e840]: EnumDeviceType.Gate = 21
+            - text: (표시명 "통문") + 전용 3D 심볼
+        - cell [ref=e841]:
+          - text: 아래 "enum 신설 영향면" 표 — 서버
+          - code [ref=e842]: type_device="Gate"
+          - text: 등록·발행 선행 필요(로컬 API 테스트 서버부터)
+      - row [ref=e843]:
+        - cell "D3" [ref=e844]
+        - cell "3D 철망 LOD 임계" [ref=e845]
+        - cell "≥18.0 3D / 16~17.5 기둥점 / <16 현행" [ref=e846]
+        - cell "성능·가독" [ref=e847]
+      - row [ref=e848]:
+        - cell "D4" [ref=e849]
+        - cell "펜스 상태를 구간으로 입힐지 그룹 전체로" [ref=e850]
+        - cell "1차 그룹 전체(현행 데이터 한계), 2차 센서↔구간 매핑 시 구간" [ref=e851]
+        - cell "구간 매핑 데이터 신설 여부" [ref=e852]
+      - row [ref=e853]:
+        - cell "D5" [ref=e854]
+        - cell "함체 도어 상태의 원천(접점 이벤트 vs 장애 detail)" [ref=e855]
+        - cell "접점 이벤트(ContactOn/Off)" [ref=e856]
+        - cell "서버 계약 확인" [ref=e857]
+      - row [ref=e858]:
+        - cell "D6" [ref=e859]
+        - 'cell "통문 형태: 외개/양개/슬라이딩 중 1차 범위" [ref=e860]'
+        - cell "양개(2짝) 1종" [ref=e861]
+        - cell "모델 수" [ref=e862]
+      - row [ref=e863]:
+        - cell "D7" [ref=e864]
+        - cell "드래그 드로잉의 단순화 허용 오차" [ref=e865]
+        - cell "2px(지도 좌표) · 최소 점 간격 1m" [ref=e866]
+        - cell "점 개수·기둥 개수" [ref=e867]
+      - row [ref=e868]:
+        - cell "D8" [ref=e869]
+        - cell "잔여 구간 처리" [ref=e870]
+        - cell "균등 분배(실간격 = L/n)" [ref=e871]
+        - cell "\"정확 3m\" 요구면 잔여 패널 옵션" [ref=e872]
+      - row [ref=e873]:
+        - cell "D9" [ref=e874]
+        - cell "차량 5종을 이 PRD 에 흡수할지(§3-D)" [ref=e875]
+        - cell "흡수 · 1차 승용차/트럭/순찰차 3종" [ref=e876]
+        - cell "팔레트 탭 + 모델/DB/부팅 SQL/속성창 신설(전부 신규 배관)" [ref=e877]
+  - heading "7. 검증 계획(요약)" [level=2] [ref=e878]
+  - generic [ref=e879]:
+    - generic [ref=e880]:
+      - heading "헤드리스(순수 함수)" [level=4] [ref=e881]
+      - list [ref=e882]:
+        - listitem [ref=e883]:
+          - code [ref=e884]: FenceLayout.Compute(points, spacing, closed)
+          - text: — 기둥 수·코너·잔여·통문 절개 (직선/꺾임/닫힘/짧은 변/통문 2개 인접)
+        - listitem [ref=e885]:
+          - code [ref=e886]: DoorStateMachine
+          - text: — ContactOn/Off/Unknown 전이, 반전 옵션
+        - listitem [ref=e887]: LOD 선택 — 실효줌 경계값(17.5/18.0)
+    - generic [ref=e888]:
+      - heading "실기(하네스 재사용)" [level=4] [ref=e889]
+      - list [ref=e890]:
+        - listitem [ref=e891]: 드래그로 4점 라인 생성 → DB 점 4개·기둥 수 = 계산값(로그) · 확대 캡처
+        - listitem [ref=e892]:
+          - text: 로컬 NATS
+          - code [ref=e893]: ContactOn/ContactOff
+          - text: 발행 → 통문/함체 문짝 각도 프레임 캡처(200ms×8, 회전 400ms)
+        - listitem [ref=e894]:
+          - text: DETECT 발행 → 철망 구간 빨강 펄스 픽셀 변동(기존
+          - code [ref=e895]: Frames
+          - text: 계측 재사용)
+        - listitem [ref=e896]: 줌 왕복 → LOD 전환·최소표시줌 게이트(D-21) 회귀

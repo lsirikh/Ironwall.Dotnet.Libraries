@@ -1,9 +1,12 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 /****************************************************************************
@@ -43,13 +46,53 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         set { _index = value; NotifyOfPropertyChange(() => Index); }
     }
 
-    public int DeviceGroup
+    public List<int>? DeviceGroups
     {
-        get { return _model.DeviceGroup; }
+        get { return _model.DeviceGroups; }
         set
         {
-            _model.DeviceGroup = value;
-            NotifyOfPropertyChange(() => DeviceGroup);
+            _model.DeviceGroups = value;
+            NotifyOfPropertyChange(() => DeviceGroups);
+            NotifyOfPropertyChange(() => DeviceGroupsText);
+        }
+    }
+
+    public string DeviceGroupsText
+    {
+        get
+        {
+            if (DeviceGroups == null || DeviceGroups.Count == 0) return "";
+            try
+            {
+                var provider = IoC.Get<DeviceGroupProvider>();
+                return string.Join(", ", DeviceGroups.Select(id =>
+                    provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+            }
+            catch { return string.Join(", ", DeviceGroups); }
+        }
+    }
+
+    /// <summary>
+    /// 소속 부대(서버 8.0+ <c>unit_id</c>) 표시 문구(D-14). 부대 콘솔에서 끌어 놓은 배정이
+    /// 장비 쪽에서도 이름으로 확인된다 — 이름을 못 구하면 원값 id, 배정 자체가 없으면 "미배치".
+    /// </summary>
+    /// <remarks>
+    /// 목록 열 · 상세 칸 모두 이 값을 그대로 쓴다(단일 정본). 6.3·7.0 계약에서는 이 값을 보이는 열/칸 자체를
+    /// 카탈로그가 걸러내므로(<see cref="Consoles.Lists.DeviceColumnCatalog"/> · <see cref="Consoles.Properties.DevicePropertyCatalog"/>)
+    /// 여기서 다시 계약을 확인하지 않는다 — 안 불리면 안 그려진다.
+    /// </remarks>
+    public string UnitDisplay
+    {
+        get
+        {
+            try
+            {
+                return IoC.Get<UnitNameDirectory>().Display(_model.UnitId, () => NotifyOfPropertyChange(() => UnitDisplay));
+            }
+            catch
+            {
+                return _model.UnitId?.ToString() ?? UnitNameDirectory.Unassigned;
+            }
         }
     }
 
@@ -80,6 +123,72 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         {
             _model.DeviceType = value;
             NotifyOfPropertyChange(() => DeviceType);
+            NotifyOfPropertyChange(() => DeviceTypeDisplay);
+        }
+    }
+
+    /// <summary>
+    /// 콘솔 목록 "종류" 열(레거시 6.3 계약)의 표시 문구 — <see cref="TypeAxisDisplay"/>(축 계약)와 같은
+    /// "한국어 (코드)" 형식이다(<see cref="Helpers.DeviceEnumDisplay.EnumBilingual"/>). raw enum 이름
+    /// ("IpCamera" 등)이 그리드에 그대로 새지 않게 한다.
+    /// </summary>
+    public string DeviceTypeDisplay => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceEnumDisplay.EnumBilingual(DeviceType);
+
+    /// <summary>
+    /// 판별자(<c>category_device</c>) — 읽기 전용. 경로가 정하고 바뀌지 않는다.
+    /// 아직 서버에 가지 않은 Draft 는 판별자가 비어 있다 — 그때는 모델의 형에서 읽는다(상세 폼에 "None" 이 찍히지 않게).
+    /// </summary>
+    public EnumDeviceCategory CategoryDevice => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceAxesMapper.CategoryOf(_model);
+
+    /// <summary>
+    /// 종류축(<c>type_&lt;category&gt;</c>)의 서버 코드 — v7.0+ 축 화면의 콤보가 이 값을 바인딩한다(device-console-v8 FR-09).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>빈 값은 받지 않는다.</b> WPF <c>ComboBox</c> 는 <c>ItemsSource</c> 가 바뀌어 현재 값이 목록에 없으면
+    /// <c>SelectedValue=null</c> 을 소스에 되쓴다 — 카탈로그 재조회 한 번에 모든 행의 종류축이 지워진다(ISSUE-25).
+    /// 콤보로는 어차피 "비우기"를 할 수 없으므로 빈 값 대입을 무시해도 잃는 기능이 없다.</para>
+    /// <para><b>클라 enum 을 함께 맞춘다.</b> 쓰기 매핑은 enum 이 표현할 수 있는 값이면 enum 을 쓴다
+    /// (<c>DeviceAxesMapper.TypeAxisForWrite</c>). 여기서 enum 을 옛 값으로 두면 콤보 편집이 저장에서 사라진다.
+    /// enum 이 표현하지 못하는 값(<c>SPEED_DOME</c>)은 enum 을 건드리지 않고 원값만 보존한다.</para>
+    /// </remarks>
+    public string? TypeAxisCode
+    {
+        get { return _model.TypeAxisCode; }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            var code = value.Trim();
+            if (string.Equals(_model.TypeAxisCode, code, StringComparison.Ordinal)) return;
+
+            _model.TypeAxisCode = code;
+            SyncClientEnum(code);
+            NotifyOfPropertyChange(() => TypeAxisCode);
+            NotifyOfPropertyChange(nameof(TypeAxisDisplay));
+            NotifyOfPropertyChange(() => DeviceType);
+        }
+    }
+
+    /// <summary>Grid text for the type axis: "Label (Code)", "미대응: X" for values the server catalog does not know, "선택 필요" when required and empty.</summary>
+    public string TypeAxisDisplay => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.TypeAxisPanelSupport.DescribeFor(_model);
+
+    private void SyncClientEnum(string code)
+    {
+        if (_model is ICameraDeviceModel camera)
+        {
+            if (Enum.TryParse<EnumCameraType>(code, ignoreCase: true, out var cameraType) && Enum.IsDefined(cameraType))
+            {
+                camera.Category = cameraType;
+                NotifyOfPropertyChange("Category");
+            }
+            return;
+        }
+
+        // 제어기·센서는 옛 DeviceType 이 곧 종류축이다. 형상 4축(스피커·함체·경광등·통문)은 DeviceType 과 무관 — 건드리지 않는다.
+        if (_model is IControllerDeviceModel or ISensorDeviceModel
+            && Enum.TryParse<EnumDeviceType>(code, ignoreCase: true, out var deviceType)
+            && Enum.IsDefined(deviceType) && deviceType != EnumDeviceType.NONE)
+        {
+            _model.DeviceType = deviceType;
         }
     }
 
@@ -101,6 +210,93 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         {
             _model.Status = value;
             NotifyOfPropertyChange(() => Status);
+            NotifyOfPropertyChange(() => StatusDisplay);
+            NotifyOfPropertyChange(() => IsFault);
+        }
+    }
+
+    /// <summary>
+    /// 콘솔 목록 상태 배지 문구 — <see cref="EnumDeviceStatus"/> 3값을 한글로 옮긴다(device-console-v8 N02-B).
+    /// </summary>
+    /// <remarks>
+    /// 라벨은 목업(<c>docs/design/window-layout-system-storyboard.html</c> <c>DEV_ST</c> 표)을 그대로
+    /// 따른다 — 화면마다 다른 말을 새로 짓지 않는다. 매핑 정본은
+    /// <see cref="Helpers.DeviceEnumDisplay.StatusKorean"/> 하나뿐이다 — 상세 폼의 "운영 상태" 콤보도
+    /// 같은 표를 읽는다(둘이 따로 놀며 갈라지지 않게).
+    /// </remarks>
+    public string StatusDisplay => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceEnumDisplay.StatusKorean(Status);
+
+    /// <summary>
+    /// 장애 배지 판정 — <see cref="EnumDeviceStatus.ERROR"/> 하나만 장애다. 레일 카운터
+    /// (<see cref="Consoles.Lists.DeviceRailCounter.IsFault"/>)와 같은 규칙을 각자 독립적으로 계산한다 —
+    /// 행 하나의 판정과 레일 집계는 호출 경로가 달라(행은 바인딩, 레일은 목록 스냅샷) 억지로 한 호출로
+    /// 묶으면 결합만 늘고 얻는 것이 없다.
+    /// </summary>
+    public bool IsFault => Status == EnumDeviceStatus.ERROR;
+
+    public string? Location
+    {
+        get { return _model.Location; }
+        set
+        {
+            _model.Location = value;
+            NotifyOfPropertyChange(() => Location);
+        }
+    }
+
+    public double Latitude
+    {
+        get { return _model.Latitude; }
+        set
+        {
+            _model.Latitude = Math.Clamp(value, -90.0, 90.0);
+            NotifyOfPropertyChange(() => Latitude);
+        }
+    }
+
+    public double Longitude
+    {
+        get { return _model.Longitude; }
+        set
+        {
+            _model.Longitude = Math.Clamp(value, -180.0, 180.0);
+            NotifyOfPropertyChange(() => Longitude);
+        }
+    }
+
+    public bool IsEnable
+    {
+        get { return _model.IsEnable; }
+        set
+        {
+            _model.IsEnable = value;
+            NotifyOfPropertyChange(() => IsEnable);
+            NotifyOfPropertyChange(() => IsEnableDisplay);
+        }
+    }
+
+    /// <summary>콘솔 목록 "활성화" 칸의 텍스트 폴백 — 체크 렌더가 아닌 곳(툴팁 등)에서 쓴다.</summary>
+    public string IsEnableDisplay => IsEnable ? "사용" : "사용 안 함";
+
+    /// <summary>설치 방위각 0~360° (model.Heading, v4.4). 미설정 시 null. set 시 mod360 정규화(서버 0~360 검증 대응).</summary>
+    public double? Bearing
+    {
+        get { return _model.Heading; }
+        set
+        {
+            _model.Heading = value.HasValue ? ((value.Value % 360) + 360) % 360 : (double?)null;
+            NotifyOfPropertyChange(() => Bearing);
+        }
+    }
+
+    /// <summary>설치 고도(m, model.Altitude). optional, clamp 없음.</summary>
+    public double? Altitude
+    {
+        get { return _model.Altitude; }
+        set
+        {
+            _model.Altitude = value;
+            NotifyOfPropertyChange(() => Altitude);
         }
     }
     #endregion

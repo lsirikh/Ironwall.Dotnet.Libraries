@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Enums;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Devices;
 /****************************************************************************
@@ -20,18 +21,52 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
 
     public BaseDeviceModel(IBaseDeviceModel model) : base(model)
     {
-        DeviceGroup = model.DeviceGroup;
+        DeviceGroups = model.DeviceGroups;
         DeviceNumber = model.DeviceNumber;
         DeviceName = model.DeviceName;
         DeviceType = model.DeviceType;
         Version = model.Version;
         Status = model.Status;
+        Location = model.Location;
+        Latitude = model.Latitude;
+        Longitude = model.Longitude;
+        IsEnable = model.IsEnable;
+        Heading = model.Heading;
+        Altitude = model.Altitude;
+        CategoryDevice = model.CategoryDevice;
+        TypeAxisCode = model.TypeAxisCode;
+        UnitId = model.UnitId;
+        Axes = model.Axes;
     }
+
+    // ── v7.0+ 표현 모델 (device-console-v8 FR-03) ──
+    // 전부 [JsonIgnore] 다 — 이 모델은 NATS·조치보고 본문으로도 직렬화되므로 새 속성이 그 와이어에 새면 안 된다.
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public EnumDeviceCategory CategoryDevice { get; set; } = EnumDeviceCategory.None;
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public string? TypeAxisCode { get; set; }
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public int? UnitId { get; set; }
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public IDeviceAxesModel? Axes { get; set; }
 
     [JsonProperty("device_number", Order = 2)]
     public int DeviceNumber { get; set; }
-    [JsonProperty("device_group", Order = 3)]
-    public int DeviceGroup { get; set; }
+    [JsonProperty("device_groups", Order = 3, NullValueHandling = NullValueHandling.Ignore)]
+    public List<int>? DeviceGroups { get; set; }
+    [JsonIgnore]
+    public string DeviceGroupsText =>
+        DeviceGroups != null && DeviceGroups.Count > 0
+            ? string.Join(", ", DeviceGroups)
+            : "";
     [JsonProperty("device_name", Order = 4)]
     public string? DeviceName { get; set; }
     [JsonProperty("device_type", Order = 5)]
@@ -40,4 +75,18 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
     public string? Version { get; set; } 
     [JsonIgnore]
     public EnumDeviceStatus Status { get; set; } = EnumDeviceStatus.DEACTIVATED;
+    [JsonProperty("location", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
+    public string? Location { get; set; }
+    [JsonProperty("latitude", Order = 11)]
+    public double Latitude { get; set; }
+    [JsonProperty("longitude", Order = 12)]
+    public double Longitude { get; set; }
+    [JsonProperty("is_enable", Order = 13)]
+    public bool IsEnable { get; set; }
+    /// <summary>장비 설치 방위각 0~360° (v4.4 geolocation.heading). 심볼 FOV BaseBearing 구동용. optional.</summary>
+    [JsonProperty("heading", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
+    public double? Heading { get; set; }
+    /// <summary>장비 설치 고도(m) (v4.4 geolocation.altitude). optional.</summary>
+    [JsonProperty("altitude", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
+    public double? Altitude { get; set; }
 }

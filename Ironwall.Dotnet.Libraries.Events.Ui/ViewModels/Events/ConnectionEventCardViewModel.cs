@@ -32,7 +32,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Implementation of Interface -
         #endregion
         #region - Overrides -
-        public override Task SendAction(string content, string idUser)
+        public override Task<bool> SendAction(string content, string idUser)
         {
 
             return base.SendAction(content, idUser);

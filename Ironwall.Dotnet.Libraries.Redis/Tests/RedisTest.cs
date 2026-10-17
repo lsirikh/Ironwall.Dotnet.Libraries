@@ -45,7 +45,7 @@ public class RedisServiceTests
 
         redisService.RedisSubscribeEventAsync += async (e) =>
         {
-            var msg = e.Message;
+            var msg = e.Message ?? string.Empty;
             Console.WriteLine($"Received from channel: {msg}");
             tcs.TrySetResult(msg);
             await Task.CompletedTask;
@@ -53,11 +53,11 @@ public class RedisServiceTests
 
         // Act
         var testMessage = $"Hello Redis! {Guid.NewGuid()}";
-        await redisService.PublishAsync(_setupModel.NameChannel, testMessage);
+        await redisService.PublishAsync(_setupModel.NameChannel ?? "Channel1", testMessage);
 
         // Assert
         var received = await Task.WhenAny(tcs.Task, Task.Delay(3000));
         Assert.True(received == tcs.Task, "Did not receive message in time.");
-        Assert.Equal(testMessage, tcs.Task.Result);
+        Assert.Equal(testMessage, tcs.Task?.Result);
     }
 }

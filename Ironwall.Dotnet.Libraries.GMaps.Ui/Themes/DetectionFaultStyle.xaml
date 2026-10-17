@@ -1,0 +1,125 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!--  탐지·장애 상태 인디케이터 GMapDetectionFaultControl (GMap_Map_Instruments)
+          - 집계 pill 2개(탐지=Critical / 장애=Warning). 활성(건수>0)이면 강조+글리프 채움, 0건 중립.
+          - 탐지 pill 활성 시 펄스(PulseRing Opacity 애니, D-13). 세로(기본)/가로 배치.
+          - 전 색상 DynamicResource 토큰. 템플릿 스코프이므로 앱 StaticResource 참조 금지.  -->
+
+    <Style TargetType="{x:Type ctrl:GMapDetectionFaultControl}">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ctrl:GMapDetectionFaultControl}">
+                    <StackPanel x:Name="PART_Root" Orientation="Vertical">
+                        <StackPanel.Effect>
+                            <DropShadowEffect BlurRadius="8" Opacity="0.28" ShadowDepth="2" Color="Black" />
+                        </StackPanel.Effect>
+
+                        <!--  ── 탐지 pill ──  -->
+                        <Grid x:Name="DetPill" Margin="0,0,0,3"
+                              Visibility="{TemplateBinding DetectionPillVisibility}">
+                            <Border x:Name="DetPulse"
+                                    CornerRadius="20" Margin="-3"
+                                    Background="Transparent"
+                                    BorderBrush="{DynamicResource StatusCriticalBrush}"
+                                    BorderThickness="2" Opacity="0" />
+                            <Border x:Name="DetBody"
+                                    Padding="8,6,10,6" CornerRadius="20"
+                                    Background="{DynamicResource SurfaceTranslucentBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1.5">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="DetGlyph" Width="22" Height="22" CornerRadius="11"
+                                            Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+                                        <md:PackIcon Kind="Radar" Width="13" Height="13"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                     Foreground="{DynamicResource TextMutedBrush}" x:Name="DetIcon" />
+                                    </Border>
+                                    <TextBlock Text="탐지" Margin="8,0,0,0" VerticalAlignment="Center"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock x:Name="DetCount" Text="{TemplateBinding DetectionText}"
+                                               Margin="8,0,0,0" VerticalAlignment="Center"
+                                               FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!--  ── 장애 pill ──  -->
+                        <Grid x:Name="FaultPill"
+                              Visibility="{TemplateBinding FaultPillVisibility}">
+                            <Border x:Name="FaultBody"
+                                    Padding="8,6,10,6" CornerRadius="20"
+                                    Background="{DynamicResource SurfaceTranslucentBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1.5">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="FaultGlyph" Width="22" Height="22" CornerRadius="11"
+                                            Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+                                        <md:PackIcon Kind="AlertOutline" Width="13" Height="13"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                     Foreground="{DynamicResource TextMutedBrush}" x:Name="FaultIcon" />
+                                    </Border>
+                                    <TextBlock Text="장애" Margin="8,0,0,0" VerticalAlignment="Center"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock x:Name="FaultCount" Text="{TemplateBinding FaultText}"
+                                               Margin="8,0,0,0" VerticalAlignment="Center"
+                                               FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <ControlTemplate.Triggers>
+                        <!--  가로 배치  -->
+                        <Trigger Property="Orientation" Value="Horizontal">
+                            <Setter TargetName="PART_Root" Property="Orientation" Value="Horizontal" />
+                            <Setter TargetName="DetPill" Property="Margin" Value="0,0,3,0" />
+                        </Trigger>
+
+                        <!--  탐지 활성 = Critical 강조 + 펄스  -->
+                        <Trigger Property="DetectionActive" Value="True">
+                            <Setter TargetName="DetBody" Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+                            <Setter TargetName="DetGlyph" Property="Background" Value="{DynamicResource StatusCriticalBrush}" />
+                            <Setter TargetName="DetGlyph" Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+                            <Setter TargetName="DetIcon" Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+                            <Setter TargetName="DetCount" Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="PulseSb">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="DetPulse"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0" To="0.7" Duration="0:0:0.65"
+                                                         AutoReverse="True" RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="PulseSb" />
+                            </Trigger.ExitActions>
+                        </Trigger>
+
+                        <!--  장애 활성 = Warning 강조(정적)  -->
+                        <Trigger Property="FaultActive" Value="True">
+                            <Setter TargetName="FaultBody" Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+                            <Setter TargetName="FaultGlyph" Property="Background" Value="{DynamicResource StatusWarningBrush}" />
+                            <Setter TargetName="FaultGlyph" Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+                            <Setter TargetName="FaultIcon" Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+                            <Setter TargetName="FaultCount" Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

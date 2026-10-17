@@ -1,0 +1,33 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dialogs.CameraDetailDialogView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://www.caliburnproject.org"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		카메라 상세 몸통 — 탭 셋(하드웨어 정보 · 카메라 설정 · 링크).
+		B4(window-design-inventory #26): 이 뷰는 틀을 그리지 않는다. 이 뷰를 여는 곳은 호스트 래퍼(CameraPropertyDialogView) 하나뿐이고,
+		  그 래퍼가 커널 틀(제목 · ✕ · [취소] · [저장])을 그린다 — 여기서도 틀을 그리면 머리와 버튼 줄이 두 겹이 됐다.
+		  옛 이 틀의 식별자(Dialog.Devices.CameraDetail.*)는 래퍼의 틀이 같은 DialogKey 로 이어받는다.
+		탭 스타일은 DynamicResource 로 찾는다 — 앱 없이 띄우는 뷰 시험에서도 뜨게(런타임 결과는 같다).
+	-->
+	<TabControl
+		MinHeight="220"
+		ItemsSource="{Binding Items}"
+		SelectedItem="{Binding ActiveItem}"
+		Style="{DynamicResource MaterialDesignTabControl}">
+		<TabControl.ItemTemplate>
+			<DataTemplate>
+				<TextBlock Text="{Binding DisplayName}" />
+			</DataTemplate>
+		</TabControl.ItemTemplate>
+		<TabControl.ContentTemplate>
+			<DataTemplate>
+				<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+					<ContentControl cal:View.Model="{Binding}" />
+				</ScrollViewer>
+			</DataTemplate>
+		</TabControl.ContentTemplate>
+	</TabControl>
+</UserControl>

@@ -65,6 +65,10 @@ public enum EnumMapVendor
     [Description("NearMap - 고해상도 항공사진 특화")]
     NearMap = 11,
 
+    [Display(Name = "MBTiles")]
+    [Description("오프라인 MBTiles 타일 DB")]
+    MBTiles = 20,
+
     [Display(Name = "기타")]
     [Description("기타 지도 제공업체")]
     Other = 99

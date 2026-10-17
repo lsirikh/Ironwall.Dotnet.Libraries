@@ -64,7 +64,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -86,7 +86,7 @@
 				x:Name="ButtonSoundFolder"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="FolderOpen" />
 				</Button.Content>
@@ -136,7 +136,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -168,7 +168,7 @@
 				Grid.Row="0"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="Play" />
 				</Button.Content>
@@ -199,7 +199,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -211,7 +211,7 @@
 				Grid.Row="2"
 				Grid.Column="4"
 				IsChecked="{Binding IsDetectionAutoSoundStop, Mode=TwoWay}"
-				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+				Style="{StaticResource Console.ToggleSwitch}" />
 
 			<Grid
 				Grid.Row="3"
@@ -292,7 +292,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -324,7 +324,7 @@
 				Grid.Row="0"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="Play" />
 				</Button.Content>
@@ -353,7 +353,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -365,7 +365,7 @@
 				Grid.Row="2"
 				Grid.Column="4"
 				IsChecked="{Binding IsMalfunctionAutoSoundStop, Mode=TwoWay}"
-				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+				Style="{StaticResource Console.ToggleSwitch}" />
 
 			<Grid
 				Grid.Row="3"
@@ -446,7 +446,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -478,7 +478,7 @@
 				Grid.Row="0"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="Play" />
 				</Button.Content>
@@ -509,7 +509,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -521,7 +521,7 @@
 				Grid.Row="2"
 				Grid.Column="4"
 				IsChecked="{Binding IsActionReportAutoSoundStop, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+				Style="{StaticResource Console.ToggleSwitch}" />
 
 			<Grid
 				Grid.Row="3"

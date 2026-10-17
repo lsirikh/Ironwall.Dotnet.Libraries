@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SSO 연동 — SSO PRD FR-01 · FR-03 · FR-06.
+    SSO 에이전트(명명 파이프 · SALP)에서 앱 토큰을 받아 GOP 에 교환하고, 401 때 재교환한다.
+    Accounts.Api 는 SDK 를 모른다 — SDK 의존은 이 프로젝트에만 둔다.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <!--
+      SDK 고정본의 위치를 **프로젝트 속성**으로 박는다. 폴더의 nuget.config 는 이 프로젝트를 직접 복원할 때만
+      읽히고, 호스트 솔루션(Dotnet.Monitoring.Solution)처럼 다른 폴더에서 복원하면 무시될 수 있다.
+      이 속성은 어디서 복원하든 이 프로젝트에 붙는다.
+    -->
+    <RestoreAdditionalProjectSources>$(MSBuildThisFileDirectory)..\third_party\sso</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="Sso.Client.Sdk" Version="3.10.6" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+  </ItemGroup>
+
+</Project>

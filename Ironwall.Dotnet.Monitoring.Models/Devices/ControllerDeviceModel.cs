@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Monitoring.Models.Helpers;
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Helpers;
 using Newtonsoft.Json;
 using System;
 
@@ -16,7 +17,9 @@ public class ControllerDeviceModel : BaseDeviceModel, IControllerDeviceModel
 
     public ControllerDeviceModel()
     {
-
+        // (422 fix) Camera/Speaker/Enclosure/Lamp 모델과 동일하게 타입 명시.
+        //   누락 시 DeviceType=NONE → ToControllerDeviceDto가 type_device="NONE" 전송 → 서버 422(enum 검증 실패).
+        DeviceType = EnumDeviceType.Controller;
     }
 
     public ControllerDeviceModel(IControllerDeviceModel model) : base(model)

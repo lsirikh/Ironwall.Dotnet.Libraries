@@ -1,0 +1,98 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.LogoutPanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	mc:Ignorable="d">
+	<!--
+		로그아웃 확인 — B3(window-design-inventory-analysis.md #9). 커널 다이얼로그 틀 T4 · S 400.
+		옛 모양: md:Card 400×220 + 시안 머리(ModernDialogHeader). 확인 · 취소는 x:Name 버튼 그대로(FooterActions + Message.Attach).
+		ESC · 머리 ✕ = [취소](코드 숨김 → DialogCancelRoute). 확인 문구 "정말로 로그아웃" 은 UI 시험(SC-SHL-010)이 글로 읽는다 — 뷰에 직접 놓인 TextBlock.
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+			<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		</ResourceDictionary>
+	</UserControl.Resources>
+
+	<md:DialogHost
+		x:Name="DialogHost"
+		DialogTheme="Inherit"
+		Identifier="LogoutPanel">
+		<dlg:ConsoleDialogFrame
+			x:Name="CardContents"
+			DialogKey="Accounts.Logout"
+			HelpKey="Accounts.Logout"
+			PrimaryText=""
+			SecondaryInvoked="OnSecondaryInvoked"
+			SecondaryText=""
+			Size="Small"
+			Title="로그아웃">
+
+			<dlg:ConsoleDialogFrame.FooterActions>
+				<StackPanel Orientation="Horizontal">
+					<!--
+						SSO 세션일 때만 — 에이전트에 "all"(이 PC 의 모든 SSO 프로그램 · SSO 세션 종료).
+						되돌릴 수 없는 넓은 동작이라 위험 모양(Danger)으로, 주 동작(오른쪽 끝)에서 떨어진 왼쪽에 둔다.
+					-->
+					<Button
+						x:Name="ClickLogoutAll"
+						Height="34"
+						MinWidth="92"
+						Margin="0,0,24,0"
+						AutomationProperties.AutomationId="Accounts.Logout.LogoutAllButton"
+						cal:Message.Attach="ClickLogoutAll"
+						Content="전체 로그아웃"
+						Style="{StaticResource Console.Button.Danger}"
+						Visibility="{Binding IsSsoSession, Converter={StaticResource BoolToVisibility}}" />
+					<Button
+						x:Name="ClickCancel"
+						Height="34"
+						MinWidth="92"
+						Margin="0,0,8,0"
+						cal:Message.Attach="ClickCancel"
+						Content="취소"
+						Style="{StaticResource Console.Button}" />
+					<Button
+						x:Name="ClickOk"
+						Height="34"
+						MinWidth="92"
+						cal:Message.Attach="ClickOk"
+						Content="{Binding OkText}"
+						Style="{StaticResource Console.Button.Primary}" />
+				</StackPanel>
+			</dlg:ConsoleDialogFrame.FooterActions>
+
+			<DockPanel Margin="0,4" LastChildFill="True">
+				<!--  무게는 색이 아니라 글리프로 — 글자는 대비가 높은 토큰  -->
+				<md:PackIcon
+					Width="22"
+					Height="22"
+					Margin="0,0,12,0"
+					VerticalAlignment="Top"
+					DockPanel.Dock="Left"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					Kind="AlertOutline" />
+				<StackPanel>
+					<TextBlock
+						FontWeight="SemiBold"
+						Style="{StaticResource Acct.BodyText}"
+						Text="정말로 로그아웃 하시겠습니까?" />
+					<TextBlock
+						Margin="0,6,0,0"
+						Style="{StaticResource Acct.Hint}"
+						Text="{Binding HintText}" />
+				</StackPanel>
+			</DockPanel>
+		</dlg:ConsoleDialogFrame>
+	</md:DialogHost>
+</UserControl>

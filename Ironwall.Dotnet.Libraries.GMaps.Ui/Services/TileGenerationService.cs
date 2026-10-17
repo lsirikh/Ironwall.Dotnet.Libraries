@@ -10,6 +10,7 @@ using GMap.NET.MapProviders;
 using GMap.NET.Projections;
 using System;
 using System.IO;
+using System.Data.SQLite;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using System.Windows.Media;
@@ -57,19 +58,16 @@ public class TileGenerationService
 {
     private readonly ILogService _log;
     private readonly IEventAggregator _eventAggregator;
-    private readonly GMapSetupModel _setup;
-    private const string DIRECTORY = "c:/Tiles";
 
-    public TileGenerationService(ILogService log
-                                , IEventAggregator ea
-                                , GMapSetupModel setup)
+    private static readonly string MAPS_DIR = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory,
+        "maps");
+
+    public TileGenerationService(ILogService log, IEventAggregator ea)
     {
         _log = log;
         _eventAggregator = ea;
-        _setup = setup;
-
-        if (!Directory.Exists(_setup.TileDirectory))
-            Directory.CreateDirectory(_setup.TileDirectory ?? DIRECTORY);
+        Directory.CreateDirectory(MAPS_DIR);
     }
 
     /// <summary>
@@ -234,47 +232,45 @@ public class TileGenerationService
             var customMap = CreateCustomMapModel(mapName, tifFilePath, tifInfo, geoTransform,
                 minZoom, maxZoom, tileSize, EnumGeoReference.ManualControlPoints);
 
+            // 4. MBTiles 출력 경로 설정
+            var mbtilesFileName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}.mbtiles";
+            var mbtilesPath = Path.Combine(MAPS_DIR, mbtilesFileName);
+            customMap.MbtilesPath = mbtilesPath;
+            customMap.TilesDirectoryPath = string.Empty;
 
-            // 4. 타일 디렉토리 생성
-            var tileDirectoryName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}";
-            var tileDirectory = Path.Combine(_setup.TileDirectory ?? DIRECTORY, tileDirectoryName);
-            Directory.CreateDirectory(tileDirectory);
-            customMap.TilesDirectoryPath = tileDirectory;
-                       
             // 5. 타일 생성
             var totalTiles = await GenerateTilesFromTifAsync(
-                tifFilePath, tifInfo, geoTransform, customMap.TilesDirectoryPath,
+                tifFilePath, tifInfo, geoTransform, mbtilesPath,
                 minZoom, maxZoom, tileSize, progress);
 
             // 6. 최종 정보 업데이트
             customMap.TotalTileCount = totalTiles;
-            customMap.TilesDirectorySize = GetDirectorySize(tileDirectory);
+            customMap.TilesDirectorySize = File.Exists(mbtilesPath) ? new FileInfo(mbtilesPath).Length : 0;
             customMap.ProcessedAt = DateTime.Now;
             customMap.ProcessingTimeMinutes = (int)(DateTime.Now - startTime).TotalMinutes;
             customMap.Status = EnumMapStatus.Active;
-            customMap.QualityScore = 0.7; // 수동 입력의 경우 보통 품질
+            customMap.QualityScore = 0.7;
 
             _log?.Info($"수동 좌표 TIF 변환 완료: {totalTiles}개 타일, {customMap.ProcessingTimeMinutes}분 소요");
-
-            UpdateCustomMapAfterTileGeneration(customMap, totalTiles, startTime);
 
             return customMap;
         }
         catch (Exception ex)
         {
             _log?.Error($"수동 좌표 TIF 변환 실패: {ex.Message}");
-            //await _eventAggregator.PublishOnUIThreadAsync(new TileGenerationFailedEvent(ex.Message));
+            //await _ea.PublishOnUIThreadAsync(new TileGenerationFailedEvent(ex.Message));
             throw;
         }
     }
 
 
     /// <summary>
-    /// Web Mercator 투영법으로 타일 생성
+    /// Web Mercator 투영법으로 MBTiles 파일 생성 (SQLite)
     /// </summary>
     public async Task<int> GenerateTilesFromTifAsync(
-        string tifFilePath, TifFileInfo tifInfo, GeoTransformInfo geoTransform, string tileDirectory,
-        int minZoom, int maxZoom, int tileSize, IProgress<TileConversionProgress> progress)
+        string tifFilePath, TifFileInfo tifInfo, GeoTransformInfo geoTransform, string mbtilesPath,
+        int minZoom, int maxZoom, int tileSize, IProgress<TileConversionProgress> progress,
+        string layerName = "overlay")
     {
         var totalTiles = 0;
         var projection = MercatorProjection.Instance;
@@ -291,71 +287,165 @@ public class TileGenerationService
             var tiles = projection.GetAreaTileList(geoBounds, z, 0);
             estimatedTiles += tiles.Count;
         }
+        _log?.Info($"MBTiles 생성 시작 — 예상 타일 수: {estimatedTiles}, 출력: {mbtilesPath}");
 
-        _log?.Info($"예상 타일 수: {estimatedTiles}");
+        // 실패 시 부분 파일 삭제를 위해 경로 기억
+        var tempPath = mbtilesPath + ".tmp";
+        SQLiteConnection? conn = null;
 
-        for (int zoom = minZoom; zoom <= maxZoom; zoom++)
+        try
         {
-            var zoomDirectory = Path.Combine(tileDirectory, zoom.ToString());
-            Directory.CreateDirectory(zoomDirectory);
+            conn = new SQLiteConnection($"Data Source=\"{tempPath}\";Pooling=False;");
+            conn.Open();
 
-            var tileList = projection.GetAreaTileList(geoBounds, zoom, 0);
-            _log?.Info($"줌 레벨 {zoom}: {tileList.Count}개 타일 처리");
+            // 쓰기 성능 최적화 PRAGMA
+            using (var pragma = new SQLiteCommand("PRAGMA journal_mode=MEMORY; PRAGMA synchronous=OFF;", conn))
+                pragma.ExecuteNonQuery();
 
-            var processedInZoom = 0;
-            foreach (var tilePoint in tileList)
+            // 스키마 생성
+            using (var schema = new SQLiteCommand(@"
+                CREATE TABLE IF NOT EXISTS tiles (
+                    zoom_level  INTEGER NOT NULL,
+                    tile_column INTEGER NOT NULL,
+                    tile_row    INTEGER NOT NULL,
+                    tile_data   BLOB NOT NULL,
+                    PRIMARY KEY (zoom_level, tile_column, tile_row)
+                );
+                CREATE TABLE IF NOT EXISTS metadata (
+                    name  TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    PRIMARY KEY (name)
+                );", conn))
+                schema.ExecuteNonQuery();
+
+            // metadata 삽입
+            var bounds = $"{geoTransform.MinLongitude},{geoTransform.MinLatitude},{geoTransform.MaxLongitude},{geoTransform.MaxLatitude}";
+            using (var meta = new SQLiteCommand(@"
+                INSERT OR REPLACE INTO metadata VALUES('name', @name);
+                INSERT OR REPLACE INTO metadata VALUES('format', 'png');
+                INSERT OR REPLACE INTO metadata VALUES('minzoom', @minzoom);
+                INSERT OR REPLACE INTO metadata VALUES('maxzoom', @maxzoom);
+                INSERT OR REPLACE INTO metadata VALUES('bounds', @bounds);
+                INSERT OR REPLACE INTO metadata VALUES('type', 'overlay');", conn))
             {
-                try
-                {
-                    var tileImage = await CreateTileFromTifAsync(
-                        tifFilePath, tifInfo, geoTransform, tilePoint, zoom, tileSize, projection);
-
-                    if (tileImage != null)
-                    {
-                        var xDir = Path.Combine(zoomDirectory, tilePoint.X.ToString());
-                        Directory.CreateDirectory(xDir);
-                        var tilePath = Path.Combine(xDir, $"{tilePoint.Y}.png");
-
-                        tileImage.Save(tilePath, ImageFormat.Png);
-                        tileImage.Dispose();
-                        totalTiles++;
-                        processedInZoom++;
-
-                        // 진행률 중간 보고 (각 줌 레벨에서 100개마다)
-                        if (processedInZoom % 100 == 0)
-                        {
-                            var progressPercent = (double)totalTiles / estimatedTiles * 100;
-                            progress?.Report(new TileConversionProgress
-                            {
-                                ProcessedTiles = totalTiles,
-                                TotalTiles = estimatedTiles,
-                                CurrentZoomLevel = zoom,
-                                ProgressPercentage = progressPercent
-                            });
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log?.Error($"타일 {tilePoint.X}/{tilePoint.Y} 실패: {ex.Message}");
-                }
+                meta.Parameters.AddWithValue("@name", layerName);
+                meta.Parameters.AddWithValue("@minzoom", minZoom.ToString());
+                meta.Parameters.AddWithValue("@maxzoom", maxZoom.ToString());
+                meta.Parameters.AddWithValue("@bounds", bounds);
+                meta.ExecuteNonQuery();
             }
 
-            // 줌 레벨 완료 후 진행률 보고
-            var zoomProgressPercent = (double)totalTiles / estimatedTiles * 100;
-            progress?.Report(new TileConversionProgress
+            // 타일 삽입 (트랜잭션 배치: 1000개마다 COMMIT)
+            // insertCmd를 명시적 블록으로 감싸 conn.Close() 전에 반드시 Dispose되도록 함
+            // (using var 패턴은 try 블록 끝까지 살아있어 File.Move 시 파일 락 유발)
+            var tx = conn.BeginTransaction();
+            var batchCount = 0;
+
+            using (var insertCmd = new SQLiteCommand(
+                "INSERT OR REPLACE INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (@z, @x, @y, @data);",
+                conn, tx))
             {
-                ProcessedTiles = totalTiles,
-                TotalTiles = estimatedTiles,
-                CurrentZoomLevel = zoom,
-                ProgressPercentage = zoomProgressPercent
-            });
+                var pZ = insertCmd.Parameters.Add("@z", System.Data.DbType.Int32);
+                var pX = insertCmd.Parameters.Add("@x", System.Data.DbType.Int64);
+                var pY = insertCmd.Parameters.Add("@y", System.Data.DbType.Int64);
+                var pData = insertCmd.Parameters.Add("@data", System.Data.DbType.Binary);
 
-            _log?.Info($"줌 레벨 {zoom} 완료: {processedInZoom}개 타일 생성");
-            GC.Collect(); // 메모리 정리
+                for (int zoom = minZoom; zoom <= maxZoom; zoom++)
+                {
+                    var tileList = projection.GetAreaTileList(geoBounds, zoom, 0);
+                    _log?.Info($"줌 레벨 {zoom}: {tileList.Count}개 타일 처리");
+                    var processedInZoom = 0;
+
+                    foreach (var tilePoint in tileList)
+                    {
+                        try
+                        {
+                            var tileImage = await CreateTileFromTifAsync(
+                                tifFilePath, tifInfo, geoTransform, tilePoint, zoom, tileSize, projection);
+
+                            if (tileImage != null)
+                            {
+                                using var ms = new MemoryStream();
+                                tileImage.Save(ms, ImageFormat.Png);
+                                tileImage.Dispose();
+
+                                // XYZ → TMS 변환 (MBTiles 표준)
+                                var tmsRow = (long)(Math.Pow(2, zoom) - 1) - tilePoint.Y;
+                                pZ.Value = zoom;
+                                pX.Value = tilePoint.X;
+                                pY.Value = tmsRow;
+                                pData.Value = ms.ToArray();
+                                insertCmd.ExecuteNonQuery();
+
+                                totalTiles++;
+                                processedInZoom++;
+                                batchCount++;
+
+                                // 배치 커밋 (1000개마다)
+                                if (batchCount >= 1000)
+                                {
+                                    tx.Commit();
+                                    tx.Dispose();
+                                    tx = conn.BeginTransaction();
+                                    insertCmd.Transaction = tx;
+                                    batchCount = 0;
+                                }
+
+                                // 진행률 보고 (100개마다)
+                                if (processedInZoom % 100 == 0)
+                                {
+                                    progress?.Report(new TileConversionProgress
+                                    {
+                                        ProcessedTiles = totalTiles,
+                                        TotalTiles = estimatedTiles,
+                                        CurrentZoomLevel = zoom,
+                                        ProgressPercentage = (double)totalTiles / estimatedTiles * 100
+                                    });
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _log?.Error($"타일 {tilePoint.X}/{tilePoint.Y} 실패: {ex.Message}");
+                        }
+                    }
+
+                    // 줌 레벨 완료 진행률
+                    progress?.Report(new TileConversionProgress
+                    {
+                        ProcessedTiles = totalTiles,
+                        TotalTiles = estimatedTiles,
+                        CurrentZoomLevel = zoom,
+                        ProgressPercentage = (double)totalTiles / estimatedTiles * 100
+                    });
+                    _log?.Info($"줌 레벨 {zoom} 완료: {processedInZoom}개 타일 생성");
+                }
+
+                // 마지막 배치 커밋
+                tx.Commit();
+                tx.Dispose();
+            } // insertCmd Dispose: conn.Close() 전에 반드시 해제
+
+            conn.Close();
+            conn.Dispose();
+            conn = null;
+            SQLiteConnection.ClearAllPools(); // 풀링 비활성화에도 내부 캐시 잔여 해제
+
+            // 임시 파일 → 최종 파일로 이동
+            if (File.Exists(mbtilesPath))
+                File.Delete(mbtilesPath);
+            File.Move(tempPath, mbtilesPath);
+
+            _log?.Info($"MBTiles 생성 완료 — {totalTiles}개 타일, {mbtilesPath}");
+            return totalTiles;
         }
-
-        return totalTiles;
+        catch
+        {
+            conn?.Dispose();
+            // 실패 시 임시 파일 삭제
+            if (File.Exists(tempPath)) try { File.Delete(tempPath); } catch { }
+            throw;
+        }
     }
     #endregion
 
@@ -428,15 +518,11 @@ public class TileGenerationService
         string mapName, string tifFilePath, TifFileInfo tifInfo, GeoTransformInfo geoTransform,
         int minZoom, int maxZoom, int tileSize, EnumGeoReference geoReferenceMethod)
     {
-        var tileDirectoryName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}";
-        var tileDirectory = Path.Combine(_setup.TileDirectory ?? DIRECTORY, tileDirectoryName);
-        Directory.CreateDirectory(tileDirectory);
-
         return new CustomMapModel
         {
             Name = mapName,
             SourceImagePath = tifFilePath,
-            TilesDirectoryPath = tileDirectory,
+            TilesDirectoryPath = string.Empty,
             OriginalFileSize = tifInfo.FileSize,
             OriginalWidth = tifInfo.Width,
             OriginalHeight = tifInfo.Height,
@@ -461,11 +547,13 @@ public class TileGenerationService
     private void UpdateCustomMapAfterTileGeneration(CustomMapModel customMap, int totalTiles, DateTime startTime)
     {
         customMap.TotalTileCount = totalTiles;
-        customMap.TilesDirectorySize = GetDirectorySize(customMap.TilesDirectoryPath);
+        customMap.TilesDirectorySize = !string.IsNullOrEmpty(customMap.MbtilesPath) && File.Exists(customMap.MbtilesPath)
+            ? new FileInfo(customMap.MbtilesPath).Length
+            : GetDirectorySize(customMap.TilesDirectoryPath);
         customMap.ProcessedAt = DateTime.Now;
         customMap.ProcessingTimeMinutes = (int)(DateTime.Now - startTime).TotalMinutes;
         customMap.Status = EnumMapStatus.Active;
-        customMap.QualityScore = 0.7; // 기본 품질 점수
+        customMap.QualityScore = 0.7;
     }
 
     private void CalculateLinearTransform(List<ManualGeoPoint> points, int imageWidth, int imageHeight, GeoTransformInfo geoTransform)
@@ -725,7 +813,7 @@ public class TileGenerationService
 
                                 if (srcOffset < scanlineBuffer.Length)
                                 {
-                                    // 🔧 색상 처리 개선
+                                    //색상 처리 개선
                                     ExtractPixelColor(scanlineBuffer, srcOffset, destPtr + destOffset, tifInfo);
                                 }
                             }

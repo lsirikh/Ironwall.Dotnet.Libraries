@@ -1,0 +1,29 @@
+{
+  "_note": "파일별 커버리지의 관측 기록입니다. 손으로 고치지 마세요 — verify 가 갱신합니다. 하락은 원장의 cover: 스펙이 판정합니다.",
+  "updated_at": "2026-09-08T03:20:39.101Z",
+  "files": {
+    "install.js": 59.7,
+    "scripts/gen-manual-tables.js": 81.3,
+    ".claude/hooks/pre-tool-gate.js": 20.6,
+    ".claude/hooks/_common.js": 56.4,
+    ".claude/hooks/_state.js": 61.1,
+    ".claude/hooks/_plan-graph.js": 97,
+    ".claude/hooks/_session-guard.js": 91,
+    ".claude/hooks/_git.js": 42.8,
+    ".claude/hooks/_config.js": 93.1,
+    ".claude/hooks/pre-compact.js": 85.6,
+    ".claude/hooks/post-write-sync.js": 0,
+    ".claude/hooks/_signals.js": 72.3,
+    ".claude/hooks/_agents.js": 93.8,
+    ".claude/hooks/session-gate.js": 64.3,
+    ".claude/hooks/_session-context.js": 56.7,
+    "scripts/build-package.js": 94.4,
+    ".claude/hooks/subagent-stop.js": 50.9,
+    ".claude/hooks/_gates.js": 98.1,
+    ".claude/hooks/_impact.js": 85.6,
+    ".claude/hooks/_charter.js": 71.1,
+    ".claude/hooks/_learning.js": 61.2,
+    ".claude/hooks/advance-phase-harness.js": 47.7,
+    ".claude/hooks/stop-observation.js": 88.9
+  }
+}

@@ -21,7 +21,6 @@ public class GMapSetupModel : IGMapSetupModel
         MapType = "GoogleSatelliteMap";
         MapMode = "Online";
         MapName = "기본 지도";
-        TileDirectory = "c:/";
     }
 
     /// <summary>
@@ -35,14 +34,12 @@ public class GMapSetupModel : IGMapSetupModel
         HomePositionModel? homePosition = null,
         string? mapType = null,
         string? mapMode = null,
-        string? mapName = null,
-        string? tileDirectory = null)
+        string? mapName = null)
     {
         HomePosition = homePosition;
         MapType = mapType;
         MapMode = mapMode;
         MapName = mapName;
-        TileDirectory = tileDirectory;
     }
 
     /// <summary>
@@ -56,10 +53,17 @@ public class GMapSetupModel : IGMapSetupModel
             throw new ArgumentNullException(nameof(source));
 
         HomePosition = source.HomePosition;
+        MapAnchor = source.MapAnchor;
+        MapRotation = source.MapRotation;
+        MapTilt = source.MapTilt;
+        MapCompass = source.MapCompass;
+        MapWindyIndicator = source.MapWindyIndicator;
+        MapDetectionFault = source.MapDetectionFault;
+        MapInstrumentVisibility = source.MapInstrumentVisibility;
         MapType = source.MapType;
         MapMode = source.MapMode;
         MapName = source.MapName;
-        TileDirectory = source.TileDirectory;
+        MapDataDirectory = source.MapDataDirectory;
     }
 
     #endregion
@@ -75,10 +79,18 @@ public class GMapSetupModel : IGMapSetupModel
     #endregion
     #region - Properties -
     public HomePositionModel? HomePosition { get; set; }
+    public MapAnchorModel? MapAnchor { get; set; }
+    public MapRotationModel? MapRotation { get; set; }
+    public MapTiltModel? MapTilt { get; set; }
+    public MapCompassModel? MapCompass { get; set; }
+    public MapWindyIndicatorModel? MapWindyIndicator { get; set; }
+    public MapDetectionFaultModel? MapDetectionFault { get; set; }
+    public MapInstrumentVisibilityModel? MapInstrumentVisibility { get; set; }
     public string? MapType { get; set; }
     public string? MapMode { get; set; }
     public string? MapName { get; set; }
-    public string? TileDirectory { get; set; }
+    /// <summary>기본맵(.mbtiles) 폴더 — 비면 실행폴더\Datas 폴백. <see cref="IGMapSetupModel.MapDataDirectory"/> 참조.</summary>
+    public string? MapDataDirectory { get; set; }
     #endregion
     #region - Attributes -
     #endregion

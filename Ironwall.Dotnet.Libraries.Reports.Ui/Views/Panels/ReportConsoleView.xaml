@@ -1,0 +1,393 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportConsoleView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:vm="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels"
+	AutomationProperties.AutomationId="Reports.Console.Root"
+	AutomationProperties.Name="보고서 관리"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		보고서 콘솔 — 레일 · 목록 · 상세 3단. 정본 목업:
+		docs/design/window-layout-system-storyboard.html L1250-1295(보고서 콘솔) · L1530-1531(창→틀) · L1649(L-D8).
+		치수(헤더 40 · 레일 184/56 · 툴바 48 · 행 38 · 상태 띠 30)와 폭별 도킹/서랍/접힘은 ConsoleShell 이 맡고,
+		상세 기본 폭은 380 이다("미리보기라 넓게" L1271).
+		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationId 만.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<local:RailIconKindConverter x:Key="IconKind" />
+		<local:RowAutomationNameConverter x:Key="RowAutomationName" />
+
+		<!--
+			상태 칩 — 커널 칩(Console.Chip)과 같은 규격 · 같은 모양: 안쪽 여백 10,4 · 사이 6 · 둥근 11 · 글자 12.
+			색이 아니라 형태로 고른 것을 보인다 — 레이아웃 밖 2px 윤곽 고리(Mark) + 굵은 글자. 고르거나 풀어도 칩 크기가 바뀌지 않는다
+			(D-2026-09-24-f2dd41: 글자 칸은 늘 굵은 폭으로 재는 투명 글자로 예약, 고리는 덮개). 예전의 테두리 1→2 · ● 표지는 고를 때마다
+			칩을 넓혀 옆 칩을 밀었다.
+			V-30 에서 툴바 폭을 벌려 보려고 여백을 9→6 · 사이 5→4 로 깎았던 것을 되돌린다 — 필터는 이제 툴바 둘째 줄에 따로 서서
+			검색 · 동작 단추와 폭을 나눠 먹지 않는다(D-2026-09-27-71c353). 위아래 2 는 좁아서 칩이 다음 줄로 넘어갈 때의 줄 간격이다.
+		-->
+		<Style x:Key="StatusChip" TargetType="Button">
+			<Setter Property="Margin" Value="0,2,6,2" />
+			<Setter Property="Padding" Value="10,4" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Grid>
+							<Border
+								x:Name="Chip"
+								Padding="{TemplateBinding Padding}"
+								Background="{DynamicResource SurfaceAltBrush}"
+								BorderBrush="{DynamicResource BorderBrush}"
+								BorderThickness="1"
+								CornerRadius="11">
+								<Grid>
+									<!--  고정폭 예약 — 늘 굵게 재어, 고른 칩의 글자가 굵어져도 칩이 넓어지지 않는다.  -->
+									<TextBlock
+										FontWeight="SemiBold"
+										IsHitTestVisible="False"
+										Opacity="0"
+										Text="{Binding Display}" />
+									<TextBlock VerticalAlignment="Center" Text="{Binding Display}">
+										<TextBlock.Style>
+											<Style TargetType="TextBlock">
+												<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding IsSelected}" Value="True">
+														<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+														<Setter Property="FontWeight" Value="SemiBold" />
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</TextBlock.Style>
+									</TextBlock>
+								</Grid>
+							</Border>
+							<!--  고른 표지 — 실제 테두리 두께는 그대로 두고, 레이아웃 밖 덮개로 두꺼워 보인다(커널 SelectedRing 과 같다).  -->
+							<Border
+								x:Name="Mark"
+								Margin="-2"
+								BorderBrush="{DynamicResource PrimaryBrush}"
+								BorderThickness="2"
+								CornerRadius="13"
+								IsHitTestVisible="False"
+								Visibility="Collapsed" />
+						</Grid>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+							<DataTrigger Binding="{Binding IsSelected}" Value="True">
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource TintInfoBrush}" />
+								<Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+							</DataTrigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+	</UserControl.Resources>
+
+	<c:ConsoleShell
+		Title="보고서"
+		ConsoleKey="Reports"
+		HelpKey="Reports.Console"
+		DetailWidth="380"
+		IsDetailRequested="{Binding Detail.IsDetailRequested}"
+		Loaded="OnShellLoaded"
+		Subtitle="{Binding RailSubtitle}">
+
+		<!--
+			머리 오른쪽 — 닫기 ✕ 하나(호스트가 이 패널을 모달로 띄운다).
+			U-17 — 옛 머리는 "보고서 관리 · 닫기" 였다. 틀 머리(보고서) · 콘솔 머리(보고서 · 생성 이력) 에 이어 세 번째로 같은 이름을
+			되풀이했고, 닫기만 글자 버튼이라 다른 콘솔(계정 ✕)과 모양이 달랐다. 이름은 틀 · 콘솔 머리가 이미 말한다 —
+			자동화용 이름은 뿌리(Reports.Console.Root)의 AutomationProperties.Name 으로 옮겼다(T-REP003).
+		-->
+		<c:ConsoleShell.HeaderContent>
+			<Button
+				AutomationProperties.AutomationId="Reports.Console.CloseButton"
+				AutomationProperties.Name="보고서 닫기"
+				Click="OnClose"
+				Style="{StaticResource Console.Button.Close}" />
+		</c:ConsoleShell.HeaderContent>
+
+		<!--  레일 — 탭 3 이 레일 3 이 된다(L1260-1262). 생성 이력에는 진행 중 건수 배지.  -->
+		<c:ConsoleShell.Rail>
+			<c:ConsoleRail
+				AutomationProperties.AutomationId="Console.Reports.Rail"
+				ConsoleKey="Reports"
+				IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				ItemsSource="{Binding RailEntries}"
+				SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
+				<c:ConsoleRail.Resources>
+					<!--  아이콘 토큰 → PackIcon. 싱글턴 뷰모델이 시각 요소를 쥐지 않게 여기서 그린다.  -->
+					<DataTemplate DataType="{x:Type vm:ReportRailIcon}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
+					</DataTemplate>
+				</c:ConsoleRail.Resources>
+				<c:ConsoleRail.Footer>
+					<TextBlock
+						AutomationProperties.AutomationId="Console.Reports.Rail.Footer"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding RailFooterText}"
+						TextWrapping="WrapWithOverflow" />
+				</c:ConsoleRail.Footer>
+			</c:ConsoleRail>
+		</c:ConsoleShell.Rail>
+
+		<!--  툴바 — 첫째 줄 [새 보고서 / 새 템플릿] · [삭제] · [갱신] · 검색 · [열 n/m], 둘째 줄 상태 칩(생성 이력 레일에서만)  -->
+		<c:ConsoleShell.Toolbar>
+			<c:ConsoleToolbar
+				AddClick="OnAdd"
+				AddDisabledReason="{Binding AddBlockedReason}"
+				AddText="{Binding AddText}"
+				CanAdd="{Binding CanAdd}"
+				CanDelete="{Binding CanDelete}"
+				CanRefresh="{Binding CanReload}"
+				ColumnsClick="OnColumns"
+				ConsoleKey="Reports"
+				DeleteClick="OnDelete"
+				DeleteDisabledReason="{Binding DeleteBlockedReason}"
+				Loaded="OnToolbarLoaded"
+				RefreshClick="OnReload"
+				SearchPlaceholder="{Binding SearchPlaceholder}"
+				SearchText="{Binding SearchText, Mode=TwoWay}"
+				ShowSearch="{Binding ShowSearch}">
+				<!--  상태 칩 5종 — 콤보를 대신한다(L1279). "전체"는 아무것도 안 누른 상태이고 서버에 값을 보내지 않는다.  -->
+				<c:ConsoleToolbar.Filters>
+					<c:ConsoleChipGroup
+						AutomationProperties.AutomationId="Console.Reports.Filters"
+						Focusable="False"
+						ItemsSource="{Binding ListViewModel.StatusChips}"
+						Visibility="{Binding IsListRail, Converter={StaticResource BoolToVisibility}}">
+						<!--  좁으면 다음 줄로 넘긴다 — 칩을 누르거나 글자 중간에서 자르지 않는다  -->
+						<c:ConsoleChipGroup.ItemsPanel>
+							<ItemsPanelTemplate>
+								<WrapPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</c:ConsoleChipGroup.ItemsPanel>
+						<c:ConsoleChipGroup.ItemTemplate>
+							<DataTemplate>
+								<Button
+									AutomationProperties.AutomationId="{Binding AutomationId}"
+									AutomationProperties.Name="{Binding Display}"
+									Click="OnStatusChip"
+									Style="{StaticResource StatusChip}"
+									ToolTip="다시 누르면 전체로 돌아갑니다" />
+							</DataTemplate>
+						</c:ConsoleChipGroup.ItemTemplate>
+					</c:ConsoleChipGroup>
+				</c:ConsoleToolbar.Filters>
+			</c:ConsoleToolbar>
+		</c:ConsoleShell.Toolbar>
+
+		<!--  목록 — 열은 화면마다 다르므로 코드에서 만든다  -->
+		<c:ConsoleShell.List>
+			<Grid ClipToBounds="True">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
+				</Grid.RowDefinitions>
+
+				<Border
+					Grid.Row="0"
+					Padding="12,5"
+					Background="{DynamicResource SurfaceAltBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,0,1"
+					Visibility="{Binding HasListCaption, Converter={StaticResource BoolToVisibility}}">
+					<TextBlock
+						AutomationProperties.AutomationId="Console.Reports.ListCaption"
+						FontSize="11.5"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding ListCaption}" />
+				</Border>
+
+				<Grid Grid.Row="1">
+					<DataGrid
+						AutomationProperties.AutomationId="Reports.List.ReportGrid"
+						CanUserReorderColumns="False"
+						CanUserSortColumns="False"
+						IsReadOnly="True"
+						ItemsSource="{Binding Rows}"
+						Loaded="OnGridLoaded"
+						SelectionChanged="OnGridSelectionChanged"
+						SelectionMode="Single"
+						Style="{StaticResource Console.DataGrid}">
+						<DataGrid.RowStyle>
+							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
+								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Reports.Row.{0}}" />
+								<!--  R11 — 화면 읽기 프로그램이 클래스 이름 대신 제목 · 이름을 읽게 한다.  -->
+								<Setter Property="AutomationProperties.Name" Value="{Binding Converter={StaticResource RowAutomationName}}" />
+							</Style>
+						</DataGrid.RowStyle>
+					</DataGrid>
+
+					<!--
+						빈 상태 — 커널 ConsoleEmptyState(글리프 + 무엇이 비었나 + 다음 할 일). 조회 실패와 "없음" 을 다른 글로 가른다.
+						제목 글은 옛 자동화 식별자(Reports.List.EmptyStateText — 호스트 T-REP013 이 읽는다)를 지닌 TextBlock 으로
+						Action 자리에 싣는다 — ConsoleEmptyState 는 UIA 피어가 없어 거기 붙인 식별자는 자동화 트리에 나오지 않는다.
+					-->
+					<c:ConsoleEmptyState AutomationProperties.AutomationId="Reports.List.EmptyState" IsHitTestVisible="False">
+						<c:ConsoleEmptyState.Style>
+							<Style BasedOn="{StaticResource {x:Type c:ConsoleEmptyState}}" TargetType="c:ConsoleEmptyState">
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<MultiDataTrigger>
+										<MultiDataTrigger.Conditions>
+											<Condition Binding="{Binding IsTemplateRail}" Value="False" />
+											<Condition Binding="{Binding ListViewModel.IsEmpty}" Value="True" />
+										</MultiDataTrigger.Conditions>
+										<Setter Property="Visibility" Value="Visible" />
+									</MultiDataTrigger>
+									<MultiDataTrigger>
+										<MultiDataTrigger.Conditions>
+											<Condition Binding="{Binding IsTemplateRail}" Value="True" />
+											<Condition Binding="{Binding TemplateViewModel.IsEmpty}" Value="True" />
+										</MultiDataTrigger.Conditions>
+										<Setter Property="Visibility" Value="Visible" />
+									</MultiDataTrigger>
+								</Style.Triggers>
+							</Style>
+						</c:ConsoleEmptyState.Style>
+						<c:ConsoleEmptyState.Action>
+							<StackPanel Margin="0,-2,0,0">
+								<TextBlock
+									MaxWidth="320"
+									HorizontalAlignment="Center"
+									AutomationProperties.AutomationId="Reports.List.EmptyStateText"
+									FontSize="13.5"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									TextAlignment="Center"
+									TextWrapping="WrapWithOverflow">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Text" Value="{Binding ListViewModel.EmptyStateText}" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsTemplateRail}" Value="True">
+													<Setter Property="Text" Value="{Binding TemplateViewModel.EmptyStateText}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+								<TextBlock
+									MaxWidth="320"
+									Margin="0,5,0,0"
+									HorizontalAlignment="Center"
+									AutomationProperties.AutomationId="Reports.List.EmptyStateHint"
+									FontSize="12.5"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									TextAlignment="Center"
+									TextWrapping="WrapWithOverflow">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Text" Value="{Binding ListViewModel.EmptyStateHint}" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsTemplateRail}" Value="True">
+													<Setter Property="Text" Value="{Binding TemplateViewModel.EmptyStateHint}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+							</StackPanel>
+						</c:ConsoleEmptyState.Action>
+					</c:ConsoleEmptyState>
+				</Grid>
+			</Grid>
+		</c:ConsoleShell.List>
+
+		<!--  상태 띠(30) — 건수 + 지금 필터 + 방금 한 일  -->
+		<c:ConsoleShell.StatusBar>
+			<Border
+				Padding="12,5"
+				Background="{DynamicResource SurfaceAltBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="0,1,0,0">
+				<DockPanel LastChildFill="True">
+					<!--  R13 — 오른쪽 18 은 호스트 틀의 크기 조절 손잡이(16×16) 자리다. 없으면 글 끝이 손잡이에 닿았다.  -->
+					<TextBlock
+						Margin="12,0,18,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Console.Reports.Status.Message"
+						DockPanel.Dock="Right"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding StatusText}"
+						TextTrimming="CharacterEllipsis" />
+					<TextBlock
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.List.CountText"
+						DockPanel.Dock="Left"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding ListStatusText}" />
+					<TextBlock
+						Margin="12,0,0,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Console.Reports.Status.Filter"
+						DockPanel.Dock="Left"
+						FontSize="12"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Visibility="{Binding IsListRail, Converter={StaticResource BoolToVisibility}}">
+						<Run Text="상태: " /><Run Text="{Binding FilterSummary, Mode=OneWay}" />
+					</TextBlock>
+				</DockPanel>
+			</Border>
+		</c:ConsoleShell.StatusBar>
+
+		<!--  상세 — 여섯 상태 + 고정 적용 막대. 생성 이력 화면은 막대 대신 자기 동작 줄을 갖는다.  -->
+		<c:ConsoleShell.Detail>
+			<c:ConsoleDetailHost
+				ApplyClick="OnApply"
+				ApplyText="{Binding DetailApplyText}"
+				Banner="{Binding DetailBanner}"
+				CanApply="{Binding DetailCanApply}"
+				CanRevert="{Binding DetailCanRevert}"
+				ConsoleKey="Reports"
+				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
+				FooterText="{Binding DetailFooterText}"
+				IsDirty="{Binding Detail.IsDirty}"
+				IsReadOnly="{Binding Detail.IsReadOnly}"
+				Kind="{Binding DetailKind}"
+				RevertClick="OnRevert"
+				RevertText="{Binding DetailRevertText}"
+				ShakeToken="{Binding Detail.ShakeToken}"
+				ShowButtons="{Binding ShowDetailButtons}"
+				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				Title="{Binding DetailTitle}">
+				<Grid>
+					<local:ReportGenerationDetailView Visibility="{Binding IsListRail, Converter={StaticResource BoolToVisibility}}" />
+					<local:ReportCreateDetailView Visibility="{Binding IsCreateRail, Converter={StaticResource BoolToVisibility}}" />
+					<local:ReportTemplateDetailView Visibility="{Binding IsTemplateFormVisible, Converter={StaticResource BoolToVisibility}}" />
+					<!--
+						V-29 — 템플릿을 고르지 않았으면 빈 편집 폼 대신 빈 상태(무엇이 비었고 무엇을 하면 되는지).
+						빈 폼은 이름* · 기간 · 구성 요소 ▲▼ · [되돌리기][적용] 까지 그대로 서서 새 항목을 적는 중처럼 읽혔다.
+					-->
+					<c:ConsoleEmptyState
+						Padding="16,48,16,16"
+						VerticalAlignment="Top"
+						AutomationProperties.AutomationId="Reports.Detail.TemplateEmptyState"
+						Glyph="M6,3 H14 L18,7 V21 H6 Z M14,3 V7 H18 M9,12 H15 M9,16 H15"
+						Hint="{Binding TemplateDetailEmptyHint}"
+						IsHitTestVisible="False"
+						Title="{x:Static vm:ReportConsoleViewModel.TemplateDetailEmptyTitle}"
+						Visibility="{Binding IsTemplateDetailEmpty, Converter={StaticResource BoolToVisibility}}" />
+				</Grid>
+			</c:ConsoleDetailHost>
+		</c:ConsoleShell.Detail>
+	</c:ConsoleShell>
+</UserControl>

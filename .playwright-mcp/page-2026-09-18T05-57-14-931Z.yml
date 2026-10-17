@@ -1,0 +1,2070 @@
+- generic [ref=f13e2]:
+  - banner [ref=f13e3]:
+    - generic [ref=f13e4]:
+      - text: Ironwall GIS
+      - generic [ref=f13e6]: · 창 레이아웃 제안
+    - group "테마" [ref=f13e7]:
+      - button "시스템" [pressed] [ref=f13e8] [cursor=pointer]
+      - button "라이트" [ref=f13e9] [cursor=pointer]
+      - button "다크" [ref=f13e10] [cursor=pointer]
+  - generic [ref=f13e11]:
+    - generic [ref=f13e12]:
+      - paragraph [ref=f13e13]: 장비 정보 창 · 3단 콘솔
+      - heading "목록은 가운데, 고른 장비는 오른쪽에서 읽는다" [level=1] [ref=f13e14]
+      - paragraph [ref=f13e15]: 지금 장비 창은 행을 누르면 편집기가 위쪽 요약 카드를 덮고, 목록은 높이 260px에 갇혀 있습니다. 선택 탭 · 목록 · 상세 속성을 세로 3단으로 나누면 목록은 창 높이를 전부 쓰고, 상세는 위에서 아래로 읽는 폼이 됩니다. 같은 틀을 계정 · 이벤트 · 보고서 · 억제 스케줄까지 15개 창에 씁니다.
+    - generic [ref=f13e16]:
+      - term [ref=f13e17]: 레일
+      - definition [ref=f13e18]: 184px · 접힘 56px · 개수 배지
+      - term [ref=f13e19]: 목록
+      - definition [ref=f13e20]: 높이 가변 · 핵심 6열 · 선택은 좌측 3px 바
+      - term [ref=f13e21]: 상세
+      - definition [ref=f13e22]: 340px · 조절 300–480 · 섹션 순서 고정
+      - term [ref=f13e23]: 기본 창
+      - definition [ref=f13e24]: 1050×700 → 1280×760 제안
+      - term [ref=f13e25]: 근거
+      - definition [ref=f13e26]:
+        - link "분석 보고서" [ref=f13e27] [cursor=pointer]:
+          - /url: ../analyses/window-layout-redesign-analysis.md
+      - term [ref=f13e28]: 서버 판
+      - definition [ref=f13e29]: v8.0.1 라이브 교체 완료(2026-09-18, 타 세션 문서 기준 — 확인 필요) · 화면은 계약 세대로 가림
+      - term [ref=f13e30]: 범위
+      - definition [ref=f13e31]: 맵 OverlayWindow 20종만 제외한 전 창 — 장비 · 이벤트 · 억제 · 계정 6 · 보고서 3 · 설정 9탭 · 서버(신설) · 부대(신설) · 다이얼로그 13 · 시스템 알림 5
+      - term [ref=f13e32]: API v8 판
+      - definition [ref=f13e33]:
+        - link "GOP v8 콘솔 재기획" [ref=f13e34] [cursor=pointer]:
+          - /url: gop-api-v8-console-wireframe.html
+        - text: — 장비 6축 · 부품 · 부대 콘솔 · WPF 매핑
+  - region [ref=f13e35]:
+    - generic [ref=f13e36]:
+      - heading "움직여 보는 장비 콘솔" [level=2] [ref=f13e37]
+      - paragraph [ref=f13e38]: 탭 전환 · 행 선택(Ctrl/Shift 다중) · 추가 · 필드 수정 · 경계 드래그
+    - generic [ref=f13e39]:
+      - generic [ref=f13e40]:
+        - text: 창 폭
+        - slider "창 폭" [ref=f13e41]: "1280"
+        - status [ref=f13e42]: 1280px
+      - generic [ref=f13e43]:
+        - checkbox "편집 권한 없는 계정으로 보기" [ref=f13e44]
+        - text: 편집 권한 없는 계정으로 보기
+      - generic [ref=f13e45]: 표 안의 장비·IP·좌표는 설명용 예시입니다.
+    - generic [ref=f13e47]:
+      - generic [ref=f13e48]:
+        - strong [ref=f13e50]: 장비 정보
+        - generic [ref=f13e51]: 카메라 · 12대
+        - generic [aria-hidden] [ref=f13e52]:
+          - generic [ref=f13e53]: ─
+          - generic [ref=f13e54]: ▢
+          - generic [ref=f13e55]: ✕
+      - generic [ref=f13e56]:
+        - complementary "장비 종류" [ref=f13e57]:
+          - navigation [ref=f13e58]
+          - generic [ref=f13e59]:
+            - generic [ref=f13e60]: 전체 0대
+            - generic [ref=f13e61]: 장애 0대
+        - generic [ref=f13e62]:
+          - generic [ref=f13e63]:
+            - button "추가" [ref=f13e64] [cursor=pointer]
+            - button "삭제" [ref=f13e67] [cursor=pointer]
+            - button "갱신" [ref=f13e68] [cursor=pointer]
+            - textbox [ref=f13e73]:
+              - /placeholder: 장비번호·이름 검색
+            - button "열 6/12" [ref=f13e74] [cursor=pointer]
+          - generic [ref=f13e75]:
+            - table:
+              - rowgroup
+              - rowgroup
+          - generic [ref=f13e76]:
+            - generic [ref=f13e77]: 총 0건
+            - generic [ref=f13e78]: 선택 0건
+            - generic [ref=f13e79]: 예시 데이터
+        - separator "상세 패널 폭" [ref=f13e80]
+        - complementary "선택 항목 상세" [ref=f13e81]
+    - paragraph [ref=f13e82]: 창 폭 1280px 이상이면 상세가 붙어 있고, 960–1279px이면 행을 누를 때 오른쪽에서 밀려 나오며, 960px 미만이면 레일이 아이콘으로 접힙니다. 경계선은 끌어서 300–480px 사이로 바꾸고, 더블클릭하면 340px로 돌아갑니다. 끄는 중 Esc는 원래 폭으로 되돌립니다.
+  - region [ref=f13e83]:
+    - generic [ref=f13e84]:
+      - heading "지금 장비 창이 답답한 이유" [level=2] [ref=f13e85]
+      - paragraph [ref=f13e86]: XAML 선언값을 같은 축척(×0.34)으로 그렸습니다
+    - generic [ref=f13e87]:
+      - generic [ref=f13e88]:
+        - heading "현행 1050 × 700 · DeviceDashboardView" [level=3] [ref=f13e89]:
+          - text: 현행
+          - generic [ref=f13e90]: 1050 × 700 · DeviceDashboardView
+        - generic [ref=f13e91]:
+          - generic [ref=f13e92]: 장비 정보
+          - generic [ref=f13e93]: 요약 카드 280↔ 선택 시 편집기가 덮음
+          - generic [ref=f13e94]: 레일100
+          - generic [ref=f13e95]: 추가 · 삭제 · 갱신 · 저장
+          - generic [ref=f13e96]: 목록 높이 260 고정
+          - generic [ref=f13e97]: "선택된 항목 : N"
+        - paragraph [ref=f13e99]: 점선이 카드 높이 700입니다. 헤더 44 + 여백 8 + 요약 280 + 탭 영역 390 + 아래 여백 20 = 742로 선언값 합이 카드를 넘습니다(실제 렌더 잘림 여부는 미확인).
+      - generic [ref=f13e100]:
+        - heading "제안 1280 × 760 · T1 콘솔" [level=3] [ref=f13e101]:
+          - text: 제안
+          - generic [ref=f13e102]: 1280 × 760 · T1 콘솔
+        - generic [ref=f13e103]:
+          - generic [ref=f13e104]: 장비 정보 · 카메라 12대
+          - generic [ref=f13e105]: 레일 184개수 배지
+          - generic [ref=f13e106]: 툴바 44
+          - generic [ref=f13e107]: 목록 — 창 높이 전부
+          - generic [ref=f13e109]: 상세340
+        - paragraph [ref=f13e110]: 목록 폭은 1280 − 184 − 340 = 756px. 1050px 창을 그대로 두면 526px로 핵심 열도 빠듯해 기본 크기를 올리는 쪽을 권합니다.
+    - list [ref=f13e111]:
+      - listitem [ref=f13e112]:
+        - generic [ref=f13e113]: D-1
+        - generic [ref=f13e114]:
+          - text: 행을 고르면 요약이 사라집니다.
+          - paragraph [ref=f13e115]:
+            - text: 편집기와 요약 카드가 같은 칸(
+            - code [ref=f13e116]: Grid.Row="0"
+            - text: )을
+            - code [ref=f13e117]: IsSelected
+            - text: 로 번갈아 씁니다 —
+            - code [ref=f13e118]: DeviceDashboardView.xaml:584
+            - text: .
+      - listitem [ref=f13e119]:
+        - generic [ref=f13e120]: D-2
+        - generic [ref=f13e121]:
+          - text: 목록이 약 7행에서 멈춥니다.
+          - paragraph [ref=f13e122]:
+            - code [ref=f13e123]: DataGrid Height="260"
+            - text: ", 레일"
+            - code [ref=f13e124]: Height="390"
+            - text: 고정이라 창을 키워도 늘지 않습니다.
+      - listitem [ref=f13e125]:
+        - generic [ref=f13e126]: D-3
+        - generic [ref=f13e127]:
+          - text: 편집기가 가로로 눌린 폼입니다.
+          - paragraph [ref=f13e128]: 20개 남짓한 필드가 자동 폭 6열 격자로 280px 높이에 흩어져 읽는 순서가 보이지 않습니다.
+      - listitem [ref=f13e129]:
+        - generic [ref=f13e130]: D-4
+        - generic [ref=f13e131]:
+          - text: 툴바가 복사본으로 번졌습니다.
+          - paragraph [ref=f13e132]:
+            - code [ref=f13e133]: "[250 | 1* | 1* | 70 · 10 · 70 …]"
+            - text: 골격이 장비 7종과 계정 관리에 반복됩니다.
+      - listitem [ref=f13e134]:
+        - generic [ref=f13e135]: D-5
+        - generic [ref=f13e136]:
+          - text: 여러 개를 한꺼번에 고칠 수 있다는 게 드러나지 않습니다.
+          - paragraph [ref=f13e137]:
+            - text: 편집기는 선택 목록(
+            - code [ref=f13e138]: IList
+            - text: )을 받는데, 화면에는 몇 개가 바뀌는지 표시가 없습니다.
+  - region [ref=f13e139]:
+    - generic [ref=f13e140]:
+      - heading "상세 패널이 가지는 여섯 상태" [level=2] [ref=f13e141]
+      - paragraph [ref=f13e142]: 누르면 위 콘솔이 그 상태로 열립니다
+    - generic [ref=f13e143]:
+      - generic [ref=f13e144]:
+        - strong [ref=f13e146]: 선택 없음
+        - generic [ref=f13e148]: 아무 행도 고르지 않았을 때
+        - paragraph [ref=f13e149]: 무엇을 하면 되는지 한 줄 안내와 이 종류의 정상·장애 수. 요약 카드를 없앤 대신 여기서 숫자를 봅니다.
+        - button "콘솔에서 보기" [ref=f13e150] [cursor=pointer]
+      - generic [ref=f13e151]:
+        - strong [ref=f13e153]: 한 개
+        - generic [ref=f13e155]: 행 하나를 골랐을 때
+        - paragraph [ref=f13e156]: 제목(장비명 · 장비번호)과 상태 배지 아래로 섹션이 계약 순서대로 펼쳐집니다.
+        - button "콘솔에서 보기" [ref=f13e157] [cursor=pointer]
+      - generic [ref=f13e158]:
+        - strong [ref=f13e160]: 여러 개
+        - generic [ref=f13e162]: Ctrl · Shift 로 여럿을 골랐을 때
+        - paragraph [ref=f13e163]: 값이 서로 다른 칸은 — 여러 값 —. 장비번호는 잠그고, 손댄 칸만 적용합니다.
+        - button "콘솔에서 보기" [ref=f13e164] [cursor=pointer]
+      - generic [ref=f13e165]:
+        - generic [ref=f13e166]:
+          - strong [ref=f13e167]: 새로 등록
+          - generic [ref=f13e168]: +
+        - generic [ref=f13e169]: 추가를 눌렀을 때
+        - paragraph [ref=f13e170]: 빈 폼과 필수 항목 안내. 다이얼로그를 따로 띄우지 않고 같은 자리에서 등록합니다.
+        - button "콘솔에서 보기" [ref=f13e171] [cursor=pointer]
+      - generic [ref=f13e172]:
+        - strong [ref=f13e174]: 미적용 변경
+        - generic [ref=f13e176]: 칸을 고치고 아직 적용 전
+        - paragraph [ref=f13e177]: 아래 막대가 경고색으로 바뀌고 건수를 보입니다. 이 상태로 다른 행을 누르면 이동을 막고 이유를 알립니다.
+        - button "콘솔에서 보기" [ref=f13e178] [cursor=pointer]
+      - generic [ref=f13e179]:
+        - strong [ref=f13e181]: 읽기 전용
+        - generic [ref=f13e183]: 편집 권한이 없을 때
+        - paragraph [ref=f13e184]: 칸은 잠기고 이유 한 줄. 추가·삭제도 비활성 + 툴팁 사유 — 아무 일도 안 일어나는 버튼은 두지 않습니다.
+        - button "콘솔에서 보기" [ref=f13e185] [cursor=pointer]
+  - region [ref=f13e186]:
+    - generic [ref=f13e187]:
+      - heading "자리는 오른쪽으로, 순서는 그대로" [level=2] [ref=f13e188]
+      - paragraph [ref=f13e189]: 편집기 6종의 실제 섹션 순서
+    - paragraph [ref=f13e190]: 속성창은 순서 자체가 정보라서 옮기면서 바꾸지 않습니다. 종류마다 다른 설정(함체 임계값 · 카메라 상세보기)은 늘 맨 아래입니다.
+    - generic [ref=f13e192]:
+      - generic [ref=f13e194]:
+        - generic [ref=f13e195]: "1"
+        - text: 장비 공통
+      - generic [ref=f13e196]:
+        - generic [ref=f13e197]: "2"
+        - text: 장비별 속성
+      - generic [ref=f13e198]:
+        - generic [ref=f13e199]: "3"
+        - text: 위치 정보
+      - generic [ref=f13e200]:
+        - generic [ref=f13e201]: "4"
+        - text: 그룹
+      - generic [ref=f13e202]:
+        - generic [ref=f13e203]: "5"
+        - text: 부가
+      - generic [ref=f13e204]: 제어기
+      - generic [ref=f13e205]: 장비번호 · 이름 · 유형 · 버전 · 활성화 · 상태
+      - generic [ref=f13e206]: IP · 포트
+      - generic [ref=f13e207]: 위치 · 위도 · 경도 · 고도 · 방위각
+      - generic [ref=f13e208]: 그룹
+      - generic [ref=f13e209]: —
+      - generic [ref=f13e210]: 센서
+      - generic [ref=f13e211]: 같음
+      - generic [ref=f13e212]: 제어기
+      - generic [ref=f13e213]: 같음
+      - generic [ref=f13e214]: 같음
+      - generic [ref=f13e215]: —
+      - generic [ref=f13e216]: 카메라
+      - generic [ref=f13e217]: 같음
+      - generic [ref=f13e218]: IP · 포트 · 사용자명 · 비밀번호 · 모드 · 분류 · 녹화
+      - generic [ref=f13e219]: 같음
+      - generic [ref=f13e220]: 같음
+      - generic [ref=f13e221]: 상세보기
+      - generic [ref=f13e222]: 스피커
+      - generic [ref=f13e223]: 같음
+      - generic [ref=f13e224]: 유형 · 설명 · 방송서버
+      - generic [ref=f13e225]: 같음
+      - generic [ref=f13e226]: 같음
+      - generic [ref=f13e227]: —
+      - generic [ref=f13e228]: 함체
+      - generic [ref=f13e229]: 같음
+      - generic [ref=f13e230]: 도어 · 히터 · 팬
+      - generic [ref=f13e231]: 같음
+      - generic [ref=f13e232]: 같음
+      - generic [ref=f13e233]: 임계값
+      - generic [ref=f13e234]: 경광등
+      - generic [ref=f13e235]: 같음
+      - generic [ref=f13e236]: IP · 포트 · 사용자 · 비밀번호 · 설명
+      - generic [ref=f13e237]: 같음
+      - generic [ref=f13e238]: 같음
+      - generic [ref=f13e239]: —
+  - region [ref=f13e240]:
+    - generic [ref=f13e241]:
+      - heading "목록에 남기는 열" [level=2] [ref=f13e242]
+      - paragraph [ref=f13e243]: 나머지는 상세 패널과 ‘열’ 메뉴로
+    - table [ref=f13e245]:
+      - rowgroup [ref=f13e246]:
+        - row [ref=f13e247]:
+          - columnheader "종류" [ref=f13e248]
+          - columnheader "실제 열 수" [ref=f13e249]
+          - columnheader "목록 기본" [ref=f13e250]
+          - columnheader "상세 패널로" [ref=f13e251]
+      - rowgroup [ref=f13e252]:
+        - row [ref=f13e253]:
+          - cell "카메라" [ref=f13e254]
+          - cell "12" [ref=f13e255]
+          - cell "상태 · 장비번호 · 장비명 · 유형 · IP:포트 · 활성화" [ref=f13e256]
+          - cell "모드 · 카테고리 · 녹화 · 위치" [ref=f13e257]
+        - row [ref=f13e258]:
+          - cell "센서" [ref=f13e259]
+          - cell "9" [ref=f13e260]
+          - cell "상태 · 장비번호 · 장비명 · 유형 · 제어기 · 활성화" [ref=f13e261]
+          - cell "위치 · 탐지 이력(행 동작으로)" [ref=f13e262]
+        - row [ref=f13e263]:
+          - cell "제어기 · 경광등" [ref=f13e264]
+          - cell "9" [ref=f13e265]
+          - cell "상태 · 장비번호 · 장비명 · 유형 · IP:포트 · 활성화" [ref=f13e266]
+          - cell "위치" [ref=f13e267]
+        - row [ref=f13e268]:
+          - cell "스피커" [ref=f13e269]
+          - cell "9" [ref=f13e270]
+          - cell "상태 · 장비번호 · 장비명 · 스피커 종류 · 방송서버 · 활성화" [ref=f13e271]
+          - cell "위치" [ref=f13e272]
+        - row [ref=f13e273]:
+          - cell "함체" [ref=f13e274]
+          - cell "10" [ref=f13e275]
+          - cell "상태 · 장비번호 · 장비명 · 도어 · 히터·팬 · 활성화" [ref=f13e276]
+          - cell "위치" [ref=f13e277]
+        - row [ref=f13e278]:
+          - cell "장비 그룹" [ref=f13e279]
+          - cell "5" [ref=f13e280]
+          - cell "이름 · 설명 · 장비수" [ref=f13e281]
+          - cell "그룹 탐지 이력(행 동작으로)" [ref=f13e282]
+    - paragraph [ref=f13e283]:
+      - text: IP와 포트는 한 칸
+      - code [ref=f13e284]: 10.20.4.12:554
+      - text: 으로 합칩니다. 창을 넓히면 ‘열’ 메뉴에서 전부 되살릴 수 있고, 사용자별로 기억합니다.
+  - region [ref=f13e285]:
+    - generic [ref=f13e286]:
+      - heading "창 폭에 따라 접힌다" [level=2] [ref=f13e287]
+      - paragraph [ref=f13e288]: 창은 이제 끌어서 크기를 바꿀 수 있습니다 (Surface Kernel)
+    - generic [ref=f13e289]:
+      - generic [ref=f13e290]:
+        - term [ref=f13e291]: 1280px 이상
+        - definition [ref=f13e292]:
+          - paragraph [ref=f13e297]: 세 칸이 나란히 붙습니다. 경계는 300–480px로 조절.
+      - generic [ref=f13e298]:
+        - term [ref=f13e299]: 960 – 1279px
+        - definition [ref=f13e300]:
+          - paragraph [ref=f13e305]: 상세는 행을 누를 때 오른쪽에서 밀려 나와 목록 위에 겹칩니다.
+      - generic [ref=f13e306]:
+        - term [ref=f13e307]: 960px 미만
+        - definition [ref=f13e308]:
+          - paragraph [ref=f13e313]: 레일이 아이콘 56px로 접히고, 상세는 서랍 그대로.
+    - paragraph [ref=f13e314]:
+      - text: 판정은
+      - code [ref=f13e315]: ConsoleLayoutMath.Resolve(width)
+      - text: 한 곳에서 합니다 — 화면 없이 단위 테스트할 수 있게.
+  - region [ref=f13e316]:
+    - generic [ref=f13e317]:
+      - heading "이벤트 콘솔 — 같은 틀, 오른쪽 칸만 다르다" [level=2] [ref=f13e318]
+      - paragraph [ref=f13e319]: 개요 차트 네 장 · 탐지를 골라 판정 수정과 조치보고 · 우클릭 조치내역 · 억제 스케줄 서랍
+    - paragraph [ref=f13e320]: 지금 이벤트 창도 장비 창과 같은 결함을 갖고 있습니다 — 행을 고르면 편집기(높이 265)가 위쪽 요약 차트(높이 200)와 같은 칸을 차지해 차트가 사라지고, 목록은 260~280px에 갇혀 있습니다. 위쪽 ‘센서 이벤트 / 카메라 이벤트’ 탭의 제어기별 막대 · 유형별 파이 · 카메라 탐지 KPI와 레일 ‘차트보기’의 시간대 추이는 하나도 버리지 않고 레일의 개요 한 화면에 모읍니다. 카메라 탐지는 따로 떨어진 탭이 아니라 탐지의 두 번째 출처로 — 같은 색 계열의 주황 + 빗금(추이는 점선) — 도넛 · 장비별 막대 · 추이 · 탐지 목록에 똑같이 들어갑니다.
+    - generic [ref=f13e321]:
+      - generic [ref=f13e322]:
+        - checkbox "이벤트 수정 · 조치 권한 없는 계정으로 보기" [ref=f13e323]
+        - text: 이벤트 수정 · 조치 권한 없는 계정으로 보기
+      - generic [ref=f13e324]: 개요의 막대 · 도넛 · 추이에 마우스를 올려 보세요 · 탐지 행 우클릭 → 조치내역 보기 · 상세 칸의 상자는 고칠 수 있는 칸입니다. 수치와 장비는 예시입니다.
+    - generic [ref=f13e326]:
+      - generic [ref=f13e327]:
+        - strong [ref=f13e329]: 이벤트
+        - generic [ref=f13e330]: 개요 · 24시간
+        - generic [aria-hidden] [ref=f13e331]:
+          - generic [ref=f13e332]: ─
+          - generic [ref=f13e333]: ▢
+          - generic [ref=f13e334]: ✕
+      - generic [ref=f13e335]:
+        - complementary "이벤트 종류" [ref=f13e336]:
+          - navigation [ref=f13e337]:
+            - button "개요" [ref=f13e338] [cursor=pointer]
+            - button "탐지 ▲11" [ref=f13e342] [cursor=pointer]:
+              - generic [ref=f13e346]: 탐지
+              - generic [ref=f13e347]: ▲11
+            - button "장애 ▲1" [ref=f13e348] [cursor=pointer]:
+              - generic [ref=f13e351]: 장애
+              - generic [ref=f13e352]: ▲1
+            - button "연결" [ref=f13e353] [cursor=pointer]
+            - button "조치" [ref=f13e357] [cursor=pointer]
+            - button "운영 ▲5" [ref=f13e362] [cursor=pointer]:
+              - generic [ref=f13e366]: 운영
+              - generic [ref=f13e367]: ▲5
+            - button "억제 스케줄 1" [ref=f13e369] [cursor=pointer]:
+              - generic [ref=f13e373]: 억제 스케줄
+              - generic [ref=f13e374]: "1"
+          - generic [ref=f13e375]:
+            - generic [ref=f13e376]: 미조치 12건
+            - generic [ref=f13e377]: 장애 진행 1건
+        - generic [ref=f13e378]:
+          - generic [ref=f13e379]:
+            - group "기간" [ref=f13e380]:
+              - button "오늘" [ref=f13e381] [cursor=pointer]
+              - button "24시간" [pressed] [ref=f13e382] [cursor=pointer]
+              - button "7일" [ref=f13e383] [cursor=pointer]
+              - button "직접" [ref=f13e384] [cursor=pointer]
+            - generic [ref=f13e385]:
+              - group "탐지 출처" [ref=f13e386]:
+                - emphasis [ref=f13e387]: 탐지
+                - button "센서" [pressed] [ref=f13e388] [cursor=pointer]
+                - button "카메라" [pressed] [ref=f13e389] [cursor=pointer]
+              - button "사전 경보" [pressed] [ref=f13e390] [cursor=pointer]
+              - button "장애" [pressed] [ref=f13e391] [cursor=pointer]
+              - button "연결" [pressed] [ref=f13e392] [cursor=pointer]
+              - button "조치" [pressed] [ref=f13e393] [cursor=pointer]
+              - button "운영" [pressed] [ref=f13e394] [cursor=pointer]
+          - generic [ref=f13e396]:
+            - generic [ref=f13e397]:
+              - generic [ref=f13e398]:
+                - generic [ref=f13e399]: 총 이벤트 · 09-13 12:10 ~ 09-14 12:10
+                - generic [ref=f13e400]: "267"
+                - emphasis [ref=f13e401]: 건 · 1일
+              - generic [ref=f13e402]:
+                - generic [ref=f13e403]:
+                  - term [ref=f13e404]: 활성 센서
+                  - definition [ref=f13e405]: "50"
+                - generic [ref=f13e406]:
+                  - term [ref=f13e407]: 활성 카메라
+                  - definition [ref=f13e408]: "7"
+                - generic [ref=f13e409]:
+                  - term [ref=f13e410]: 활성 제어기
+                  - definition [ref=f13e411]: "6"
+            - paragraph [ref=f13e412]:
+              - text: 총계는 6종 합(센서 탐지 + 카메라 탐지 + 사전 경보 + 장애 + 연결 + 조치)입니다 — 운영 27건은 총계에서 빠집니다(서버 규칙). 조회 기간 1일 ·
+              - code [ref=f13e413]: days_in_range
+              - text: .
+            - generic [ref=f13e414]:
+              - article [ref=f13e415]:
+                - generic [ref=f13e416]:
+                  - heading "유형별 비중" [level=4] [ref=f13e417]
+                  - generic [ref=f13e418]: summary
+                - generic [ref=f13e419]:
+                  - img "유형별 이벤트 비중 — 탐지는 센서와 카메라로 나뉨" [ref=f13e420]:
+                    - generic [ref=f13e422] [cursor=pointer]
+                    - generic [ref=f13e423] [cursor=pointer]
+                    - generic [ref=f13e424] [cursor=pointer]
+                    - generic [ref=f13e425] [cursor=pointer]
+                    - generic [ref=f13e426] [cursor=pointer]
+                    - generic [ref=f13e427] [cursor=pointer]
+                    - generic [ref=f13e429]: "267"
+                    - generic [ref=f13e430]: 총계 6종
+                  - generic [ref=f13e431]:
+                    - generic [ref=f13e432]:
+                      - generic [ref=f13e434]: 침입 탐지
+                      - generic [ref=f13e435]: "162"
+                      - emphasis [ref=f13e436]: 61%
+                    - button "센서 128 48%" [pressed] [ref=f13e437] [cursor=pointer]:
+                      - generic [ref=f13e439]: 센서
+                      - generic [ref=f13e440]: "128"
+                      - emphasis [ref=f13e441]: 48%
+                    - button "카메라 34 13%" [pressed] [ref=f13e442] [cursor=pointer]:
+                      - generic [ref=f13e444]: 카메라
+                      - generic [ref=f13e445]: "34"
+                      - emphasis [ref=f13e446]: 13%
+                    - button "사전 경보 19 7%" [pressed] [ref=f13e447] [cursor=pointer]:
+                      - generic [ref=f13e449]: 사전 경보
+                      - generic [ref=f13e450]: "19"
+                      - emphasis [ref=f13e451]: 7%
+                    - button "장애 9 3%" [pressed] [ref=f13e452] [cursor=pointer]:
+                      - generic [ref=f13e454]: 장애
+                      - generic [ref=f13e455]: "9"
+                      - emphasis [ref=f13e456]: 3%
+                    - button "연결 21 8%" [pressed] [ref=f13e457] [cursor=pointer]:
+                      - generic [ref=f13e459]: 연결
+                      - generic [ref=f13e460]: "21"
+                      - emphasis [ref=f13e461]: 8%
+                    - button "조치 56 21%" [pressed] [ref=f13e462] [cursor=pointer]:
+                      - generic [ref=f13e464]: 조치
+                      - generic [ref=f13e465]: "56"
+                      - emphasis [ref=f13e466]: 21%
+                    - button "운영 27 제외" [pressed] [ref=f13e468] [cursor=pointer]:
+                      - generic [ref=f13e470]: 운영
+                      - generic [ref=f13e471]: "27"
+                      - emphasis [ref=f13e472]: 제외
+                - generic [ref=f13e473]:
+                  - generic [ref=f13e474]:
+                    - text: 일평균
+                    - code [ref=f13e475]: daily_averages
+                  - generic [ref=f13e476]: 센서 탐지 128.0
+                  - generic [ref=f13e477]: 카메라 탐지 34.0
+                  - generic [ref=f13e478]: 사전 경보 19.0
+                  - generic [ref=f13e479]: 장애 9.0
+                  - generic [ref=f13e480]: 연결 21.0
+                  - generic [ref=f13e481]: 조치 56.0
+                  - generic [ref=f13e482]: 운영 27.0
+              - article [ref=f13e483]:
+                - generic [ref=f13e484]:
+                  - heading "장비별 이벤트" [level=4] [ref=f13e485]
+                  - generic [ref=f13e486]: by-device · controllers
+                  - tablist "장비 묶음" [ref=f13e487]:
+                    - tab [selected] [ref=f13e488] [cursor=pointer]:
+                      - text: 제어기
+                      - emphasis [ref=f13e489]: "6"
+                    - tab [ref=f13e490] [cursor=pointer]:
+                      - text: 카메라
+                      - emphasis [ref=f13e491]: "7"
+                    - tab [ref=f13e492] [cursor=pointer]:
+                      - text: 함체
+                      - emphasis [ref=f13e493]: "4"
+                    - tab [ref=f13e494] [cursor=pointer]:
+                      - text: 통문
+                      - emphasis [ref=f13e495]: "3"
+                - generic [ref=f13e496]:
+                  - button "북측 제어기 B 합계 82건" [ref=f13e497] [cursor=pointer]:
+                    - generic [ref=f13e498]:
+                      - generic [ref=f13e499]: 북측 제어기 B
+                      - generic [ref=f13e500]: CTL-0103
+                    - generic [ref=f13e507]: "82"
+                  - button "탄약고 제어기 합계 42건" [ref=f13e508] [cursor=pointer]:
+                    - generic [ref=f13e509]:
+                      - generic [ref=f13e510]: 탄약고 제어기
+                      - generic [ref=f13e511]: CTL-0104
+                    - generic [ref=f13e518]: "42"
+                  - button "북측 제어기 A 합계 41건" [ref=f13e519] [cursor=pointer]:
+                    - generic [ref=f13e520]:
+                      - generic [ref=f13e521]: 북측 제어기 A
+                      - generic [ref=f13e522]: CTL-0102
+                    - generic [ref=f13e529]: "41"
+                  - button "정문 제어기 합계 29건" [ref=f13e530] [cursor=pointer]:
+                    - generic [ref=f13e531]:
+                      - generic [ref=f13e532]: 정문 제어기
+                      - generic [ref=f13e533]: CTL-0101
+                    - generic [ref=f13e540]: "29"
+                  - button "남측 제어기 합계 19건" [ref=f13e541] [cursor=pointer]:
+                    - generic [ref=f13e542]:
+                      - generic [ref=f13e543]: 남측 제어기
+                      - generic [ref=f13e544]: CTL-0105
+                    - generic [ref=f13e551]: "19"
+                  - button "서측 제어기 합계 12건" [ref=f13e552] [cursor=pointer]:
+                    - generic [ref=f13e553]:
+                      - generic [ref=f13e554]: 서측 제어기
+                      - generic [ref=f13e555]: CTL-0106
+                    - generic [ref=f13e561]: "12"
+                - generic [ref=f13e564]:
+                  - generic [ref=f13e565]: "0"
+                  - generic [ref=f13e566]: "50"
+                  - generic [ref=f13e567]: "100"
+                - paragraph [ref=f13e569]: 제어기 막대의 탐지는 센서 탐지만 — 카메라 탐지는 제어기에 속하지 않아 카메라 탭에서 봅니다 · 막대를 누르면 그 장비의 내역
+              - article [ref=f13e570]:
+                - generic [ref=f13e571]:
+                  - heading "시간대별 추이" [level=4] [ref=f13e572]
+                  - generic [ref=f13e573]: trend · 1시간 단위
+                  - generic [ref=f13e574]: 모양으로 구분 — 카메라 파선 · 사전 경보 점선 · 운영 일점쇄선 · 앱에서는 휠로 확대
+                - img "시간대별 이벤트 추이" [ref=f13e576]:
+                  - generic [ref=f13e577]: "0"
+                  - generic [ref=f13e578]: "5"
+                  - generic [ref=f13e579]: "10"
+                  - generic [ref=f13e580]: 13시
+                  - generic [ref=f13e581]: 19시
+                  - generic [ref=f13e582]: 01시
+                  - generic [ref=f13e583]: 07시
+              - article [ref=f13e599]:
+                - generic [ref=f13e600]:
+                  - heading "탐지 출처" [level=4] [ref=f13e601]
+                  - generic [ref=f13e602]: summary · 센서 · 카메라 · 사전 경보
+                - group "탐지 출처 비율" [ref=f13e603]:
+                  - button "센서 탐지 128건 — 내역 보기" [ref=f13e604] [cursor=pointer]
+                  - button "카메라 탐지 34건 — 내역 보기" [ref=f13e605] [cursor=pointer]
+                  - button "사전 경보 19건 — 내역 보기" [ref=f13e606] [cursor=pointer]
+                - generic [ref=f13e607]:
+                  - generic [ref=f13e608]: 센서 71%
+                  - generic [ref=f13e609]: 카메라 19%
+                  - generic [ref=f13e610]: 사전 경보 10%
+                - generic [ref=f13e611]:
+                  - generic [ref=f13e613]: 센서
+                  - generic [ref=f13e615]: 카메라
+                  - generic [ref=f13e617]: 사전 경보
+                  - generic [ref=f13e619]: 총 건수
+                  - generic [ref=f13e620]: "128"
+                  - generic [ref=f13e621]: "34"
+                  - generic [ref=f13e622]: "19"
+                  - generic [ref=f13e623]: 일평균
+                  - generic [ref=f13e624]: "128.0"
+                  - generic [ref=f13e625]: "34.0"
+                  - generic [ref=f13e626]: "19.0"
+                  - generic [ref=f13e627]: 활성 장비
+                  - generic [ref=f13e628]: "50"
+                  - generic [ref=f13e629]: "7"
+                  - generic [ref=f13e630]: —
+                - paragraph [ref=f13e631]:
+                  - text: 사전 경보는
+                  - code [ref=f13e632]: type_event="Alert"
+                  - text: — 침입 집계(
+                  - code [ref=f13e633]: sensor_detection
+                  - text: ·
+                  - code [ref=f13e634]: camera_detection
+                  - text: )에서 빠집니다. 수단은 복합(
+                  - code [ref=f13e635]: RADAR_DETECT
+                  - text: ·
+                  - code [ref=f13e636]: AI_DETECT
+                  - text: ·
+                  - code [ref=f13e637]: DISTANCE_SENSOR
+                  - text: ).
+                - generic [ref=f13e638]:
+                  - generic [ref=f13e639]:
+                    - heading "카메라 AI 객체" [level=4] [ref=f13e640]
+                    - generic "서버 요약에 객체 분류 집계가 없어 필드 추가가 필요합니다" [ref=f13e641]: 제안
+                  - list [ref=f13e646]:
+                    - listitem [ref=f13e647]: 사람21
+                    - listitem [ref=f13e649]: 차량10
+                    - listitem [ref=f13e651]: 동물3
+            - generic [ref=f13e653]:
+              - generic [ref=f13e654]: 미조치가 몰린 구역
+              - button "북측 7구간 · 3" [ref=f13e655] [cursor=pointer]
+              - button "남문 게이트 · 2" [ref=f13e656] [cursor=pointer]
+              - button "탄약고 동측 · 2" [ref=f13e657] [cursor=pointer]
+              - button "북측 3구간 · 2" [ref=f13e658] [cursor=pointer]
+              - button "정문 초소 · 1" [ref=f13e659] [cursor=pointer]
+              - generic [ref=f13e660]: 불러온 목록 기준
+          - generic [ref=f13e661]:
+            - generic [ref=f13e662]: 불러온 44건
+            - generic [ref=f13e663]: 선택 0건
+            - generic [ref=f13e664]: 서버 요약 기준 · 올리면 값, 누르면 그 내역으로 · 예시 수치
+    - paragraph [ref=f13e665]: 조치보고 · 조치 내역 창은 Float라 뒤를 어둡게 막지 않습니다 — 머리를 끌어 옮기면서 목록 · 지도를 계속 볼 수 있습니다. 탐지 신호 이력은 확정대로 팝업 다이얼로그이고, 억제 스케줄의 두 칸 폼은 오른쪽 칸에 들어가지 않아 같은 창 안의 780px 서랍으로 엽니다.
+  - region [ref=f13e666]:
+    - generic [ref=f13e667]:
+      - heading "이벤트 창이 가는 곳" [level=2] [ref=f13e668]
+      - paragraph [ref=f13e669]: 틀은 모양, 호스팅은 띄우는 방식 — 둘은 따로 정합니다
+    - table [ref=f13e671]:
+      - rowgroup [ref=f13e672]:
+        - row [ref=f13e673]:
+          - columnheader "창" [ref=f13e674]
+          - columnheader "지금" [ref=f13e675]
+          - columnheader "틀" [ref=f13e676]
+          - columnheader "호스팅" [ref=f13e677]
+          - columnheader "이미 확정돼 지키는 것" [ref=f13e678]
+      - rowgroup [ref=f13e679]:
+        - row [ref=f13e680]:
+          - cell "이벤트 대시보드" [ref=f13e681]
+          - cell "요약 탭 200 ↔ 편집기 265 같은 칸 · 기간 바 · 레일 5" [ref=f13e682]
+          - cell "T1" [ref=f13e683]
+          - cell "Float" [ref=f13e685]
+          - cell "CRUD B모델(추가·삭제 즉시, 저장=수정)" [ref=f13e686]
+        - row [ref=f13e687]:
+          - cell "요약 탭 2종 + 차트보기" [ref=f13e688]
+          - cell "센서 이벤트 = 제어기별 막대 + 유형 파이 · 카메라 이벤트 = KPI 3 · 차트보기 = 시간대 추이 라인 5계열" [ref=f13e689]
+          - cell "T3" [ref=f13e690]
+          - cell "콘솔 ‘개요’" [ref=f13e692]
+          - cell "계열 켜고 끄기 · 차트 휠 확대 · 불러오는 중 표시 · 카메라 KPI 3(총 탐지 · 일평균 · 활성 카메라)" [ref=f13e693]
+        - row [ref=f13e694]:
+          - cell "탐지 · 장애 · 연결 · 조치 내역" [ref=f13e695]
+          - cell "목록 260–280 고정 · 무한 스크롤 · 우클릭 ‘조치보고’ 하나" [ref=f13e696]
+          - cell "T1" [ref=f13e697]
+          - cell "콘솔 탭" [ref=f13e699]
+          - cell "무한 스크롤 유지 — 드래그 정렬 없음 · 썸네일 열" [ref=f13e700]
+        - row [ref=f13e701]:
+          - cell "실시간 드로어" [ref=f13e702]
+          - cell "카드 목록 · 일괄 버튼(툴팁 ‘전체 조치보고’ + 휴지통 아이콘)" [ref=f13e703]
+          - cell "그대로" [ref=f13e704]
+          - cell "셸 우측" [ref=f13e705]
+          - cell "카드 220×200 · 뒤집기 · 56×56 사진 칸 · 자동 조치 타이머는 범위 밖" [ref=f13e706]
+        - row [ref=f13e707]:
+          - cell "조치보고 (탐지 / 장애)" [ref=f13e708]
+          - cell "원본 요약 + 문구 라디오 + 기타 + 메모" [ref=f13e709]
+          - cell "T4 · M 560" [ref=f13e710]
+          - cell "Float" [ref=f13e712]
+          - cell "원본 썸네일 150×110 · 문구 0개면 빈 목록 + 직접 입력 · 중복 조치 허용" [ref=f13e713]
+        - row [ref=f13e714]:
+          - cell "조치 내역 (신규)" [ref=f13e715]
+          - cell "없음 — 조회 API만 있고 화면이 없다" [ref=f13e716]
+          - cell "T4 · M 560" [ref=f13e717]
+          - cell "Float" [ref=f13e719]
+          - cell "조치보고 창과 같은 창 · 원본 1건 → 조치 N건 타임라인" [ref=f13e720]
+        - row [ref=f13e721]:
+          - cell "조치보고 문구 관리" [ref=f13e722]
+          - cell "승인 PRD 840×640 · 드래그 정렬" [ref=f13e723]
+          - cell "PRD 그대로" [ref=f13e724]
+          - cell "모달" [ref=f13e725]
+          - cell "순서 저장은 단일 요청 한 번" [ref=f13e726]
+        - row [ref=f13e727]:
+          - cell "탐지 신호 이력" [ref=f13e728]
+          - cell "필터 · 통계 칩 · 차트 · 목록" [ref=f13e729]
+          - cell "T3 · L 880" [ref=f13e730]
+          - cell "모달" [ref=f13e732]
+          - cell "진입 = 우클릭 2종 · 컨테이너 = 팝업 다이얼로그" [ref=f13e733]
+        - row [ref=f13e734]:
+          - cell "억제 스케줄" [ref=f13e735]
+          - cell "폼이 위(408 + 356) · 목록이 아래" [ref=f13e736]
+          - cell "T1 + 서랍" [ref=f13e737]:
+            - generic [ref=f13e738]: T1
+            - text: + 서랍
+          - cell "콘솔 탭" [ref=f13e739]
+          - cell "폼은 목록과 같은 패널 안 · 반복 요약 문구 · 박스형 32px 입력" [ref=f13e740]
+  - region [ref=f13e741]:
+    - generic [ref=f13e742]:
+      - heading "지금 들어온 것은 드로어, 지나간 것은 콘솔" [level=2] [ref=f13e743]
+      - paragraph [ref=f13e744]: 카드 내부는 확정 설계(v3) 그대로
+    - generic [ref=f13e745]:
+      - generic "실시간 드로어 예시" [ref=f13e746]:
+        - generic [ref=f13e747]:
+          - text: 이벤트
+          - generic [ref=f13e748]: "3"
+          - generic "전체 조치보고" [ref=f13e749]: ✓
+        - generic [ref=f13e750]:
+          - generic [ref=f13e752] [cursor=pointer]:
+            - generic [ref=f13e753]:
+              - generic [ref=f13e754]:
+                - button "뒤집기" [ref=f13e755]
+                - generic [ref=f13e761]: 탐지 이벤트
+              - generic [ref=f13e762]:
+                - paragraph [ref=f13e763]: 북측 7구간 - SEN-1107
+                - generic [ref=f13e764]:
+                  - button "탐지 스냅샷 크게 보기" [ref=f13e765]
+                  - generic [ref=f13e768]:
+                    - generic [ref=f13e769]: (침입)
+                    - generic [ref=f13e770]: 1,840
+              - generic [ref=f13e773]:
+                - button "조치보고" [ref=f13e774]
+                - generic [ref=f13e777]: 2026-09-14 12:04:11
+            - generic [ref=f13e778]:
+              - generic [ref=f13e779]:
+                - button "앞면으로" [ref=f13e780]
+                - generic [ref=f13e783]: 상세
+              - generic [ref=f13e784]:
+                - term [ref=f13e785]: 제어기
+                - definition [ref=f13e786]: CTL-0103
+                - term [ref=f13e787]: 센서
+                - definition [ref=f13e788]: SEN-1107
+                - term [ref=f13e789]: 결과
+                - definition [ref=f13e790]: 침입
+                - term [ref=f13e791]: 신호
+                - definition [ref=f13e792]: 1,840
+                - term [ref=f13e793]: 시간
+                - definition [ref=f13e794]: 12:04:11
+              - link "기록에서 보기" [ref=f13e796]:
+                - /url: "#events"
+          - generic [ref=f13e798] [cursor=pointer]:
+            - generic [ref=f13e799]:
+              - generic [ref=f13e800]:
+                - button "뒤집기" [ref=f13e801]
+                - generic [ref=f13e807]: 탐지 이벤트
+              - generic [ref=f13e808]:
+                - paragraph [ref=f13e809]: 탄약고 동측 - SEN-2201
+                - generic [ref=f13e810]:
+                  - button "사진 도착 전 — 눌러서 도착 흉내" [ref=f13e811]
+                  - generic [ref=f13e816]:
+                    - generic [ref=f13e817]: (침입)
+                    - generic [ref=f13e818]: 2,310
+              - generic [ref=f13e821]:
+                - button "조치보고" [ref=f13e822]
+                - generic [ref=f13e825]: 2026-09-14 11:12:55
+            - generic [ref=f13e826]:
+              - generic [ref=f13e827]:
+                - button "앞면으로" [ref=f13e828]
+                - generic [ref=f13e831]: 상세
+              - generic [ref=f13e832]:
+                - term [ref=f13e833]: 제어기
+                - definition [ref=f13e834]: CTL-0104
+                - term [ref=f13e835]: 센서
+                - definition [ref=f13e836]: SEN-2201
+                - term [ref=f13e837]: 결과
+                - definition [ref=f13e838]: 침입
+                - term [ref=f13e839]: 신호
+                - definition [ref=f13e840]: 2,310
+                - term [ref=f13e841]: 시간
+                - definition [ref=f13e842]: 11:12:55
+              - link "기록에서 보기" [ref=f13e844]:
+                - /url: "#events"
+          - generic [ref=f13e846] [cursor=pointer]:
+            - generic [ref=f13e847]:
+              - generic [ref=f13e848]:
+                - button "뒤집기" [ref=f13e849]
+                - generic [ref=f13e854]: 장애 이벤트
+              - generic [ref=f13e855]:
+                - paragraph [ref=f13e856]: 북측 7구간 - SEN-1107
+                - generic [ref=f13e857]:
+                  - generic "사진 미제공" [ref=f13e858]
+                  - generic [ref=f13e863]:
+                    - generic [ref=f13e864]: 장애
+                    - emphasis [ref=f13e865]: 사진 미제공
+              - generic [ref=f13e866]:
+                - button "조치보고" [ref=f13e867]
+                - generic [ref=f13e870]: 2026-09-14 11:52:30
+            - generic [ref=f13e871]:
+              - generic [ref=f13e872]:
+                - button "앞면으로" [ref=f13e873]
+                - generic [ref=f13e876]: 상세
+              - generic [ref=f13e877]:
+                - term [ref=f13e878]: 제어기
+                - definition [ref=f13e879]: CTL-0103
+                - term [ref=f13e880]: 센서
+                - definition [ref=f13e881]: SEN-1107
+                - term [ref=f13e882]: 장애원인
+                - definition [ref=f13e883]: 케이블 절단
+                - term [ref=f13e884]: 이벤트 시간
+                - definition [ref=f13e885]: 11:52:30
+              - link "기록에서 보기" [ref=f13e887]:
+                - /url: "#events"
+      - generic [ref=f13e888]:
+        - generic [ref=f13e889]:
+          - term [ref=f13e890]: 역할
+          - definition [ref=f13e891]: 드로어는 대응 대기열, 콘솔은 기록 · 조치 · 통계입니다. 같은 이벤트를 두 곳에서 다른 목적으로 봅니다.
+        - generic [ref=f13e892]:
+          - term [ref=f13e893]: 탐지 스냅샷
+          - definition [ref=f13e894]: 탐지 카드 둘째 줄의 56×56 사진 칸은 자리가 고정돼 있고, 사진이 늦게 도착하면 칸 안의 그림만 바뀝니다(구역·장비 줄과 결과·신호 위치는 그대로). 왼쪽 두 번째 카드의 빈 사진 칸을 눌러 도착을 흉내 내 보세요. 장애 카드는 같은 칸에 기본 그림 + ‘사진 미제공’. 콘솔 목록의 스냅샷 열 · 상세 · 조치 창이 같은 사진을 씁니다.
+        - generic [ref=f13e895]:
+          - term [ref=f13e896]: 잇는 길
+          - definition [ref=f13e897]: 카드를 누르면 뒤집히고, 뒷면에 기록에서 보기가 콘솔을 그 행이 선택된 상태로 엽니다. 카드 우클릭에는 조치보고 · 조치내역 보기 · 기록에서 보기가 뜹니다.
+        - generic [ref=f13e898]:
+          - term [ref=f13e899]: 일괄 버튼
+          - definition [ref=f13e900]: 지금 버튼은 툴팁이 ‘전체 조치보고’인데 아이콘이 휴지통입니다(같은 버튼 블록 안, 렌더 미확인). 조치를 뜻하는 아이콘으로 바꿉니다.
+        - generic [ref=f13e901]:
+          - term [ref=f13e902]: 건드리지 않는 것
+          - definition [ref=f13e903]: 카드 내부 구성, 그리고 자동 조치보고 타이머. 두 갈래 경로가 겹쳐 있는 부분이라 별도 기획 없이 손대지 않습니다.
+  - region [ref=f13e904]:
+    - generic [ref=f13e905]:
+      - heading "발생 기록은 고치지 않고, 판정만 고치고, 대응은 쌓는다" [level=2] [ref=f13e906]
+      - paragraph [ref=f13e907]: 이벤트 속성 편집 경계 · 조치보고 1건 → N건
+    - paragraph [ref=f13e908]: 이벤트는 일어난 사실의 기록입니다. 센서가 잰 신호, 발생 시각, 장비는 사람이 고치면 기록이 아니게 됩니다. 사람이 고칠 수 있는 것은 판정(침입인지 오탐인지, 장애 사유)뿐이고, 대응은 고치는 대신 조치보고를 한 건 더 쌓습니다. 지금 앱은 이 경계가 새고 있습니다 — 저장해도 서버에 가지 않는 칸, 측정값을 고칠 수 있는 칸, 작성자를 바꿀 수 있는 칸이 있습니다.
+    - table [ref=f13e910]:
+      - rowgroup [ref=f13e911]:
+        - row [ref=f13e912]:
+          - columnheader "이벤트" [ref=f13e913]
+          - columnheader "칸" [ref=f13e914]
+          - columnheader "지금" [ref=f13e915]
+          - columnheader "제안" [ref=f13e916]
+          - columnheader "이유" [ref=f13e917]
+      - rowgroup [ref=f13e918]:
+        - row [ref=f13e919]:
+          - cell "탐지" [ref=f13e920]
+          - cell "번호 · 발생시각 · 장비 · 구역 · 종류" [ref=f13e921]
+          - cell "읽기 (새 행만 장비·시각 지정)" [ref=f13e922]
+          - cell "읽기" [ref=f13e923]
+          - cell "추적성 — 지금 규칙 유지" [ref=f13e924]
+        - row [ref=f13e925]:
+          - cell "유형" [ref=f13e926]
+          - cell "콤보로 수정" [ref=f13e927]
+          - cell "읽기로 잠금" [ref=f13e928]
+          - cell "종류를 바꾸면 다른 사건이 됩니다" [ref=f13e929]
+        - row [ref=f13e930]:
+          - cell "결과" [ref=f13e931]
+          - cell "콤보로 수정" [ref=f13e932]
+          - cell "수정" [ref=f13e933]
+          - cell "운영자 판정 — 침입 · 오탐" [ref=f13e934]
+        - row [ref=f13e935]:
+          - cell "상태 (조치보고 여부)" [ref=f13e936]
+          - cell "콤보로 수정 — 저장 요청에 실리지 않아 서버에 반영 안 됨" [ref=f13e937]
+          - cell "자동 표시 ‘조치 N건’" [ref=f13e938]
+          - cell "서버가 조치 생성 때 스스로 켭니다" [ref=f13e939]
+        - row [ref=f13e940]:
+          - cell "신호 · AI 모델 · 추론 · 프레임" [ref=f13e941]
+          - cell "단일 선택일 때 수정" [ref=f13e942]
+          - cell "읽기로 잠금" [ref=f13e943]
+          - cell "센서 · AI가 잰 값 — 틀렸다면 조치보고 메모로 남깁니다" [ref=f13e944]
+        - row [ref=f13e945]:
+          - cell "장애" [ref=f13e946]
+          - cell "번호 · 발생 · 장비 · 구역 · 종류 · 유형" [ref=f13e947]
+          - cell "유형만 콤보로 수정" [ref=f13e948]
+          - cell "전부 읽기" [ref=f13e949]
+          - cell "탐지와 같음" [ref=f13e950]
+        - row [ref=f13e951]:
+          - cell "사유" [ref=f13e952]
+          - cell "콤보로 수정" [ref=f13e953]
+          - cell "수정" [ref=f13e954]
+          - 'cell "현장 확인 뒤 정정(예: 케이블 절단 → 전원 불량)" [ref=f13e955]'
+        - row [ref=f13e956]:
+          - cell "1차 · 2차 시작 · 종료" [ref=f13e957]
+          - cell "셀 편집" [ref=f13e958]
+          - cell "읽기로 잠금" [ref=f13e959]
+          - cell "제어기 루프(1차로 나가 2차로 들어오는 RS485 · IP 선) 위의 고장 시작 · 끝 지점 — 시각이 아닙니다. 장비가 보낸 값이라 잠그고, 보정이 꼭 필요하면 권한자 기능으로 따로(결정 E-D11)" [ref=f13e960]
+        - row [ref=f13e961]:
+          - cell "연결" [ref=f13e962]
+          - cell "전부" [ref=f13e963]
+          - cell "읽기" [ref=f13e964]
+          - cell "읽기" [ref=f13e965]
+          - cell "지금 규칙 유지" [ref=f13e966]
+        - row [ref=f13e967]:
+          - cell "조치" [ref=f13e968]
+          - cell "원본 · 시각" [ref=f13e969]
+          - cell "읽기" [ref=f13e970]
+          - cell "읽기" [ref=f13e971]
+          - cell "지금 규칙 유지" [ref=f13e972]
+        - row [ref=f13e973]:
+          - cell "사용자" [ref=f13e974]
+          - cell "글자로 수정" [ref=f13e975]
+          - cell "작성자 자동 · 읽기" [ref=f13e976]
+          - cell "다른 사람 이름으로 바꿀 수 있으면 기록이 아닙니다" [ref=f13e977]
+        - row [ref=f13e978]:
+          - cell "내용" [ref=f13e979]
+          - cell "글자로 수정" [ref=f13e980]
+          - cell "수정" [ref=f13e981]
+          - cell "오탈자 정정 — 판단이 바뀌었으면 새 조치보고로" [ref=f13e982]
+    - generic [ref=f13e983]:
+      - generic [ref=f13e984]:
+        - term [ref=f13e985]: 보이는 모양
+        - definition [ref=f13e986]: 상세 칸에서 상자 = 고칠 수 있는 칸, 맨 글자 = 발생 기록입니다. 섹션 순서는 지금 편집기 순서를 그대로 둡니다(고칠 수 있는 칸을 위로 올리지 않음). 값을 바꾸면 그 칸 왼쪽에 앰버 줄이 서고 하단이 [되돌리기] [저장]으로 바뀝니다. 저장 요청에는 바뀐 판정 칸만 싣습니다.
+      - generic [ref=f13e987]:
+        - term [ref=f13e988]: 조치 1 → N
+        - definition [ref=f13e989]: 중복 조치보고는 이미 허용돼 있습니다(2026-08-06 차단 제거). 그래서 [조치보고] 버튼은 조치가 있어도 꺼지지 않고 ‘조치보고 추가’가 됩니다. 조치보고 창 위쪽에 이전 조치 N건을 접어 보여 줘 같은 내용을 두 번 쓰지 않게 합니다.
+      - generic [ref=f13e990]:
+        - term [ref=f13e991]: 조치내역 보기
+        - definition [ref=f13e992]:
+          - text: 탐지 · 장애 행, 드로어 카드, 탐지 신호 이력 행의 우클릭에 새로 넣습니다. 여는 창은 조치보고와 같은 Float 창이고 조치 목록을 펼친 채 엽니다. 목록은 이미 있는
+          - code [ref=f13e993]: "GET /events/detections/{id}/actions"
+          - text: ·
+          - code [ref=f13e994]: "/malfunctions/{id}/actions"
+          - text: 로 열 때 한 번 불러오고, 조치 여부가 꺼진 이벤트는 부르지 않습니다.
+      - generic [ref=f13e995]:
+        - term [ref=f13e996]: 권한
+        - definition [ref=f13e997]:
+          - text: 판정 칸 · 조치보고 · 조치 내용 수정은 이벤트 수정 권한으로 가립니다. 권한이 없으면 상자가 잠기고 누르면 ‘권한이 없습니다.’ 한 줄만. 권한 서비스를 못 읽으면 지금은 전부 허용(
+          - code [ref=f13e998]: "?? true"
+          - text: ) — 거부로 바꿉니다. 조치 내역 보기는 읽기 권한만 있으면 됩니다.
+  - region [ref=f13e999]:
+    - generic [ref=f13e1000]:
+      - heading "이벤트 쪽에서 정해 주실 것" [level=2] [ref=f13e1001]
+      - paragraph [ref=f13e1002]: 분석 보고서 §11-8
+    - table [ref=f13e1004]:
+      - rowgroup [ref=f13e1005]:
+        - row [ref=f13e1006]:
+          - columnheader "#" [ref=f13e1007]
+          - columnheader "내용" [ref=f13e1008]
+          - columnheader "권고" [ref=f13e1009]
+      - rowgroup [ref=f13e1010]:
+        - row [ref=f13e1011]:
+          - cell "E-D1" [ref=f13e1012]
+          - cell "위쪽 요약 탭(센서 / 카메라 이벤트)과 ‘차트보기’를 레일 개요 하나로 — 차트 넷 모두 보존" [ref=f13e1013]
+          - cell "채택" [ref=f13e1014]
+        - row [ref=f13e1015]:
+          - cell "E-D2" [ref=f13e1016]
+          - cell "시작 · 종료 기간 바를 툴바 기간 칩(오늘 · 24시간 · 7일 · 직접)으로" [ref=f13e1017]
+          - cell "채택" [ref=f13e1018]
+        - row [ref=f13e1019]:
+          - cell "E-D3" [ref=f13e1020]
+          - cell "목록의 추가 · 삭제는 ⋯ 메뉴(권한자)로, 저장은 상세 칸 하단 변경 막대로, 주 버튼은 조치보고" [ref=f13e1021]
+          - cell "채택" [ref=f13e1022]
+        - row [ref=f13e1023]:
+          - cell "E-D4" [ref=f13e1024]
+          - cell "조치 내역 = 이미 있는 원본별 조치 조회 API를 열 때 한 번 호출(조치 여부 꺼짐이면 호출 안 함)" [ref=f13e1025]
+          - cell "채택" [ref=f13e1026]
+        - row [ref=f13e1027]:
+          - cell "E-D5" [ref=f13e1028]
+          - cell "조치보고 창 · 조치 내역 창 = 같은 T4 모양 + Float" [ref=f13e1029]
+          - cell "채택" [ref=f13e1030]
+        - row [ref=f13e1031]:
+          - cell "E-D6" [ref=f13e1032]
+          - cell "탐지 신호 이력은 확정대로 팝업 다이얼로그 유지 — 창 구조 기획의 Float 배정 철회" [ref=f13e1033]
+          - cell "유지" [ref=f13e1034]
+        - row [ref=f13e1035]:
+          - cell "E-D7" [ref=f13e1036]
+          - cell "억제 스케줄을 이벤트 콘솔 레일로 옮기고, 수정은 같은 창 안 780px 서랍" [ref=f13e1037]
+          - cell "채택" [ref=f13e1038]
+        - row [ref=f13e1039]:
+          - cell "E-D8" [ref=f13e1040]
+          - cell "드로어 일괄 버튼 아이콘(휴지통 → 조치)" [ref=f13e1041]
+          - cell "화면 확인 후" [ref=f13e1042]
+        - row [ref=f13e1043]:
+          - cell "E-D9" [ref=f13e1044]
+          - cell "제어기별 차트를 세로 묶음 막대 → 가로 누적 막대(합계 순)로 — 제어기 이름이 길고 수가 늘어도 읽힘" [ref=f13e1045]
+          - cell "채택 권고 · 확인 필요" [ref=f13e1046]
+        - row [ref=f13e1047]:
+          - cell "E-D10" [ref=f13e1048]
+          - cell "차트 계열색을 코드 고정값에서 테마 토큰으로 — 색상은 유지, 라이트 대비만 보정 · 파이는 가운데 합계가 있는 도넛으로" [ref=f13e1049]
+          - cell "채택" [ref=f13e1050]
+        - row [ref=f13e1051]:
+          - cell "E-D11" [ref=f13e1052]
+          - cell "편집 경계 표 채택 — 유형 · 상태 · 신호 · AI · 고장 구간 · 조치 사용자 잠금 (고장 구간 보정 기능을 따로 둘지)" [ref=f13e1053]
+          - cell "채택 · 보정은 요청 시" [ref=f13e1054]
+        - row [ref=f13e1055]:
+          - cell "E-D12" [ref=f13e1056]
+          - cell "우클릭 조치내역 보기 신설(목록 행 · 드로어 카드 · 탐지 신호 이력 행) — 옛 스토리보드의 행 펼침(RowDetails) 제안 대체" [ref=f13e1057]
+          - cell "채택" [ref=f13e1058]
+        - row [ref=f13e1059]:
+          - cell "E-D13" [ref=f13e1060]
+          - cell [ref=f13e1061]:
+            - text: 권한 판정 실패 시 허용(
+            - code [ref=f13e1062]: "?? true"
+            - text: ) → 거부
+          - cell "채택" [ref=f13e1063]
+        - row [ref=f13e1064]:
+          - cell "E-D14" [ref=f13e1065]
+          - cell [ref=f13e1066]:
+            - text: 카메라 탐지 = 탐지의 두 번째 출처 — 색은 빨강(
+            - code [ref=f13e1067]: "#FF6464"
+            - text: ) → 탐지 계열 주황 + 빗금 · 추이 점선 · 칩은 ‘탐지’ 묶음 안 센서 / 카메라 · 카메라 이벤트 탭 KPI 3은 ‘탐지 출처’ 비교 카드의 카메라 열로 · 장비별 카드 [제어기 | 카메라] 탭 · 탐지 목록 출처 칩과 AI 꼬리표
+          - cell "채택 권고" [ref=f13e1068]
+        - row [ref=f13e1069]:
+          - cell "E-D15" [ref=f13e1070]
+          - cell "카메라 AI 객체 분류(사람 · 차량 · 동물) 집계를 서버 요약에 추가 요청 — 지금은 이벤트마다 객체 목록만 있고 기간 집계가 없음" [ref=f13e1071]
+          - cell "서버 확인 후" [ref=f13e1072]
+  - region [ref=f13e1073]:
+    - generic [ref=f13e1074]:
+      - heading "계정 콘솔 — 탭 6개를 레일로, 편집을 오른쪽 칸으로" [level=2] [ref=f13e1075]
+      - paragraph [ref=f13e1076]: 지금은 상세 칸이 없어 편집이 전부 다이얼로그입니다
+    - paragraph [ref=f13e1077]: "실측: 계정 콘솔은 1120×700 고정 카드에 상단 탭 6개(사용자 · 권한 설정 · 세션 관리 · 세션 설정 · 감사 로그 · 권한 부여)이고, 사용자 목록은 13열입니다. 행을 더블클릭하면 400×550 편집 다이얼로그가 뜹니다 — 목록과 편집이 분리돼 있어 한 사람을 고치려면 창을 오갑니다. 탭을 레일로 내리고 상세 칸을 만들어 편집·잠금 해제·비밀번호 초기화를 그 안으로 가져옵니다."
+    - generic [ref=f13e1079]:
+      - generic [ref=f13e1080]:
+        - text: 계정 · 사용자
+        - generic [ref=f13e1081]: 1120×700 → 1280×760
+      - generic [ref=f13e1082]:
+        - generic [ref=f13e1083]:
+          - generic [ref=f13e1084]: 레일 184
+          - generic [ref=f13e1085]: 상단 탭 6 → 레일 6
+          - list [ref=f13e1086]:
+            - listitem [ref=f13e1087]: 사용자
+            - listitem [ref=f13e1088]: 권한 설정
+            - listitem [ref=f13e1089]: 세션 관리
+            - listitem [ref=f13e1090]: 권한 부여
+            - listitem [ref=f13e1091]: 감사 로그
+            - listitem [ref=f13e1092]: ─
+            - listitem [ref=f13e1093]: 세션 설정
+          - generic [ref=f13e1094]: 권한별 표시 규칙 그대로 이관(감사 로그만 verb 기반)
+        - generic [ref=f13e1095]:
+          - generic [ref=f13e1096]: 목록 (가변)
+          - generic [ref=f13e1097]: 13열 → 기본 6열
+          - list [ref=f13e1098]:
+            - listitem [ref=f13e1099]: "기본: 잠금 · 사진+아이디 · 성명 · 구분 · 부서·직급 · 상태"
+            - listitem [ref=f13e1100]: "상세로: 사번 · 전화 · 이메일 · 번호"
+            - listitem [ref=f13e1101]: 무한 스크롤 · 기본 페이지 100(다른 목록 20)
+        - generic [ref=f13e1102]:
+          - generic [ref=f13e1103]: 상세 340 — 신설
+          - generic [ref=f13e1104]: 다이얼로그 3종 흡수
+          - list [ref=f13e1105]:
+            - listitem [ref=f13e1106]: 사진 96 + 아이디 · 성명
+            - listitem [ref=f13e1107]: 인적사항(사번·전화·이메일·직급·부서)
+            - listitem [ref=f13e1108]: 역할 · 권한 그룹 · 부여 이력
+            - listitem [ref=f13e1109]: 세션 요약(활성 N · 마지막 로그인)
+            - listitem [ref=f13e1110]: 잠금 상태 + 사유 + 잠긴 시각
+          - generic [ref=f13e1111]: "[편집] [비밀번호 초기화] [잠금 해제] [세션 종료]"
+      - generic [ref=f13e1112]:
+        - generic [ref=f13e1113]: "184"
+        - generic [ref=f13e1115]: 가변
+        - generic [ref=f13e1117]: "340"
+    - table [ref=f13e1120]:
+      - rowgroup [ref=f13e1121]:
+        - row [ref=f13e1122]:
+          - columnheader "화면" [ref=f13e1123]
+          - columnheader "지금 (실측)" [ref=f13e1124]
+          - columnheader "이번 판" [ref=f13e1125]
+          - columnheader "v8 API 반영" [ref=f13e1126]
+      - rowgroup [ref=f13e1127]:
+        - row [ref=f13e1128]:
+          - cell "사용자" [ref=f13e1129]
+          - cell "13열 · 상세 없음 · 더블클릭 → 400×550 편집 다이얼로그 · 툴바 추가·삭제·갱신" [ref=f13e1130]
+          - cell "기본 6열 + 상세 칸. 편집·잠금 해제·비밀번호 초기화를 상세로. 등록만 다이얼로그(450×550) 유지" [ref=f13e1131]
+          - cell "목록 기본 페이지 100 가정 분리" [ref=f13e1132]
+        - row [ref=f13e1133]:
+          - cell "권한 설정" [ref=f13e1134]
+          - cell "한 패널이 목록 · 상세 매트릭스 · 구성원 세 뷰를 번갈아 교체" [ref=f13e1135]
+          - cell "왼쪽=그룹 목록, 오른쪽 상세=모듈 매트릭스(스크롤) + 구성원 탭. 뷰 교체 없이 한 화면" [ref=f13e1136]
+          - cell "모듈 16종 전부 전송(누락 시 422). 카탈로그가 12종이면 저장 전 경고 배너" [ref=f13e1137]
+        - row [ref=f13e1138]:
+          - cell "세션 관리" [ref=f13e1139]
+          - cell "12열 · 무한 스크롤 · 행 안에 강제 종료 2종" [ref=f13e1140]
+          - cell "목록 유지 + 상세 칸(단말·IP·만료·사유). 파괴 동작은 상세 하단으로" [ref=f13e1141]
+          - cell "내 세션 목록도 페이지가 나뉜다 — 전량 로드 가정 제거" [ref=f13e1142]
+        - row [ref=f13e1143]:
+          - cell "권한 부여" [ref=f13e1144]
+          - cell "폼(계정·그룹·시작·종료) + 목록 + 회수" [ref=f13e1145]
+          - cell "폼을 상세 칸으로, 목록은 가운데. 만료 임박 강조" [ref=f13e1146]
+          - cell "—" [ref=f13e1147]
+        - row [ref=f13e1148]:
+          - cell "감사 로그" [ref=f13e1149]
+          - cell "8열 · 필터가 날짜 2개뿐" [ref=f13e1150]
+          - cell "필터에 동작 23 · 대상 4 · 결과 2 드롭다운 추가. 상세=변경 전후 표" [ref=f13e1151]
+          - cell "세 필터가 닫힌 어휘 — 자유 입력은 422. 변경 전후는 바뀐 필드만 옴" [ref=f13e1152]
+        - row [ref=f13e1153]:
+          - cell "세션 설정" [ref=f13e1154]
+          - cell "스크롤 폼 + 하단 [새로고침][저장]" [ref=f13e1155]
+          - cell "T2 설정 틀 그대로 · 좌 라벨 · 우 입력 180" [ref=f13e1156]
+          - cell "—" [ref=f13e1157]
+    - generic [ref=f13e1158]:
+      - heading "권한 매트릭스 — 저장이 막히는 자리" [level=3] [ref=f13e1159]
+      - generic [ref=f13e1160]: 모듈 16 × 동작 4
+    - generic [ref=f13e1162]:
+      - generic [ref=f13e1163]:
+        - strong [ref=f13e1165]: 계정
+        - generic [ref=f13e1166]: 권한 설정 · 관제 운영
+        - generic [aria-hidden] [ref=f13e1167]:
+          - generic [ref=f13e1168]: ─
+          - generic [ref=f13e1169]: ▢
+          - generic [ref=f13e1170]: ✕
+      - generic [ref=f13e1171]:
+        - complementary [ref=f13e1172]:
+          - navigation [ref=f13e1173]:
+            - button "사용자 12" [ref=f13e1174] [cursor=pointer]:
+              - generic [ref=f13e1175]: 사용자
+              - generic [ref=f13e1176]: "12"
+            - button "권한 설정 4" [ref=f13e1177] [cursor=pointer]:
+              - generic [ref=f13e1178]: 권한 설정
+              - generic [ref=f13e1179]: "4"
+            - button "세션 관리 7" [ref=f13e1180] [cursor=pointer]:
+              - generic [ref=f13e1181]: 세션 관리
+              - generic [ref=f13e1182]: "7"
+            - button "권한 부여 2" [ref=f13e1183] [cursor=pointer]:
+              - generic [ref=f13e1184]: 권한 부여
+              - generic [ref=f13e1185]: "2"
+            - button "감사 로그" [ref=f13e1186] [cursor=pointer]
+            - button "세션 설정" [ref=f13e1189] [cursor=pointer]
+        - generic [ref=f13e1191]:
+          - generic [ref=f13e1192]:
+            - generic [ref=f13e1193]:
+              - button "그룹" [pressed] [ref=f13e1194] [cursor=pointer]
+              - button "구성원" [ref=f13e1195] [cursor=pointer]
+            - generic [ref=f13e1196]: 모듈 16종 전부를 한 번에 보냅니다
+          - table [ref=f13e1198]:
+            - rowgroup [ref=f13e1199]:
+              - row [ref=f13e1200] [cursor=pointer]:
+                - columnheader "모듈" [ref=f13e1201]
+                - columnheader "조회" [ref=f13e1202]
+                - columnheader "편집" [ref=f13e1203]
+                - columnheader "삭제" [ref=f13e1204]
+                - columnheader "제어" [ref=f13e1205]
+            - rowgroup [ref=f13e1206]:
+              - row [ref=f13e1207] [cursor=pointer]:
+                - cell "장비" [ref=f13e1208]
+                - cell "✔" [ref=f13e1209]
+                - cell "✔" [ref=f13e1210]
+                - cell [ref=f13e1211]
+                - cell "✔ 실집행" [ref=f13e1212]
+              - row [ref=f13e1213] [cursor=pointer]:
+                - cell "이벤트" [ref=f13e1214]
+                - cell "✔" [ref=f13e1215]
+                - cell "✔" [ref=f13e1216]
+                - cell [ref=f13e1217]
+                - cell [ref=f13e1218]
+              - row [ref=f13e1219] [cursor=pointer]:
+                - cell "보고서" [ref=f13e1220]
+                - cell "✔" [ref=f13e1221]
+                - cell [ref=f13e1222]
+                - cell [ref=f13e1223]
+                - cell [ref=f13e1224]
+              - row [ref=f13e1225] [cursor=pointer]:
+                - cell "카메라" [ref=f13e1226]
+                - cell "✔" [ref=f13e1227]
+                - cell [ref=f13e1228]
+                - cell [ref=f13e1229]
+                - cell [ref=f13e1230]
+              - row [ref=f13e1231] [cursor=pointer]:
+                - cell "사용자" [ref=f13e1232]
+                - cell "✔" [ref=f13e1233]
+                - cell [ref=f13e1234]
+                - cell [ref=f13e1235]
+                - cell "실집행" [ref=f13e1236]
+              - row [ref=f13e1237] [cursor=pointer]:
+                - cell [ref=f13e1238]:
+                  - text: 연동
+                  - generic [ref=f13e1239]: 신규
+                - cell "✔" [ref=f13e1241]
+                - cell [ref=f13e1242]
+                - cell [ref=f13e1243]
+                - cell [ref=f13e1244]
+              - row [ref=f13e1245] [cursor=pointer]:
+                - cell [ref=f13e1246]:
+                  - text: 파일
+                  - generic [ref=f13e1247]: 신규
+                - cell "✔" [ref=f13e1249]
+                - cell [ref=f13e1250]
+                - cell [ref=f13e1251]
+                - cell [ref=f13e1252]
+              - row [ref=f13e1253] [cursor=pointer]:
+                - cell [ref=f13e1254]:
+                  - text: 부대
+                  - generic [ref=f13e1255]: 신규
+                - cell "✔" [ref=f13e1257]
+                - cell [ref=f13e1258]
+                - cell [ref=f13e1259]
+                - cell [ref=f13e1260]
+          - generic [ref=f13e1261]:
+            - generic [ref=f13e1262]: 모듈 16 · 표시 8
+            - generic [ref=f13e1263]: 전체 교체 저장 — 끄는 모듈도 키를 실어야 합니다
+        - complementary [ref=f13e1264]:
+          - generic [ref=f13e1265]:
+            - generic [ref=f13e1266]: 권한 그룹
+            - heading "관제 운영" [level=3] [ref=f13e1267]
+          - generic [ref=f13e1268]:
+            - generic [ref=f13e1269]: 카탈로그가 12종이면 저장이 422 로 막힙니다 — 연동 · 파일 · 부대를 채워야 합니다.
+            - generic [ref=f13e1270]:
+              - heading "요약" [level=4] [ref=f13e1271]
+              - generic [ref=f13e1272]:
+                - generic [ref=f13e1273]: 구성원
+                - generic [ref=f13e1274]: "5"
+              - generic [ref=f13e1275]:
+                - generic [ref=f13e1276]: 켜진 모듈
+                - generic [ref=f13e1277]: 6 / 16
+              - generic [ref=f13e1278]:
+                - generic [ref=f13e1279]: 제어 권한
+                - generic [ref=f13e1280]: 장비 · 계정 서버 실집행 2곳
+            - generic [ref=f13e1281]:
+              - heading "주의" [level=4] [ref=f13e1282]
+              - paragraph [ref=f13e1283]: 나머지 모듈의 제어는 서버가 검사하지 않습니다 — 화면 게이팅용이라고 표기합니다.
+          - generic [ref=f13e1284]:
+            - generic [ref=f13e1285]: 저장 = 전체 교체
+            - button "되돌리기" [ref=f13e1286] [cursor=pointer]
+            - button "저장" [ref=f13e1287] [cursor=pointer]
+    - paragraph [ref=f13e1288]: 세 뷰(목록 · 매트릭스 · 구성원)를 번갈아 교체하던 것을 목록 + 상세 한 화면으로 폅니다. 매트릭스는 가운데 칸에서 스크롤하고, 구성원은 칩으로 전환합니다. 저장은 전체 교체라 화면이 끄려는 모듈도 키를 실어 보내야 하며, 카탈로그가 낡으면 저장 자체가 막히므로 저장 전에 배너로 경고합니다.
+    - generic [ref=f13e1289]:
+      - heading "계정 콘솔 구현 메모" [level=4] [ref=f13e1290]
+      - generic [ref=f13e1291]:
+        - term [ref=f13e1292]: 상세 칸
+        - definition [ref=f13e1293]: "신설. 기존 편집 다이얼로그(`EditorDialogView` 400×550)의 항목을 그대로 옮기고, 아이디·비밀번호 읽기 전용 규칙 유지. 등록(450×550)·비밀번호 재설정(450×300)은 T4 로 남깁니다."
+        - term [ref=f13e1294]: 잠금
+        - definition [ref=f13e1295]: 목록 첫 열의 자물쇠와 "해제" 버튼은 유지하되, 사유·잠긴 시각은 상세 칸에서 보여 줍니다.
+        - term [ref=f13e1296]: 필터
+        - definition [ref=f13e1297]:
+          - text: 감사 로그 3필터는
+          - code [ref=f13e1298]: ComboBox
+          - text: (닫힌 어휘) — 자유 입력
+          - code [ref=f13e1299]: TextBox
+          - text: 금지.
+        - term [ref=f13e1300]: 자동화
+        - definition [ref=f13e1301]:
+          - text: 로그인 창에만
+          - code [ref=f13e1302]: AutomationId
+          - text: 가 있습니다(
+          - code [ref=f13e1303]: Accounts.Login.*
+          - text: ). 콘솔에도 같은 규칙으로
+          - code [ref=f13e1304]: Accounts.Console.*
+          - text: 를 답니다.
+  - region [ref=f13e1305]:
+    - generic [ref=f13e1306]:
+      - heading "보고서 콘솔 — 탭 3개를 레일로, 미리보기를 오른쪽 칸으로" [level=2] [ref=f13e1307]
+      - paragraph [ref=f13e1308]: 960×700 · 목록 · 생성 · 템플릿 · 미리보기 오버레이
+    - paragraph [ref=f13e1309]: "실측: 960×700 고정 카드에 탭 3개(목록 · 생성 · 템플릿)이고, 미리보기는 본문 위에 오버레이로 덮이며 템플릿 수정도 560 오버레이입니다. 목록에서 미리보기를 누르면 화면 전체가 덮여 목록이 사라집니다. 레일 3 + 오른쪽 칸으로 펴면 목록을 보면서 미리보기·메타를 볼 수 있습니다."
+    - generic [ref=f13e1311]:
+      - generic [ref=f13e1312]:
+        - text: 보고서 · 목록
+        - generic [ref=f13e1313]: 960×700 → 1280×760
+      - generic [ref=f13e1314]:
+        - generic [ref=f13e1315]:
+          - generic [ref=f13e1316]: 레일 184
+          - generic [ref=f13e1317]: 탭 3 → 레일 3
+          - list [ref=f13e1318]:
+            - listitem [ref=f13e1319]: 생성 이력(목록)
+            - listitem [ref=f13e1320]: 새 보고서(생성)
+            - listitem [ref=f13e1321]: 템플릿
+          - generic [ref=f13e1322]: 진행 중 건수 배지
+        - generic [ref=f13e1323]:
+          - generic [ref=f13e1324]: 목록 (가변)
+          - generic [ref=f13e1325]: DataGrid 6열
+          - list [ref=f13e1326]:
+            - listitem [ref=f13e1327]: 아이디 · 제목 · 유형 · 기간 · 상태 · 생성일시
+            - listitem [ref=f13e1328]: 상태 칸 = 칩 + 진행바 + 취소
+            - listitem [ref=f13e1329]: "툴바: 상태 콤보 5종 닫힌 값 · 검색 · 갱신"
+        - generic [ref=f13e1330]:
+          - generic [ref=f13e1331]: 상세 380
+          - generic [ref=f13e1332]: 미리보기 오버레이 → 오른쪽 칸
+          - list [ref=f13e1333]:
+            - listitem [ref=f13e1334]: PDF 미리보기(WebView2) 축소판
+            - listitem [ref=f13e1335]: "메타: 유형 · 기간 · 템플릿 · 요청자"
+            - listitem [ref=f13e1336]: "진행: 단계 + 퍼센트 + 갱신 시각"
+            - listitem [ref=f13e1337]: 실패 사유 / 파일 유실 안내
+          - generic [ref=f13e1338]: "[크게 보기] [PDF 내려받기] [상세 CSV] [취소]"
+      - generic [ref=f13e1339]:
+        - generic [ref=f13e1340]: "184"
+        - generic [ref=f13e1342]: 가변
+        - generic [ref=f13e1344]: 380 — 미리보기라 넓게
+    - table [ref=f13e1347]:
+      - rowgroup [ref=f13e1348]:
+        - row [ref=f13e1349]:
+          - columnheader "지금 (실측)" [ref=f13e1350]
+          - columnheader "이번 판" [ref=f13e1351]
+          - columnheader "v8 API 반영" [ref=f13e1352]
+      - rowgroup [ref=f13e1353]:
+        - row [ref=f13e1354]:
+          - cell "미리보기가 본문 전체를 덮는 오버레이(WebView2)" [ref=f13e1355]
+          - cell "오른쪽 칸에 축소 미리보기, [크게 보기] 만 모달" [ref=f13e1356]
+          - cell "—" [ref=f13e1357]
+        - row [ref=f13e1358]:
+          - cell "상태 필터 콤보" [ref=f13e1359]
+          - cell "상태 칩 5종(대기·생성중·완료·실패·취소)" [ref=f13e1360]
+          - cell "빈 문자열도 422 — \"전체\"는 파라미터를 생략" [ref=f13e1361]
+        - row [ref=f13e1362]:
+          - cell "목록 행 안에 진행바 + 취소 버튼" [ref=f13e1363]
+          - cell "행에는 칩 + 퍼센트, 취소는 상세 하단(파괴적 동작 모음)" [ref=f13e1364]
+          - cell "취소는 대기·생성중만 가능" [ref=f13e1365]
+        - row [ref=f13e1366]:
+          - cell "다운로드 실패 시 일반 오류" [ref=f13e1367]
+          - cell "미완료(400)와 파일 유실(410) 을 다른 문구로" [ref=f13e1368]
+          - cell [ref=f13e1369]:
+            - text: 사유는
+            - code [ref=f13e1370]: error.details.error_code
+            - text: 에서 읽음
+        - row [ref=f13e1371]:
+          - cell "템플릿 수정 = 560 오버레이" [ref=f13e1372]
+          - cell "템플릿 레일의 오른쪽 칸 편집(이름·설명·기본기간·구성 체크리스트)" [ref=f13e1373]
+          - cell "—" [ref=f13e1374]
+        - row [ref=f13e1375]:
+          - cell "상세 CSV 유형 콤보" [ref=f13e1376]
+          - cell "그대로 — 8종 닫힌 값 표기" [ref=f13e1377]
+          - cell "탐지·장애·조치·시스템·설정·감사·로그인·세션" [ref=f13e1378]
+    - generic [ref=f13e1379]:
+      - heading "보고서 창 구현 메모" [level=4] [ref=f13e1380]
+      - generic [ref=f13e1381]:
+        - term [ref=f13e1382]: 미리보기
+        - definition [ref=f13e1383]: WebView2 는 airspace 문제가 있어 WPF 팝업이 그 위에 못 뜹니다 — 오른쪽 칸에 넣을 때 토스트·메뉴가 미리보기 위로 겹치지 않도록 배치합니다(기존 교훈).
+        - term [ref=f13e1384]: 진행 표시
+        - definition [ref=f13e1385]:
+          - code [ref=f13e1386]: progress_pct
+          - text: ·
+          - code [ref=f13e1387]: progress_stage
+          - text: ·
+          - code [ref=f13e1388]: progress_updated_at
+          - text: 3필드를 그대로 씁니다. 갱신이 멈춘 것과 느린 것을 구분하려면 갱신 시각을 같이 보여 줍니다.
+        - term [ref=f13e1389]: 상태 필터
+        - definition [ref=f13e1390]:
+          - code [ref=f13e1391]: ComboBox
+          - text: /칩 모두 "전체"는 값이 아니라 미전송으로 구현합니다.
+  - region [ref=f13e1392]:
+    - generic [ref=f13e1393]:
+      - heading "설정 창 — 9탭 (10탭이 아니었다)" [level=2] [ref=f13e1394]
+      - paragraph [ref=f13e1395]: 800×500 · 레일 100 · 즉시 저장
+    - paragraph [ref=f13e1396]: "정정: 앞선 인벤토리는 설정 창을 10탭으로 적었지만 실제 렌더되는 탭은 9개입니다. 계정 관련 탭 4종(계정·권한·세션·감사)은 뷰모델만 등록돼 있고 탭이 없는 고아 상태입니다 — 계정 콘솔로 이미 옮겨 갔기 때문입니다. 설정은 값이 바뀔 때마다 즉시 저장되고 저장 버튼이 없습니다."
+    - table [ref=f13e1398]:
+      - rowgroup [ref=f13e1399]:
+        - row [ref=f13e1400]:
+          - columnheader "#" [ref=f13e1401]
+          - columnheader "탭" [ref=f13e1402]
+          - columnheader "내용 요약" [ref=f13e1403]
+          - columnheader "이번 판" [ref=f13e1404]
+      - rowgroup [ref=f13e1405]:
+        - row [ref=f13e1406]:
+          - cell "1" [ref=f13e1407]
+          - cell "이벤트 설정" [ref=f13e1408]
+          - cell "자동 해제 타이머(탐지·장애) · 카메라 팝업 연동 · 팝업 영상 소스 · 스냅샷 폴더" [ref=f13e1409]
+          - cell "그대로 — 자동 조치 타이머는 손대지 않음" [ref=f13e1410]
+        - row [ref=f13e1411]:
+          - cell "2" [ref=f13e1412]
+          - cell "소리 설정" [ref=f13e1413]
+          - cell "음원 폴더 · 출력 장치 · 알람 3종 선택·재생 · 자동 해제" [ref=f13e1414]
+          - cell "그대로" [ref=f13e1415]
+        - row [ref=f13e1416]:
+          - cell "3" [ref=f13e1417]
+          - cell "API 브로커" [ref=f13e1418]
+          - cell "NATS 주소·포트·주제·계정·타임아웃" [ref=f13e1419]
+          - cell "연결 상태 배지 추가(연결·끊김·재시도)" [ref=f13e1420]
+        - row [ref=f13e1421]:
+          - cell "4" [ref=f13e1422]
+          - cell "팝업 브로커" [ref=f13e1423]
+          - cell "Redis 주소·포트·채널" [ref=f13e1424]
+          - cell "같음" [ref=f13e1425]
+        - row [ref=f13e1426]:
+          - cell "5" [ref=f13e1427]
+          - cell "지도 설정" [ref=f13e1428]
+          - cell "지도 선택 · 기본맵 폴더 · 줌 범위 · 홈 좌표" [ref=f13e1429]
+          - cell "그대로" [ref=f13e1430]
+        - row [ref=f13e1431]:
+          - cell "6" [ref=f13e1432]
+          - cell "3rd Party 이벤트" [ref=f13e1433]
+          - cell "게이트웨이 연동(다른 라이브러리 위임)" [ref=f13e1434]
+          - cell "그대로" [ref=f13e1435]
+        - row [ref=f13e1436]:
+          - cell "7" [ref=f13e1437]
+          - cell "웹서버 설정" [ref=f13e1438]
+          - cell "활성화 · IP · 포트" [ref=f13e1439]
+          - cell "그대로" [ref=f13e1440]
+        - row [ref=f13e1441]:
+          - cell "8" [ref=f13e1442]
+          - cell "와치독 설정" [ref=f13e1443]
+          - cell "감시 활성 · 지금 시작 · 재시작 횟수" [ref=f13e1444]
+          - cell "그대로" [ref=f13e1445]
+        - row [ref=f13e1446]:
+          - cell "9" [ref=f13e1447]
+          - cell "About" [ref=f13e1448]
+          - cell "버전 · 회사 · 저작권(읽기 전용)" [ref=f13e1449]
+          - cell "서버 계약 세대 표시 추가(6.3 / 7.0 / 8.0)" [ref=f13e1450]
+        - row [ref=f13e1451]:
+          - cell "＋" [ref=f13e1452]
+          - cell "서버 연결(신설 후보)" [ref=f13e1453]
+          - cell "API 주소 · 판본 · 계약 세대 · 카탈로그 최신 시각 — 지금은 About 과 API 브로커에 흩어져 있음" [ref=f13e1454]
+    - generic [ref=f13e1455]:
+      - heading "설정 창 구현 메모" [level=4] [ref=f13e1456]
+      - generic [ref=f13e1457]:
+        - term [ref=f13e1458]: 틀
+        - definition [ref=f13e1459]: T2 그대로(좌 레일 100 · 우 폼). 800×500 유지 — 콘솔로 넓히지 않습니다.
+        - term [ref=f13e1460]: 저장
+        - definition [ref=f13e1461]: 즉시 저장 유지. 단 실패를 삼키지 않게 저장 결과를 상태 줄에 한 줄로 알립니다(설정 파일 원자적 쓰기 이슈 이력).
+        - term [ref=f13e1462]: 고아 탭
+        - definition [ref=f13e1463]: 계정 4종 뷰모델은 계정 콘솔로 이관 완료 — DI 등록만 남은 것은 정리 대상으로 적어 둡니다.
+  - region [ref=f13e1464]:
+    - generic [ref=f13e1465]:
+      - heading "서버 모니터 — 화면이 아예 없다 (신설)" [level=2] [ref=f13e1466]
+      - paragraph [ref=f13e1467]: API 서비스만 있고 UI 0건 · 생존 판정은 REST 로 하면 안 된다
+    - paragraph [ref=f13e1468]: "실측: 서버 목록·상세·지표를 보여 주는 화면이 앱과 라이브러리 어디에도 없습니다. 서버 API 서비스는 있지만 장비 제공자와 NATS 서비스가 내부적으로만 씁니다. v7.0 에서 서버가 장비와 같은 모델(유형·접속·설정·관측)이 되고 지표·시스템 이벤트 입구가 생겼으니, T1 + 지표 카드로 신설합니다."
+    - generic [ref=f13e1470]:
+      - generic [ref=f13e1471]:
+        - text: 서버
+        - generic [ref=f13e1472]: 신설 · 1280×760
+      - generic [ref=f13e1473]:
+        - generic [ref=f13e1474]:
+          - generic [ref=f13e1475]: 레일 184
+          - generic [ref=f13e1476]: 서버 유형별
+          - list [ref=f13e1477]:
+            - listitem [ref=f13e1478]: 전체
+            - listitem [ref=f13e1479]: PROXY · NVR · 스피커 · 함체
+            - listitem [ref=f13e1480]: ─
+            - listitem [ref=f13e1481]: 시스템 이벤트
+          - generic [ref=f13e1482]: 부대 필터 · 예하 포함
+        - generic [ref=f13e1483]:
+          - generic [ref=f13e1484]: 목록 + 지표
+          - generic [ref=f13e1485]: DataGrid + 게이지 띠
+          - list [ref=f13e1486]:
+            - listitem [ref=f13e1487]: "열: 이름 · 유형 · 주소 · 상태 · 마지막 변화 · 부대"
+            - listitem [ref=f13e1488]: "선택 시 아래 지표 띠: CPU · 메모리 · 디스크 · 네트워크"
+            - listitem [ref=f13e1489]: 임계 초과는 배지(서버가 판정해 보낸 것만)
+        - generic [ref=f13e1490]:
+          - generic [ref=f13e1491]: 상세 340
+          - list [ref=f13e1492]:
+            - listitem [ref=f13e1493]: 접속(주소 · 포트 · 계정)
+            - listitem [ref=f13e1494]:
+              - text: 설정(
+              - code [ref=f13e1495]: server_config
+              - text: 모드·임계)
+            - listitem [ref=f13e1496]: 상태(관측, 읽기 전용)
+            - listitem [ref=f13e1497]: 소속 부대
+            - listitem [ref=f13e1498]: 최근 시스템 이벤트 5
+          - generic [ref=f13e1499]: "[설정 수정] [지표 이력]"
+    - table [ref=f13e1501]:
+      - rowgroup [ref=f13e1502]:
+        - row [ref=f13e1503]:
+          - columnheader "규칙" [ref=f13e1504]
+          - columnheader "왜" [ref=f13e1505]
+          - columnheader "화면 처리" [ref=f13e1506]
+      - rowgroup [ref=f13e1507]:
+        - row [ref=f13e1508]:
+          - cell "REST 로 생존을 판정하지 않는다" [ref=f13e1509]
+          - cell "상태 시각은 마지막 전이이고 워치독이 없다 — 60초마다 성실히 보고하는 서버와 죽은 서버가 응답에서 같아 보인다" [ref=f13e1510]
+          - cell "라벨은 \"마지막 변화\". 생존 표시는 NATS 수신 간격 등 별도 신호로만" [ref=f13e1511]
+        - row [ref=f13e1512]:
+          - cell "한 번도 보고 없는 서버·부품" [ref=f13e1513]
+          - cell "관측 시각이 영구히 빈 값" [ref=f13e1514]
+          - cell "\"보고 없음\" 로 명시 — 정상·고장과 구분" [ref=f13e1515]
+        - row [ref=f13e1516]:
+          - cell "지표 이력은 재판정 안 함" [ref=f13e1517]
+          - cell "과거 행의 임계 초과 배열이 항상 빈 값" [ref=f13e1518]
+          - cell "이력 화면에서는 임계 배지를 그리지 않음" [ref=f13e1519]
+        - row [ref=f13e1520]:
+          - cell "생성 폼에 상태 금지" [ref=f13e1521]
+          - cell "관측 필드를 쓰면 422" [ref=f13e1522]
+          - cell "등록 직후 상태는 미확인으로 표시" [ref=f13e1523]
+        - row [ref=f13e1524]:
+          - cell "프록시 설정 창" [ref=f13e1525]
+          - cell "410 — 서버 설정의 모드로 이관" [ref=f13e1526]
+          - cell "설정 섹션 안으로 흡수" [ref=f13e1527]
+  - region [ref=f13e1528]:
+    - generic [ref=f13e1529]:
+      - heading "부대 콘솔 — 확정 설계를 따른다" [level=2] [ref=f13e1530]
+      - paragraph [ref=f13e1531]:
+        - text: "정본:"
+        - link "부대 콘솔 스토리보드" [ref=f13e1532] [cursor=pointer]:
+          - /url: event-mapping-unit-console-storyboard.html#unit
+        - text: ·
+        - link "와이어프레임" [ref=f13e1533] [cursor=pointer]:
+          - /url: event-mapping-unit-console-wireframe.html
+        - text: (2026-09-18, Track C)
+    - paragraph [ref=f13e1534]: 부대 콘솔은 별도 확정도가 이미 있습니다. 이 문서는 그 설계를 전 창 체계 안에 앉히는 자리만 잡고, 치수·드래그·API 계약은 그쪽을 정본으로 둡니다. 치수 규약이 서로 같아(헤더 40 · 툴바 40 · 행 38 · 입력 32 · 상세 340 · 콘솔 1280×760 · 다이얼로그 S400 / M560 / L720) 그대로 맞물립니다.
+    - table [ref=f13e1536]:
+      - rowgroup [ref=f13e1537]:
+        - row [ref=f13e1538]:
+          - columnheader "확정된 것" [ref=f13e1539]
+          - columnheader "내용" [ref=f13e1540]
+          - columnheader "전 창 체계에서의 자리" [ref=f13e1541]
+      - rowgroup [ref=f13e1542]:
+        - row [ref=f13e1543]:
+          - cell "보기 3종" [ref=f13e1544]
+          - cell "편제 트리 · 인접 관계도 · 미배치 장비" [ref=f13e1545]
+          - cell "T1 레일 3 + 상세 340" [ref=f13e1546]
+        - row [ref=f13e1547]:
+          - cell "트리 이동" [ref=f13e1548]
+          - cell "드래그로 상위 변경 — 엄격히 상위 제대만, 건너뛰기 허용, 루트로 올리기 드롭존. 드래그 시작 순간 드롭 가능 노드만 윤곽" [ref=f13e1549]
+          - cell [ref=f13e1550]:
+            - text: 드래그 우선 방침과 일치. 호출은
+            - code [ref=f13e1551]: "PATCH …/units/{id}"
+            - text: 1회(폭발반경 1)
+        - row [ref=f13e1552]:
+          - cell "형제 순서" [ref=f13e1553]
+          - cell "API에 순서 필드가 없어 순서 드래그를 제공하지 않는다 — 표시는 코드 기준 정렬" [ref=f13e1554]
+          - cell "저장 안 되는 조작을 UI 로 만들지 않는 원칙" [ref=f13e1555]
+        - row [ref=f13e1556]:
+          - cell "인접" [ref=f13e1557]
+          - cell "같은 제대만 · 무방향 · 전체 집합 교체(저장 직전 재조회 + 변경 감지 필요)" [ref=f13e1558]
+          - cell "동시 편집 충돌 안내가 필요한 유일한 자리" [ref=f13e1559]
+        - row [ref=f13e1560]:
+          - cell "삭제" [ref=f13e1561]
+          - cell "409 시 무엇이 막는지 개수로(장비 · 그룹 · 이벤트 이력) + 운용 중지 대안 제시" [ref=f13e1562]
+          - cell "파괴적 동작 표준 문구" [ref=f13e1563]
+        - row [ref=f13e1564]:
+          - cell "소속 이동" [ref=f13e1565]
+          - cell "장비·서버·그룹의 부대 픽커 + 목록 예하 포함 토글" [ref=f13e1566]
+          - cell "장비 콘솔 상세 \"소속\" 섹션에서 이 트리를 재사용" [ref=f13e1567]
+    - generic [ref=f13e1568]:
+      - heading "서버 협의가 필요하다고 적힌 것" [level=4] [ref=f13e1569]
+      - generic [ref=f13e1570]:
+        - term [ref=f13e1571]: 방위 라벨
+        - definition [ref=f13e1572]: 인접에 "좌측방 · 우측방" 이 DB 에는 있는데 API 에 안 나옵니다 — 노출 요청.
+        - term [ref=f13e1573]: 형제 순서
+        - definition [ref=f13e1574]: 정렬 필드 신설 요청(없으면 순서 UI 영구 불가).
+        - term [ref=f13e1575]: 세대
+        - definition [ref=f13e1576]: 부대 UI 는 계약 v8 이상에서만 표시합니다.
+  - region [ref=f13e1577]:
+    - generic [ref=f13e1578]:
+      - heading "이벤트 맵핑 워크벤치 — 확정 설계를 따른다" [level=2] [ref=f13e1579]
+      - paragraph [ref=f13e1580]:
+        - text: "정본:"
+        - link "스토리보드" [ref=f13e1581] [cursor=pointer]:
+          - /url: event-mapping-unit-console-storyboard.html
+        - text: ·
+        - link "와이어프레임" [ref=f13e1582] [cursor=pointer]:
+          - /url: event-mapping-unit-console-wireframe.html
+        - text: · 드래그 우선
+    - paragraph [ref=f13e1583]: 연동(이벤트 맵핑)도 확정도가 있습니다. 3-Pane(매핑 목록 300 · 액션 보드 · 장비 팔레트 340)에 드래그 3종(투입 · 해제 · 우선순위)이고, 서버에 재정렬 API 가 없어 정렬은 Draft 안에서만 하고 [적용] 때 바뀐 행만 보냅니다. 전 창 체계에서는 T1 의 변형(오른쪽 칸이 상세가 아니라 팔레트)으로 앉힙니다.
+    - table [ref=f13e1585]:
+      - rowgroup [ref=f13e1586]:
+        - row [ref=f13e1587]:
+          - columnheader "확정된 것" [ref=f13e1588]
+          - columnheader "내용" [ref=f13e1589]
+          - columnheader "왜 중요한가" [ref=f13e1590]
+      - rowgroup [ref=f13e1591]:
+        - row [ref=f13e1592]:
+          - cell "3-Pane" [ref=f13e1593]
+          - cell "① 매핑 목록(개수 배지 · 비활성 흐림) ② 액션 보드(카메라·스피커·경광등 탭) ③ 장비 팔레트(부대 필터 · 예하 포함)" [ref=f13e1594]
+          - cell "오른쪽 칸을 상세가 아닌 팔레트로 쓰는 유일한 창" [ref=f13e1595]
+        - row [ref=f13e1596]:
+          - cell "Draft 커밋" [ref=f13e1597]
+          - cell "드롭은 즉시 Draft, 서버 전송은 [적용] 한 번. 해제는 취소선으로 남아 되돌릴 수 있음" [ref=f13e1598]
+          - cell "드롭마다 호출하면 20행 재배치가 20회 — 타임아웃이 곱해짐" [ref=f13e1599]
+        - row [ref=f13e1600]:
+          - cell "드래그 시각" [ref=f13e1601]
+          - cell [ref=f13e1602]:
+            - text: 삽입선 가로 2px · 고스트는 테두리+그림자 · 파선
+            - code [ref=f13e1603]: "{6,4}"
+            - text: "(기존 {4,3}·{5,3} 회피) · 드롭 불가는 사선 해치"
+          - cell "라이트에서 Primary=Selection=Focus 가 같은 색이라 색으로는 구분 불가" [ref=f13e1604]
+        - row [ref=f13e1605]:
+          - cell "장비 이름" [ref=f13e1606]
+          - cell [ref=f13e1607]:
+            - text: 연동 응답이 참조 2키라 이름이 없다 → 장비 전량 캐시가 선행 조건, 캐시 미스는
+            - code [ref=f13e1608]: "#id"
+            - text: 로
+          - cell "v7.0 참조 축소의 직접 영향" [ref=f13e1609]
+        - row [ref=f13e1610]:
+          - cell "서버 미검증" [ref=f13e1611]
+          - cell "중복 · 그룹 소속 불일치 · 비활성 매핑을 서버가 안 막는다 → 클라가 경고. 매칭 실행도 클라 몫" [ref=f13e1612]
+          - cell "워크벤치가 스스로 검증 화면을 가져야 하는 이유" [ref=f13e1613]
+        - row [ref=f13e1614]:
+          - cell "권한" [ref=f13e1615]
+          - cell [ref=f13e1616]:
+            - text: 모듈이
+            - code [ref=f13e1617]: events
+            - text: →
+            - code [ref=f13e1619]: integrations
+            - text: 로 갱신
+          - cell "권한 매트릭스 16종에 이미 포함" [ref=f13e1620]
+        - row [ref=f13e1621]:
+          - cell "착수 전 결함" [ref=f13e1622]
+          - cell [ref=f13e1623]:
+            - text: ViewModel · View · 도메인 모델이 전무(API 래퍼 24메서드만) · 하위 DTO 에
+            - code [ref=f13e1624]: id
+            - text: 가 없어 수정·삭제·벌크 해제가 구조적으로 불가
+          - cell "화면보다 DTO 수선이 먼저" [ref=f13e1625]
+    - paragraph [ref=f13e1626]: 이 두 창(부대 · 이벤트 맵핑)은 이 문서에서 자리와 연결만 정의합니다 — 상세 설계를 여기에 복사하면 정본이 둘이 됩니다.
+  - region [ref=f13e1627]:
+    - generic [ref=f13e1628]:
+      - heading "다이얼로그 가족 — 폭이 아홉 가지였다" [level=2] [ref=f13e1629]
+      - paragraph [ref=f13e1630]: 실측 폭 400 · 450 · 460 · 500 · 550 · 560 · 600 → 세 규격
+    - paragraph [ref=f13e1631]: 실측한 고정 크기 다이얼로그는 폭이 제각각입니다. S 400 · M 560 · L 720 세 규격으로 모으고, 높이는 내용에 맡기되 최대치만 정합니다. 계정 편집·삭제는 상세 칸으로 흡수하고(결정 L-D4), 빈 껍데기인 제어기 추가는 장비 등록 하나로 합칩니다.
+    - table [ref=f13e1633]:
+      - rowgroup [ref=f13e1634]:
+        - row [ref=f13e1635]:
+          - columnheader "다이얼로그" [ref=f13e1636]
+          - columnheader "지금 (실측)" [ref=f13e1637]
+          - columnheader "이번 판" [ref=f13e1638]
+      - rowgroup [ref=f13e1639]:
+        - row [ref=f13e1640]:
+          - cell "계정 등록" [ref=f13e1641]
+          - cell "450×550" [ref=f13e1642]
+          - cell "M 560 · T4" [ref=f13e1643]
+        - row [ref=f13e1644]:
+          - cell "계정 편집" [ref=f13e1645]
+          - cell "400×550" [ref=f13e1646]
+          - cell "상세 칸으로 흡수" [ref=f13e1647]
+        - row [ref=f13e1648]:
+          - cell "계정 삭제" [ref=f13e1649]
+          - cell "450×280" [ref=f13e1650]
+          - cell "상세 칸 + 확인 팝업(T5)" [ref=f13e1651]
+        - row [ref=f13e1652]:
+          - cell "비밀번호 재설정" [ref=f13e1653]
+          - cell "450×300" [ref=f13e1654]
+          - cell "S 400 · T4" [ref=f13e1655]
+        - row [ref=f13e1656]:
+          - cell "내 정보" [ref=f13e1657]
+          - cell "550×500" [ref=f13e1658]
+          - cell "M 560 · T4" [ref=f13e1659]
+        - row [ref=f13e1660]:
+          - cell "함체 임계값" [ref=f13e1661]
+          - cell "460×470" [ref=f13e1662]
+          - cell "M 560 — 장비 상세의 설정 섹션과 같은 값을 편집하므로 상세 칸 흡수 후보" [ref=f13e1663]
+        - row [ref=f13e1664]:
+          - cell "카메라 속성" [ref=f13e1665]
+          - cell "500×600" [ref=f13e1666]
+          - cell "장비 상세 칸으로 흡수(의도/관측 분리 적용)" [ref=f13e1667]
+        - row [ref=f13e1668]:
+          - cell "장비 추가(배정)" [ref=f13e1669]
+          - cell "600×600" [ref=f13e1670]
+          - cell "L 720 — 좌→우 이동형 두 목록이라 넓게" [ref=f13e1671]
+        - row [ref=f13e1672]:
+          - cell "제어기 추가" [ref=f13e1673]
+          - cell [ref=f13e1674]:
+            - text: 빈 스텁(
+            - code [ref=f13e1675]: <Grid/>
+            - text: )
+          - cell "삭제 — 장비 등록(카테고리 선택형) 하나로" [ref=f13e1676]
+        - row [ref=f13e1677]:
+          - cell "센서 추가" [ref=f13e1678]
+          - cell "고정 없음(임베드)" [ref=f13e1679]
+          - cell "장비 등록에 통합" [ref=f13e1680]
+        - row [ref=f13e1681]:
+          - cell "조치보고 2종" [ref=f13e1682]
+          - cell "행 550 · 폭은 호스트" [ref=f13e1683]
+          - cell "M 560 · Float(뒤를 막지 않음)" [ref=f13e1684]
+        - row [ref=f13e1685]:
+          - cell "변경 미리보기(신규)" [ref=f13e1686]
+          - cell "없음" [ref=f13e1687]
+          - cell "M 560 — 부품 추가·제거·지워질 관측·설정 변경" [ref=f13e1688]
+        - row [ref=f13e1689]:
+          - cell "부대 소속 픽커(신규)" [ref=f13e1690]
+          - cell "없음" [ref=f13e1691]
+          - cell "S 400 — 편제 트리 재사용" [ref=f13e1692]
+    - generic [ref=f13e1693]:
+      - heading "T5 시스템 알림 — 지금 탈출구가 없는 창이 있다" [level=3] [ref=f13e1694]
+      - generic [ref=f13e1695]: 확인 · 안내 · 진행 · 로그인 · 로그아웃
+    - table [ref=f13e1697]:
+      - rowgroup [ref=f13e1698]:
+        - row [ref=f13e1699]:
+          - columnheader "창" [ref=f13e1700]
+          - columnheader "지금 (실측)" [ref=f13e1701]
+          - columnheader "이번 판" [ref=f13e1702]
+      - rowgroup [ref=f13e1703]:
+        - row [ref=f13e1704]:
+          - cell "확인" [ref=f13e1705]
+          - cell "400×250" [ref=f13e1706]
+          - cell [ref=f13e1707]:
+            - text: S 400 ·
+            - code [ref=f13e1708]: ConfirmAsync → bool
+            - text: — 취소가 호출자에게 전달되게
+        - row [ref=f13e1709]:
+          - cell "안내" [ref=f13e1710]
+          - cell "400×250" [ref=f13e1711]
+          - cell [ref=f13e1712]:
+            - text: S 400 ·
+            - code [ref=f13e1713]: InfoAsync
+        - row [ref=f13e1714]:
+          - cell "진행" [ref=f13e1715]
+          - cell "500×500 · 닫기 요소 0개" [ref=f13e1716]
+          - cell "S 400 + 취소 버튼 필수 · 예외 시 자동 해제 — 지금은 예외가 나면 전체 화면이 잠겨 재시작 외 탈출 불가" [ref=f13e1717]
+        - row [ref=f13e1718]:
+          - cell "로그인" [ref=f13e1719]
+          - cell "400(실패 시 406)" [ref=f13e1720]
+          - cell "S 400 고정 — 폭이 흔들리지 않게(결과는 색·문구로)" [ref=f13e1721]
+        - row [ref=f13e1722]:
+          - cell "로그아웃" [ref=f13e1723]
+          - cell "400×220" [ref=f13e1724]
+          - cell "S 400 · 확인 팝업과 같은 틀" [ref=f13e1725]
+    - generic [ref=f13e1726]:
+      - heading "다이얼로그 구현 메모" [level=4] [ref=f13e1727]
+      - generic [ref=f13e1728]:
+        - term [ref=f13e1729]: 호스팅
+        - definition [ref=f13e1730]: 틀(T4)과 띄우는 방식(모달 · Float)은 별개입니다. 조치보고·조치 내역·변경 미리보기는 Float, 파괴적 확인은 모달.
+        - term [ref=f13e1731]: 진행 팝업
+        - definition [ref=f13e1732]:
+          - text: Surface Kernel
+          - code [ref=f13e1733]: RunWithProgressAsync
+          - text: 로 통일하고 취소 토큰을 받습니다. 닫기 없는 전체 화면 스크림은 금지.
+        - term [ref=f13e1734]: 버튼 줄
+        - definition [ref=f13e1735]: 하단 오른쪽 정렬 · 주 동작이 오른쪽 끝 · 파괴적 동작은 확인 문구에 대상 이름을 넣습니다.
+  - region [ref=f13e1736]:
+    - generic [ref=f13e1737]:
+      - heading "셸 — 창을 여는 자리" [level=2] [ref=f13e1738]
+      - paragraph [ref=f13e1739]: 1250×850 · 좌측 메뉴 · 이벤트 드로어
+    - table [ref=f13e1741]:
+      - rowgroup [ref=f13e1742]:
+        - row [ref=f13e1743]:
+          - columnheader "영역" [ref=f13e1744]
+          - columnheader "지금 (실측)" [ref=f13e1745]
+          - columnheader "이번 판" [ref=f13e1746]
+      - rowgroup [ref=f13e1747]:
+        - row [ref=f13e1748]:
+          - cell "셸 창" [ref=f13e1749]
+          - cell "1250×850" [ref=f13e1750]
+          - cell "그대로 — 콘솔은 셸 안 표면으로 뜸" [ref=f13e1751]
+        - row [ref=f13e1752]:
+          - cell "좌측 메뉴" [ref=f13e1753]
+          - cell "WINDY · 통합웹 / 로그인 · 로그아웃 · 내 정보 · 계정 · 이벤트 · 억제창 · 장비 · 보고서 · 설정" [ref=f13e1754]
+          - cell "여기에 부대(v8) · 서버(신설) 추가 — 권한·계약 세대로 표시 결정" [ref=f13e1755]
+        - row [ref=f13e1756]:
+          - cell "이벤트 드로어" [ref=f13e1757]
+          - cell [ref=f13e1758]:
+            - text: 열 폭
+            - code [ref=f13e1759]: "300"
+            - text: 인데 내부
+            - code [ref=f13e1760]: Border
+            - text: 는
+            - code [ref=f13e1761]: "250"
+            - text: 하드코딩 — 불일치
+          - cell "한 값으로 통일하고 200~300 사용자 조절(Surface Kernel)" [ref=f13e1762]
+        - row [ref=f13e1763]:
+          - cell "콘솔 진입" [ref=f13e1764]
+          - cell "메뉴 클릭 → 컨덕터가 전체화면 패널로 교체" [ref=f13e1765]
+          - cell "Surface Kernel 표면으로 — 여러 콘솔을 동시에 띄우고 옮길 수 있게" [ref=f13e1766]
+    - paragraph [ref=f13e1767]: 맵 OverlayWindow 20종은 이번 범위에서 제외합니다(2차). 그 외 창은 이 문서의 절들이 모두 덮습니다 — 장비 · 이벤트 · 억제 · 계정 6 · 보고서 3 · 설정 9탭 · 서버(신설) · 부대(신설) · 다이얼로그 13 · 시스템 알림 5.
+  - region [ref=f13e1768]:
+    - generic [ref=f13e1769]:
+      - heading "창 틀은 여섯 가지면 된다" [level=2] [ref=f13e1770]
+      - paragraph [ref=f13e1771]: 창 30종 + 맵 오버레이 20종을 성격별로 묶었습니다
+    - generic [ref=f13e1772]:
+      - generic [ref=f13e1773]:
+        - generic [ref=f13e1780]:
+          - strong [ref=f13e1781]: T1 · 목록과 상세
+          - generic [ref=f13e1782]: 15개 창
+        - paragraph [ref=f13e1783]: 레일 · 목록 · 상세 3단. 장비 7종, 계정 사용자·세션·권한 부여·감사 로그, 이벤트 내역 4종, 보고서 목록·템플릿, 억제 스케줄.
+      - generic [ref=f13e1784]:
+        - generic [ref=f13e1796]:
+          - strong [ref=f13e1797]: T2 · 설정
+          - generic [ref=f13e1798]: 5개 창
+        - paragraph [ref=f13e1799]: 레일 · 섹션 폼 · 아래 고정 저장 막대(바뀐 게 있을 때만 켜짐). 설정 정보 10탭, 세션 설정, 보고서 생성, 권한 매트릭스(넓은 폼).
+      - generic [ref=f13e1800]:
+        - generic [ref=f13e1809]:
+          - strong [ref=f13e1810]: T3 · 분석
+          - generic [ref=f13e1811]: 2개 창
+        - paragraph [ref=f13e1812]: 레일 · 필터 막대 · 차트 전폭, 점을 누르면 상세가 밀려 나옵니다. 이벤트 차트보기, 탐지 신호 이력.
+      - generic [ref=f13e1813]:
+        - generic [ref=f13e1819]:
+          - strong [ref=f13e1820]: T4 · 작업 다이얼로그
+          - generic [ref=f13e1821]: 10개 창
+        - paragraph [ref=f13e1822]: 폭은 400 · 560 · 720 세 가지만. 아래 고정 버튼 줄 — 보조는 왼쪽, 주 동작은 오른쪽, 지우기는 위험색, 기본 포커스는 취소.
+      - generic [ref=f13e1823]:
+        - generic [ref=f13e1827]:
+          - strong [ref=f13e1828]: T5 · 시스템 알림
+          - generic [ref=f13e1829]: 2 + 공통
+        - paragraph [ref=f13e1830]: 확인 · 안내 · 진행, 토스트, P0 알람. Surface Kernel 기획의 표면 규칙을 그대로 따릅니다.
+      - generic [ref=f13e1831]:
+        - generic [ref=f13e1835]:
+          - strong [ref=f13e1836]: T6 · 맵 오버레이 창
+          - generic [ref=f13e1837]: 2차 · 14개
+        - paragraph [ref=f13e1838]: 헤더 38 · 모서리 10 · 그림자 하나. 계기(나침반·강풍·줌·축척·좌표·장애)는 모양이 곧 기능이라 대상에서 뺍니다.
+  - region [ref=f13e1839]:
+    - generic [ref=f13e1840]:
+      - heading "창마다 어느 틀로 가는가" [level=2] [ref=f13e1841]
+      - paragraph [ref=f13e1842]: 크기는 XAML 고정값
+    - table [ref=f13e1844]:
+      - rowgroup [ref=f13e1845]:
+        - row [ref=f13e1846]:
+          - columnheader "영역" [ref=f13e1847]
+          - columnheader "창" [ref=f13e1848]
+          - columnheader "지금 모양" [ref=f13e1849]
+          - columnheader "지금 크기" [ref=f13e1850]
+          - columnheader "틀" [ref=f13e1851]
+      - rowgroup [ref=f13e1852]:
+        - row [ref=f13e1853]:
+          - cell "장비" [ref=f13e1854]
+          - cell "그룹 · 제어기 · 센서 · 카메라 · 스피커 · 함체 · 경광등" [ref=f13e1855]
+          - cell "요약 280 · 레일 390 · 목록 260 · 선택 시 편집기가 요약을 덮음" [ref=f13e1856]
+          - cell "1050×700" [ref=f13e1857]
+          - cell "T1" [ref=f13e1858]
+        - row [ref=f13e1860]:
+          - cell "계정" [ref=f13e1861]
+          - cell "사용자 · 세션 관리 · 권한 부여 · 감사 로그" [ref=f13e1862]
+          - cell "위쪽 탭 6 · 목록 · 편집은 별도 다이얼로그" [ref=f13e1863]
+          - cell "1120×700" [ref=f13e1864]
+          - cell "T1" [ref=f13e1865]
+        - row [ref=f13e1867]:
+          - cell "계정" [ref=f13e1868]
+          - cell "권한 설정 · 세션 설정" [ref=f13e1869]
+          - cell "표 6개 · 폼" [ref=f13e1870]
+          - cell "—" [ref=f13e1871]
+          - cell "T2" [ref=f13e1872]
+        - row [ref=f13e1874]:
+          - cell "이벤트" [ref=f13e1875]
+          - cell "탐지 · 장애 · 연결 · 조치 내역" [ref=f13e1876]
+          - cell "위쪽 요약 탭(센서/카메라 차트) ↔ 선택 시 편집기가 같은 칸을 덮음 · 기간 바 · 왼쪽 레일 5" [ref=f13e1877]
+          - cell "1150×760" [ref=f13e1878]
+          - cell "T1" [ref=f13e1879]
+        - row [ref=f13e1881]:
+          - cell "이벤트" [ref=f13e1882]
+          - cell "차트보기 · 탐지 신호 이력" [ref=f13e1883]
+          - cell "차트 · 필터 190×2 + 목록" [ref=f13e1884]
+          - cell "— · 880" [ref=f13e1885]
+          - cell "T3" [ref=f13e1886]
+        - row [ref=f13e1888]:
+          - cell "이벤트" [ref=f13e1889]
+          - cell "억제 스케줄" [ref=f13e1890]
+          - cell "폼이 위(408 + 356 고정) · 목록이 아래" [ref=f13e1891]
+          - cell "1050×720" [ref=f13e1892]
+          - cell "T1" [ref=f13e1893]
+        - row [ref=f13e1895]:
+          - cell "보고서" [ref=f13e1896]
+          - cell "목록 · 템플릿" [ref=f13e1897]
+          - cell "위쪽 탭 3 · 목록" [ref=f13e1898]
+          - cell "960×700" [ref=f13e1899]
+          - cell "T1" [ref=f13e1900]
+        - row [ref=f13e1902]:
+          - cell "보고서" [ref=f13e1903]
+          - cell "생성" [ref=f13e1904]
+          - cell "폼" [ref=f13e1905]
+          - cell "—" [ref=f13e1906]
+          - cell "T2" [ref=f13e1907]
+        - row [ref=f13e1909]:
+          - cell "설정" [ref=f13e1910]
+          - cell "설정 정보 10탭" [ref=f13e1911]
+          - cell "레일 10 · 폼" [ref=f13e1912]
+          - cell "800×500" [ref=f13e1913]
+          - cell "T2" [ref=f13e1914]
+        - row [ref=f13e1916]:
+          - cell "다이얼로그" [ref=f13e1917]
+          - cell "조치보고 2 · 계정 4 · 함체 임계값 · 장비 배정 · 카메라 속성 · 장비 추가" [ref=f13e1918]
+          - cell "폭 400 · 450 · 460 · 500 · 550 · 600 여섯 가지" [ref=f13e1919]
+          - cell "제각각" [ref=f13e1920]
+          - cell "T4" [ref=f13e1921]
+        - row [ref=f13e1923]:
+          - cell "공통" [ref=f13e1924]
+          - cell "확인 · 안내 · 진행 · 로그인 · 로그아웃 · 강풍 모드" [ref=f13e1925]
+          - cell "카드" [ref=f13e1926]
+          - cell "400×250 등" [ref=f13e1927]
+          - cell "T5" [ref=f13e1928]
+        - row [ref=f13e1930]:
+          - cell "지도" [ref=f13e1931]
+          - cell "레이어 · 센서 정보 · 재생 · 추적 설정 · 방송 · TTS · 카메라 팝업 등" [ref=f13e1932]
+          - cell "Control + 스타일, 모서리 3–13" [ref=f13e1933]
+          - cell "제각각" [ref=f13e1934]
+          - cell "T6 · 2차" [ref=f13e1935]
+  - region [ref=f13e1937]:
+    - generic [ref=f13e1938]:
+      - heading "다른 콘솔에 옮기면" [level=2] [ref=f13e1939]
+      - paragraph [ref=f13e1940]: 오른쪽 칸에 무엇이 오는지만 다릅니다
+    - generic [ref=f13e1941]:
+      - generic [ref=f13e1942]:
+        - heading "계정사용자" [level=3] [ref=f13e1943]
+        - generic [ref=f13e1944]:
+          - generic [ref=f13e1945]:
+            - generic [ref=f13e1946]: 사용자
+            - generic [ref=f13e1947]: 권한 설정
+            - generic [ref=f13e1948]: 세션 관리
+            - generic [ref=f13e1949]: 세션 설정
+            - generic [ref=f13e1950]: 감사 로그
+            - generic [ref=f13e1951]: 권한 부여
+          - generic [ref=f13e1959]:
+            - generic [ref=f13e1961]: 인적사항
+            - emphasis [ref=f13e1962]
+            - emphasis [ref=f13e1963]
+            - generic [ref=f13e1964]: 역할
+            - emphasis [ref=f13e1965]
+            - generic [ref=f13e1966]:
+              - generic [ref=f13e1967]: 잠금
+              - generic [ref=f13e1968]: 편집
+        - paragraph [ref=f13e1969]: 위쪽 탭 6개가 레일로 내려오고 권한별 표시 규칙은 그대로 옮깁니다. 편집 · 삭제 · 잠금은 상세 칸으로 흡수하고, 등록과 비밀번호 재설정만 다이얼로그로 남깁니다.
+      - generic [ref=f13e1970]:
+        - heading "이벤트탐지 내역" [level=3] [ref=f13e1971]
+        - generic [ref=f13e1972]:
+          - generic [ref=f13e1973]:
+            - generic [ref=f13e1974]: 차트보기
+            - generic [ref=f13e1975]: 탐지내역
+            - generic [ref=f13e1976]: 장애내역
+            - generic [ref=f13e1977]: 연결내역
+            - generic [ref=f13e1978]: 조치내역
+          - generic [ref=f13e1986]:
+            - generic [ref=f13e1987] [cursor=pointer]
+            - generic [ref=f13e1988]: 신호
+            - emphasis [ref=f13e1989]
+            - emphasis [ref=f13e1990]
+            - generic [ref=f13e1991]:
+              - generic [ref=f13e1992]: 지도에서 보기
+              - generic [ref=f13e1993]: 조치보고
+        - paragraph [ref=f13e1994]:
+          - text: 위쪽 요약 탭(센서 / 카메라 이벤트 차트)은 레일의 개요로 옮기고, 조치보고는 우클릭 메뉴에서 상세 칸의 주 버튼으로 올라오고, 우클릭에는 조치내역 보기가 새로 들어갑니다. 제어기별 막대 · 유형 도넛 · 시간대 추이 · 카메라 탐지는 개요 한 화면에 모입니다. 자세한 설계는 아래
+          - link "이벤트 콘솔" [ref=f13e1995] [cursor=pointer]:
+            - /url: "#events"
+          - text: .
+      - generic [ref=f13e1996]:
+        - heading "억제 스케줄" [level=3] [ref=f13e1997]
+        - generic [ref=f13e1998]:
+          - generic [ref=f13e1999]:
+            - generic [ref=f13e2000]: 진행 중
+            - generic [ref=f13e2001]: 예정
+            - generic [ref=f13e2002]: 종료
+          - generic [ref=f13e2010]:
+            - generic [ref=f13e2011]: 억제 시간
+            - emphasis [ref=f13e2012]
+            - generic [ref=f13e2013]: 범위
+            - emphasis [ref=f13e2014]
+            - emphasis [ref=f13e2015]
+            - generic [ref=f13e2016]: 장비
+            - emphasis [ref=f13e2017]
+            - generic [ref=f13e2018]:
+              - generic [ref=f13e2019]: 취소 예약
+              - generic [ref=f13e2020]: 수정
+        - paragraph [ref=f13e2021]: 목록을 가운데로 올리고 오른쪽 칸은 읽기 요약(상태 · 반복 요약 · 대상)입니다. 확정된 두 칸 폼(약 780px)은 오른쪽 칸에 들어가지 않으므로 수정 · 새 스케줄은 같은 창 안의 넓은 서랍으로 엽니다.
+      - generic [ref=f13e2022]:
+        - heading "보고서템플릿" [level=3] [ref=f13e2023]
+        - generic [ref=f13e2024]:
+          - generic [ref=f13e2025]:
+            - generic [ref=f13e2026]: 목록
+            - generic [ref=f13e2027]: 생성
+            - generic [ref=f13e2028]: 템플릿
+          - generic [ref=f13e2034]:
+            - generic [ref=f13e2035]: 기본 정보
+            - emphasis [ref=f13e2036]
+            - emphasis [ref=f13e2037]
+            - generic [ref=f13e2038]: 기본 기간
+            - emphasis [ref=f13e2039]
+            - generic [ref=f13e2040]:
+              - generic [ref=f13e2041]: 복제
+              - generic [ref=f13e2042]: 저장
+        - paragraph [ref=f13e2043]: 목록 · 생성 · 템플릿을 오가며 미리보기를 확인하던 왕복이 사라집니다. 목록에서는 오른쪽 칸이 미리보기와 메타 정보가 됩니다.
+  - region [ref=f13e2044]:
+    - generic [ref=f13e2045]:
+      - heading "맵 오버레이 창 — 2차로 뺍니다" [level=2] [ref=f13e2046]
+      - paragraph [ref=f13e2047]: 각 오버레이 스타일 파일의 첫 CornerRadius, 실제 크기로
+    - paragraph [ref=f13e2048]: 지도 위에 뜨는 창형 오버레이 14종 가운데 기존 표준(모서리 10 · 헤더 38)을 지키는 것은 7종입니다. 통일할 가치는 분명하지만, 코드 영역·좌표계·검증 방식이 앱 창과 달라 1차에 섞으면 무엇이 무엇을 깨뜨렸는지 가를 수 없습니다.
+    - generic [ref=f13e2049]:
+      - generic [ref=f13e2050]:
+        - generic [ref=f13e2052]: "3"
+        - generic [ref=f13e2053]: 군대부호 등록
+      - generic [ref=f13e2054]:
+        - generic [ref=f13e2056]: "4"
+        - generic [ref=f13e2057]: 앵커 패널
+      - generic [ref=f13e2058]:
+        - generic [ref=f13e2060]: "4"
+        - generic [ref=f13e2061]: 심볼 상세 보기
+      - generic [ref=f13e2062]:
+        - generic [ref=f13e2064]: "5"
+        - generic [ref=f13e2065]: 재생 콘솔
+      - generic [ref=f13e2066]:
+        - generic [ref=f13e2068]: "7"
+        - generic [ref=f13e2069]: 카메라 제어 허브
+      - generic [ref=f13e2070]:
+        - generic [ref=f13e2072]: "8"
+        - generic [ref=f13e2073]: 레이어 패널
+      - generic [ref=f13e2074]:
+        - generic [ref=f13e2076]: "10"
+        - generic [ref=f13e2077]: 센서 정보 · 추적 설정 · 방송 · TTS · 관심지역 · 드로잉 HUD · 지도 등록
+      - generic [ref=f13e2078]:
+        - generic [ref=f13e2080]: "13"
+        - generic [ref=f13e2081]: 카메라 영상 팝업
+      - generic [ref=f13e2082]:
+        - generic [ref=f13e2084]: "6"
+        - generic [ref=f13e2085]: 줌 (계기)
+      - generic [ref=f13e2086]:
+        - generic [ref=f13e2088]: "8"
+        - generic [ref=f13e2089]: 나침반 (계기)
+      - generic [ref=f13e2090]:
+        - generic [ref=f13e2092]: "20"
+        - generic [ref=f13e2093]: 장애 표시 (계기)
+      - generic [ref=f13e2094]:
+        - generic [ref=f13e2096]: "22"
+        - generic [ref=f13e2097]: 강풍 표시 (계기)
+    - generic [ref=f13e2098]:
+      - generic [ref=f13e2099]: 표준 10 (7종)
+      - generic [ref=f13e2101]: 표준에서 벗어난 창 (7종)
+      - generic [ref=f13e2103]: 계기 — 통일 대상 아님
+    - generic [ref=f13e2105]:
+      - table [ref=f13e2107]:
+        - rowgroup [ref=f13e2108]:
+          - row [ref=f13e2109]:
+            - columnheader [ref=f13e2110]
+            - columnheader "1차 · 앱 창" [ref=f13e2111]
+            - columnheader "2차 · 맵 오버레이" [ref=f13e2112]
+        - rowgroup [ref=f13e2113]:
+          - row [ref=f13e2114]:
+            - cell "코드" [ref=f13e2115]
+            - cell "메인 솔루션 + Devices · Accounts · Events · Reports.Ui" [ref=f13e2116]
+            - cell "GMaps.Ui 컨트롤 · 스타일 · 지도 캔버스" [ref=f13e2117]
+          - row [ref=f13e2118]:
+            - cell "좌표" [ref=f13e2119]
+            - cell "셸 창" [ref=f13e2120]
+            - cell "지도 캔버스 픽셀 + 위경도(카메라 리더선)" [ref=f13e2121]
+          - row [ref=f13e2122]:
+            - cell "드래그" [ref=f13e2123]
+            - cell "새로 만듦" [ref=f13e2124]
+            - cell "이미 있음 — 캔버스 부모 구조에 묶여 있음" [ref=f13e2125]
+          - row [ref=f13e2126]:
+            - cell "검증" [ref=f13e2127]
+            - cell "UI 자동화로 상당 부분" [ref=f13e2128]
+            - cell "픽셀 비교 위주" [ref=f13e2129]
+          - row [ref=f13e2130]:
+            - cell "함께 고치는 기획" [ref=f13e2131]
+            - cell "거의 없음" [ref=f13e2132]
+            - cell "3D 하우징 · 그룹 심볼 변환 진행 중" [ref=f13e2133]
+      - generic [ref=f13e2134]:
+        - term [ref=f13e2135]: 외곽
+        - definition [ref=f13e2136]: 표면 색 · 1px 테두리 · 모서리 10 · 그림자 한 종
+        - term [ref=f13e2137]: 헤더
+        - definition [ref=f13e2138]: 38 · 강조색 · 아이콘 16 + 제목 13 + 닫기
+        - term [ref=f13e2139]: 섹션
+        - definition [ref=f13e2140]: 1차 상세 패널과 같은 섹션 라벨 규격
+        - term [ref=f13e2141]: 크기 조절
+        - definition [ref=f13e2142]: 목록형(레이어 · 센서 정보 · 재생)만 오른쪽 아래 손잡이
+        - term [ref=f13e2143]: 센서 정보
+        - definition [ref=f13e2144]: 지도 쪽 ‘선택 그룹 센서 목록’ — 1차 상세 칸과 같은 정보 구조라 시각 규격을 맞춥니다
+        - term [ref=f13e2145]: 착수 조건
+        - definition [ref=f13e2146]: 1차 토큰 확정 · 진행 중 지도 기획 2건과 파일 충돌 합의 · 스크린샷 기준선
+  - region [ref=f13e2147]:
+    - generic [ref=f13e2148]:
+      - heading "진행 순서" [level=2] [ref=f13e2149]
+      - paragraph [ref=f13e2150]: 앞 단계가 다음 단계의 재료입니다
+    - list [ref=f13e2151]:
+      - listitem [ref=f13e2152]:
+        - generic [ref=f13e2153]: 1-A
+        - generic [ref=f13e2154]:
+          - strong [ref=f13e2155]: 틀과 부품
+          - paragraph [ref=f13e2156]: 레일 · 툴바 · 상세 패널 · 저장 막대 · 다이얼로그 폭, 그리고 창 폭 판정 순수 함수.
+        - generic [ref=f13e2157]: Surface Kernel 창 프레임과 함께
+      - listitem [ref=f13e2158]:
+        - generic [ref=f13e2159]: 1-B
+        - generic [ref=f13e2160]:
+          - strong [ref=f13e2161]: 장비 창
+          - paragraph [ref=f13e2162]: 이 문서의 콘솔 그대로 — 7탭, 상세 패널 6상태, 열 우선순위. 상세 패널은 선택마다 새로 만들지 않고 하나를 두고 선택만 바꿉니다.
+        - generic [ref=f13e2163]: 1-A 이후
+      - listitem [ref=f13e2164]:
+        - generic [ref=f13e2165]: 1-C
+        - generic [ref=f13e2166]:
+          - strong [ref=f13e2167]: 콘솔로 넓히기
+          - paragraph [ref=f13e2168]: 계정 → 이벤트 → 보고서 → 억제 스케줄.
+        - generic [ref=f13e2169]: 장비 창 확인 후
+      - listitem [ref=f13e2170]:
+        - generic [ref=f13e2171]: 1-D
+        - generic [ref=f13e2172]:
+          - strong [ref=f13e2173]: 설정과 다이얼로그
+          - paragraph [ref=f13e2174]: 설정 정보를 T2로, 다이얼로그 10종 폭을 세 가지로.
+        - generic [ref=f13e2175]: 1-A 이후, 1-B와 병행 가능
+      - listitem [ref=f13e2176]:
+        - generic [ref=f13e2177]: "2"
+        - generic [ref=f13e2178]:
+          - strong [ref=f13e2179]: 맵 오버레이 창
+          - paragraph [ref=f13e2180]: 창형 14종 크롬 통일, 센서 정보 패널 규격 맞춤.
+        - generic [ref=f13e2181]: 1차 토큰 확정 + 지도 기획 충돌 합의
+  - region [ref=f13e2182]:
+    - generic [ref=f13e2183]:
+      - heading "정해 주실 것" [level=2] [ref=f13e2184]
+      - paragraph [ref=f13e2185]: 권고안으로 진행해도 되는지
+    - table [ref=f13e2187]:
+      - rowgroup [ref=f13e2188]:
+        - row [ref=f13e2189]:
+          - columnheader "#" [ref=f13e2190]
+          - columnheader "내용" [ref=f13e2191]
+          - columnheader "권고" [ref=f13e2192]
+      - rowgroup [ref=f13e2193]:
+        - row [ref=f13e2194]:
+          - cell "L-D1" [ref=f13e2195]
+          - cell "장비 창 기본 크기를 1050×700에서 1280×760으로" [ref=f13e2196]
+          - cell "올림" [ref=f13e2197]
+        - row [ref=f13e2198]:
+          - cell "L-D2" [ref=f13e2199]
+          - cell "목록 기본 열을 핵심 6열로, 나머지는 상세 패널과 ‘열’ 메뉴로" [ref=f13e2200]
+          - cell "채택" [ref=f13e2201]
+        - row [ref=f13e2202]:
+          - cell "L-D3" [ref=f13e2203]
+          - cell "요약 카드 띠(280px)를 없애고 레일 개수 배지 · 선택 없음 상태의 수치로 흡수" [ref=f13e2204]
+          - cell "채택" [ref=f13e2205]
+        - row [ref=f13e2206]:
+          - cell "L-D4" [ref=f13e2207]
+          - cell "계정 편집 · 삭제 · 잠금 다이얼로그를 상세 패널로" [ref=f13e2208]
+          - cell "채택 (등록 · 비밀번호 재설정은 유지)" [ref=f13e2209]
+        - row [ref=f13e2210]:
+          - cell "L-D5" [ref=f13e2211]
+          - cell "이벤트 위쪽 요약 탭을 레일 ‘개요’로 — 아래 이벤트 쪽 E-D1과 같음" [ref=f13e2212]
+          - cell "채택" [ref=f13e2213]
+        - row [ref=f13e2214]:
+          - cell "L-D6" [ref=f13e2215]
+          - cell "맵 오버레이 창 통일은 2차로 분리" [ref=f13e2216]
+          - cell "분리" [ref=f13e2217]
+        - row [ref=f13e2218]:
+          - cell "L-D7" [ref=f13e2219]
+          - cell "권한 매트릭스의 세 뷰 교체(목록 · 매트릭스 · 구성원)를 목록 + 상세 한 화면으로 + 모듈 16종 카탈로그 경고 배너" [ref=f13e2220]
+          - cell "채택" [ref=f13e2221]
+        - row [ref=f13e2222]:
+          - cell "L-D8" [ref=f13e2223]
+          - cell "보고서 미리보기를 전체 오버레이 → 오른쪽 칸 축소 미리보기(크게 보기만 모달)" [ref=f13e2224]
+          - cell "채택" [ref=f13e2225]
+        - row [ref=f13e2226]:
+          - cell "L-D9" [ref=f13e2227]
+          - cell "설정 창은 9탭 유지(10탭은 오기) + 고아 뷰모델 4종 정리 · 서버 연결 탭 신설 여부" [ref=f13e2228]
+          - cell "정리 채택 · 새 탭은 확인" [ref=f13e2229]
+        - row [ref=f13e2230]:
+          - cell "L-D10" [ref=f13e2231]
+          - cell "서버 모니터 콘솔 신설(T1 + 지표) — 지금 UI 0건 · 생존 판정은 REST 금지" [ref=f13e2232]
+          - cell "신설" [ref=f13e2233]
+        - row [ref=f13e2234]:
+          - cell "L-D11" [ref=f13e2235]
+          - cell "부대 콘솔 — 별도 확정도(2026-09-18)를 정본으로 따르고 이 문서는 자리만 잡음" [ref=f13e2236]
+          - cell "확정도 채택" [ref=f13e2237]
+        - row [ref=f13e2238]:
+          - cell "L-D14" [ref=f13e2239]
+          - cell "이벤트 맵핑 워크벤치를 전 창 체계에 편입(T1 변형 — 오른쪽 칸이 팔레트) · 착수는 DTO 결함 수선 후" [ref=f13e2240]
+          - cell "편입 · 착수는 후순위" [ref=f13e2241]
+        - row [ref=f13e2242]:
+          - cell "L-D12" [ref=f13e2243]
+          - cell "다이얼로그 폭을 S 400 · M 560 · L 720 세 규격으로 · 빈 스텁(제어기 추가) 삭제 · 진행 팝업에 취소 버튼" [ref=f13e2244]
+          - cell "채택" [ref=f13e2245]
+        - row [ref=f13e2246]:
+          - cell "L-D13" [ref=f13e2247]
+          - cell "이벤트 드로어 폭 불일치(열 300 vs 내부 250) 통일 + 200~300 사용자 조절" [ref=f13e2248]
+          - cell "채택" [ref=f13e2249]
+  - contentinfo [ref=f13e2250]:
+    - generic [ref=f13e2251]:
+      - text: Ironwall 콘솔 레이아웃 · 2026-09-14 · 색은
+      - code [ref=f13e2252]: Tokens.Light.xaml
+      - text: /
+      - code [ref=f13e2253]: Tokens.Dark.xaml
+      - text: 실측값
+    - generic [ref=f13e2254]:
+      - text: 근거
+      - link "window-layout-redesign-analysis.md" [ref=f13e2255] [cursor=pointer]:
+        - /url: ../analyses/window-layout-redesign-analysis.md
+      - text: · 창 구조 기획
+      - link "Surface Kernel 스토리보드" [ref=f13e2256] [cursor=pointer]:
+        - /url: window-surface-kernel-storyboard.html
+    - generic [ref=f13e2257]: 콘솔 안의 장비 이름 · IP · 좌표는 설명용 예시입니다. 목업은 실제 앱 화면이 아니라 디자인 검토용 재현입니다.

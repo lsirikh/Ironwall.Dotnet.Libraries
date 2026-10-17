@@ -1,0 +1,88 @@
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+/****************************************************************************
+   Purpose      : EventQueue 매니저 인터페이스 — UUID 기반 글로벌 이벤트 큐
+   Created By   : GHLee
+   Created On   : 2026-03-08
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+****************************************************************************/
+public interface IEventQueueManager
+{
+    /// <summary>이벤트 큐에 등록 → entryId 반환. externalEntryId가 있으면 해당 값 사용, 없으면 자체 UUID 생성</summary>
+    string Enqueue(EventEntry entry, string? externalEntryId = null);
+
+    /// <summary>조치보고 시 해당 entry 제거 + 그룹 복원 판단</summary>
+    void Dequeue(string entryId);
+
+    /// <summary>(EB3) 특정 장비의 모든 이벤트 엔트리 제거 — 장비 삭제 시 고아 이벤트 방지</summary>
+    void RemoveByDevice(int deviceId, EnumDeviceType deviceType);
+
+    /// <summary>전체 이벤트 일괄 조치보고</summary>
+    void DequeueAll();
+
+    /// <summary>특정 entry 조회</summary>
+    EventEntry? GetEntry(string entryId);
+
+    /// <summary>큐 전체 이벤트 수</summary>
+    int GetTotalQueueCount();
+
+    /// <summary>활성(미조치) 탐지(Intrusion)·장애(Fault) 건수 — 지도 계기 인디케이터 소스
+    /// (GMap_Map_Instruments D-01/03). _entries를 EventType별 재집계.</summary>
+    (int Detection, int Fault) GetActiveCounts();
+
+    /// <summary>활성 탐지/장애 건수 변경 시 발화 (detection, fault) — Enqueue/Dequeue/DequeueAll
+    /// 모든 경로에서 발화(동일 상태 dequeue 포함). 인디케이터가 폴링 없이 라이브 갱신.</summary>
+    event Action<int, int>? OnActiveCountChanged;
+
+    /// <summary>특정 그룹에 이벤트가 있는지 여부</summary>
+    bool HasEventsForGroup(int groupId);
+
+    /// <summary>특정 개별 심볼에 이벤트가 있는지 여부</summary>
+    bool HasEventsForDevice(int deviceId, EnumDeviceType deviceType);
+
+    /// <summary>특정 device의 가장 오래된 entry 조회 (제거하지 않음)</summary>
+    EventEntry? FindEntryByDevice(int deviceId, EnumDeviceType deviceType);
+
+    /// <summary>서버 이벤트 ID(EventEntry.EventId) + EventType로 활성 entry 조회 (제거하지 않음). 없으면 null.
+    /// 탐지(Intrusion)/장애(Fault)는 서버측 **독립 id 시퀀스**라 숫자 EventId만으로는 충돌 가능 →
+    /// EventType 판별 필수(FindEntryByDevice가 deviceType을 요구하는 것과 동일 원칙).
+    /// SYNC_DETECTION 썸네일 갱신 게이트 — resource_id가 현재 EQM에 등록(활성)된 **탐지**인 경우에만 재조회.</summary>
+    EventEntry? FindEntryByEventId(int eventId, EnumEventType eventType);
+
+    /// <summary>그룹의 현재 복합상태를 실제 활성 엔트리 기준으로 재계산해 반환(순수 읽기, 상태변경 없음).
+    /// 심볼 재계산 복원(FR-03)용 — 조치보고/복구 시 잔여 활성 이벤트를 반영. 엔트리 없으면 Normal.</summary>
+    EnumCompositeEventStatus GetGroupState(int groupId);
+
+    /// <summary>개별 디바이스의 현재 복합상태를 실제 활성 엔트리 기준으로 재계산해 반환(순수 읽기, 상태변경 없음).</summary>
+    EnumCompositeEventStatus GetDeviceState(int deviceId, EnumDeviceType deviceType);
+
+    /// <summary>그룹에 등록된 활성 엔트리 스냅샷(순수 읽기, 상태변경 없음). 그룹 심볼 더블클릭 조치보고가
+    /// '가장 먼저 발생한 이벤트'를 고를 때 사용. 그룹에 활성 이벤트가 없으면 빈 리스트.</summary>
+    IReadOnlyList<EventEntry> GetEntriesByGroup(int groupId);
+
+    /// <summary>지정 제어기의 블랙아웃 Fault 엔트리를 자동복구(Dequeue + OnAutoRecovery 발화). 제어기 통신 복구
+    /// (SYNC_DEVICE ACTIVATED) 트리거용 — Controller_Fault_AutoRecovery_Extension FR-04. 대상 없으면 false(멱등).</summary>
+    bool TryAutoRecoverController(int controllerId);
+
+    /// <summary>Timer 틱당 최대 Dequeue 건수 (기본 5)</summary>
+    int MaxDequeuePerTick { get; set; }
+
+    /// <summary>Enqueue 호출 시마다 발생 (0→1 전이 여부와 무관). EventType 전달.</summary>
+    event Action<EnumEventType>? OnAnyEnqueue;
+
+    /// <summary>그룹 복합 상태 전이 시 (groupId, prev, next)</summary>
+    event Action<int, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnGroupStateChanged;
+
+    /// <summary>개별 디바이스 복합 상태 전이 시 (deviceId, deviceType, prev, next)</summary>
+    event Action<int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnDeviceStateChanged;
+
+    /// <summary>자동 조치보고 타임아웃 시 발화 (EventEntry 전달). Dequeue는 핸들러 책임.</summary>
+    event Action<EventEntry>? OnAutoReport;
+
+    /// <summary>Fault 자동복구 완료 시 발화 (faultEntryId). EventQueueManager는 이미 Dequeue 처리 완료.</summary>
+    event Action<string>? OnAutoRecovery;
+}

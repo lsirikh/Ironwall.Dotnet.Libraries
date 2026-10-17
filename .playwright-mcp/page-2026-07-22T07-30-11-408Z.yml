@@ -1,0 +1,1677 @@
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: Sensorway Co., Ltd.
+      - generic [ref=e10]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: Sensorway Co., Ltd.
+        - generic [ref=e26]: UM-KO-2026-07
+      - generic [ref=e27]:
+        - generic [ref=e28]: USER MANUAL · 사용자 매뉴얼
+        - heading "Pids Monitoring System" [level=1] [ref=e29]
+        - generic [ref=e30]: IRONWALL 데스크톱 관제 프로그램 · 사용자 매뉴얼
+        - generic [ref=e31]:
+          - generic [ref=e32]: 안양발전소
+          - generic [ref=e33]: v2.6.0
+          - generic [ref=e34]: KO
+        - img "Pids Monitoring System" [ref=e36]
+      - generic [ref=e37]:
+        - generic [ref=e38]: 발행일 2026-07-22
+        - generic [ref=e39]: Sensorway Co., Ltd.
+  - generic [ref=e42]:
+    - generic [ref=e44]:
+      - generic [ref=e45]: Sensorway Co., Ltd.
+      - generic [ref=e47]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e60]:
+      - heading "목차 CONTENTS" [level=1] [ref=e61]
+      - list [ref=e62]:
+        - listitem [ref=e63]:
+          - link "01. 시작하기 — 실행 · 로그인 · 메인 화면 4" [ref=e175] [cursor=pointer]:
+            - /url: "#chap-1"
+            - generic [ref=e65]: 01. 시작하기 — 실행 · 로그인 · 메인 화면
+            - generic [ref=e176]: "4"
+        - listitem [ref=e67]:
+          - link "1.1 프로그램 실행 5" [ref=e177] [cursor=pointer]:
+            - /url: "#sec-sec-loading"
+            - generic [ref=e69]: 1.1 프로그램 실행
+            - generic [ref=e178]: "5"
+        - listitem [ref=e71]:
+          - link "1.2 로그인 6" [ref=e179] [cursor=pointer]:
+            - /url: "#sec-sec-login"
+            - generic [ref=e73]: 1.2 로그인
+            - generic [ref=e180]: "6"
+        - listitem [ref=e75]:
+          - link "1.3 회원가입 안내 7" [ref=e181] [cursor=pointer]:
+            - /url: "#sec-sec-signup"
+            - generic [ref=e77]: 1.3 회원가입 안내
+            - generic [ref=e182]: "7"
+        - listitem [ref=e79]:
+          - link "1.4 로그인 후 메인 화면 8" [ref=e183] [cursor=pointer]:
+            - /url: "#sec-sec-main"
+            - generic [ref=e81]: 1.4 로그인 후 메인 화면
+            - generic [ref=e184]: "8"
+        - listitem [ref=e83]:
+          - link "02. 화면 구성 — 상단 메뉴와 도구 모음 10" [ref=e185] [cursor=pointer]:
+            - /url: "#chap-2"
+            - generic [ref=e85]: 02. 화면 구성 — 상단 메뉴와 도구 모음
+            - generic [ref=e186]: "10"
+        - listitem [ref=e87]:
+          - link "2.1 상단 메뉴 (File · Maps) 11" [ref=e187] [cursor=pointer]:
+            - /url: "#sec-sec-topmenu"
+            - generic [ref=e89]: 2.1 상단 메뉴 (File · Maps)
+            - generic [ref=e188]: "11"
+        - listitem [ref=e91]:
+          - link "2.2 상단 도구 모음과 리소스 표시 12" [ref=e189] [cursor=pointer]:
+            - /url: "#sec-sec-toolbar"
+            - generic [ref=e93]: 2.2 상단 도구 모음과 리소스 표시
+            - generic [ref=e190]: "12"
+        - listitem [ref=e95]:
+          - link "03. 지도 조작 — 홈 · 사이트 고정 · 지도 도구 13" [ref=e191] [cursor=pointer]:
+            - /url: "#chap-3"
+            - generic [ref=e97]: 03. 지도 조작 — 홈 · 사이트 고정 · 지도 도구
+            - generic [ref=e192]: "13"
+        - listitem [ref=e99]:
+          - link "3.1 홈 위치 이동·설정 14" [ref=e193] [cursor=pointer]:
+            - /url: "#sec-sec-home"
+            - generic [ref=e101]: 3.1 홈 위치 이동·설정
+            - generic [ref=e194]: "14"
+        - listitem [ref=e103]:
+          - link "3.2 사이트 고정 (맵 앵커) 15" [ref=e195] [cursor=pointer]:
+            - /url: "#sec-sec-anchor"
+            - generic [ref=e105]: 3.2 사이트 고정 (맵 앵커)
+            - generic [ref=e196]: "15"
+        - listitem [ref=e107]:
+          - link "3.3 화면 중앙 십자가 · 관심지역 · 레이어 관리 17" [ref=e197] [cursor=pointer]:
+            - /url: "#sec-sec-map-tools"
+            - generic [ref=e109]: 3.3 화면 중앙 십자가 · 관심지역 · 레이어 관리
+            - generic [ref=e198]: "17"
+        - listitem [ref=e111]:
+          - link "3.4 추적 재생과 타겟 추적 설정 19" [ref=e199] [cursor=pointer]:
+            - /url: "#sec-sec-tracking"
+            - generic [ref=e113]: 3.4 추적 재생과 타겟 추적 설정
+            - generic [ref=e200]: "19"
+        - listitem [ref=e115]:
+          - link "04. 맵 편집 — 심볼 배치와 속성 22" [ref=e201] [cursor=pointer]:
+            - /url: "#chap-4"
+            - generic [ref=e117]: 04. 맵 편집 — 심볼 배치와 속성
+            - generic [ref=e202]: "22"
+        - listitem [ref=e119]:
+          - link "4.1 맵 편집 모드와 심볼 조작 23" [ref=e203] [cursor=pointer]:
+            - /url: "#sec-sec-editmode"
+            - generic [ref=e121]: 4.1 맵 편집 모드와 심볼 조작
+            - generic [ref=e204]: "23"
+        - listitem [ref=e123]:
+          - link "4.2 심볼 공통 속성 25" [ref=e205] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-common"
+            - generic [ref=e125]: 4.2 심볼 공통 속성
+            - generic [ref=e206]: "25"
+        - listitem [ref=e127]:
+          - link "4.3 심볼 종류별 속성 (군대부호 · PIDS · 건물) 27" [ref=e207] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-types"
+            - generic [ref=e129]: 4.3 심볼 종류별 속성 (군대부호 · PIDS · 건물)
+            - generic [ref=e208]: "27"
+        - listitem [ref=e131]:
+          - link "4.4 라인 심볼 속성 29" [ref=e209] [cursor=pointer]:
+            - /url: "#sec-sec-line"
+            - generic [ref=e133]: 4.4 라인 심볼 속성
+            - generic [ref=e210]: "29"
+        - listitem [ref=e135]:
+          - link "05. 환경 설정 (셋업 패널) 31" [ref=e211] [cursor=pointer]:
+            - /url: "#chap-5"
+            - generic [ref=e137]: 05. 환경 설정 (셋업 패널)
+            - generic [ref=e212]: "31"
+        - listitem [ref=e139]:
+          - link "5.1 셋업 패널 · 이벤트 설정 32" [ref=e213] [cursor=pointer]:
+            - /url: "#sec-sec-setup-event"
+            - generic [ref=e141]: 5.1 셋업 패널 · 이벤트 설정
+            - generic [ref=e214]: "32"
+        - listitem [ref=e143]:
+          - link "5.2 소리 설정 35" [ref=e215] [cursor=pointer]:
+            - /url: "#sec-sec-setup-sound"
+            - generic [ref=e145]: 5.2 소리 설정
+            - generic [ref=e216]: "35"
+        - listitem [ref=e147]:
+          - link "5.3 서버 연결(브로커) 설정 38" [ref=e217] [cursor=pointer]:
+            - /url: "#sec-sec-setup-broker"
+            - generic [ref=e149]: 5.3 서버 연결(브로커) 설정
+            - generic [ref=e218]: "38"
+        - listitem [ref=e151]:
+          - link "5.4 지도 · 웹 · 도커 · 프로그램 · 연동 설정 41" [ref=e219] [cursor=pointer]:
+            - /url: "#sec-sec-setup-system"
+            - generic [ref=e153]: 5.4 지도 · 웹 · 도커 · 프로그램 · 연동 설정
+            - generic [ref=e220]: "41"
+        - listitem [ref=e155]:
+          - link "06. 장비 관리 (장비 패널) 45" [ref=e221] [cursor=pointer]:
+            - /url: "#chap-6"
+            - generic [ref=e157]: 06. 장비 관리 (장비 패널)
+            - generic [ref=e222]: "45"
+        - listitem [ref=e159]:
+          - link "6.1 장비 패널과 장비 그룹 46" [ref=e223] [cursor=pointer]:
+            - /url: "#sec-sec-device-panel"
+            - generic [ref=e161]: 6.1 장비 패널과 장비 그룹
+            - generic [ref=e224]: "46"
+        - listitem [ref=e163]:
+          - link "6.2 제어기 · 센서 설정 50" [ref=e225] [cursor=pointer]:
+            - /url: "#sec-sec-device-controller-sensor"
+            - generic [ref=e165]: 6.2 제어기 · 센서 설정
+            - generic [ref=e226]: "50"
+        - listitem [ref=e167]:
+          - link "6.3 카메라 설정 52" [ref=e227] [cursor=pointer]:
+            - /url: "#sec-sec-device-camera"
+            - generic [ref=e169]: 6.3 카메라 설정
+            - generic [ref=e228]: "52"
+        - listitem [ref=e171]:
+          - link "6.4 스피커 · 함체 · 경광등 설정 55" [ref=e229] [cursor=pointer]:
+            - /url: "#sec-sec-device-others"
+            - generic [ref=e173]: 6.4 스피커 · 함체 · 경광등 설정
+            - generic [ref=e230]: "55"
+  - generic [ref=e233]:
+    - generic [ref=e235]:
+      - generic [ref=e236]: Sensorway Co., Ltd.
+      - generic [ref=e238]: Pids Monitoring System 사용자 매뉴얼
+    - list [ref=e252]:
+      - listitem [ref=e253]:
+        - link "07. 이벤트 이력 (이벤트 패널) 57" [ref=e254] [cursor=pointer]:
+          - /url: "#chap-7"
+          - generic [ref=e255]: 07. 이벤트 이력 (이벤트 패널)
+          - generic [ref=e257]: "57"
+      - listitem [ref=e258]:
+        - link "7.1 이벤트 패널과 탐지 이력 58" [ref=e259] [cursor=pointer]:
+          - /url: "#sec-sec-event-detection"
+          - generic [ref=e260]: 7.1 이벤트 패널과 탐지 이력
+          - generic [ref=e262]: "58"
+      - listitem [ref=e263]:
+        - link "7.2 장애 · 연결 · 조치 이력 62" [ref=e264] [cursor=pointer]:
+          - /url: "#sec-sec-event-fault-etc"
+          - generic [ref=e265]: 7.2 장애 · 연결 · 조치 이력
+          - generic [ref=e267]: "62"
+      - listitem [ref=e268]:
+        - link "08. 실시간 관제 — 이벤트 발생과 조치 65" [ref=e269] [cursor=pointer]:
+          - /url: "#chap-8"
+          - generic [ref=e270]: 08. 실시간 관제 — 이벤트 발생과 조치
+          - generic [ref=e272]: "65"
+      - listitem [ref=e273]:
+        - link "8.1 심볼 우클릭 메뉴 66" [ref=e274] [cursor=pointer]:
+          - /url: "#sec-sec-symbol-menu"
+          - generic [ref=e275]: 8.1 심볼 우클릭 메뉴
+          - generic [ref=e277]: "66"
+      - listitem [ref=e278]:
+        - link "8.2 탐지 이벤트 발생 화면 68" [ref=e279] [cursor=pointer]:
+          - /url: "#sec-sec-detection-live"
+          - generic [ref=e280]: 8.2 탐지 이벤트 발생 화면
+          - generic [ref=e282]: "68"
+      - listitem [ref=e283]:
+        - link "8.3 장애 이벤트 발생 화면 71" [ref=e284] [cursor=pointer]:
+          - /url: "#sec-sec-fault-live"
+          - generic [ref=e285]: 8.3 장애 이벤트 발생 화면
+          - generic [ref=e287]: "71"
+      - listitem [ref=e288]:
+        - link "8.4 이벤트 조치 보고 73" [ref=e289] [cursor=pointer]:
+          - /url: "#sec-sec-action-report"
+          - generic [ref=e290]: 8.4 이벤트 조치 보고
+          - generic [ref=e292]: "73"
+      - listitem [ref=e293]:
+        - link "8.5 카메라 영상 팝업 75" [ref=e294] [cursor=pointer]:
+          - /url: "#sec-sec-camera-popup"
+          - generic [ref=e295]: 8.5 카메라 영상 팝업
+          - generic [ref=e297]: "75"
+      - listitem [ref=e298]:
+        - link "09. 보고서 · 계정 · 권한 관리 78" [ref=e299] [cursor=pointer]:
+          - /url: "#chap-9"
+          - generic [ref=e300]: 09. 보고서 · 계정 · 권한 관리
+          - generic [ref=e302]: "78"
+      - listitem [ref=e303]:
+        - link "9.1 보고서(리포트) 79" [ref=e304] [cursor=pointer]:
+          - /url: "#sec-sec-report"
+          - generic [ref=e305]: 9.1 보고서(리포트)
+          - generic [ref=e307]: "79"
+      - listitem [ref=e308]:
+        - link "9.2 계정 관리 84" [ref=e309] [cursor=pointer]:
+          - /url: "#sec-sec-account-mgmt"
+          - generic [ref=e310]: 9.2 계정 관리
+          - generic [ref=e312]: "84"
+      - listitem [ref=e313]:
+        - link "9.3 권한 그룹과 스케쥴 권한 87" [ref=e314] [cursor=pointer]:
+          - /url: "#sec-sec-permission-group"
+          - generic [ref=e315]: 9.3 권한 그룹과 스케쥴 권한
+          - generic [ref=e317]: "87"
+      - listitem [ref=e318]:
+        - link "9.4 세션 · 감사 로그 89" [ref=e319] [cursor=pointer]:
+          - /url: "#sec-sec-session-audit"
+          - generic [ref=e320]: 9.4 세션 · 감사 로그
+          - generic [ref=e322]: "89"
+      - listitem [ref=e323]:
+        - link "10. 개인 설정 — 내 정보 · 로그아웃 · 통합 웹 · 강풍 모드 92" [ref=e324] [cursor=pointer]:
+          - /url: "#chap-10"
+          - generic [ref=e325]: 10. 개인 설정 — 내 정보 · 로그아웃 · 통합 웹 · 강풍 모드
+          - generic [ref=e327]: "92"
+      - listitem [ref=e328]:
+        - link "10.1 내 정보와 로그아웃 93" [ref=e329] [cursor=pointer]:
+          - /url: "#sec-sec-myinfo-logout"
+          - generic [ref=e330]: 10.1 내 정보와 로그아웃
+          - generic [ref=e332]: "93"
+      - listitem [ref=e333]:
+        - link "10.2 통합 웹 열기와 강풍 모드 96" [ref=e334] [cursor=pointer]:
+          - /url: "#sec-sec-web-wind"
+          - generic [ref=e335]: 10.2 통합 웹 열기와 강풍 모드
+          - generic [ref=e337]: "96"
+  - generic [ref=e340]:
+    - generic [ref=e342]:
+      - generic [ref=e343]: Sensorway Co., Ltd.
+      - generic [ref=e345]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e358]:
+      - generic [ref=e359]: CHAPTER
+      - generic [ref=e360]: "01"
+      - heading "시작하기 — 실행 · 로그인 · 메인 화면" [level=1] [ref=e361]
+      - paragraph [ref=e362]: 프로그램 실행과 로그인, 회원가입 안내, 그리고 로그인 후 메인 화면 구성을 설명합니다.
+      - list [ref=e363]:
+        - listitem [ref=e364]:
+          - generic [ref=e365]: "1.1"
+          - text: 프로그램 실행
+        - listitem [ref=e366]:
+          - generic [ref=e367]: "1.2"
+          - text: 로그인
+        - listitem [ref=e368]:
+          - generic [ref=e369]: "1.3"
+          - text: 회원가입 안내
+        - listitem [ref=e370]:
+          - generic [ref=e371]: "1.4"
+          - text: 로그인 후 메인 화면
+  - generic [ref=e374]:
+    - generic [ref=e376]:
+      - generic [ref=e377]: Sensorway Co., Ltd.
+      - generic [ref=e379]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e392]:
+      - generic [ref=e393]:
+        - generic [ref=e394]: CHAPTER 1
+        - heading "1.1프로그램 실행" [level=2] [ref=e395]
+      - paragraph [ref=e396]: 프로그램을 실행하면 초기 로딩 화면이 잠시 표시된 뒤 로그인 화면으로 넘어갑니다.
+      - generic [ref=e397]:
+        - figure "그림 1. 초기 로딩(스플래시) 화면" [ref=e398]:
+          - img "초기 로딩(스플래시) 화면" [ref=e399]
+        - generic [ref=e401]: "프로그램을 실행하면 제품명(Pids Monitoring System)과 버전, 하단의 진행 표시줄과 현재 로딩 상태 메시지(예: 'SoundService — 시작 중...')가 표시되는 로딩 화면이 나타납니다. 구성요소 초기화가 끝나면 이 화면은 자동으로 닫히고 로그인 화면으로 전환됩니다."
+      - generic [ref=e403]:
+        - generic [ref=e404]: ℹ 실행 준비
+        - generic [ref=e405]: 로딩이 오래 걸리면 지도 타일·소리·서버 연결 등 초기화 항목을 준비 중인 상태입니다. 하단 상태 메시지로 진행 단계를 확인할 수 있습니다.
+  - generic [ref=e408]:
+    - generic [ref=e410]:
+      - generic [ref=e411]: Sensorway Co., Ltd.
+      - generic [ref=e413]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e426]:
+      - generic [ref=e427]:
+        - generic [ref=e428]: CHAPTER 1
+        - heading "1.2로그인" [level=2] [ref=e429]
+      - paragraph [ref=e430]: 등록된 계정의 아이디와 비밀번호로 로그인하여 관제 화면에 진입합니다.
+      - generic [ref=e431]:
+        - figure "그림 2. 로그인 화면" [ref=e432]:
+          - img "로그인 화면" [ref=e433]
+        - generic [ref=e435]: 화면 중앙에 로그인 창이 표시됩니다. 아이디(ID)와 비밀번호(PW)를 입력합니다. 비밀번호 입력란 오른쪽의 눈 아이콘을 누르면 입력한 비밀번호를 잠시 확인할 수 있습니다. '아이디를 저장하시겠습니까?'를 체크한 상태로 로그인하면 다음 실행 시 아이디가 자동으로 채워집니다.
+      - generic [ref=e436]:
+        - figure "그림 3. 아이디·비밀번호 입력 후" [ref=e437]:
+          - img "아이디·비밀번호 입력 후" [ref=e438]
+        - generic [ref=e440]: 아이디와 비밀번호를 모두 입력하면 확인 버튼이 활성화됩니다. 확인을 누르면 인증이 진행되고, 성공하면 관제 메인 화면으로 전환됩니다. 취소를 누르면 입력한 내용이 취소됩니다.
+      - generic [ref=e442]:
+        - generic [ref=e443]: 💡 아이디 저장
+        - generic [ref=e444]: "'아이디를 저장하시겠습니까?'를 체크하면 다음 실행 시 아이디가 자동 입력됩니다. 비밀번호는 저장되지 않으므로 매번 직접 입력하십시오."
+  - generic [ref=e447]:
+    - generic [ref=e449]:
+      - generic [ref=e450]: Sensorway Co., Ltd.
+      - generic [ref=e452]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e465]:
+      - generic [ref=e466]:
+        - generic [ref=e467]: CHAPTER 1
+        - heading "1.3회원가입 안내" [level=2] [ref=e468]
+      - paragraph [ref=e469]: 이 프로그램에서는 계정을 직접 만들지 않고, 통합관제 웹에서 회원가입을 진행합니다.
+      - generic [ref=e470]:
+        - figure "그림 4. 회원가입 안내 팝업" [ref=e471]:
+          - img "회원가입 안내 팝업" [ref=e472]
+        - generic [ref=e474]: 로그인 창 아래의 Register(회원가입)를 누르면 '회원가입은 통합관제 웹에서 진행해 주세요.'라는 안내 팝업이 표시됩니다. 계정 생성은 데스크톱 프로그램이 아니라 통합관제 웹 포털에서 이루어지므로, 웹에서 계정을 만든 뒤 이 프로그램에 로그인하십시오. 닫기를 눌러 팝업을 닫습니다.
+      - generic [ref=e476]:
+        - generic [ref=e477]: ℹ 계정 발급
+        - generic [ref=e478]: 계정이 없으면 통합관제 웹 포털에서 회원가입하거나 운영 담당자에게 계정 발급을 요청하십시오.
+  - generic [ref=e481]:
+    - generic [ref=e483]:
+      - generic [ref=e484]: Sensorway Co., Ltd.
+      - generic [ref=e486]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e499]:
+      - generic [ref=e500]:
+        - generic [ref=e501]: CHAPTER 1
+        - heading "1.4로그인 후 메인 화면" [level=2] [ref=e502]
+      - paragraph [ref=e503]: 로그인하면 GIS 위성지도 기반의 관제 메인 화면이 나타납니다.
+      - generic [ref=e504]:
+        - figure "그림 5. 로그인 후 메인 화면 (안양발전소 기준)" [ref=e505]:
+          - img "로그인 후 메인 화면 (안양발전소 기준)" [ref=e506]
+        - generic [ref=e508]: 화면 중앙에 현장 위성지도가 표시되고, 그 위에 구역(구역-01~17), 제어기(제어기1~7), 외곽 센서(외곽1~12), 카메라 등 현장 구성요소가 심볼로 배치됩니다. 상단에는 File·Maps 메뉴, 지도 종류(위성지도) 선택, 이동·홈·편집 도구가 있고, 오른쪽 위에는 시스템 리소스 사용률이 표시됩니다. 좌측에는 기능 아이콘 레일, 우측에는 이벤트 패널이 있으며, 좌측 상단에는 현재 마우스 위치의 좌표(WGS-84)가 표시됩니다.
+  - generic [ref=e511]:
+    - generic [ref=e513]:
+      - generic [ref=e514]: Sensorway Co., Ltd.
+      - generic [ref=e516]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e529]:
+      - generic [ref=e530]:
+        - figure "그림 6. 우측 이벤트 패널" [ref=e531]:
+          - img "우측 이벤트 패널" [ref=e532]
+        - generic [ref=e534]: 화면 오른쪽의 이벤트 패널은 실시간 이벤트 목록과 현재 '이벤트 수'를 보여줍니다. 상단의 휴지통 아이콘으로 목록을 비우고, X 버튼으로 패널을 닫을 수 있습니다. 탐지·장애 등 이벤트가 발생하면 이 패널에 카드 형태로 나타납니다.
+      - generic [ref=e536]:
+        - generic [ref=e537]: 💡 좌표 확인
+        - generic [ref=e538]: 좌측 상단의 좌표 표시로 마우스가 가리키는 지점의 위도·경도를 실시간으로 확인할 수 있습니다. 좌표계는 상단 Maps 메뉴에서 변경합니다.
+  - generic [ref=e541]:
+    - generic [ref=e543]:
+      - generic [ref=e544]: Sensorway Co., Ltd.
+      - generic [ref=e546]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e559]:
+      - generic [ref=e560]: CHAPTER
+      - generic [ref=e561]: "02"
+      - heading "화면 구성 — 상단 메뉴와 도구 모음" [level=1] [ref=e562]
+      - paragraph [ref=e563]: 상단의 File·Maps 메뉴, 지도 종류 선택, 지도 제어·편집 도구, 오른쪽 위 시스템 리소스 표시 등 화면 상단 구성을 설명합니다.
+      - list [ref=e564]:
+        - listitem [ref=e565]:
+          - generic [ref=e566]: "2.1"
+          - text: 상단 메뉴 (File · Maps)
+        - listitem [ref=e567]:
+          - generic [ref=e568]: "2.2"
+          - text: 상단 도구 모음과 리소스 표시
+  - generic [ref=e571]:
+    - generic [ref=e573]:
+      - generic [ref=e574]: Sensorway Co., Ltd.
+      - generic [ref=e576]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e589]:
+      - generic [ref=e590]:
+        - generic [ref=e591]: CHAPTER 2
+        - heading "2.1상단 메뉴 (File · Maps)" [level=2] [ref=e592]
+      - paragraph [ref=e593]: 화면 상단의 File·Maps 메뉴로 지도 불러오기와 좌표계 설정 등 기본 기능을 사용합니다.
+      - generic [ref=e594]:
+        - figure "그림 7. File 메뉴" [ref=e595]:
+          - img "File 메뉴" [ref=e596]
+        - generic [ref=e598]: File 메뉴에는 맵 불러오기(Ctrl+L), 이미지 불러오기(Ctrl+I), 새 커스텀 맵 생성(Ctrl+N), 맵 타일 폴더 설정(Ctrl+D), 종료(Exit, Ctrl+E)가 있습니다. 지도 데이터를 불러오거나 맵 타일이 저장된 폴더를 지정할 때 사용합니다.
+      - generic [ref=e599]:
+        - figure "그림 8. Maps 메뉴 — 좌표계 선택" [ref=e600]:
+          - img "Maps 메뉴 — 좌표계 선택" [ref=e601]
+        - generic [ref=e603]: Maps 메뉴에서 화면에 표시할 좌표계를 선택합니다. WGS-84 좌표계, MGRS 좌표계, UTM 좌표계 중 하나를 고를 수 있으며, 현재 선택된 항목 앞에 체크 표시가 나타납니다.
+  - generic [ref=e606]:
+    - generic [ref=e608]:
+      - generic [ref=e609]: Sensorway Co., Ltd.
+      - generic [ref=e611]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e624]:
+      - generic [ref=e625]:
+        - generic [ref=e626]: CHAPTER 2
+        - heading "2.2상단 도구 모음과 리소스 표시" [level=2] [ref=e627]
+      - paragraph [ref=e628]: 상단 바에는 지도를 다루는 제어 도구와 심볼 편집 도구, 그리고 우측의 시스템 리소스 표시가 모여 있습니다. 지도 화면을 이동하고, 표시 방식을 바꾸고, 현장 심볼을 편집하는 대부분의 조작을 이 영역에서 시작합니다.
+      - generic [ref=e629]:
+        - figure "그림 9. 지도 제어 도구 모음" [ref=e630]:
+          - img "지도 제어 도구 모음" [ref=e631]
+        - generic [ref=e633]: 지도를 조작하는 아이콘 버튼들이 가로로 나열되어 있습니다. 집 모양 버튼으로 기본 위치(홈)로 이동하거나 홈을 설정하고, 대괄호 모양 버튼으로 전체화면 보기를, 십자 표적 버튼으로 화면 중앙에 조준선을 표시합니다. 이어서 위치 핀(관심지역), 겹친 사각형(레이어 표시 전환), 재생 버튼(추적 재생), 톱니바퀴(지도 설정) 버튼이 배치되어 있습니다.
+      - generic [ref=e634]:
+        - figure "그림 10. 지도 종류 선택 드롭다운" [ref=e635]:
+          - img "지도 종류 선택 드롭다운" [ref=e636]
+        - generic [ref=e638]: 지도 종류를 고르는 드롭다운으로, 현재 위성지도가 선택되어 있습니다. 목록을 펼치면 위성지도와 일반지도 중에서 선택할 수 있으며, 항목을 클릭하면 지도 배경이 즉시 바뀝니다.
+      - generic [ref=e639]:
+        - figure "그림 11. 심볼 편집 도구 모음" [ref=e640]:
+          - img "심볼 편집 도구 모음" [ref=e641]
+        - generic [ref=e643]: 지도 위 심볼을 편집하는 도구 모음입니다. 좌측의 편집 스위치를 켜면 심볼을 편집할 수 있고, 그 옆으로 선택 해제, 삭제(휴지통), 실행 취소·다시 실행 버튼이 있습니다. 오른쪽에는 심볼 종류(PIDS 장비)와 세부 항목(스피커)을 고르는 두 개의 드롭다운과 추가 버튼이 있어, 원하는 심볼을 골라 지도에 배치할 수 있습니다.
+      - generic [ref=e644]:
+        - figure "그림 12. 시스템 리소스 사용률 표시" [ref=e645]:
+          - img "시스템 리소스 사용률 표시" [ref=e646]
+        - generic [ref=e648]: "상단 바 우측 끝에 표시되는 시스템 자원 사용률입니다. 세 개의 표시가 각각 현재 사용률을 백분율(예: 5%, 14%, 49%)로 보여 주어, 관제 PC의 부하 상태를 한눈에 확인할 수 있습니다."
+  - generic [ref=e651]:
+    - generic [ref=e653]:
+      - generic [ref=e654]: Sensorway Co., Ltd.
+      - generic [ref=e656]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e669]:
+      - generic [ref=e670]: CHAPTER
+      - generic [ref=e671]: "03"
+      - heading "지도 조작 — 홈 · 사이트 고정 · 지도 도구" [level=1] [ref=e672]
+      - paragraph [ref=e673]: 홈 위치 이동·설정, 사이트 고정(맵 앵커), 화면 중앙 십자가, 관심지역·레이어 관리, 추적 재생 등 지도 도구를 설명합니다.
+      - list [ref=e674]:
+        - listitem [ref=e675]:
+          - generic [ref=e676]: "3.1"
+          - text: 홈 위치 이동·설정
+        - listitem [ref=e677]:
+          - generic [ref=e678]: "3.2"
+          - text: 사이트 고정 (맵 앵커)
+        - listitem [ref=e679]:
+          - generic [ref=e680]: "3.3"
+          - text: 화면 중앙 십자가 · 관심지역 · 레이어 관리
+        - listitem [ref=e681]:
+          - generic [ref=e682]: "3.4"
+          - text: 추적 재생과 타겟 추적 설정
+  - generic [ref=e685]:
+    - generic [ref=e687]:
+      - generic [ref=e688]: Sensorway Co., Ltd.
+      - generic [ref=e690]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e703]:
+      - generic [ref=e704]:
+        - generic [ref=e705]: CHAPTER 3
+        - heading "3.1홈 위치 이동·설정" [level=2] [ref=e706]
+      - paragraph [ref=e707]: 자주 보는 위치를 홈으로 지정해 두면 한 번의 클릭으로 그 위치로 돌아올 수 있습니다.
+      - generic [ref=e708]:
+        - figure "그림 13. 홈 위치 설정 버튼" [ref=e709]:
+          - img "홈 위치 설정 버튼" [ref=e710]
+        - generic [ref=e712]: 상단 도구 모음의 '홈 위치 설정' 버튼을 누르면 현재 보고 있는 지도 위치를 홈으로 저장합니다. 관제에서 기준이 되는 위치를 홈으로 지정해 두면 편리합니다.
+      - generic [ref=e713]:
+        - figure "그림 14. 홈 위치 이동 버튼" [ref=e714]:
+          - img "홈 위치 이동 버튼" [ref=e715]
+        - generic [ref=e717]: "'홈 위치 이동' 버튼을 누르면 미리 저장해 둔 홈 위치로 지도가 즉시 이동합니다. 지도를 여기저기 확대·이동한 뒤 기준 위치로 빠르게 복귀할 때 사용합니다."
+      - generic [ref=e719]:
+        - generic [ref=e720]: 💡 사용 순서
+        - generic [ref=e721]: 먼저 원하는 위치로 지도를 맞춘 뒤 '홈 위치 설정'으로 저장하고, 이후에는 '홈 위치 이동'으로 언제든 그 위치로 돌아옵니다.
+  - generic [ref=e724]:
+    - generic [ref=e726]:
+      - generic [ref=e727]: Sensorway Co., Ltd.
+      - generic [ref=e729]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e742]:
+      - generic [ref=e743]:
+        - generic [ref=e744]: CHAPTER 3
+        - heading "3.2사이트 고정 (맵 앵커)" [level=2] [ref=e745]
+      - paragraph [ref=e746]: 사이트 고정(맵 앵커)은 지도를 관제 대상 구역으로 한정해, 지도가 현장 밖으로 벗어나지 않도록 합니다.
+      - generic [ref=e747]:
+        - figure "그림 15. 사이트 고정(맵 앵커) 버튼" [ref=e748]:
+          - img "사이트 고정(맵 앵커) 버튼" [ref=e749]
+        - generic [ref=e751]: 상단 도구 모음의 '사이트 고정(맵 앵커)' 버튼입니다. 이 기능을 설정하지 않으면 지도가 현장 구역에 고정되지 않아, 확대·이동 시 지도가 현장을 벗어나 임의 지역까지 이동할 수 있습니다.
+      - generic [ref=e752]:
+        - figure "그림 16. 사이트 고정 패널" [ref=e753]:
+          - img "사이트 고정 패널" [ref=e754]
+        - generic [ref=e756]: "'사이트 고정 활성'을 체크한 뒤, '현재 화면 기준(지금 보는 영역을 좌표로)' 버튼으로 지금 보이는 범위를 고정 영역으로 잡거나, '지도에서 영역 그리기(드래그)'로 직접 영역을 지정합니다. 북서(NW)·남동(SE) 위도/경도와 최소 줌을 지정할 수 있고, '엄격 컨테인먼트(화면밖 완전차단)'를 켜면 지정 영역 밖으로 완전히 나가지 못하게 합니다. '저장·적용'을 눌러 설정을 반영합니다."
+  - generic [ref=e759]:
+    - generic [ref=e761]:
+      - generic [ref=e762]: Sensorway Co., Ltd.
+      - generic [ref=e764]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e777]:
+      - generic [ref=e778]:
+        - figure "그림 17. 영역 그리기(드래그로 지정)" [ref=e779]:
+          - img "영역 그리기(드래그로 지정)" [ref=e780]
+        - generic [ref=e782]: "'지도에서 영역 그리기(드래그)'를 선택하면 화면 상단에 '지도에서 드래그해 사이트 고정 영역을 그리세요 — (ESC = 취소)' 안내가 나타납니다. 지도 위에서 마우스로 드래그해 사각형 영역을 그리면 그 범위가 고정 영역으로 지정되며, 북서·남동 좌표값이 패널에 자동으로 채워집니다."
+      - generic [ref=e784]:
+        - generic [ref=e785]: ⚠ 반드시 설정 권장
+        - generic [ref=e786]: 사이트 고정을 하지 않으면 지도 조작 중 화면이 관제 현장을 벗어날 수 있습니다. 운영 전에 현장 범위로 사이트 고정을 설정하는 것을 권장합니다.
+  - generic [ref=e789]:
+    - generic [ref=e791]:
+      - generic [ref=e792]: Sensorway Co., Ltd.
+      - generic [ref=e794]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e807]:
+      - generic [ref=e808]:
+        - generic [ref=e809]: CHAPTER 3
+        - heading "3.3화면 중앙 십자가 · 관심지역 · 레이어 관리" [level=2] [ref=e810]
+      - paragraph [ref=e811]: 상단 바의 지도 제어 도구 중 화면 중앙 십자가, 관심지역, 레이어 관리 세 가지 기능을 소개합니다. 지도의 중심을 표시하고, 자주 보는 위치를 저장하며, 지도에 표시할 심볼을 골라 켜고 끌 수 있습니다.
+      - generic [ref=e812]:
+        - figure "그림 18. 화면 중앙 십자가 버튼" [ref=e813]:
+          - img "화면 중앙 십자가 버튼" [ref=e814]
+        - generic [ref=e816]: 상단 바에 있는 원형 조준점 모양의 버튼으로, 마우스를 올리면 '화면 중앙 십자가'라는 이름이 표시됩니다. 눌러서 지도 화면 정중앙에 십자 표시를 켜거나 끌 수 있어 현재 화면의 중심 위치를 기준 삼을 때 사용합니다.
+      - generic [ref=e817]:
+        - figure "그림 19. 관심지역 관리 버튼" [ref=e818]:
+          - img "관심지역 관리 버튼" [ref=e819]
+        - generic [ref=e821]: 상단 바의 위치 핀 모양 버튼으로, 마우스를 올리면 '관심지역 관리'라는 이름이 나타납니다. 눌러 관심지역 창을 열어 자주 확인하는 위치를 저장하고 불러올 수 있습니다.
+      - generic [ref=e822]:
+        - figure "그림 20. 관심지역 창" [ref=e823]:
+          - img "관심지역 창" [ref=e824]
+        - generic [ref=e826]: 상단에 저장된 위치 목록이 표시되고, 아래에는 '이동'·'등록'·'삭제' 버튼이 있습니다. 목록에서 위치를 고른 뒤 '이동'을 누르면 그 지점으로 지도가 이동하고, '등록'으로 현재 화면을 새 관심지역으로 저장하며, '삭제'로 선택한 항목을 지웁니다.
+  - generic [ref=e829]:
+    - generic [ref=e831]:
+      - generic [ref=e832]: Sensorway Co., Ltd.
+      - generic [ref=e834]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e847]:
+      - generic [ref=e848]:
+        - figure "그림 21. 레이어 관리 버튼" [ref=e849]:
+          - img "레이어 관리 버튼" [ref=e850]
+        - generic [ref=e852]: 상단 바의 겹친 층 모양 버튼으로, 마우스를 올리면 '레이어 관리'라는 이름이 표시됩니다. 눌러 지도에 표시할 항목을 켜고 끄는 레이어 창을 엽니다.
+      - generic [ref=e853]:
+        - figure "그림 22. 레이어 창 — 표시 항목 켜고 끄기" [ref=e854]:
+          - img "레이어 창 — 표시 항목 켜고 끄기" [ref=e855]
+        - generic [ref=e857]: 오버레이 지도·오버레이 이미지·심볼 그룹이 접었다 펼 수 있는 목록으로 정리되어 있고, 각 항목의 체크박스로 지도 표시 여부를 켜고 끕니다. 심볼 아래에는 PIDS 장비(카메라·센서·제어기)와 PIDS 그룹이 나뉘어 있어 카메라·센서 하나하나까지 개별로 표시를 조절할 수 있으며, 오버레이 이미지 옆 슬라이더로 투명도를 조정합니다.
+  - generic [ref=e860]:
+    - generic [ref=e862]:
+      - generic [ref=e863]: Sensorway Co., Ltd.
+      - generic [ref=e865]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e878]:
+      - generic [ref=e879]:
+        - generic [ref=e880]: CHAPTER 3
+        - heading "3.4추적 재생과 타겟 추적 설정" [level=2] [ref=e881]
+      - paragraph [ref=e882]: 과거 특정 시간대에 감지된 대상의 이동 경로를 지도 위에서 되짚어 볼 수 있습니다. 상단 바의 추적 재생 도구로 기간과 세션을 골라 재생하고, 추적 설정 도구로 표시 방식과 재생 옵션을 조정합니다.
+      - generic [ref=e883]:
+        - figure "그림 23. 상단 바의 추적 재생 도구" [ref=e884]:
+          - img "상단 바의 추적 재생 도구" [ref=e885]
+        - generic [ref=e887]: 상단 바 오른쪽에 있는 삼각형 재생 모양 아이콘입니다. 마우스를 올리면 '추적 재생(Playback)' 안내가 나타나며, 누르면 추적 재생 패널이 열립니다.
+      - generic [ref=e888]:
+        - figure "그림 24. 추적 재생 패널" [ref=e889]:
+          - img "추적 재생 패널" [ref=e890]
+        - generic [ref=e892]: 상단 '기간'에서 최근 5분·30분·1시간·오늘 버튼이나 달력으로 시작/종료 시각을 정한 뒤 '불러오기'를 누르면, '탐지 세션' 목록에 해당 기간의 대상들이 탐지 ID·타입(사람/동물)·등급·시각과 함께 나타납니다. 왼쪽 체크박스로 재생할 세션을 선택하고, 하단 '재생' 영역의 재생 버튼과 진행 막대로 재생하며, 배속(0.5×·1×·2×·4×)을 조절할 수 있습니다.
+  - generic [ref=e895]:
+    - generic [ref=e897]:
+      - generic [ref=e898]: Sensorway Co., Ltd.
+      - generic [ref=e900]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e913]:
+      - generic [ref=e914]:
+        - figure "그림 25. 재생 중 지도에 표시되는 이동 경로" [ref=e915]:
+          - img "재생 중 지도에 표시되는 이동 경로" [ref=e916]
+        - generic [ref=e918]: "재생을 시작하면 선택한 대상이 지도 위에서 움직이며 지나온 이동 경로가 함께 그려집니다. 대상 표식 옆에는 이동 속도(예: 1.2 m/s)가 표시되어 어느 구역(Zone)을 따라 이동했는지 한눈에 확인할 수 있습니다."
+      - generic [ref=e919]:
+        - figure "그림 26. 상단 바의 추적 설정 도구" [ref=e920]:
+          - img "상단 바의 추적 설정 도구" [ref=e921]
+        - generic [ref=e923]: 상단 바의 톱니바퀴 모양 아이콘입니다. 마우스를 올리면 '추적 설정' 안내가 나타나며, 누르면 추적 표시 방식과 재생 옵션을 조정하는 설정 패널이 열립니다.
+  - generic [ref=e926]:
+    - generic [ref=e928]:
+      - generic [ref=e929]: Sensorway Co., Ltd.
+      - generic [ref=e931]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e945]:
+      - figure "그림 27. 추적 설정 패널" [ref=e946]:
+        - img "추적 설정 패널" [ref=e947]
+      - generic [ref=e949]: "'표시'에서 추적 표시를 켜고 끄거나 표시할 최소 확대 수준을 정하고, '트레일'에서 이동 경로로 남길 최대 점 수와 끊김 분할 기준을 조정합니다. '수명'·'속도·재생'에서 표식 유지 시간과 최대 재생 시간 등을 설정할 수 있으며, 아래 '저장'을 누르면 값이 유지되고 '기본값'으로 초기화할 수 있습니다."
+  - generic [ref=e952]:
+    - generic [ref=e954]:
+      - generic [ref=e955]: Sensorway Co., Ltd.
+      - generic [ref=e957]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e970]:
+      - generic [ref=e971]: CHAPTER
+      - generic [ref=e972]: "04"
+      - heading "맵 편집 — 심볼 배치와 속성" [level=1] [ref=e973]
+      - paragraph [ref=e974]: 맵 편집 모드에서 심볼을 이동·회전·복제하고, 심볼과 라인의 속성을 조정하는 방법을 설명합니다.
+      - list [ref=e975]:
+        - listitem [ref=e976]:
+          - generic [ref=e977]: "4.1"
+          - text: 맵 편집 모드와 심볼 조작
+        - listitem [ref=e978]:
+          - generic [ref=e979]: "4.2"
+          - text: 심볼 공통 속성
+        - listitem [ref=e980]:
+          - generic [ref=e981]: "4.3"
+          - text: 심볼 종류별 속성 (군대부호 · PIDS · 건물)
+        - listitem [ref=e982]:
+          - generic [ref=e983]: "4.4"
+          - text: 라인 심볼 속성
+  - generic [ref=e986]:
+    - generic [ref=e988]:
+      - generic [ref=e989]: Sensorway Co., Ltd.
+      - generic [ref=e991]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1004]:
+      - generic [ref=e1005]:
+        - generic [ref=e1006]: CHAPTER 4
+        - heading "4.1맵 편집 모드와 심볼 조작" [level=2] [ref=e1007]
+      - paragraph [ref=e1008]: 지도 위의 심볼을 옮기거나 방향과 크기를 바꾸려면 먼저 편집 모드를 켜야 합니다. 상단 바의 편집 토글로 모드를 전환한 뒤 심볼을 선택해 위치·회전·크기를 조정하고, 필요하면 복제할 수 있습니다.
+      - generic [ref=e1009]:
+        - figure "그림 28. 편집 모드 토글 (꺼짐)" [ref=e1010]:
+          - img "편집 모드 토글 (꺼짐)" [ref=e1011]
+        - generic [ref=e1013]: 상단 바의 '편집' 항목에 있는 스위치입니다. 스위치가 왼쪽 회색 상태이면 편집 모드가 꺼진 것으로, 이때는 심볼을 옮기거나 바꿀 수 없고 지도를 안전하게 보기만 할 수 있습니다.
+      - generic [ref=e1014]:
+        - figure "그림 29. 편집 모드 토글 (켜짐)" [ref=e1015]:
+          - img "편집 모드 토글 (켜짐)" [ref=e1016]
+        - generic [ref=e1018]: 스위치를 눌러 오른쪽 파란색으로 바꾸면 편집 모드가 켜집니다. 이 상태에서 지도 위 심볼을 선택해 위치·방향·크기를 조정할 수 있습니다.
+      - generic [ref=e1019]:
+        - figure "그림 30. 선택된 심볼의 조작 핸들" [ref=e1020]:
+          - img "선택된 심볼의 조작 핸들" [ref=e1021]
+        - generic [ref=e1023]: 편집 모드에서 심볼을 클릭하면 파란색 선택 틀과 조작점이 나타납니다. 심볼 본체를 끌어 위치를 옮기고, 위쪽에 뻗은 초록색 점으로 방향을 회전시키며, 모서리의 점을 끌어 크기를 조절합니다.
+      - generic [ref=e1024]:
+        - figure "그림 31. 선택된 마커 복제 버튼" [ref=e1025]:
+          - img "선택된 마커 복제 버튼" [ref=e1026]
+        - generic [ref=e1028]: 상단 바에 있는 복제 버튼으로, 마우스를 올리면 '선택된 마커 복제 (Ctrl+D)' 안내가 표시됩니다. 심볼을 선택한 뒤 이 버튼을 누르거나 Ctrl+D를 눌러 같은 심볼을 하나 더 만들 수 있습니다.
+      - generic [ref=e1030]:
+        - generic [ref=e1031]: ⚠ 주의
+        - generic [ref=e1032]: 편집 모드가 켜진 상태에서는 심볼이 실수로 옮겨지거나 크기가 바뀔 수 있습니다. 배치를 마쳤으면 편집 토글을 다시 꺼 두는 것이 안전합니다.
+  - generic [ref=e1035]:
+    - generic [ref=e1037]:
+      - generic [ref=e1038]: Sensorway Co., Ltd.
+      - generic [ref=e1040]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1055]:
+      - generic [ref=e1056]: 💡 사용 팁
+      - generic [ref=e1057]: 같은 종류의 심볼을 여러 개 배치할 때는 하나를 원하는 모양으로 만든 뒤 Ctrl+D로 복제하면 빠릅니다.
+  - generic [ref=e1060]:
+    - generic [ref=e1062]:
+      - generic [ref=e1063]: Sensorway Co., Ltd.
+      - generic [ref=e1065]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1078]:
+      - generic [ref=e1079]:
+        - generic [ref=e1080]: CHAPTER 4
+        - heading "4.2심볼 공통 속성" [level=2] [ref=e1081]
+      - paragraph [ref=e1082]: 지도 위 심볼을 선택하면 마커 속성 창이 열려 제목·크기·색상·시현 여부 등을 조정할 수 있습니다. 여기서 다루는 항목은 카메라·센서·구역 등 대부분의 심볼에 공통으로 적용됩니다.
+      - generic [ref=e1083]:
+        - figure "그림 32. 마커 속성 창 전체" [ref=e1084]:
+          - img "마커 속성 창 전체" [ref=e1085]
+        - generic [ref=e1087]: 지도에서 심볼을 선택하면 나타나는 마커 속성 창으로, BASIC(기본)·COLOR(색상)·모양/제목 표시·DISPLAY(시현) 항목이 세로로 배치되어 있습니다. 각 값을 바꾸면 지도의 심볼에 즉시 반영되며, 오른쪽 위 X 버튼으로 창을 닫습니다.
+      - generic [ref=e1088]:
+        - figure "그림 33. 기본(BASIC) 항목" [ref=e1089]:
+          - img "기본(BASIC) 항목" [ref=e1090]
+        - generic [ref=e1092]: 심볼의 제목, 제목 글자 크기, 가로·세로 크기 값을 입력하는 영역입니다. 회전 슬라이더를 좌우로 움직이거나 오른쪽 칸에 각도를 입력해 심볼을 원하는 방향으로 돌릴 수 있습니다.
+  - generic [ref=e1095]:
+    - generic [ref=e1097]:
+      - generic [ref=e1098]: Sensorway Co., Ltd.
+      - generic [ref=e1100]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1113]:
+      - generic [ref=e1114]:
+        - figure "그림 34. 색상(COLOR) 항목" [ref=e1115]:
+          - img "색상(COLOR) 항목" [ref=e1116]
+        - generic [ref=e1118]: 심볼의 채우기 색과 테두리 색을 각각 드롭다운에서 고르고, 선두께 목록에서 테두리 굵기를 선택합니다. 색상과 두께를 바꾸면 지도의 심볼 모양에 그대로 적용됩니다.
+      - generic [ref=e1119]:
+        - figure "그림 35. 모양·제목 표시 선택" [ref=e1120]:
+          - img "모양·제목 표시 선택" [ref=e1121]
+        - generic [ref=e1123]: "'모양' 체크박스는 심볼 아이콘의 표시 여부를, '제목' 체크박스는 심볼 이름표의 표시 여부를 켜고 끕니다. 필요에 따라 아이콘만, 이름표만, 또는 둘 다 보이도록 조합할 수 있습니다."
+      - generic [ref=e1124]:
+        - figure "그림 36. 최소 줌(시현) 설정" [ref=e1125]:
+          - img "최소 줌(시현) 설정" [ref=e1126]
+        - generic [ref=e1128]: DISPLAY 영역의 '최소 줌' 슬라이더로 심볼이 나타나기 시작하는 지도 확대 단계를 정합니다. 설정한 값보다 지도를 더 축소하면 해당 심볼은 화면에서 감춰집니다.
+      - generic [ref=e1129]:
+        - figure "그림 37. 겹침 순서(Z-ORDER) 조절" [ref=e1130]:
+          - img "겹침 순서(Z-ORDER) 조절" [ref=e1131]
+        - generic [ref=e1133]: 심볼이 서로 겹칠 때 앞뒤로 놓이는 순서를 조절하는 영역으로, 현재 순서가 숫자로 표시됩니다. 오른쪽의 위·아래 화살표 버튼으로 한 단계씩 또는 맨 앞·맨 뒤로 순서를 옮길 수 있습니다.
+      - generic [ref=e1134]:
+        - figure "그림 38. 도형 속성 - 투명도" [ref=e1135]:
+          - img "도형 속성 - 투명도" [ref=e1136]
+        - generic [ref=e1138]: 구역(영역·라인)처럼 도형으로 그려지는 심볼에 나타나는 '도형 속성' 항목입니다. 투명도 슬라이더를 움직여 도형의 채우기 투명도를 조절하면 아래 지도가 비쳐 보이는 정도가 달라집니다.
+  - generic [ref=e1141]:
+    - generic [ref=e1143]:
+      - generic [ref=e1144]: Sensorway Co., Ltd.
+      - generic [ref=e1146]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1159]:
+      - generic [ref=e1160]:
+        - generic [ref=e1161]: CHAPTER 4
+        - heading "4.3심볼 종류별 속성 (군대부호 · PIDS · 건물)" [level=2] [ref=e1162]
+      - paragraph [ref=e1163]: 지도에 놓는 심볼은 종류마다 편집할 수 있는 속성이 다릅니다. 군대부호·PIDS·건물 심볼의 속성 창에서 어떤 항목을 어떻게 설정하는지 살펴봅니다.
+      - generic [ref=e1164]:
+        - figure "그림 39. 군사 심볼 속성 창" [ref=e1165]:
+          - img "군사 심볼 속성 창" [ref=e1166]
+        - generic [ref=e1168]: 상단에서 소속 구분(아군 등), 전투 차원(육상), 표준 정체성(현재), 부대 규모(중대)를 각각 목록에서 선택합니다. 아래 '부대 식별 정보'에는 부대 지시자, 상급 부대명, 콜사인, 국가 코드를 직접 입력해 부대를 구체적으로 표기할 수 있습니다.
+  - generic [ref=e1171]:
+    - generic [ref=e1173]:
+      - generic [ref=e1174]: Sensorway Co., Ltd.
+      - generic [ref=e1176]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1189]:
+      - generic [ref=e1190]:
+        - figure "그림 40. PIDS 심볼 속성 창" [ref=e1191]:
+          - img "PIDS 심볼 속성 창" [ref=e1192]
+        - generic [ref=e1194]: 연결디바이스 목록에서 이 심볼이 연결될 제어기를 고르고, '현재위치 적용' 버튼으로 지금 위치를 반영합니다. 'FOV 영역 표시'를 체크하면 감지 범위가 지도에 그려지며, FOV 색상과 투명도, 그리고 '탐지 영역 설정'의 탐지범위·탐지각도·탐지방향·기준방향 값을 슬라이더로 조절해 감시 영역을 맞춥니다.
+      - generic [ref=e1195]:
+        - figure "그림 41. 건물 심볼 속성 창" [ref=e1196]:
+          - img "건물 심볼 속성 창" [ref=e1197]
+        - generic [ref=e1199]: 건물종류와 건물용도를 목록에서 선택하고, 지상층·지하층 수는 슬라이더로 설정합니다. 맨 아래 면적 칸에는 건물 면적을 직접 숫자로 입력합니다.
+      - generic [ref=e1201]:
+        - generic [ref=e1202]: 💡 사용 팁
+        - generic [ref=e1203]: PIDS 심볼은 'FOV 영역 표시'를 켠 뒤 탐지범위·탐지각도·탐지방향을 조절하면 실제 감시 영역을 지도에서 눈으로 확인하며 맞출 수 있습니다.
+  - generic [ref=e1206]:
+    - generic [ref=e1208]:
+      - generic [ref=e1209]: Sensorway Co., Ltd.
+      - generic [ref=e1211]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1224]:
+      - generic [ref=e1225]:
+        - generic [ref=e1226]: CHAPTER 4
+        - heading "4.4라인 심볼 속성" [level=2] [ref=e1227]
+      - paragraph [ref=e1228]: 지도 위에 그려진 라인(구역 경계선)을 선택하면 속성 창에서 라인의 정보를 확인하고 선 모양과 투명도를 조정할 수 있습니다. PIDS 라인의 경우 연결할 장비 그룹까지 지정합니다.
+      - generic [ref=e1229]:
+        - figure "그림 42. 라인 속성 창" [ref=e1230]:
+          - img "라인 속성 창" [ref=e1231]
+        - generic [ref=e1233]: 선택한 라인의 정보와 스타일이 표시됩니다. 상단 '라인 정보'에는 라인을 이루는 포인트 수(11개)와 전체 총 거리(189.6m)가 나오고, 아래 '라인 스타일'에서 선 패턴을 고르고 투명도를 조절합니다.
+      - generic [ref=e1234]:
+        - figure "그림 43. 선 패턴 선택 목록" [ref=e1235]:
+          - img "선 패턴 선택 목록" [ref=e1236]
+        - generic [ref=e1238]: "'패턴' 항목을 펼치면 실선, 점선, 점점선, 점-선 패턴 중에서 선의 모양을 고를 수 있습니다. 원하는 항목을 클릭하면 지도 위 라인의 선 모양이 바로 바뀝니다."
+  - generic [ref=e1241]:
+    - generic [ref=e1243]:
+      - generic [ref=e1244]: Sensorway Co., Ltd.
+      - generic [ref=e1246]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1259]:
+      - generic [ref=e1260]:
+        - figure "그림 44. PIDS 그룹 속성 창" [ref=e1261]:
+          - img "PIDS 그룹 속성 창" [ref=e1262]
+        - generic [ref=e1264]: "PIDS 라인을 선택하면 라인 정보와 스타일에 더해 하단에 'PIDS 그룹 설정'이 나타납니다. '장비 그룹' 목록(예: Zone3)을 펼쳐 이 라인에 연결할 장비 그룹을 지정할 수 있습니다."
+      - generic [ref=e1266]:
+        - generic [ref=e1267]: 💡 사용 팁
+        - generic [ref=e1268]: 투명도 슬라이더를 좌우로 움직이면 라인이 지도 배경과 겹칠 때 얼마나 진하게 보일지 조절할 수 있습니다.
+  - generic [ref=e1271]:
+    - generic [ref=e1273]:
+      - generic [ref=e1274]: Sensorway Co., Ltd.
+      - generic [ref=e1276]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1289]:
+      - generic [ref=e1290]: CHAPTER
+      - generic [ref=e1291]: "05"
+      - heading "환경 설정 (셋업 패널)" [level=1] [ref=e1292]
+      - paragraph [ref=e1293]: 이벤트·소리·서버 연결·지도·웹·프로그램 등 프로그램 동작 환경을 설정하는 셋업 패널을 설명합니다.
+      - list [ref=e1294]:
+        - listitem [ref=e1295]:
+          - generic [ref=e1296]: "5.1"
+          - text: 셋업 패널 · 이벤트 설정
+        - listitem [ref=e1297]:
+          - generic [ref=e1298]: "5.2"
+          - text: 소리 설정
+        - listitem [ref=e1299]:
+          - generic [ref=e1300]: "5.3"
+          - text: 서버 연결(브로커) 설정
+        - listitem [ref=e1301]:
+          - generic [ref=e1302]: "5.4"
+          - text: 지도 · 웹 · 도커 · 프로그램 · 연동 설정
+  - generic [ref=e1305]:
+    - generic [ref=e1307]:
+      - generic [ref=e1308]: Sensorway Co., Ltd.
+      - generic [ref=e1310]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1323]:
+      - generic [ref=e1324]:
+        - generic [ref=e1325]: CHAPTER 5
+        - heading "5.1셋업 패널 · 이벤트 설정" [level=2] [ref=e1326]
+      - paragraph [ref=e1327]: 셋업 패널은 이벤트·소리·서버 연결·지도·웹 등 프로그램 환경을 설정하는 곳입니다. 이 섹션에서는 좌측 아이콘 레일에서 셋업 패널을 여는 방법과, 첫 번째 탭인 이벤트 설정에서 조정할 수 있는 항목들을 살펴봅니다.
+      - generic [ref=e1328]:
+        - figure "그림 45. 좌측 아이콘 레일의 셋업(SETUP) 항목" [ref=e1329]:
+          - img "좌측 아이콘 레일의 셋업(SETUP) 항목" [ref=e1330]
+        - generic [ref=e1332]: 화면 왼쪽 세로 메뉴의 맨 아래에 있는 톱니바퀴 모양의 SETUP 항목입니다. 위쪽으로 로그아웃, 내 정보, 계정, 이벤트, 장비, 리포트 항목이 함께 나열되어 있으며, SETUP을 누르면 환경 설정 창이 열립니다.
+  - generic [ref=e1335]:
+    - generic [ref=e1337]:
+      - generic [ref=e1338]: Sensorway Co., Ltd.
+      - generic [ref=e1340]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1353]:
+      - generic [ref=e1354]:
+        - figure "그림 46. 셋업 패널 · 이벤트 설정 탭 전체 화면" [ref=e1355]:
+          - img "셋업 패널 · 이벤트 설정 탭 전체 화면" [ref=e1356]
+        - generic [ref=e1358]: 제목이 '설정 정보'인 환경 설정 창입니다. 왼쪽에는 이벤트 설정·소리 설정·API 브로커·팝업 브로커·지도 설정·3rd Party 탭이 세로로 있고, 오른쪽에는 현재 선택된 이벤트 설정 항목들이 카드 형태로 표시됩니다. 오른쪽 위 X 버튼으로 창을 닫습니다.
+      - generic [ref=e1359]:
+        - figure "그림 47. 탐지 이벤트 해제 설정" [ref=e1360]:
+          - img "탐지 이벤트 해제 설정" [ref=e1361]
+        - generic [ref=e1363]: "탐지 이벤트를 일정 시간이 지나면 자동으로 해제하도록 하는 설정입니다. 오른쪽 토글을 켜면 활성화되며, 아래 입력란에서 자동 해제까지의 대기 시간(예: 20)을 지정합니다."
+      - generic [ref=e1364]:
+        - figure "그림 48. 카메라 팝업 연동 켜기/끄기" [ref=e1365]:
+          - img "카메라 팝업 연동 켜기/끄기" [ref=e1366]
+        - generic [ref=e1368]: 이벤트가 발생할 때 관련 카메라 영상 팝업을 자동으로 띄울지 정하는 설정입니다. 오른쪽 토글을 켜면 이벤트와 카메라 팝업이 연동됩니다.
+  - generic [ref=e1371]:
+    - generic [ref=e1373]:
+      - generic [ref=e1374]: Sensorway Co., Ltd.
+      - generic [ref=e1376]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1389]:
+      - generic [ref=e1390]:
+        - figure "그림 49. 팝업 영상 소스 선택" [ref=e1391]:
+          - img "팝업 영상 소스 선택" [ref=e1392]
+        - generic [ref=e1394]: 카메라 팝업에 표시할 영상을 어떤 방식으로 불러올지 선택하는 항목입니다. 오른쪽의 'URL조회'와 'Onvif조회' 중 하나를 라디오 버튼으로 고릅니다.
+      - generic [ref=e1395]:
+        - figure "그림 50. 카메라 팝업 자동해제 설정" [ref=e1396]:
+          - img "카메라 팝업 자동해제 설정" [ref=e1397]
+        - generic [ref=e1399]: "떠 있는 카메라 팝업을 일정 시간 후 자동으로 닫는 설정입니다. 오른쪽 토글을 켜면 활성화되며, 아래 입력란에서 팝업이 유지되는 시간(예: 15)을 지정합니다."
+      - generic [ref=e1400]:
+        - figure "그림 51. 스냅샷 저장 폴더 지정" [ref=e1401]:
+          - img "스냅샷 저장 폴더 지정" [ref=e1402]
+        - generic [ref=e1404]: 카메라 화면 캡처(스냅샷)를 저장할 폴더 경로를 지정하는 항목입니다. 입력란에 경로를 직접 적거나 오른쪽 '찾아보기' 버튼으로 폴더를 선택하며, 비워 두면 기본 앱 폴더 안의 스냅샷 폴더에 저장됩니다.
+      - generic [ref=e1405]:
+        - generic [ref=e1406]:
+          - generic [ref=e1407]: 💡 사용 팁
+          - generic [ref=e1408]: 각 항목 오른쪽의 파란 토글 스위치로 기능을 켜고 끕니다. 스위치가 파란색(체크 표시)이면 켜짐, 회색이면 꺼짐 상태입니다.
+        - generic [ref=e1409]:
+          - generic [ref=e1410]: ℹ 참고
+          - generic [ref=e1411]: 이벤트 설정을 마친 뒤에는 좌측의 이벤트 설정·소리 설정·API 브로커·팝업 브로커·지도 설정·3rd Party 탭을 눌러 다른 환경 설정으로 이동할 수 있습니다.
+  - generic [ref=e1414]:
+    - generic [ref=e1416]:
+      - generic [ref=e1417]: Sensorway Co., Ltd.
+      - generic [ref=e1419]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1432]:
+      - generic [ref=e1433]:
+        - generic [ref=e1434]: CHAPTER 5
+        - heading "5.2소리 설정" [level=2] [ref=e1435]
+      - paragraph [ref=e1436]: 소리 설정 화면에서는 알람에 사용할 음원 폴더와 출력 장치를 지정하고, 탐지·장애·조치보고 이벤트마다 재생할 소리와 자동 해제 방식을 설정할 수 있습니다.
+      - generic [ref=e1437]:
+        - figure "그림 52. 소리 설정 화면 전체" [ref=e1438]:
+          - img "소리 설정 화면 전체" [ref=e1439]
+        - generic [ref=e1441]: 셋업(설정) 패널 좌측 탭에서 소리 설정을 선택하면 나타나는 화면입니다. 위에서부터 음원 폴더 설정, 출력 장치 설정, 탐지알람·장애알람·조치알람 설정 카드가 차례로 표시되며, 오른쪽 스크롤로 아래 항목까지 이동할 수 있습니다.
+      - generic [ref=e1442]:
+        - figure "그림 53. 음원 폴더 설정" [ref=e1443]:
+          - img "음원 폴더 설정" [ref=e1444]
+        - generic [ref=e1446]: 알람 소리로 사용할 음원 파일이 들어 있는 폴더를 지정하는 항목입니다. 오른쪽에 현재 지정된 폴더 위치가 표시되며, 폴더 아이콘 버튼을 눌러 다른 위치를 선택할 수 있습니다.
+      - generic [ref=e1447]:
+        - figure "그림 54. 출력 장치 설정" [ref=e1448]:
+          - img "출력 장치 설정" [ref=e1449]
+        - generic [ref=e1451]: 알람 소리를 내보낼 스피커 등 출력 장치를 고르는 항목입니다. 가운데 목록에서 장치를 선택하며, 오른쪽 새로고침 버튼을 누르면 연결된 장치 목록을 다시 불러옵니다.
+  - generic [ref=e1454]:
+    - generic [ref=e1456]:
+      - generic [ref=e1457]: Sensorway Co., Ltd.
+      - generic [ref=e1459]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1472]:
+      - generic [ref=e1473]:
+        - figure "그림 55. 탐지알람 설정" [ref=e1474]:
+          - img "탐지알람 설정" [ref=e1475]
+        - generic [ref=e1477]: 침입·이상 감지(탐지) 이벤트가 발생했을 때 울릴 소리를 지정합니다. 목록에서 소리를 고르고 오른쪽 재생 버튼으로 미리 들어볼 수 있으며, 아래 탐지알람 자동해제를 켜면 설정한 타임아웃 시간(초)이 지난 뒤 알람이 자동으로 꺼집니다.
+      - generic [ref=e1478]:
+        - figure "그림 56. 장애알람 설정" [ref=e1479]:
+          - img "장애알람 설정" [ref=e1480]
+        - generic [ref=e1482]: 장비 고장 등 장애 이벤트가 발생했을 때 울릴 소리를 지정합니다. 목록에서 소리를 선택하고 재생 버튼으로 확인할 수 있으며, 장애알람 자동해제를 켜면 타임아웃 시간(초) 후 알람이 자동 종료됩니다.
+      - generic [ref=e1483]:
+        - figure "그림 57. 조치알람 설정" [ref=e1484]:
+          - img "조치알람 설정" [ref=e1485]
+        - generic [ref=e1487]: 조치 보고와 관련된 알람에 사용할 소리를 지정합니다. 목록에서 소리를 고르고 재생 버튼으로 미리 들어보며, 보고알람 자동해제를 켜면 타임아웃 시간(초) 후 알람이 자동으로 해제됩니다.
+      - generic [ref=e1489]:
+        - generic [ref=e1490]: 💡 사용 팁
+        - generic [ref=e1491]: 각 알람 소리 항목 오른쪽의 재생 버튼을 누르면 실제 현장에 울리기 전에 소리를 미리 들어볼 수 있습니다.
+  - generic [ref=e1494]:
+    - generic [ref=e1496]:
+      - generic [ref=e1497]: Sensorway Co., Ltd.
+      - generic [ref=e1499]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1514]:
+      - generic [ref=e1515]: ℹ 참고
+      - generic [ref=e1516]: 자동해제를 켜면 아래에 표시되는 타임아웃 시간(초)만큼 지난 뒤 알람이 스스로 꺼집니다. 오래 유지하려면 값을 크게, 짧게 울리려면 값을 작게 설정하세요.
+  - generic [ref=e1519]:
+    - generic [ref=e1521]:
+      - generic [ref=e1522]: Sensorway Co., Ltd.
+      - generic [ref=e1524]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1537]:
+      - generic [ref=e1538]:
+        - generic [ref=e1539]: CHAPTER 5
+        - heading "5.3서버 연결(브로커) 설정" [level=2] [ref=e1540]
+      - paragraph [ref=e1541]: 셋업(설정) 패널의 'API 브로커' 탭에서는 관제 서버와의 실시간 연결 정보를 입력합니다. 이 정보가 올바라야 이벤트와 현장 상태가 실시간으로 화면에 반영됩니다.
+      - generic [ref=e1542]:
+        - figure "그림 58. API 브로커 연결 설정 화면" [ref=e1543]:
+          - img "API 브로커 연결 설정 화면" [ref=e1544]
+        - generic [ref=e1546]: 설정 정보 창의 좌측 탭에서 'API 브로커'를 선택하면 관제 서버 연결 항목이 나타납니다. 브로커 서버 IP 주소, 포트, 기본 구독 Subject, 클라이언트 이름, 인증 사용자명·비밀번호를 각 항목의 오른쪽 입력란에 입력합니다. 목록은 아래로 스크롤하여 나머지 항목까지 확인할 수 있습니다.
+      - generic [ref=e1547]:
+        - figure "그림 59. 연결 필수 항목 (IP·포트·구독 Subject)" [ref=e1548]:
+          - img "연결 필수 항목 (IP·포트·구독 Subject)" [ref=e1549]
+        - generic [ref=e1551]: 관제 서버에 연결하려면 브로커 서버 IP 주소와 포트를 반드시 입력해야 합니다. 기본 구독 Subject에는 수신할 대상 경로를 입력하며, 항목마다 오른쪽에 입력 예시가 안내됩니다.
+  - generic [ref=e1554]:
+    - generic [ref=e1556]:
+      - generic [ref=e1557]: Sensorway Co., Ltd.
+      - generic [ref=e1559]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1572]:
+      - generic [ref=e1573]:
+        - figure "그림 60. 클라이언트 이름과 선택 인증 항목" [ref=e1574]:
+          - img "클라이언트 이름과 선택 인증 항목" [ref=e1575]
+        - generic [ref=e1577]: 클라이언트 이름은 이 프로그램을 구분하기 위한 이름입니다. 인증 사용자명과 비밀번호는 '(선택적)'으로 표시되어 있어, 서버가 인증을 요구할 때만 입력하면 됩니다.
+      - generic [ref=e1578]:
+        - figure "그림 61. 연결 타임아웃 설정" [ref=e1579]:
+          - img "연결 타임아웃 설정" [ref=e1580]
+        - generic [ref=e1582]: 연결 타임아웃 항목에서는 서버 응답을 기다리는 최대 시간을 밀리초 단위로 지정합니다. 기본값은 5000이며 오른쪽 입력란에서 값을 변경할 수 있습니다.
+      - generic [ref=e1583]:
+        - figure "그림 62. 팝업 브로커 연결 설정 화면" [ref=e1584]:
+          - img "팝업 브로커 연결 설정 화면" [ref=e1585]
+        - generic [ref=e1587]: 좌측 탭에서 '팝업 브로커'를 선택하면 영상 팝업용 서버 연결 항목이 나타납니다. 브로커 서버 IP 주소와 포트, 필요 시 인증 비밀번호, 그리고 채널 이름을 입력합니다. 인증 비밀번호는 선택 항목으로 입력된 값은 점으로 가려져 표시됩니다.
+  - generic [ref=e1590]:
+    - generic [ref=e1592]:
+      - generic [ref=e1593]: Sensorway Co., Ltd.
+      - generic [ref=e1595]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1609]:
+      - generic [ref=e1610]:
+        - generic [ref=e1611]: ℹ 참고
+        - generic [ref=e1612]: "'(선택적)'으로 표시된 인증 사용자명·비밀번호는 서버가 인증을 요구할 때만 입력하면 됩니다. 요구하지 않는 환경에서는 비워 두어도 됩니다."
+      - generic [ref=e1613]:
+        - generic [ref=e1614]: 💡 사용 팁
+        - generic [ref=e1615]: "'API 브로커'는 이벤트·현장 상태 수신용, '팝업 브로커'는 영상 팝업용으로 각각 별도의 연결입니다. 두 탭의 서버 정보를 혼동하지 않도록 주의하세요."
+  - generic [ref=e1618]:
+    - generic [ref=e1620]:
+      - generic [ref=e1621]: Sensorway Co., Ltd.
+      - generic [ref=e1623]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1636]:
+      - generic [ref=e1637]:
+        - generic [ref=e1638]: CHAPTER 5
+        - heading "5.4지도 · 웹 · 도커 · 프로그램 · 연동 설정" [level=2] [ref=e1639]
+      - paragraph [ref=e1640]: 셋업(설정) 패널의 왼쪽 탭에서 지도, 웹서버, 감시 상태, 프로그램 정보, 외부 이벤트 연동 항목을 차례로 설정합니다. 각 화면은 오른쪽에 입력란과 켜기/끄기 스위치로 구성되어 있습니다.
+      - generic [ref=e1641]:
+        - figure "그림 63. 지도 설정 탭 — 지도 이름과 홈 위치" [ref=e1642]:
+          - img "지도 설정 탭 — 지도 이름과 홈 위치" [ref=e1643]
+        - generic [ref=e1645]: "왼쪽 탭에서 '지도 설정'을 선택하면 지도 종류와 홈 위치를 정할 수 있습니다. 오른쪽 위 드롭다운으로 표시할 지도(예: 위성지도)를 고르고, 홈 위도·경도·줌 레벨을 입력해 프로그램을 켤 때 처음 보여줄 위치와 배율을 지정합니다. 맨 아래 '홈 위치 사용'을 체크하면 이 홈 위치가 적용됩니다."
+  - generic [ref=e1648]:
+    - generic [ref=e1650]:
+      - generic [ref=e1651]: Sensorway Co., Ltd.
+      - generic [ref=e1653]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1666]:
+      - generic [ref=e1667]:
+        - figure "그림 64. 웹서버 설정 탭 — 웹 연동 주소와 포트" [ref=e1668]:
+          - img "웹서버 설정 탭 — 웹 연동 주소와 포트" [ref=e1669]
+        - generic [ref=e1671]: "'웹서버 설정' 탭에서는 통합 웹 연동에 사용할 서버 정보를 입력합니다. 오른쪽 위 스위치로 웹서버 사용을 켜고 끄며, 그 아래에 서버 IP 주소와 포트 번호를 입력합니다. 스위치가 꺼져 있으면 웹 연동 기능이 동작하지 않습니다."
+      - generic [ref=e1672]:
+        - figure "그림 65. 감시 상태 탭 — 프로그램 자동 감시와 현재 상태" [ref=e1673]:
+          - img "감시 상태 탭 — 프로그램 자동 감시와 현재 상태" [ref=e1674]
+        - generic [ref=e1676]: 이 탭에서는 프로그램이 정상 동작 중인지 지속적으로 감시하는 기능을 켜고 끌 수 있습니다. 위쪽 스위치로 감시를 활성화하며, 변경 사항은 프로그램 재시작 후 적용되지만 '지금 시작' 버튼으로 즉시 켤 수도 있습니다. 아래 '감시 상태'에는 현재 상태(정상 감시 중 등), 재시작 횟수, 마지막 재시작 시각이 표시됩니다.
+  - generic [ref=e1679]:
+    - generic [ref=e1681]:
+      - generic [ref=e1682]: Sensorway Co., Ltd.
+      - generic [ref=e1684]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1697]:
+      - generic [ref=e1698]:
+        - figure "그림 66. About 탭 — 프로그램 및 회사 정보" [ref=e1699]:
+          - img "About 탭 — 프로그램 및 회사 정보" [ref=e1700]
+        - generic [ref=e1702]: "'About' 탭은 프로그램 버전과 이름, 제작 회사의 주소·전화·이메일, 저작권 등 제품 정보를 보여줍니다. 이 화면은 확인용 정보이며 별도로 조작할 항목은 없습니다. 지원 문의나 버전 확인이 필요할 때 참고합니다."
+      - generic [ref=e1703]:
+        - figure "그림 67. 3rd Party 이벤트 설정 탭 — 외부 연동 이벤트 목록" [ref=e1704]:
+          - img "3rd Party 이벤트 설정 탭 — 외부 연동 이벤트 목록" [ref=e1705]
+        - generic [ref=e1707]: 외부 시스템에서 들어오는 이벤트를 등록·관리하는 화면입니다. 오른쪽 위 버튼으로 항목 추가(+), 삭제(−), 새로고침, 저장을 하며, 목록에는 이벤트명·그룹·사용 여부·설명이 표 형태로 나타납니다. 하단에는 선택 개수와 전체 개수가 표시됩니다.
+  - generic [ref=e1710]:
+    - generic [ref=e1712]:
+      - generic [ref=e1713]: Sensorway Co., Ltd.
+      - generic [ref=e1715]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1729]:
+      - generic [ref=e1730]:
+        - generic [ref=e1731]: 💡 사용 팁
+        - generic [ref=e1732]: 지도 설정에서 홈 위도·경도·줌 레벨을 자주 감시하는 위치로 맞춰 두고 '홈 위치 사용'을 체크하면, 상단 바의 홈 이동 도구로 언제든 그 위치로 빠르게 돌아올 수 있습니다.
+      - generic [ref=e1733]:
+        - generic [ref=e1734]: ℹ 참고
+        - generic [ref=e1735]: 웹서버 설정의 사용 스위치가 꺼져 있으면 통합 웹 연동이 동작하지 않으니, 연동이 필요하면 스위치를 켠 뒤 주소와 포트를 확인하세요.
+  - generic [ref=e1738]:
+    - generic [ref=e1740]:
+      - generic [ref=e1741]: Sensorway Co., Ltd.
+      - generic [ref=e1743]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1756]:
+      - generic [ref=e1757]: CHAPTER
+      - generic [ref=e1758]: "06"
+      - heading "장비 관리 (장비 패널)" [level=1] [ref=e1759]
+      - paragraph [ref=e1760]: 현장 장비(제어기·센서·카메라·스피커·함체·경광등)를 그룹으로 등록하고 속성을 관리하는 방법을 설명합니다.
+      - list [ref=e1761]:
+        - listitem [ref=e1762]:
+          - generic [ref=e1763]: "6.1"
+          - text: 장비 패널과 장비 그룹
+        - listitem [ref=e1764]:
+          - generic [ref=e1765]: "6.2"
+          - text: 제어기 · 센서 설정
+        - listitem [ref=e1766]:
+          - generic [ref=e1767]: "6.3"
+          - text: 카메라 설정
+        - listitem [ref=e1768]:
+          - generic [ref=e1769]: "6.4"
+          - text: 스피커 · 함체 · 경광등 설정
+  - generic [ref=e1772]:
+    - generic [ref=e1774]:
+      - generic [ref=e1775]: Sensorway Co., Ltd.
+      - generic [ref=e1777]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1790]:
+      - generic [ref=e1791]:
+        - generic [ref=e1792]: CHAPTER 6
+        - heading "6.1장비 패널과 장비 그룹" [level=2] [ref=e1793]
+      - paragraph [ref=e1794]: 장비 패널에서는 현장에 설치된 제어기·센서·카메라·스피커·함체·경광등을 종류별로 한눈에 확인하고, 구역(그룹) 단위로 묶어 등록·관리할 수 있습니다. 좌측 아이콘 레일의 장비 항목으로 패널을 열어 시작합니다.
+      - generic [ref=e1795]:
+        - figure "그림 68. 좌측 아이콘 레일의 장비(DEVICES) 항목" [ref=e1796]:
+          - img "좌측 아이콘 레일의 장비(DEVICES) 항목" [ref=e1797]
+        - generic [ref=e1799]: 화면 왼쪽 세로 아이콘 레일에서 파랗게 강조된 DEVICES 항목이 장비 패널을 여는 버튼입니다. 위아래로 로그아웃·내정보·계정권한·이벤트·리포트·셋업 항목이 함께 나열되어 있으며, 원하는 항목을 눌러 해당 패널로 이동합니다.
+  - generic [ref=e1802]:
+    - generic [ref=e1804]:
+      - generic [ref=e1805]: Sensorway Co., Ltd.
+      - generic [ref=e1807]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1821]:
+      - figure "그림 69. 장비 정보 패널 - 종류별 수량과 그룹 목록" [ref=e1822]:
+        - img "장비 정보 패널 - 종류별 수량과 그룹 목록" [ref=e1823]
+      - generic [ref=e1825]: 상단에는 제어기·멀티센서·펜스센서·스마트센서·지중센서·접점센서·PIR센서·IO제어기·레이저센서·IP카메라·스피커·함체·경광등 등 장비 종류별 현재 등록 수량이 카드로 표시됩니다. 하단은 좌측의 그룹 설정·제어기 설정·센서 설정·카메라 설정·스피커 설정 탭과 우측의 그룹 목록(번호·이름·설명·장비 수)으로 구성되며, 우측 상단의 추가·삭제·새로고침·저장 버튼으로 그룹을 관리합니다.
+  - generic [ref=e1828]:
+    - generic [ref=e1830]:
+      - generic [ref=e1831]: Sensorway Co., Ltd.
+      - generic [ref=e1833]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1847]:
+      - figure "그림 70. 장비그룹 속성 - 선택한 구역의 장비 구성 확인" [ref=e1848]:
+        - img "장비그룹 속성 - 선택한 구역의 장비 구성 확인" [ref=e1849]
+      - generic [ref=e1851]: "아래 목록에서 그룹(예: Zone1)을 선택하면 상단에 장비그룹 속성 영역이 열려 이름과 설명을 확인·수정할 수 있고, 해당 그룹에 속한 장비들이 장비명·장비유형·상태·활성화 여부로 나열됩니다. 이름이나 설명을 바꾼 뒤 적용 버튼을 눌러 반영하며, 옆의 추가·삭제·새로고침 버튼으로 그룹 내 장비 구성을 편집합니다."
+  - generic [ref=e1854]:
+    - generic [ref=e1856]:
+      - generic [ref=e1857]: Sensorway Co., Ltd.
+      - generic [ref=e1859]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1873]:
+      - figure "그림 71. 장비 추가 창 - 그룹에 넣을 장비 선택" [ref=e1874]:
+        - img "장비 추가 창 - 그룹에 넣을 장비 선택" [ref=e1875]
+      - generic [ref=e1877]: 장비그룹 속성에서 추가 버튼을 누르면 등록 가능한 전체 장비 목록이 뜨며, 각 항목의 장비명·장비유형·상태·활성화 여부를 확인할 수 있습니다. 넣고자 하는 장비의 활성화 칸을 체크해 선택한 뒤 하단의 등록 버튼으로 그룹에 담고, 취소 버튼으로 창을 닫습니다. 하단에 전체 개수와 현재 선택 개수가 표시됩니다.
+  - generic [ref=e1880]:
+    - generic [ref=e1882]:
+      - generic [ref=e1883]: Sensorway Co., Ltd.
+      - generic [ref=e1885]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1898]:
+      - generic [ref=e1899]:
+        - generic [ref=e1900]: CHAPTER 6
+        - heading "6.2제어기 · 센서 설정" [level=2] [ref=e1901]
+      - paragraph [ref=e1902]: 장비 패널에서 제어기나 센서를 선택하면 속성 창이 열립니다. 여기서 장비의 기본 정보, 연결 정보, 지도상 위치, 소속 그룹을 확인하고 수정할 수 있습니다.
+      - generic [ref=e1903]:
+        - figure "그림 72. 제어기 속성 창 - 기본 정보" [ref=e1904]:
+          - img "제어기 속성 창 - 기본 정보" [ref=e1905]
+        - generic [ref=e1907]: "제어기의 속성 창 상단입니다. '장비 공통' 항목에서 장비 번호(Device No), 이름(Name: 제어기_01), 종류(Type: Controller), 버전(Ver.), 활성화 여부, 상태(Status)를 확인할 수 있고, '장비별 속성'에는 제어기의 연결 주소(IP)와 포트(Port)가 표시됩니다. 활성화와 상태는 목록에서 값을 선택합니다."
+      - generic [ref=e1908]:
+        - figure "그림 73. 제어기 속성 창 - 위치와 그룹" [ref=e1909]:
+          - img "제어기 속성 창 - 위치와 그룹" [ref=e1910]
+        - generic [ref=e1912]: 속성 창을 아래로 내리면 '위치 정보'와 '그룹' 항목이 나옵니다. 위치 이름(Location), 위도(Lat)·경도(Lng)·고도(Alt)·방향(Bearing)을 입력해 지도상 위치를 지정하고, 아래 그룹 목록(Zone1, Zone2)에서 체크박스로 소속 구역을 선택합니다. 값을 바꾼 뒤 우측 하단 '적용'을 누르면 저장됩니다.
+      - generic [ref=e1913]:
+        - figure "그림 74. 센서 속성 창 - 기본 정보" [ref=e1914]:
+          - img "센서 속성 창 - 기본 정보" [ref=e1915]
+        - generic [ref=e1917]: "센서의 속성 창 상단입니다. 장비 번호·이름(SmartSensor_001)·종류(Type: SmartSensor)·버전·활성화·상태가 표시되며, '장비별 속성'의 Controller 항목에서 이 센서를 관장할 제어기(제어기_01)를 목록에서 지정합니다. 각 센서는 소속 제어기를 반드시 선택해야 합니다."
+  - generic [ref=e1920]:
+    - generic [ref=e1922]:
+      - generic [ref=e1923]: Sensorway Co., Ltd.
+      - generic [ref=e1925]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1939]:
+      - figure "그림 75. 센서 속성 창 - 위치와 그룹" [ref=e1940]:
+        - img "센서 속성 창 - 위치와 그룹" [ref=e1941]
+      - generic [ref=e1943]: "센서 속성 창의 아래쪽입니다. 위치 이름(Location: 센서-001)과 위도·경도로 지도상 설치 위치를 지정하고, 그룹 목록에서 소속 구역을 체크합니다. 화면에서는 Zone1이 선택되어 있으며, 수정 후 '적용'을 눌러 반영합니다."
+  - generic [ref=e1946]:
+    - generic [ref=e1948]:
+      - generic [ref=e1949]: Sensorway Co., Ltd.
+      - generic [ref=e1951]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1964]:
+      - generic [ref=e1965]:
+        - generic [ref=e1966]: CHAPTER 6
+        - heading "6.3카메라 설정" [level=2] [ref=e1967]
+      - paragraph [ref=e1968]: 장비 패널에서 카메라를 선택하면 카메라 속성 창이 열립니다. 여기서 카메라의 기본 정보와 접속 정보, 설치 위치를 입력하고, 상세보기 창에서 하드웨어 사양·동작 설정·영상 주소를 관리합니다.
+      - generic [ref=e1969]:
+        - figure "그림 76. 카메라 속성 창 - 기본 정보와 접속 정보" [ref=e1970]:
+          - img "카메라 속성 창 - 기본 정보와 접속 정보" [ref=e1971]
+        - generic [ref=e1973]: 카메라 속성 창의 상단으로, 장치 번호·이름·종류·버전 같은 기본 정보와 활성화·상태를 보여줍니다. 아래쪽 장비별 속성에서는 IP·포트·아이디·비밀번호와 접속 방식(Mode), 카메라 종류(Category)를 입력합니다. 값을 수정한 뒤 오른쪽 아래 적용을 누르면 저장됩니다.
+      - generic [ref=e1974]:
+        - figure "그림 77. 카메라 속성 창 - 위치 정보와 그룹" [ref=e1975]:
+          - img "카메라 속성 창 - 위치 정보와 그룹" [ref=e1976]
+        - generic [ref=e1978]: 속성 창을 아래로 내리면 카메라의 설치 위치(Location)와 위도·경도, 고도, 바라보는 방향(Bearing)을 입력하는 위치 정보가 나옵니다. 그 아래 그룹에서 체크박스로 소속 구역을 지정할 수 있습니다. 입력을 마치면 적용을 눌러 반영합니다.
+  - generic [ref=e1981]:
+    - generic [ref=e1983]:
+      - generic [ref=e1984]: Sensorway Co., Ltd.
+      - generic [ref=e1986]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e1999]:
+      - generic [ref=e2000]:
+        - figure "그림 78. 카메라 상세보기 - 하드웨어 사양(HW Spec) 탭" [ref=e2001]:
+          - img "카메라 상세보기 - 하드웨어 사양(HW Spec) 탭" [ref=e2002]
+        - generic [ref=e2004]: 속성 창에서 상세보기를 누르면 열리는 상세 설정 창으로, 상단 탭 HW Spec·Setting·URLs 중 하드웨어 사양 탭입니다. 이름·설치 위치·제조사·모델·펌웨어·MAC 주소 등 카메라의 기본 사양 정보를 입력합니다. 아래쪽 저장으로 반영하고, 취소로 창을 닫습니다.
+      - generic [ref=e2005]:
+        - figure "그림 79. 카메라 상세보기 - 동작 설정(Setting) 탭" [ref=e2006]:
+          - img "카메라 상세보기 - 동작 설정(Setting) 탭" [ref=e2007]
+        - generic [ref=e2009]: Setting 탭에서는 카메라의 동작 모드를 지정합니다. 기상 모드·카메라 모드·히터·팬·조명(Headlight)·주야간 전환·초점·조리개를 각 선택 목록에서 고를 수 있습니다. 필요한 값을 선택한 뒤 저장을 누릅니다.
+  - generic [ref=e2012]:
+    - generic [ref=e2014]:
+      - generic [ref=e2015]: Sensorway Co., Ltd.
+      - generic [ref=e2017]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2030]:
+      - generic [ref=e2031]:
+        - figure "그림 80. 카메라 상세보기 - 영상 주소(URLs) 탭" [ref=e2032]:
+          - img "카메라 상세보기 - 영상 주소(URLs) 탭" [ref=e2033]
+        - generic [ref=e2035]: URLs 탭에서는 카메라 영상과 관련된 접속 주소를 입력합니다. 홈페이지, 영상 스트림 주소(RTSP Main·Sub), 웹 영상, 스냅샷 주소를 각 칸에 넣을 수 있습니다. 입력 후 저장을 눌러 반영합니다.
+      - generic [ref=e2036]:
+        - generic [ref=e2037]:
+          - generic [ref=e2038]: 💡 사용 팁
+          - generic [ref=e2039]: 기본 접속 정보(IP·포트·아이디·비밀번호)는 속성 창에서, 사양·동작·영상 주소 같은 세부 항목은 상세보기 창에서 나눠 관리합니다.
+        - generic [ref=e2040]:
+          - generic [ref=e2041]: ℹ 참고
+          - generic [ref=e2042]: 속성 창은 적용, 상세보기 창은 저장으로 반영됩니다. 변경 후 해당 버튼을 눌러야 저장됩니다.
+  - generic [ref=e2045]:
+    - generic [ref=e2047]:
+      - generic [ref=e2048]: Sensorway Co., Ltd.
+      - generic [ref=e2050]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2063]:
+      - generic [ref=e2064]:
+        - generic [ref=e2065]: CHAPTER 6
+        - heading "6.4스피커 · 함체 · 경광등 설정" [level=2] [ref=e2066]
+      - paragraph [ref=e2067]: 스피커, 함체, 경광등은 위치 정보를 중심으로 등록하며, 함체는 온도·습도·전류·전압 임계값을, 경광등은 접속 정보를 함께 설정합니다. 각 속성 창에서 값을 입력한 뒤 오른쪽 아래 [적용]을 눌러 저장합니다.
+      - generic [ref=e2068]:
+        - figure "그림 81. 스피커 속성 입력 창" [ref=e2069]:
+          - img "스피커 속성 입력 창" [ref=e2070]
+        - generic [ref=e2072]: 스피커의 이름(Location), 위경도(Lat·Lng), 고도(Alt), 방위(Bearing)를 입력하는 창입니다. 아래 그룹 목록(Zone1·Zone2)에서 체크박스로 소속 구역을 선택하고, 오른쪽 아래 [적용]을 눌러 저장합니다.
+      - generic [ref=e2073]:
+        - figure "그림 82. 함체 속성 입력 창" [ref=e2074]:
+          - img "함체 속성 입력 창" [ref=e2075]
+        - generic [ref=e2077]: 함체의 위치 정보(이름·위경도·고도·방위)를 입력하고, 그룹 목록에서 소속 구역을 체크합니다. 오른쪽 아래에는 [임계값] 버튼과 [적용] 버튼이 있어, 임계값 설정으로 넘어가거나 입력한 내용을 저장할 수 있습니다.
+  - generic [ref=e2080]:
+    - generic [ref=e2082]:
+      - generic [ref=e2083]: Sensorway Co., Ltd.
+      - generic [ref=e2085]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2098]:
+      - generic [ref=e2099]:
+        - figure "그림 83. 함체 임계값 설정 창" [ref=e2100]:
+          - img "함체 임계값 설정 창" [ref=e2101]
+        - generic [ref=e2103]: 함체의 온도 상한·하한(℃), 습도 상한(%), 전류 상한(A), 전압 하한(V) 기준값을 입력하는 창입니다. 각 항목에 숫자를 입력한 뒤 아래 [저장]을 누르면 반영되고, [취소]를 누르면 변경 없이 닫힙니다.
+      - generic [ref=e2104]:
+        - figure "그림 84. 경광등 속성 입력 창" [ref=e2105]:
+          - img "경광등 속성 입력 창" [ref=e2106]
+        - generic [ref=e2108]: 경광등의 접속 정보(IP·Port·User·PW)와 설명(Desc), 그리고 위치 정보(이름·위경도·고도·방위)를 입력하는 창입니다. 값을 입력한 뒤 오른쪽 아래 [적용]을 눌러 저장합니다.
+  - generic [ref=e2111]:
+    - generic [ref=e2113]:
+      - generic [ref=e2114]: Sensorway Co., Ltd.
+      - generic [ref=e2116]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2129]:
+      - generic [ref=e2130]: CHAPTER
+      - generic [ref=e2131]: "07"
+      - heading "이벤트 이력 (이벤트 패널)" [level=1] [ref=e2132]
+      - paragraph [ref=e2133]: 탐지·장애·연결·조치 이벤트의 통계와 이력을 조회하는 이벤트 패널을 설명합니다.
+      - list [ref=e2134]:
+        - listitem [ref=e2135]:
+          - generic [ref=e2136]: "7.1"
+          - text: 이벤트 패널과 탐지 이력
+        - listitem [ref=e2137]:
+          - generic [ref=e2138]: "7.2"
+          - text: 장애 · 연결 · 조치 이력
+  - generic [ref=e2141]:
+    - generic [ref=e2143]:
+      - generic [ref=e2144]: Sensorway Co., Ltd.
+      - generic [ref=e2146]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2159]:
+      - generic [ref=e2160]:
+        - generic [ref=e2161]: CHAPTER 7
+        - heading "7.1이벤트 패널과 탐지 이력" [level=2] [ref=e2162]
+      - paragraph [ref=e2163]: 이벤트 패널은 현장에서 발생한 이벤트를 실시간 통계와 이력 목록으로 보여준다. 센서 이벤트와 카메라 이벤트를 나눠 확인하고, 기간을 지정해 탐지 내역을 조회할 수 있다.
+      - generic [ref=e2164]:
+        - figure "그림 85. 좌측 아이콘 레일의 이벤트(EVENTS) 버튼" [ref=e2165]:
+          - img "좌측 아이콘 레일의 이벤트(EVENTS) 버튼" [ref=e2166]
+        - generic [ref=e2168]: 화면 왼쪽 세로 아이콘 레일에서 달력 모양의 EVENTS 항목을 선택하면 이벤트 패널이 열린다. 위아래로 로그아웃·내정보(MY PAGE)·계정권한(ACCOUNTS)·장비(DEVICES)·리포트(REPORTS)·셋업(SETUP) 등 다른 패널 버튼도 함께 놓여 있다.
+  - generic [ref=e2171]:
+    - generic [ref=e2173]:
+      - generic [ref=e2174]: Sensorway Co., Ltd.
+      - generic [ref=e2176]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2189]:
+      - generic [ref=e2190]:
+        - figure "그림 86. 이벤트 패널 - 이벤트 정보 화면과 차트보기" [ref=e2191]:
+          - img "이벤트 패널 - 이벤트 정보 화면과 차트보기" [ref=e2192]
+        - generic [ref=e2194]: 상단에 센서 이벤트와 카메라 이벤트가 좌우로 나뉘어 막대·원형 통계로 표시되고, 왼쪽 체크박스(DET·MAL·CON·ACT)로 탐지·장애·연결·조치 종류를 켜고 끌 수 있다. 가운데 From·To에 기간을 지정한 뒤 오른쪽 조회 아이콘으로 검색하며, 아래에는 시간대별 이벤트 추이 차트가 그려진다. 왼쪽 세로 탭에서 차트보기·탐지내역·장애내역·연결내역·조치내역으로 화면을 전환한다.
+      - generic [ref=e2195]:
+        - figure "그림 87. 카메라 이벤트 요약 카드" [ref=e2196]:
+          - img "카메라 이벤트 요약 카드" [ref=e2197]
+        - generic [ref=e2199]: 카메라 이벤트 탭에서는 총 탐지 건수, 일평균 탐지, 활성 카메라 수가 카드 형태로 요약되어 표시된다. 위쪽의 센서 이벤트·카메라 이벤트 제목을 눌러 두 화면을 오갈 수 있다.
+  - generic [ref=e2202]:
+    - generic [ref=e2204]:
+      - generic [ref=e2205]: Sensorway Co., Ltd.
+      - generic [ref=e2207]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2220]:
+      - generic [ref=e2221]:
+        - figure "그림 88. 탐지내역 목록 화면" [ref=e2222]:
+          - img "탐지내역 목록 화면" [ref=e2223]
+        - generic [ref=e2225]: 왼쪽 탭에서 탐지내역을 선택하면 발생한 탐지 이벤트가 표로 나열된다. 각 행은 번호·유형(Message Type)·장비(Device)·조치보고 여부·결과(Result)·발생 시각(DateTime)을 보여주며, 목록 위의 추가·삭제·새로고침·저장 아이콘으로 항목을 관리한다. 오른쪽 아래에는 표시 건수와 전체 건수가 함께 나타난다.
+      - generic [ref=e2226]:
+        - figure "그림 89. 탐지 이벤트 선택 시 나타나는 탐지 속성 창" [ref=e2227]:
+          - img "탐지 이벤트 선택 시 나타나는 탐지 속성 창" [ref=e2228]
+        - generic [ref=e2230]: 목록에서 한 건을 선택하면 위쪽에 탐지 속성 창이 열려 유형·장비·상태·결과 정보를 확인할 수 있다. 값을 바꾼 뒤 오른쪽 아래 적용 버튼을 누르면 반영된다.
+  - generic [ref=e2233]:
+    - generic [ref=e2235]:
+      - generic [ref=e2236]: Sensorway Co., Ltd.
+      - generic [ref=e2238]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2252]:
+      - generic [ref=e2253]:
+        - generic [ref=e2254]: 💡 사용 팁
+        - generic [ref=e2255]: From·To 기간을 지정한 뒤 조회(돋보기) 아이콘을 누르면 해당 기간의 이벤트만 통계와 목록에 반영된다. 왼쪽 아래 탐지·장애·연결·조치 탭으로 종류별 내역을 나눠 볼 수 있다.
+      - generic [ref=e2256]:
+        - generic [ref=e2257]: ℹ 참고
+        - generic [ref=e2258]: 목록 오른쪽 아래에는 현재 표시된 건수와 전체 건수가 함께 표시되며, 조치보고 열의 체크 표시로 각 이벤트의 조치 보고 처리 여부를 한눈에 확인할 수 있다.
+  - generic [ref=e2261]:
+    - generic [ref=e2263]:
+      - generic [ref=e2264]: Sensorway Co., Ltd.
+      - generic [ref=e2266]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2279]:
+      - generic [ref=e2280]:
+        - generic [ref=e2281]: CHAPTER 7
+        - heading "7.2장애 · 연결 · 조치 이력" [level=2] [ref=e2282]
+      - paragraph [ref=e2283]: 이벤트 패널은 탐지 외에도 장비 장애, 연결 상태, 운영자 조치 보고를 각각의 탭으로 나누어 보여줍니다. 왼쪽 세로 탭에서 장애내역·연결내역·조치내역을 선택하면 해당 이력을 조회할 수 있습니다.
+      - generic [ref=e2284]:
+        - figure "그림 90. 장애 이력 화면" [ref=e2285]:
+          - img "장애 이력 화면" [ref=e2286]
+        - generic [ref=e2288]: 왼쪽 세로 탭에서 '장애내역'을 선택하면 장비 고장 이벤트가 표로 나옵니다. 상단에는 제어기별 장애 건수 막대그래프와 전체 건수 원형 차트가 표시되고, From/To 날짜를 지정한 뒤 돋보기 버튼으로 기간 내 이력을 조회합니다. 각 행에는 발생 장비·사유·조치보고 여부와 발생 일시가 나타납니다.
+  - generic [ref=e2291]:
+    - generic [ref=e2293]:
+      - generic [ref=e2294]: Sensorway Co., Ltd.
+      - generic [ref=e2296]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2309]:
+      - generic [ref=e2310]:
+        - figure "그림 91. 장애 이력 상세 속성" [ref=e2311]:
+          - img "장애 이력 상세 속성" [ref=e2312]
+        - generic [ref=e2314]: 목록에서 한 건을 선택하면 상단에 '장애보고 속성' 영역이 열려 해당 이벤트의 종류·대상 장비·사유·상태 등 세부 내용을 보여줍니다. 내용을 확인·수정한 뒤 오른쪽 '적용' 버튼을 누르면 반영됩니다.
+      - generic [ref=e2315]:
+        - figure "그림 92. 연결 이력 화면" [ref=e2316]:
+          - img "연결 이력 화면" [ref=e2317]
+        - generic [ref=e2319]: "'연결내역' 탭은 장비의 연결 상태 변화 이벤트를 보여줍니다. 상단 차트에 연결 관련 추이가 표시되며, 조회된 항목이 없으면 목록은 비어 있고 하단에 건수가 0으로 나타납니다. From/To 기간을 바꾸고 돋보기 버튼으로 다시 조회할 수 있습니다."
+  - generic [ref=e2322]:
+    - generic [ref=e2324]:
+      - generic [ref=e2325]: Sensorway Co., Ltd.
+      - generic [ref=e2327]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2341]:
+      - figure "그림 93. 조치 이력 상세 속성" [ref=e2342]:
+        - img "조치 이력 상세 속성" [ref=e2343]
+      - generic [ref=e2345]: "'조치내역' 탭은 운영자가 이벤트를 종결하며 남긴 조치 보고 이력을 보여줍니다. 목록에는 원인 이벤트 종류·처리자·조치 내용·일시가 표시되고, 한 건을 선택하면 상단 '조치보고 속성'에서 대상 이벤트와 조치 내용 등을 확인할 수 있습니다."
+  - generic [ref=e2348]:
+    - generic [ref=e2350]:
+      - generic [ref=e2351]: Sensorway Co., Ltd.
+      - generic [ref=e2353]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2366]:
+      - generic [ref=e2367]: CHAPTER
+      - generic [ref=e2368]: "08"
+      - heading "실시간 관제 — 이벤트 발생과 조치" [level=1] [ref=e2369]
+      - paragraph [ref=e2370]: 심볼 우클릭 메뉴, 탐지·장애 이벤트 발생 시 화면 표시와 이벤트 카드, 조치 보고, 카메라 영상 팝업을 설명합니다.
+      - list [ref=e2371]:
+        - listitem [ref=e2372]:
+          - generic [ref=e2373]: "8.1"
+          - text: 심볼 우클릭 메뉴
+        - listitem [ref=e2374]:
+          - generic [ref=e2375]: "8.2"
+          - text: 탐지 이벤트 발생 화면
+        - listitem [ref=e2376]:
+          - generic [ref=e2377]: "8.3"
+          - text: 장애 이벤트 발생 화면
+        - listitem [ref=e2378]:
+          - generic [ref=e2379]: "8.4"
+          - text: 이벤트 조치 보고
+        - listitem [ref=e2380]:
+          - generic [ref=e2381]: "8.5"
+          - text: 카메라 영상 팝업
+  - generic [ref=e2384]:
+    - generic [ref=e2386]:
+      - generic [ref=e2387]: Sensorway Co., Ltd.
+      - generic [ref=e2389]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2402]:
+      - generic [ref=e2403]:
+        - generic [ref=e2404]: CHAPTER 8
+        - heading "8.1심볼 우클릭 메뉴" [level=2] [ref=e2405]
+      - paragraph [ref=e2406]: 지도 위의 심볼을 마우스 오른쪽 버튼으로 클릭하면 해당 장비에 맞는 작업 메뉴가 나타납니다. 심볼 종류에 따라 제공되는 메뉴 항목이 다르며, 목록 열람·상세 확인·정보 수정 등을 바로 실행할 수 있습니다.
+      - generic [ref=e2407]:
+        - figure "그림 94. 카메라 심볼 우클릭 메뉴" [ref=e2408]:
+          - img "카메라 심볼 우클릭 메뉴" [ref=e2409]
+        - generic [ref=e2411]: 지도의 카메라 심볼을 우클릭하면 감시카메라페이지, 감시카메라상세, 감시카메라수정, 카메라 홈페이지, 특정 위치 확인 항목이 나타납니다. 카메라 목록으로 이동하거나 상세 정보를 확인하고, 카메라 홈페이지로 접속하거나 지도에서 해당 위치를 다시 찾을 수 있습니다.
+      - generic [ref=e2412]:
+        - figure "그림 95. 제어기 심볼 우클릭 메뉴" [ref=e2413]:
+          - img "제어기 심볼 우클릭 메뉴" [ref=e2414]
+        - generic [ref=e2416]: 제어기 심볼을 우클릭하면 제어기페이지, 제어기상세, 제어기수정, 제어기 홈페이지 항목이 표시됩니다. 제어기 목록과 상세 정보를 열람하거나 정보를 수정하고, 제어기 홈페이지로 이동할 수 있습니다.
+      - generic [ref=e2417]:
+        - figure "그림 96. 감지센서 심볼 우클릭 메뉴" [ref=e2418]:
+          - img "감지센서 심볼 우클릭 메뉴" [ref=e2419]
+        - generic [ref=e2421]: 일반 감지센서 심볼을 우클릭하면 감지센서페이지, 감지센서상세, 감지센서수정 세 가지 항목이 나타납니다. 센서 목록으로 이동하거나 상세 정보를 확인하고, 센서 정보를 수정할 수 있습니다.
+  - generic [ref=e2424]:
+    - generic [ref=e2426]:
+      - generic [ref=e2427]: Sensorway Co., Ltd.
+      - generic [ref=e2429]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2442]:
+      - generic [ref=e2443]:
+        - figure "그림 97. 복합센서 심볼 우클릭 메뉴" [ref=e2444]:
+          - img "복합센서 심볼 우클릭 메뉴" [ref=e2445]
+        - generic [ref=e2447]: 여러 감지요소가 결합된 복합센서 심볼을 우클릭하면 장치페이지, 장치상세, 장치수정 항목이 표시됩니다. 장치 목록과 상세 정보를 확인하거나 등록 정보를 수정할 수 있습니다.
+      - generic [ref=e2448]:
+        - figure "그림 98. 스피커 심볼 우클릭 메뉴" [ref=e2449]:
+          - img "스피커 심볼 우클릭 메뉴" [ref=e2450]
+        - generic [ref=e2452]: 스피커 심볼을 우클릭하면 스피커페이지, 스피커상세, 스피커수정과 함께 음원 실행, TTS 실행, Stop 항목이 나타납니다. 목록·상세·수정 외에도 미리 준비된 음원이나 음성 안내(TTS)를 방송하고 Stop으로 즉시 중지할 수 있습니다.
+  - generic [ref=e2455]:
+    - generic [ref=e2457]:
+      - generic [ref=e2458]: Sensorway Co., Ltd.
+      - generic [ref=e2460]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2473]:
+      - generic [ref=e2474]:
+        - generic [ref=e2475]: CHAPTER 8
+        - heading "8.2탐지 이벤트 발생 화면" [level=2] [ref=e2476]
+      - paragraph [ref=e2477]: 현장에서 침입·이상이 감지되면 지도 위 심볼과 이벤트 패널에서 동시에 알림이 나타납니다. 발생 위치를 지도에서 확인하고, 이벤트 패널에서 상세 내용을 열람하는 흐름을 설명합니다.
+      - generic [ref=e2478]:
+        - figure "그림 99. 탐지 발생 시 센서 심볼의 강조 표시" [ref=e2479]:
+          - img "탐지 발생 시 센서 심볼의 강조 표시" [ref=e2480]
+        - generic [ref=e2482]: 탐지 이벤트가 발생하면 해당 센서 심볼 주위에 붉은 원과 빛나는 강조 효과가 나타나 발생 위치를 즉시 알려줍니다. 지도에서 이 표시를 보고 어느 지점에서 감지가 일어났는지 한눈에 파악할 수 있습니다.
+      - generic [ref=e2483]:
+        - figure "그림 100. 외곽 라인 구간의 탐지 강조" [ref=e2484]:
+          - img "외곽 라인 구간의 탐지 강조" [ref=e2485]
+        - generic [ref=e2487]: 울타리 기반 외곽 감시 구간에서 탐지가 발생하면 해당 구간의 라인이 붉게 강조되고 주변에 붉은 영역이 표시됩니다. Zone1·Zone2 등 구역명과 카메라 위치가 함께 보여 어느 구역·어느 카메라 부근에서 감지되었는지 확인할 수 있습니다.
+  - generic [ref=e2490]:
+    - generic [ref=e2492]:
+      - generic [ref=e2493]: Sensorway Co., Ltd.
+      - generic [ref=e2495]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2508]:
+      - generic [ref=e2509]:
+        - figure "그림 101. 이벤트 패널의 탐지 이벤트 알림" [ref=e2510]:
+          - img "이벤트 패널의 탐지 이벤트 알림" [ref=e2511]
+        - generic [ref=e2513]: 화면 오른쪽 이벤트 패널에 새 탐지 이벤트가 카드 형태로 올라오고 상단에 이벤트 수가 표시됩니다. 카드에는 발생 구역과 센서, 침입 유형, 발생 일시가 나타나며 하단 아이콘으로 관련 화면을 확인할 수 있습니다.
+      - generic [ref=e2514]:
+        - figure "그림 102. 탐지 이벤트 카드" [ref=e2515]:
+          - img "탐지 이벤트 카드" [ref=e2516]
+        - generic [ref=e2518]: 개별 탐지 이벤트 카드에는 발생 구역과 센서 번호, 침입 유형, 발생 일시가 표시됩니다. 카드 하단의 아이콘을 눌러 관련 정보를 살펴볼 수 있습니다.
+  - generic [ref=e2521]:
+    - generic [ref=e2523]:
+      - generic [ref=e2524]: Sensorway Co., Ltd.
+      - generic [ref=e2526]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2539]:
+      - generic [ref=e2540]:
+        - figure "그림 103. 이벤트 카드 상세(뒷면) 화면" [ref=e2541]:
+          - img "이벤트 카드 상세(뒷면) 화면" [ref=e2542]
+        - generic [ref=e2544]: 카드를 뒤집으면 상세 화면으로 전환되어 제어기·센서·결과·시간 항목이 정리되어 표시됩니다. 어느 제어기 산하 어느 센서에서 어떤 유형의 탐지가 언제 발생했는지 자세히 확인할 수 있습니다.
+      - generic [ref=e2545]:
+        - figure "그림 104. 탐지 이벤트 카드 상세 항목" [ref=e2546]:
+          - img "탐지 이벤트 카드 상세 항목" [ref=e2547]
+        - generic [ref=e2549]: 카드 뒷면에는 제어기 번호, 센서 번호, 탐지 결과, 발생 시간이 항목별로 나열됩니다. 개별 이벤트의 세부 정보를 빠르게 파악할 때 사용합니다.
+  - generic [ref=e2552]:
+    - generic [ref=e2554]:
+      - generic [ref=e2555]: Sensorway Co., Ltd.
+      - generic [ref=e2557]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2570]:
+      - generic [ref=e2571]:
+        - generic [ref=e2572]: CHAPTER 8
+        - heading "8.3장애 이벤트 발생 화면" [level=2] [ref=e2573]
+      - paragraph [ref=e2574]: 현장 장비에 고장이 발생하면 지도 위 해당 심볼에 붉은 경보 표시가 나타나고, 화면에 장애 이벤트 카드가 뜹니다. 이 절에서는 장애가 발생했을 때 지도와 이벤트 카드에서 무엇을 확인할 수 있는지 설명합니다.
+      - generic [ref=e2575]:
+        - figure "그림 105. 제어기 심볼의 장애 경보 표시" [ref=e2576]:
+          - img "제어기 심볼의 장애 경보 표시" [ref=e2577]
+        - generic [ref=e2579]: 위성지도 위 '제어기1' 심볼 주변으로 붉은 원형 경보가 번지며 장애 발생을 알립니다. 어느 제어기에서 문제가 생겼는지 지도에서 위치를 바로 확인할 수 있습니다.
+      - generic [ref=e2580]:
+        - figure "그림 106. 외곽 라인·구역의 장애 경보 표시" [ref=e2581]:
+          - img "외곽 라인·구역의 장애 경보 표시" [ref=e2582]
+        - generic [ref=e2584]: 구역(Zone1)과 외곽을 잇는 라인, 카메라(Cam108·Cam109) 심볼이 함께 표시된 지도 화면입니다. 장애가 발생한 구간의 라인과 심볼이 붉게 강조되어 영향을 받은 외곽 위치를 한눈에 파악할 수 있습니다.
+      - generic [ref=e2585]:
+        - figure "그림 107. 장애 이벤트 카드" [ref=e2586]:
+          - img "장애 이벤트 카드" [ref=e2587]
+        - generic [ref=e2589]: 상단에 '장애 이벤트'라는 제목과 주황색 경고 아이콘이 표시되고, 장애가 난 위치(Zone1 - 제어기 1)와 발생 시각이 나타납니다. 카드를 눌러 상세 내용을 펼쳐 볼 수 있습니다.
+  - generic [ref=e2592]:
+    - generic [ref=e2594]:
+      - generic [ref=e2595]: Sensorway Co., Ltd.
+      - generic [ref=e2597]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2610]:
+      - generic [ref=e2611]:
+        - figure "그림 108. 장애 이벤트 카드 상세 화면" [ref=e2612]:
+          - img "장애 이벤트 카드 상세 화면" [ref=e2613]
+        - generic [ref=e2615]: 카드를 뒤집으면 제어기 번호, 센서 번호, 장애 원인, 이벤트 발생 시각 등 상세 정보가 표시됩니다. 좌측 상단의 화살표를 누르면 앞면으로 돌아갑니다.
+      - generic [ref=e2616]:
+        - generic [ref=e2617]:
+          - generic [ref=e2618]: 💡 사용 팁
+          - generic [ref=e2619]: 지도에서 붉게 강조된 심볼을 보면 장애가 발생한 장비의 종류와 위치를 즉시 확인할 수 있습니다. 카드와 지도를 함께 보며 현장 상황을 파악하세요.
+        - generic [ref=e2620]:
+          - generic [ref=e2621]: ℹ 참고
+          - generic [ref=e2622]: 장애 이벤트 카드 상세 화면에서 장애 원인과 발생 시각을 확인한 뒤, 필요한 경우 조치 보고를 통해 이벤트를 종결 처리할 수 있습니다.
+  - generic [ref=e2625]:
+    - generic [ref=e2627]:
+      - generic [ref=e2628]: Sensorway Co., Ltd.
+      - generic [ref=e2630]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2643]:
+      - generic [ref=e2644]:
+        - generic [ref=e2645]: CHAPTER 8
+        - heading "8.4이벤트 조치 보고" [level=2] [ref=e2646]
+      - paragraph [ref=e2647]: 현장에서 발생한 이벤트는 운영자가 원인과 조치 사유를 지정해 종결 처리합니다. 조치 보고 창에서 사유를 선택하고 확인을 누르면 해당 이벤트가 마무리됩니다.
+      - generic [ref=e2648]:
+        - figure "그림 109. 탐지 이벤트 조치 보고 창" [ref=e2649]:
+          - img "탐지 이벤트 조치 보고 창" [ref=e2650]
+        - generic [ref=e2652]: 상단 '탐지 속성'에는 이벤트 종류(Type), 대상 장비(Device·Fence), 상태(Status), 감지 결과(Result)가 표시됩니다. 아래 '조치보고 항목'에서 야생동물출현·강풍/폭우·울타리 점검/작업·침입발생 특경출동조치·오경보 중 하나를 고르거나, '기타'를 선택하고 오른쪽 입력란에 직접 사유를 적을 수 있습니다. 사유를 정한 뒤 '확인'을 누르면 이벤트가 종결되고, '취소'를 누르면 보고를 중단합니다.
+  - generic [ref=e2655]:
+    - generic [ref=e2657]:
+      - generic [ref=e2658]: Sensorway Co., Ltd.
+      - generic [ref=e2660]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2673]:
+      - generic [ref=e2674]:
+        - figure "그림 110. 이벤트 패널의 전체 조치(일괄 처리) 버튼" [ref=e2675]:
+          - img "이벤트 패널의 전체 조치(일괄 처리) 버튼" [ref=e2676]
+        - generic [ref=e2678]: 이벤트 패널 상단의 '이벤트 수' 옆 휴지통 아이콘(빨간 원 강조)을 누르면 현재 목록의 이벤트를 한 번에 조치 처리할 수 있습니다. 목록에는 각 이벤트의 발생 위치와 센서, 이벤트 종류, 발생 시각이 카드 형태로 표시됩니다.
+      - generic [ref=e2679]:
+        - generic [ref=e2680]:
+          - generic [ref=e2681]: 💡 사용 팁
+          - generic [ref=e2682]: 정확한 사유가 목록에 없으면 '기타'를 선택하고 오른쪽 입력란에 상황을 직접 적을 수 있습니다.
+        - generic [ref=e2683]:
+          - generic [ref=e2684]: ⚠ 주의
+          - generic [ref=e2685]: 이벤트 수 옆 휴지통 버튼은 목록의 이벤트를 한꺼번에 처리하므로, 개별 확인이 필요한 경우 각 이벤트를 하나씩 조치 보고하세요.
+  - generic [ref=e2688]:
+    - generic [ref=e2690]:
+      - generic [ref=e2691]: Sensorway Co., Ltd.
+      - generic [ref=e2693]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2706]:
+      - generic [ref=e2707]:
+        - generic [ref=e2708]: CHAPTER 8
+        - heading "8.5카메라 영상 팝업" [level=2] [ref=e2709]
+      - paragraph [ref=e2710]: 지도 위의 카메라 심볼을 열면 해당 카메라의 실시간 영상이 별도 팝업 창으로 표시됩니다. 팝업 하단과 하위 탭에서 재생 제어, PTZ 조작, 프리셋 이동, 화면 옵션을 설정할 수 있습니다.
+      - generic [ref=e2711]:
+        - figure "그림 111. 카메라 실시간 영상 팝업" [ref=e2712]:
+          - img "카메라 실시간 영상 팝업" [ref=e2713]
+        - generic [ref=e2715]: 지도 위 카메라를 열면 하늘색 제목 표시줄에 카메라 이름(Cam109)이 뜬 영상 팝업이 나타나고, 우측 상단에 재생 상태(Playing)가 표시됩니다. 화면에는 실시간 스트리밍 영상과 촬영 시각이 겹쳐 보이며, 하단에는 일시정지·정지·화면 캡처와 음량 조절 막대가 있습니다. 이 카메라는 상단에 'PTZ 지원안함'으로 표시되어 방향 조작이 제공되지 않습니다.
+  - generic [ref=e2718]:
+    - generic [ref=e2720]:
+      - generic [ref=e2721]: Sensorway Co., Ltd.
+      - generic [ref=e2723]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2736]:
+      - generic [ref=e2737]:
+        - figure "그림 112. PTZ 제어 탭 (방향·줌·포커스 조작)" [ref=e2738]:
+          - img "PTZ 제어 탭 (방향·줌·포커스 조작)" [ref=e2739]
+        - generic [ref=e2741]: PTZ 지원 카메라에서는 팝업 아래쪽에 PTZ·프리셋·옵션 탭이 나타납니다. PTZ 탭에서는 8방향 화살표 버튼과 가운데 정지 버튼으로 카메라를 상하좌우로 움직이고, 우측의 PanTilt·Zoom 막대로 이동·확대 속도를 조절하며 줌·포커스는 마이너스/플러스 버튼으로 조작합니다.
+      - generic [ref=e2742]:
+        - figure "그림 113. 프리셋 탭 (저장된 시점 이동)" [ref=e2743]:
+          - img "프리셋 탭 (저장된 시점 이동)" [ref=e2744]
+        - generic [ref=e2746]: 프리셋 탭에서는 미리 저장해 둔 카메라 시점 목록을 보고 선택해 해당 위치로 이동시킬 수 있습니다. 화면에는 아직 등록된 프리셋이 없어 안내 문구가 표시되며, 하단의 '현재위'·'Home' 항목으로 현재 시점과 기본 위치를 다룰 수 있습니다.
+      - generic [ref=e2747]:
+        - figure "그림 114. 옵션 탭 (주야간·포커스 설정)" [ref=e2748]:
+          - img "옵션 탭 (주야간·포커스 설정)" [ref=e2749]
+        - generic [ref=e2751]: 옵션 탭에서는 영상 화질에 영향을 주는 설정을 조정합니다. '주야간'은 주간·야간·자동 중에서, '포커스'는 자동·수동 중에서 버튼을 눌러 선택하며, 선택된 항목은 파란색으로 강조됩니다.
+  - generic [ref=e2754]:
+    - generic [ref=e2756]:
+      - generic [ref=e2757]: Sensorway Co., Ltd.
+      - generic [ref=e2759]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2773]:
+      - figure "그림 115. 넓게 펼친 영상 화면" [ref=e2774]:
+        - img "넓게 펼친 영상 화면" [ref=e2775]
+      - generic [ref=e2777]: 제목 표시줄의 창 확대 버튼을 누르면 하위 탭이 접히고 영상이 가로로 넓게 펼쳐져 현장을 더 크게 볼 수 있습니다. 이 상태에서도 하단의 재생 제어와 음량 조절, 상단의 재생 상태·PTZ 지원 여부 표시는 그대로 유지됩니다.
+  - generic [ref=e2780]:
+    - generic [ref=e2782]:
+      - generic [ref=e2783]: Sensorway Co., Ltd.
+      - generic [ref=e2785]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2798]:
+      - generic [ref=e2799]: CHAPTER
+      - generic [ref=e2800]: "09"
+      - heading "보고서 · 계정 · 권한 관리" [level=1] [ref=e2801]
+      - paragraph [ref=e2802]: 보고서(리포트) 생성과 템플릿 설정, 계정 등록·잠금·강제 로그아웃, 권한 그룹, 세션·감사 로그 관리를 설명합니다.
+      - list [ref=e2803]:
+        - listitem [ref=e2804]:
+          - generic [ref=e2805]: "9.1"
+          - text: 보고서(리포트)
+        - listitem [ref=e2806]:
+          - generic [ref=e2807]: "9.2"
+          - text: 계정 관리
+        - listitem [ref=e2808]:
+          - generic [ref=e2809]: "9.3"
+          - text: 권한 그룹과 스케쥴 권한
+        - listitem [ref=e2810]:
+          - generic [ref=e2811]: "9.4"
+          - text: 세션 · 감사 로그
+  - generic [ref=e2814]:
+    - generic [ref=e2816]:
+      - generic [ref=e2817]: Sensorway Co., Ltd.
+      - generic [ref=e2819]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2832]:
+      - generic [ref=e2833]:
+        - generic [ref=e2834]: CHAPTER 9
+        - heading "9.1보고서(리포트)" [level=2] [ref=e2835]
+      - paragraph [ref=e2836]: 이벤트 통계를 바탕으로 운영 보고서를 만들고 관리하는 기능입니다. 좌측 아이콘 레일의 리포트 버튼을 눌러 보고서 관리 창을 열면 목록·생성·템플릿 세 가지 탭에서 보고서를 조회, 생성, 구성할 수 있습니다.
+      - generic [ref=e2837]:
+        - figure "그림 116. 좌측 아이콘 레일의 리포트 버튼" [ref=e2838]:
+          - img "좌측 아이콘 레일의 리포트 버튼" [ref=e2839]
+        - generic [ref=e2841]: 좌측 세로 아이콘 레일에서 REPORTS(리포트) 항목이 파란색으로 강조되어 선택된 상태입니다. 이 버튼을 누르면 보고서 관리 창이 열립니다. 위아래로 마이 페이지, 계정, 이벤트, 장비, 설정 등 다른 패널 버튼도 함께 있습니다.
+  - generic [ref=e2844]:
+    - generic [ref=e2846]:
+      - generic [ref=e2847]: Sensorway Co., Ltd.
+      - generic [ref=e2849]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2863]:
+      - figure "그림 117. 보고서 관리 창 - 목록 탭" [ref=e2864]:
+        - img "보고서 관리 창 - 목록 탭" [ref=e2865]
+      - generic [ref=e2867]: 생성된 보고서가 ID·제목·유형·기간·상태·생성일시 순으로 표에 나열됩니다. 상단의 상태 선택과 검색으로 보고서를 걸러볼 수 있고, 오른쪽 위의 미리보기·다운로드·삭제·갱신 버튼으로 선택한 보고서를 열람하거나 파일로 내려받고 삭제할 수 있습니다. 상태 칸에는 완료·취소됨 등이 표시됩니다.
+  - generic [ref=e2870]:
+    - generic [ref=e2872]:
+      - generic [ref=e2873]: Sensorway Co., Ltd.
+      - generic [ref=e2875]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2889]:
+      - figure "그림 118. 보고서 관리 창 - 생성 탭" [ref=e2890]:
+        - img "보고서 관리 창 - 생성 탭" [ref=e2891]
+      - generic [ref=e2893]: 새 보고서를 만드는 화면으로, 보고서 종류(표준 전체 / 템플릿 기반), 제목, 기간을 지정합니다. 기간은 프리셋(최근 7일 등)에서 고르거나 직접 지정(달력)으로 원하는 날짜 범위를 정할 수 있습니다. 값을 채운 뒤 왼쪽 아래 생성 버튼을 누르면 보고서가 만들어집니다.
+  - generic [ref=e2896]:
+    - generic [ref=e2898]:
+      - generic [ref=e2899]: Sensorway Co., Ltd.
+      - generic [ref=e2901]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2915]:
+      - figure "그림 119. 보고서 관리 창 - 템플릿 탭" [ref=e2916]:
+        - img "보고서 관리 창 - 템플릿 탭" [ref=e2917]
+      - generic [ref=e2919]: 보고서 형식을 미리 정의해 둔 템플릿 목록으로, 이름·설명·유형·공개 여부·기본 기간이 표시됩니다. 주간 운영 보고서, 장비 상태 보고서, 이벤트 분석 보고서 등이 등록되어 있습니다. 상단의 새 템플릿·수정·삭제 버튼으로 템플릿을 추가·편집·제거할 수 있습니다.
+  - generic [ref=e2922]:
+    - generic [ref=e2924]:
+      - generic [ref=e2925]: Sensorway Co., Ltd.
+      - generic [ref=e2927]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2941]:
+      - figure "그림 120. 템플릿 수정 창" [ref=e2942]:
+        - img "템플릿 수정 창" [ref=e2943]
+      - generic [ref=e2945]: 템플릿의 이름·설명·기본 기간·공개 여부를 지정하고, 아래 컴포넌트 목록에서 보고서에 포함할 항목을 체크박스로 선택합니다. 요약 카드, 장비 상태·유형·그리드, 이벤트 요약·추이·탐지·장애 등 원하는 구성 요소만 골라 담을 수 있습니다. 마지막에 저장 버튼을 누르면 반영됩니다.
+  - generic [ref=e2948]:
+    - generic [ref=e2950]:
+      - generic [ref=e2951]: Sensorway Co., Ltd.
+      - generic [ref=e2953]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e2966]:
+      - generic [ref=e2967]:
+        - generic [ref=e2968]: CHAPTER 9
+        - heading "9.2계정 관리" [level=2] [ref=e2969]
+      - paragraph [ref=e2970]: 계정권한 관리 패널에서는 프로그램을 사용하는 계정을 목록으로 확인하고, 계정을 새로 등록하거나 삭제하고, 잠긴 계정을 풀거나 접속 중인 세션을 강제로 로그아웃할 수 있습니다. 좌측 아이콘 레일의 계정 아이콘으로 패널을 엽니다.
+      - generic [ref=e2971]:
+        - figure "그림 121. 좌측 아이콘 레일의 계정권한 관리(ACCOUNTS) 항목" [ref=e2972]:
+          - img "좌측 아이콘 레일의 계정권한 관리(ACCOUNTS) 항목" [ref=e2973]
+        - generic [ref=e2975]: 화면 왼쪽 세로 아이콘 레일에는 로그아웃, 내정보, 계정, 이벤트, 장비, 리포트, 셋업 항목이 위에서 아래로 놓여 있습니다. 여기서 사람 두 명 모양의 계정(ACCOUNTS) 항목을 누르면 계정권한 관리 패널이 열립니다. 현재 선택된 항목은 파란색으로 강조됩니다.
+      - generic [ref=e2976]:
+        - figure "그림 122. 사용자 목록과 계정 추가·삭제·새로고침 버튼" [ref=e2977]:
+          - img "사용자 목록과 계정 추가·삭제·새로고침 버튼" [ref=e2978]
+        - generic [ref=e2980]: 잠금, 사진, 구분(ADMIN/USER), 아이디, 성명, 사번, 전화번호, 이메일, 직급, 부서 열로 등록된 계정이 표로 나타납니다. 오른쪽 위의 더하기 버튼으로 계정을 추가하고, 빼기 버튼으로 선택한 계정을 삭제하며, 새로고침 버튼으로 목록을 다시 불러옵니다. 왼쪽 체크박스로 대상 계정을 선택합니다.
+  - generic [ref=e2983]:
+    - generic [ref=e2985]:
+      - generic [ref=e2986]: Sensorway Co., Ltd.
+      - generic [ref=e2988]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3001]:
+      - generic [ref=e3002]:
+        - figure "그림 123. 잠긴 계정 해제와 계정 삭제 확인창" [ref=e3003]:
+          - img "잠긴 계정 해제와 계정 삭제 확인창" [ref=e3004]
+        - generic [ref=e3006]: 패널 상단에는 사용자, 권한 설정, 세션 관리, 세션 설정, 감사 로그, 권한 부여 탭이 있고 목록에서 잠긴 계정에는 자물쇠 아이콘과 해제 버튼이 표시됩니다. 계정을 체크한 뒤 삭제하면 선택한 계정을 삭제할지 묻는 확인창이 뜨며, 확인 또는 취소를 누릅니다.
+      - generic [ref=e3007]:
+        - figure "그림 124. 사용자 추가 입력창" [ref=e3008]:
+          - img "사용자 추가 입력창" [ref=e3009]
+        - generic [ref=e3011]: 계정을 새로 만들 때 아이디, 비밀번호, 비밀번호 확인, 이름, 사번, 전화번호, 이메일, 사진, 직급, 부서를 입력합니다. 사진 칸의 이미지 버튼으로 프로필 사진을 지정할 수 있습니다. 입력을 마치면 확인을 눌러 등록하고, 취소로 창을 닫습니다.
+  - generic [ref=e3014]:
+    - generic [ref=e3016]:
+      - generic [ref=e3017]: Sensorway Co., Ltd.
+      - generic [ref=e3019]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3032]:
+      - generic [ref=e3033]:
+        - figure "그림 125. 세션 강제 로그아웃 확인창" [ref=e3034]:
+          - img "세션 강제 로그아웃 확인창" [ref=e3035]
+        - generic [ref=e3037]: 세션 관리에서 접속 중인 계정을 강제로 로그아웃할 때 나타나는 확인창입니다. 대상 계정의 아이디와 접속 주소가 표시되며, 확인을 누르면 해당 세션이 즉시 종료되고 취소로 되돌립니다.
+      - generic [ref=e3038]:
+        - generic [ref=e3039]:
+          - generic [ref=e3040]: ⚠ 주의
+          - generic [ref=e3041]: 계정 삭제와 세션 강제 로그아웃은 되돌릴 수 없으므로, 확인창의 아이디와 대상이 맞는지 확인한 뒤 진행하세요.
+        - generic [ref=e3042]:
+          - generic [ref=e3043]: 💡 사용 팁
+          - generic [ref=e3044]: 잠긴 계정은 목록의 자물쇠 아이콘 옆 해제 버튼으로 바로 풀 수 있습니다.
+  - generic [ref=e3047]:
+    - generic [ref=e3049]:
+      - generic [ref=e3050]: Sensorway Co., Ltd.
+      - generic [ref=e3052]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3065]:
+      - generic [ref=e3066]:
+        - generic [ref=e3067]: CHAPTER 9
+        - heading "9.3권한 그룹과 스케쥴 권한" [level=2] [ref=e3068]
+      - paragraph [ref=e3069]: 계정에 어떤 작업을 허용할지는 권한 그룹으로 묶어 관리합니다. 계정권한 관리 패널의 상단 탭에서 [권한 설정]으로 그룹을 만들고, [권한 부여]로 특정 계정에 그룹 권한을 정해진 기간 동안만 한시적으로 부여할 수 있습니다.
+      - generic [ref=e3070]:
+        - figure "그림 126. 권한 설정 탭의 권한 그룹 목록" [ref=e3071]:
+          - img "권한 설정 탭의 권한 그룹 목록" [ref=e3072]
+        - generic [ref=e3074]: 계정권한 관리 패널 상단의 [권한 설정] 탭을 열면 등록된 권한 그룹들이 목록으로 나타납니다. 각 그룹마다 소속 사용자 수, 사용 여부, 그리고 조회·편집·삭제·제어 권한이 몇 개씩 허용되는지 요약이 표시됩니다. 우측 상단의 추가·편집·삭제 버튼으로 그룹을 관리하며, 그룹을 더블클릭하면 세부 권한을 편집·저장할 수 있습니다.
+  - generic [ref=e3077]:
+    - generic [ref=e3079]:
+      - generic [ref=e3080]: Sensorway Co., Ltd.
+      - generic [ref=e3082]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3095]:
+      - generic [ref=e3096]:
+        - figure "그림 127. 권한 부여 탭의 한시 권한 부여 화면" [ref=e3097]:
+          - img "권한 부여 탭의 한시 권한 부여 화면" [ref=e3098]
+        - generic [ref=e3100]: "[권한 부여] 탭에서는 특정 계정에 권한 그룹을 한시적으로 부여합니다. 상단에서 계정과 그룹을 고르고 시작 시각을 지정한 뒤(종료를 비우면 상시 적용) [부여] 버튼을 누르면 됩니다. 아래 목록에는 부여된 이력이 계정·그룹·유효 기간·상태·부여 시각과 함께 표시되며, 우측 회수 아이콘으로 부여한 권한을 되돌릴 수 있습니다."
+      - generic [ref=e3101]:
+        - generic [ref=e3102]:
+          - generic [ref=e3103]: 💡 사용 팁
+          - generic [ref=e3104]: 권한 그룹의 세부 권한을 바꾸려면 [권한 설정] 탭에서 해당 그룹을 더블클릭하세요. 조회·편집·삭제·제어 권한을 항목별로 켜고 끈 뒤 저장할 수 있습니다.
+        - generic [ref=e3105]:
+          - generic [ref=e3106]: ℹ 참고
+          - generic [ref=e3107]: 한시 부여한 권한은 종료 시각이 지나면 자동으로 만료됩니다. 기간이 남았더라도 회수 아이콘을 눌러 즉시 되돌릴 수 있습니다.
+  - generic [ref=e3110]:
+    - generic [ref=e3112]:
+      - generic [ref=e3113]: Sensorway Co., Ltd.
+      - generic [ref=e3115]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3128]:
+      - generic [ref=e3129]:
+        - generic [ref=e3130]: CHAPTER 9
+        - heading "9.4세션 · 감사 로그" [level=2] [ref=e3131]
+      - paragraph [ref=e3132]: 계정·권한 관리 창의 세션 관리·세션 설정·감사 로그 탭에서는 현재 접속 중인 세션을 확인해 강제 종료하고, 로그인 유효 시간과 잠금 정책을 조정하며, 계정에 대한 모든 변경 이력을 추적할 수 있습니다.
+      - generic [ref=e3133]:
+        - figure "그림 128. 세션 관리 탭 — 접속 세션 모니터" [ref=e3134]:
+          - img "세션 관리 탭 — 접속 세션 모니터" [ref=e3135]
+        - generic [ref=e3137]: 상단 탭에서 '세션 관리'를 선택하면 접속 세션 목록이 표로 나타납니다. 사용자·역할·IP·활성 여부·만료 시각·로그아웃 시각·사유·로그인 시작 시각이 한 줄씩 표시되며, 지금 접속 중인 세션에는 '활성' 열에 체크가 켜져 있습니다. 오른쪽 위 새로고침 아이콘으로 목록을 갱신하고, 각 행 끝의 '관리' 아이콘으로 해당 세션을 강제 종료할 수 있습니다.
+  - generic [ref=e3140]:
+    - generic [ref=e3142]:
+      - generic [ref=e3143]: Sensorway Co., Ltd.
+      - generic [ref=e3145]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3158]:
+      - generic [ref=e3159]:
+        - figure "그림 129. 세션 설정 탭 — 로그인 유효 시간·잠금 정책" [ref=e3160]:
+          - img "세션 설정 탭 — 로그인 유효 시간·잠금 정책" [ref=e3161]
+        - generic [ref=e3163]: "'세션 설정' 탭에서는 세션 정책을 조정합니다. 세션 만료 시간(시간), 로그인 재사용 유효 기간(일), 로그인 잠금 임계 횟수, 잠금 자동 해제 시간(분)을 오른쪽 입력란에 숫자로 지정하고, '세션 만료 사용' 스위치로 만료 적용 여부를 켜고 끕니다. 변경 후 오른쪽 아래 '저장' 버튼을 누르면 적용되고, '새로고침'으로 현재 값을 다시 불러옵니다."
+      - generic [ref=e3164]:
+        - figure "그림 130. 감사 로그 탭 — 계정 변경 이력" [ref=e3165]:
+          - img "감사 로그 탭 — 계정 변경 이력" [ref=e3166]
+        - generic [ref=e3168]: "'감사 로그' 탭에는 계정과 관련된 모든 조치가 시각 순으로 기록됩니다. 각 행에 시각·동작·상태·대상·대상명·행위자·IP·설명이 표시되어 누가 어떤 계정을 언제 만들고, 수정하고, 잠갔는지 확인할 수 있습니다. 오른쪽 위 새로고침 아이콘으로 최신 기록을 다시 불러옵니다."
+  - generic [ref=e3171]:
+    - generic [ref=e3173]:
+      - generic [ref=e3174]: Sensorway Co., Ltd.
+      - generic [ref=e3176]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3190]:
+      - generic [ref=e3191]:
+        - generic [ref=e3192]: 💡 사용 팁
+        - generic [ref=e3193]: 세션 관리 탭에서 '활성'에 체크된 세션이 현재 로그인 중인 사용자입니다. 의심스러운 접속이 보이면 해당 행의 '관리' 아이콘으로 즉시 강제 종료할 수 있습니다.
+      - generic [ref=e3194]:
+        - generic [ref=e3195]: ℹ 참고
+        - generic [ref=e3196]: 로그인 잠금 임계 횟수를 0으로 두면 잠금 기능이 꺼지고, 잠금 자동 해제 시간을 0으로 두면 관리자가 직접 풀 때까지 잠금이 유지됩니다.
+  - generic [ref=e3199]:
+    - generic [ref=e3201]:
+      - generic [ref=e3202]: Sensorway Co., Ltd.
+      - generic [ref=e3204]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3217]:
+      - generic [ref=e3218]: CHAPTER
+      - generic [ref=e3219]: "10"
+      - heading "개인 설정 — 내 정보 · 로그아웃 · 통합 웹 · 강풍 모드" [level=1] [ref=e3220]
+      - paragraph [ref=e3221]: 내 정보 확인과 비밀번호 변경, 로그아웃, 통합관제 웹 열기, 강풍 모드를 설명합니다.
+      - list [ref=e3222]:
+        - listitem [ref=e3223]:
+          - generic [ref=e3224]: "10.1"
+          - text: 내 정보와 로그아웃
+        - listitem [ref=e3225]:
+          - generic [ref=e3226]: "10.2"
+          - text: 통합 웹 열기와 강풍 모드
+  - generic [ref=e3229]:
+    - generic [ref=e3231]:
+      - generic [ref=e3232]: Sensorway Co., Ltd.
+      - generic [ref=e3234]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3247]:
+      - generic [ref=e3248]:
+        - generic [ref=e3249]: CHAPTER 10
+        - heading "10.1내 정보와 로그아웃" [level=2] [ref=e3250]
+      - paragraph [ref=e3251]: 좌측 아이콘 레일에서 내 계정 정보를 확인·수정하거나 프로그램에서 로그아웃할 수 있습니다. 내 정보 패널에서는 사진·연락처를 관리하고 비밀번호를 변경할 수 있습니다.
+      - generic [ref=e3252]:
+        - figure "그림 131. 좌측 아이콘 레일의 내 정보(MY PAGE) 항목" [ref=e3253]:
+          - img "좌측 아이콘 레일의 내 정보(MY PAGE) 항목" [ref=e3254]
+        - generic [ref=e3256]: 좌측 아이콘 레일이 펼쳐진 모습으로, 로그아웃·내 정보·계정·이벤트·장비·리포트·셋업 항목이 세로로 나열되어 있습니다. 현재 선택된 내 정보(MY PAGE) 항목이 파란색으로 강조되어 있으며, 이 항목을 누르면 내 정보 패널이 열립니다.
+      - generic [ref=e3257]:
+        - figure "그림 132. 내 정보 패널" [ref=e3258]:
+          - img "내 정보 패널" [ref=e3259]
+        - generic [ref=e3261]: 로그인한 계정의 아이디·이름·사원번호·전화번호·이메일·직급·부서가 표시되고, 왼쪽에는 프로필 사진과 '추가하기' 버튼이 있습니다. 각 항목을 눌러 내용을 수정한 뒤 하단의 '적용'을 누르면 저장되고, '초기화'로 입력을 되돌리거나 '계정삭제'로 계정을 삭제할 수 있습니다. 비밀번호 오른쪽의 자물쇠 아이콘을 누르면 비밀번호 변경 창이 열립니다.
+  - generic [ref=e3264]:
+    - generic [ref=e3266]:
+      - generic [ref=e3267]: Sensorway Co., Ltd.
+      - generic [ref=e3269]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3282]:
+      - generic [ref=e3283]:
+        - figure "그림 133. 비밀번호 변경 창" [ref=e3284]:
+          - img "비밀번호 변경 창" [ref=e3285]
+        - generic [ref=e3287]: 현재 비밀번호와 새 비밀번호, 새 비밀번호 확인을 입력하는 창입니다. 세 칸을 채운 뒤 '변경'을 누르면 비밀번호가 바뀌고, '취소'를 누르면 변경 없이 창을 닫습니다.
+      - generic [ref=e3288]:
+        - figure "그림 134. 좌측 아이콘 레일의 로그아웃(LOGOUT) 항목" [ref=e3289]:
+          - img "좌측 아이콘 레일의 로그아웃(LOGOUT) 항목" [ref=e3290]
+        - generic [ref=e3292]: 좌측 아이콘 레일 맨 위의 로그아웃(LOGOUT) 항목이 파란색으로 강조되어 있습니다. 이 항목을 누르면 로그아웃 확인 창이 나타납니다.
+      - generic [ref=e3293]:
+        - figure "그림 135. 로그아웃 확인 창" [ref=e3294]:
+          - img "로그아웃 확인 창" [ref=e3295]
+        - generic [ref=e3297]: "'정말로 로그아웃 하시겠습니까?'를 묻는 확인 창입니다. '확인'을 누르면 로그아웃되어 로그인 화면으로 돌아가고, '취소'를 누르면 현재 화면을 유지합니다."
+  - generic [ref=e3300]:
+    - generic [ref=e3302]:
+      - generic [ref=e3303]: Sensorway Co., Ltd.
+      - generic [ref=e3305]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3319]:
+      - generic [ref=e3320]:
+        - generic [ref=e3321]: 💡 사용 팁
+        - generic [ref=e3322]: 내 정보에서 항목을 수정한 뒤에는 반드시 하단의 '적용'을 눌러야 변경 내용이 저장됩니다.
+      - generic [ref=e3323]:
+        - generic [ref=e3324]: ⚠ 주의
+        - generic [ref=e3325]: "'계정삭제'는 본인 계정을 삭제하는 조작이므로 신중하게 사용하세요."
+  - generic [ref=e3328]:
+    - generic [ref=e3330]:
+      - generic [ref=e3331]: Sensorway Co., Ltd.
+      - generic [ref=e3333]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3346]:
+      - generic [ref=e3347]:
+        - generic [ref=e3348]: CHAPTER 10
+        - heading "10.2통합 웹 열기와 강풍 모드" [level=2] [ref=e3349]
+      - paragraph [ref=e3350]: 좌측 아이콘 레일 하단에는 통합관제 웹 포털을 여는 버튼과 강풍·기상 상황에 맞춰 운영 모드를 바꾸는 강풍 모드 패널이 있습니다. 두 기능 모두 버튼 한 번으로 실행합니다.
+      - generic [ref=e3351]:
+        - figure "그림 136. 통합 웹 열기 버튼" [ref=e3352]:
+          - img "통합 웹 열기 버튼" [ref=e3353]
+        - generic [ref=e3355]: 지구본 아이콘과 '통합웹' 글자가 표시된 버튼입니다. 이 버튼을 누르면 통합관제 웹 포털로 이동합니다.
+      - generic [ref=e3356]:
+        - figure "그림 137. 통합 웹 접속 확인 창" [ref=e3357]:
+          - img "통합 웹 접속 확인 창" [ref=e3358]
+        - generic [ref=e3360]: "'통합웹을 접속하시겠습니까?'라는 확인 창이 뜹니다. '확인'을 누르면 통합 웹으로 접속하고, '취소'를 누르면 창을 닫고 접속하지 않습니다."
+      - generic [ref=e3361]:
+        - figure "그림 138. 강풍 모드 버튼" [ref=e3362]:
+          - img "강풍 모드 버튼" [ref=e3363]
+        - generic [ref=e3365]: "'WINDY MODE' 글자와 바람 모양 아이콘이 표시된 버튼입니다. 이 버튼을 누르면 강풍 모드 설정 패널이 열립니다."
+  - generic [ref=e3368]:
+    - generic [ref=e3370]:
+      - generic [ref=e3371]: Sensorway Co., Ltd.
+      - generic [ref=e3373]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e3386]:
+      - generic [ref=e3387]:
+        - figure "그림 139. 강풍 모드 설정 패널" [ref=e3388]:
+          - img "강풍 모드 설정 패널" [ref=e3389]
+        - generic [ref=e3391]: 평시모드·약풍모드·강풍모드·태풍모드 네 가지를 선택할 수 있는 패널입니다. 현재 기상 상황에 맞는 항목을 라디오 버튼으로 하나 선택하고, 우측 상단의 X를 눌러 패널을 닫습니다.
+      - generic [ref=e3393]:
+        - generic [ref=e3394]: 💡 사용 팁
+        - generic [ref=e3395]: 바람이 강해질수록 오탐지가 늘어날 수 있습니다. 현장 기상에 맞춰 약풍·강풍·태풍 모드를 선택하면 상황에 맞는 감시 운영이 가능합니다.

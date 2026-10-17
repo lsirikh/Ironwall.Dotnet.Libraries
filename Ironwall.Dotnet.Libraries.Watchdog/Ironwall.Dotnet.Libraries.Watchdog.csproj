@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinExe: 콘솔 창 없는 백그라운드 프로세스. 로그온 예약작업(Ironwall\WatchdogLauncher)이 exe를 직접 띄울 때
+         콘솔 창이 상주하던 문제(2026-09-03 현장 보고) 해소. 콘솔 출력 사용처 0건(파일 로그만) — 기능 손실 없음. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <AssemblyName>Ironwall.Dotnet.Libraries.Watchdog</AssemblyName>
+    <RootNamespace>Ironwall.Dotnet.Libraries.Watchdog</RootNamespace>
+    <Version>1.0</Version>
+    <UseWPF>false</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.Watchdog.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Base가 계약 타입(WatchdogState/Status/Naming/Heartbeat)과 IClock/SystemClock의 단일 권위.
+         링크 복제 대신 Base를 참조해 동일 타입을 사용(중복 정의 제거 → CS0433 원천 차단).
+         단일파일 발행 시 Base 클로저가 exe에 번들되어 런타임 독립성 유지(앱 Base.dll 비의존). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+  </ItemGroup>
+
+</Project>

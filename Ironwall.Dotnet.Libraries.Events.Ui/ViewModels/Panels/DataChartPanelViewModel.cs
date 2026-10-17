@@ -1,17 +1,19 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
+using Ironwall.Dotnet.Libraries.Theme.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
-using Ironwall.Dotnet.Monitoring.Models.Events;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView.Painting;
+using MaterialDesignThemes.Wpf;
 using SkiaSharp;
 using System;
 using System.Collections.ObjectModel;
-using System.Windows.Shapes;
-using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
     /****************************************************************************
@@ -28,22 +30,57 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Ctors -
         public DataChartPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
-                                       , EventProvider eventProvider)
+                                       , EventProviderService providerService)
                                        : base(eventAggregator, log)
         {
-            _dbService = eventDbService;
-            _eventProvider = eventProvider;
+            _providerService = providerService;
 
             // 차트용 컬렉션 초기화
             Series = new ObservableCollection<ISeries>();
             XAxes = new ObservableCollection<Axis>();
             YAxes = new ObservableCollection<Axis>();
+
+            // IMPL-21: 테마 반응 — 레전드/축 글씨 theme-aware (다크 안보임 수정)
+            _themeService = TryResolveThemeService();
+            if (_themeService != null)
+                _themeService.ThemeChanged += OnThemeChanged;
+            LegendTextPaint.Color = ChartThemeProvider.LegendTextColor(CurrentTheme);
+            // 툴팁 페인트 — 미지정 시 라이브러리 기본 밝은 박스(다크 가독 붕괴, SIM-R106 계열)
+            TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(CurrentTheme);
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(CurrentTheme);
+        }
+
+        private static IThemeService? TryResolveThemeService()
+        {
+            try { return IoC.Get<IThemeService>(); }
+            catch { return null; }
+        }
+        private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
+        private void OnThemeChanged(object? sender, BaseTheme theme)
+        {
+            try
+            {
+                LegendTextPaint = new SolidColorPaint { Color = ChartThemeProvider.LegendTextColor(theme), SKTypeface = ChartThemeProvider.KoreanTypeface() };
+                TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(theme);
+                TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);   // 전환 재공급(SIM-X011 계열)
+                _ = DataInitialize();
+            }
+            catch (Exception ex) { _log?.Warning($"[DataChartPanelViewModel] OnThemeChanged 실패: {ex.Message}"); }
         }
         #endregion
         #region - Implementation of Interface -
         protected override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
+            // ★ 싱글턴 VM + 닫힘 시 ThemeChanged 해제 → 재활성화에서 재구독·재설정(테마 stale 방지, SIM-L003).
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged -= OnThemeChanged;
+                _themeService.ThemeChanged += OnThemeChanged;
+            }
+            LegendTextPaint = new SolidColorPaint { Color = ChartThemeProvider.LegendTextColor(CurrentTheme), SKTypeface = ChartThemeProvider.KoreanTypeface() };
+            TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(CurrentTheme);
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(CurrentTheme);
+
             await DataInitialize(cancellationToken).ConfigureAwait(false);
             await base.OnActivateAsync(cancellationToken);
         }
@@ -53,6 +90,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             Series.Clear();
             XAxes.Clear();
             YAxes.Clear();
+            if (close && _themeService != null)
+                _themeService.ThemeChanged -= OnThemeChanged;
             return base.OnDeactivateAsync(close, cancellationToken);
         }
         #endregion
@@ -103,70 +142,47 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
         private Task DataInitialize(CancellationToken ct = default)
         {
+            IsChartLoading = true;
             return Task.Run(async () =>
             {
                 try
                 {
-                    await _dbService.FetchInstanceAsync(StartDate, EndDate, ct);
+                    /*──────────────────────────────────────────────────────────────
+                     *  Statistics API 단일 호출 → 라인 차트 생성
+                     *──────────────────────────────────────────────────────────────*/
+                    // 단위는 기간 규칙으로 정한다(하루 이하 hour, 넘으면 day) — 예전엔 "hour" 고정이라
+                    //   개요가 '1일 단위' 라고 적힌 채 시간 칸을 그렸다(실서버 왕복 E3f).
+                    var dashboardDto = await _providerService.FetchEventDashboardAsync(
+                        StartDate, EndDate, EventTrendRangeMath.IntervalFor(StartDate, EndDate), ct);
 
-                    var eventTypes = new[]
+                    if (dashboardDto == null)
                     {
-                        new CategoryMeta("Detection",  new SKColor(255, 205, 0), _eventProvider.OfType<IDetectionEventModel>()),
-                        new CategoryMeta("Malfunction", new SKColor(30, 144, 255), _eventProvider.OfType<IMalfunctionEventModel>()),
-                        new CategoryMeta("Connection", new SKColor(155, 89, 182), _eventProvider.OfType<IConnectionEventModel>()),
-                        new CategoryMeta("Action", new SKColor(50, 205, 50), _eventProvider.OfType<IActionEventModel>())
-                    };
-
-                    var xLabels = new SortedSet<string>();
-                    var seriesList = new List<ISeries>();
-
-                    foreach (var type in eventTypes)
-                    {
-                        var grouped = type.Events
-                            .Where(ev => ev.DateTime >= StartDate && ev.DateTime <= EndDate)
-                            .GroupBy(ev => ev.DateTime.ToString("yyyy-MM-dd HH"))
-                            .OrderBy(g => g.Key)
-                            .Select(g => new { Time = g.Key, Count = g.Count() })
-                            .ToList();
-
-                        xLabels.UnionWith(grouped.Select(g => g.Time));
-
-                        var values = xLabels.Select(label =>
-                            grouped.FirstOrDefault(g => g.Time == label)?.Count ?? 0).ToArray();
-
-                        seriesList.Add(new LineSeries<int>
-                        {
-                            Name = type.Name,
-                            LineSmoothness = 0.5,
-                            GeometrySize = 8,
-
-                            // 선 색상
-                            Stroke = new SolidColorPaint(type.Color, 3),
-
-                            // 포인트 테두리 색 (더 진한 색상)
-                            GeometryStroke = new SolidColorPaint(type.Color, 3),
-
-                            // 포인트 내부 색 (더 진한 색상)
-                            GeometryFill = new SolidColorPaint(Darken(type.Color, 0.5f)),
-
-                            Fill = null,
-                            Values = values
-                        });
+                        _log?.Warning("FetchEventDashboardAsync returned null — skip chart update");
+                        return;
                     }
+
+                    LastDashboardDto = dashboardDto;
+
+                    var (seriesList, xLabels) = ChartHelper.BuildLineSeriesFromTrend(
+                        dashboardDto.Trend, StartDate, EndDate);
 
                     var xAxis = new Axis
                     {
-                        Labels = xLabels.ToArray(),
+                        Labels = xLabels,
                         LabelsRotation = 15,
                         TextSize = 12,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         UnitWidth = 1,
                         ShowSeparatorLines = false
                     };
 
                     var yAxis = new Axis
                     {
-                        Name = "Events",
+                        Name = "이벤트",
                         NameTextSize = 14,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        // 한글 축명 — typeface 미지정 시 tofu(스키아 글리프 폴백 없음)
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = ChartThemeProvider.KoreanTypeface() },
                         MinLimit = 0
                     };
 
@@ -187,20 +203,29 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 {
                     _log?.Warning($"TaskCanceledException in DataInitialize: {ex.Message}");
                 }
+                catch (Exception ex)
+                {
+                    _log?.Error($"Exception in DataInitialize: {ex.GetType().Name} - {ex.Message}");
+                }
                 finally
                 {
+                    DispatcherService.Invoke(() => IsChartLoading = false);
                     UpdateAction?.Invoke(StartDate, EndDate);
                 }
             });
         }
 
-        private SKColor Darken(SKColor color, float factor)
+        /// <summary>
+        /// Statistics API를 재호출하여 LastDashboardDto를 갱신한다.
+        /// 이벤트 삭제/추가 후 차트를 최신 상태로 유지하기 위해 사용.
+        /// </summary>
+        public async Task<EventDashboardDto?> RefreshDashboardDtoAsync(CancellationToken ct = default)
         {
-            return new SKColor(
-                (byte)(color.Red * factor),
-                (byte)(color.Green * factor),
-                (byte)(color.Blue * factor),
-                color.Alpha);
+            var dto = await _providerService.FetchEventDashboardAsync(
+                StartDate, EndDate, EventTrendRangeMath.IntervalFor(StartDate, EndDate), ct);
+            if (dto != null)
+                LastDashboardDto = dto;
+            return LastDashboardDto;
         }
 
         #endregion
@@ -242,16 +267,43 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public ObservableCollection<Axis> XAxes { get; }
         public ObservableCollection<Axis> YAxes { get; }
 
-        public SolidColorPaint LegendTextPaint { get; set; } =
-        new SolidColorPaint
+        // 토글 시 차트가 다시 그리도록 알림 속성으로(재할당+Notify).
+        private SolidColorPaint _legendTextPaint = new SolidColorPaint
         {
-            Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Caliber")
+            Color = ChartThemeProvider.LegendTextColor(BaseTheme.Light),
+            SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint LegendTextPaint
+        {
+            get => _legendTextPaint;
+            set { _legendTextPaint = value; NotifyOfPropertyChange(nameof(LegendTextPaint)); }
+        }
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
+        // 툴팁 페인트(theme-aware) — 라인 차트 호버 가독(SIM-R106 계열)
+        private SolidColorPaint _tooltipTextPaint = ChartThemeProvider.TooltipTextPaint(BaseTheme.Light);
+        public SolidColorPaint TooltipTextPaint
+        {
+            get => _tooltipTextPaint;
+            set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
+        }
+
+        private SolidColorPaint _tooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(BaseTheme.Light);
+        public SolidColorPaint TooltipBackgroundPaint
+        {
+            get => _tooltipBackgroundPaint;
+            set { _tooltipBackgroundPaint = value; NotifyOfPropertyChange(nameof(TooltipBackgroundPaint)); }
+        }
+
+        public EventDashboardDto? LastDashboardDto { get; private set; }
+
+        public bool IsChartLoading
+        {
+            get => _isChartLoading;
+            set { _isChartLoading = value; NotifyOfPropertyChange(() => IsChartLoading); }
+        }
 
         #endregion
         #region - Attributes -
@@ -260,14 +312,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         protected DateTime _startDate;
         protected DateTime _endDate;
         protected DateTime _endDateDisplay;
-        private EventProvider _eventProvider;
-        private IEventDbService _dbService;
+        private EventProviderService _providerService;
+        private bool _isChartLoading;
+        private readonly IThemeService? _themeService;
         #endregion
     }
-
-    readonly record struct CategoryMeta(
-       string Name,          // ← displayName 으로 선언
-       SKColor Color,
-       IEnumerable<IBaseEventModel> Events);
-
 }

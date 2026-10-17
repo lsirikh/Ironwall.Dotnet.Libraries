@@ -5,7 +5,8 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 public interface IBaseDeviceViewModel<T> : IBaseCustomViewModel<T> where T : IBaseDeviceModel
 {
-    int DeviceGroup { get; set; }
+    List<int>? DeviceGroups { get; set; }
+    string DeviceGroupsText { get; }
     string? DeviceName { get; set; }
     int DeviceNumber { get; set; }
     EnumDeviceType DeviceType { get; set; }

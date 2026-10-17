@@ -1,0 +1,3 @@
+[submodule "Ironwall.Dotnet.Libraries.OnvifSolution"]
+	path = Ironwall.Dotnet.Libraries.OnvifSolution
+	url = https://github.com/lsirikh/Ironwall-Onvif-Solution.git

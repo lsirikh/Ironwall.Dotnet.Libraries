@@ -1,0 +1,73 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportPreviewView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	AutomationProperties.AutomationId="Reports.Preview.Root">
+	<!--
+		미리보기 자리 — 설계 정본 window-layout-system-storyboard.html L1268(축소판) · L1290(공역).
+		★ 살아 있는 WebView2 는 코드에서 만들고 없앤다. 자리표시자일 때는 네이티브 창을 아예 만들지 않는다
+		  — 만들어 두고 숨기면 서랍 · 스크림 · 팝업 위로 뚫고 나온다.
+		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 요소는 Loaded 로 잡는다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+	</UserControl.Resources>
+
+	<Grid>
+		<!--  브라우저 자리. 살아 있을 때만 자식이 생긴다.  -->
+		<Border
+			Background="White"
+			ClipToBounds="True"
+			CornerRadius="4"
+			Loaded="OnBrowserHostLoaded"
+			Visibility="{Binding IsSurfaceLive, Converter={StaticResource BoolToVisibility}}" />
+
+		<!--  자리표시자 — 빈 칸을 내지 않는다. 까닭과 다음에 할 일을 적는다.  -->
+		<Border
+			Padding="18,20"
+			AutomationProperties.AutomationId="Reports.Preview.Placeholder"
+			Background="{DynamicResource SurfaceSunkenBrush}"
+			BorderBrush="{DynamicResource BorderBrush}"
+			BorderThickness="1"
+			CornerRadius="4">
+			<Border.Style>
+				<Style TargetType="Border">
+					<Setter Property="Visibility" Value="Visible" />
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsSurfaceLive}" Value="True">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Style>
+			<StackPanel VerticalAlignment="Center">
+				<md:PackIcon
+					Width="26"
+					Height="26"
+					HorizontalAlignment="Center"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Kind="FileDocumentOutline" />
+				<TextBlock
+					Margin="0,10,0,0"
+					HorizontalAlignment="Center"
+					AutomationProperties.AutomationId="Reports.Preview.PlaceholderReason"
+					FontSize="12.5"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding SurfaceReason}"
+					TextAlignment="Center"
+					TextWrapping="Wrap" />
+				<TextBlock
+					Margin="0,6,0,0"
+					HorizontalAlignment="Center"
+					AutomationProperties.AutomationId="Reports.Preview.PlaceholderHint"
+					FontSize="11.5"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="{Binding SurfaceHint}"
+					TextAlignment="Center"
+					TextWrapping="Wrap"
+					Visibility="{Binding HasSurfaceHint, Converter={StaticResource BoolToVisibility}}" />
+			</StackPanel>
+		</Border>
+	</Grid>
+</UserControl>

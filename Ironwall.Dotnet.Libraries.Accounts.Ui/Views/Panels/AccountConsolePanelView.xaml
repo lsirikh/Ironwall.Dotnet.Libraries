@@ -1,0 +1,2068 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.AccountConsolePanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:consoles="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Converters"
+	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:forms="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Forms"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
+	xmlns:matrix="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Matrix"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		계정 콘솔(N-06) — 레일 · 목록 · 상세 3단. 정본 목업:
+		docs/design/window-layout-system-storyboard.html L1136-L1248 · all-windows-drag-wireframe.html L335-L349 · L421-L422
+		치수(헤더 40 · 레일 184/56 · 툴바 48 · 행 38 · 상태 띠 30 · 상세 340)와 폭별 도킹/서랍/접힘은 ConsoleShell 이 맡는다.
+		x:Name 은 새로 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationId 만. 기존 ClickClose 만 그대로 둔다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<utils:ImageConverter x:Key="ImageConverter" />
+		<utils:IsoDateStringConverter x:Key="IsoDate" />
+		<local:AccountsPackIconKindConverter x:Key="IconKind" />
+
+		<Style x:Key="GroupChip" TargetType="Border">
+			<Setter Property="Padding" Value="10,3" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="12" />
+		</Style>
+
+		<Style x:Key="Kv.Label" TargetType="TextBlock">
+			<Setter Property="Width" Value="102" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+
+		<local:AllTrueConverter x:Key="AllTrue" />
+		<local:SameReferenceConverter x:Key="SameRef" />
+		<conv:LogoutReasonConverter x:Key="LogoutReason" />
+		<!--  표시 사전(A-21 · A-32 · A-34) — 저장 값은 그대로, 화면에만 한국어. 모르는 값은 "알 수 없음" + 원문은 툴팁  -->
+		<conv:RoleDisplayConverter x:Key="RoleText" />
+		<conv:ServerCodeDisplayConverter x:Key="Code" />
+		<conv:UnknownCodeToolTipConverter x:Key="CodeTip" />
+		<conv:ServerTimeConverter x:Key="ServerTime" />
+		<conv:GrantExpiringSoonConverter x:Key="ExpiringSoon" />
+
+		<!--
+			읽기 전용 값 — TextBlock 에 AutomationId 를 달면 UIA 트리에 나오지 않는다(프로젝트 실측).
+			peer 가 실재하는 TextBox 를 읽기 전용 · 테두리 없이 쓴다.
+		-->
+		<Style x:Key="Kv.ReadOnlyValue" TargetType="TextBox">
+			<Setter Property="IsReadOnly" Value="True" />
+			<Setter Property="IsReadOnlyCaretVisible" Value="False" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextWrapping" Value="Wrap" />
+		</Style>
+
+		<Style x:Key="Kv.Input" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
+		<!--
+			그룹 고르기 칩 · [그룹|구성원] 전환은 커널 Console.Chip / Console.Tab 을 그대로 쓴다(U-12).
+			옛 로컬 스타일(Matrix.GroupChip · Matrix.Chip, MDIX Outlined 기반)은 고르면 테두리 1→2 · 글자 SemiBold 로
+			폭이 늘어 옆 칩이 밀렸다. 커널 스타일은 굵은 폭을 미리 잡고 선택 테두리를 레이아웃 밖에 그린다.
+			선택은 RadioButton + IsChecked OneWay + Click — 이벤트 대시보드 칩과 같은 관용구(막힌 이동은 VM 이 되돌린다).
+		-->
+
+		<!--
+			동작 열 머리글 자리 — 머리글은 왼쪽 정렬(Console.DataGrid.ColumnHeader 기본)인데 칸의 체크는 가운데라
+			열마다 어긋났다(제어 열 Δ19px 실측). 이 열들만 머리글을 가운데로 돌린다.
+		-->
+		<Style
+			x:Key="Matrix.VerbColumnHeader"
+			BasedOn="{StaticResource Console.DataGrid.ColumnHeader}"
+			TargetType="DataGridColumnHeader">
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+		</Style>
+
+		<!--  동작 열 머리글 — 누르면 그 열 전체를 켜거나 끈다(드래그 페인팅의 폴백). 글자가 보여야 하므로 바탕 없는 단추로 그린다.  -->
+		<Style x:Key="Matrix.VerbHeader" TargetType="Button">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="MinWidth" Value="0" />
+			<Setter Property="Height" Value="22" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Border Background="{TemplateBinding Background}" Padding="2,0">
+							<TextBlock
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								FontSize="{TemplateBinding FontSize}"
+								Foreground="{TemplateBinding Foreground}"
+								Text="{TemplateBinding Content}" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<Style x:Key="Kv.Value" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextWrapping" Value="Wrap" />
+		</Style>
+
+		<!--
+			패널 닫기 ✕ — 옛 로컬 Acc.CloseButton(D-30: 머리 바탕 SurfaceAlt 에 맞춘 토큰)은 커널 Console.Button.Close 로 옮겼다(U-17).
+			같은 버튼이 보고서 · 조치 문구 · 호스트 장비/이벤트 창에도 선다. 커널 판은 도움말("닫기")을 왼쪽에 띄운다 —
+			기본 위치(마우스 아래)면 콘솔 오른쪽 가장자리 밖으로 흰 사각형이 삐져나와 상세 칸 머리에 걸렸다(실창 캡처).
+		-->
+	</UserControl.Resources>
+
+	<c:ConsoleShell
+		Title="계정 · 권한"
+		ConsoleKey="Accounts"
+		HelpKey="Accounts.Console"
+		IsDetailRequested="{Binding IsDetailRequested}"
+		Loaded="OnShellLoaded"
+		Subtitle="{Binding Detail.TypeName}">
+
+		<!--
+			✕ 는 ConsoleShell.HeaderContent 안에 있다 — Caliburn 의 x:Name 관례는 뷰를 처음 붙일 때(템플릿 적용 전) 이름을 찾으므로
+			Control 인 ConsoleShell 의 이 칸까지 닿지 않는다. 그래서 x:Name 만으로는 ClickClose 가 불리지 않았다(실창 D3:
+			✕ 를 눌러도 ClosePanel 이 호스트에 한 번도 닿지 않음). Message.Attach 는 누를 때 대상을 찾으므로 시점과 무관하다.
+			x:Name 은 그대로 둔다(관례는 트리거가 이미 있는 요소를 건너뛰어 두 번 불리지 않는다) — AccountConsoleCloseButtonTests.
+		-->
+		<c:ConsoleShell.HeaderContent>
+			<Button
+				x:Name="ClickClose"
+				cal:Message.Attach="ClickClose"
+				AutomationProperties.AutomationId="Console.Accounts.CloseButton"
+				Style="{StaticResource Console.Button.Close}" />
+		</c:ConsoleShell.HeaderContent>
+
+		<!--  레일 — 상단 탭 6 → 레일 6(세션 설정만 구분선 뒤). 권한이 없으면 항목 자체가 없다  -->
+		<c:ConsoleShell.Rail>
+			<c:ConsoleRail
+				AutomationProperties.AutomationId="Console.Accounts.Rail"
+				ConsoleKey="Accounts"
+				IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				ItemsSource="{Binding RailEntries}"
+				SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
+				<c:ConsoleRail.Resources>
+					<DataTemplate DataType="{x:Type consoles:ConsoleIconToken}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
+					</DataTemplate>
+				</c:ConsoleRail.Resources>
+				<c:ConsoleRail.Footer>
+					<TextBlock
+						AutomationProperties.AutomationId="Console.Accounts.Rail.Footer"
+						FontSize="12.5"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding RailFooterText}"
+						TextWrapping="Wrap" />
+				</c:ConsoleRail.Footer>
+			</c:ConsoleRail>
+		</c:ConsoleShell.Rail>
+
+		<!--  툴바 — 창마다 복사되던 골격(D-4)을 다시 만들지 않는다  -->
+		<c:ConsoleShell.Toolbar>
+			<c:ConsoleToolbar
+				AddClick="OnAdd"
+				AddDisabledReason="{Binding AddBlockedReason}"
+				AddText="{Binding AddText}"
+				CanAdd="{Binding CanAdd}"
+				CanDelete="{Binding CanDelete}"
+				CanRefresh="{Binding CanReload}"
+				ColumnsClick="OnColumns"
+				ConsoleKey="Accounts"
+				DeleteClick="OnDelete"
+				DeleteDisabledReason="{Binding DeleteBlockedReason}"
+				Loaded="OnToolbarLoaded"
+				RefreshClick="OnReload"
+				SearchPlaceholder="{Binding SearchPlaceholder}"
+				SearchText="{Binding SearchText, Mode=TwoWay}"
+				ShowSearch="{Binding ShowSearch}">
+				<!--  감사 로그의 기간 — 서버가 닫힌 어휘를 주는지 확인하기 전까지 자유 입력은 두지 않는다  -->
+				<!--
+					B7(#49) — 옛 WPF DatePicker 두 개(스타일 미지정 → MDIX 기본 달력 · Teal)를 커널 단일 날짜 칸(c:DateTimeField)으로.
+					날짜만 다룬다(뷰모델이 시작일 00:00 ~ 종료일 23:59:59 로 넓힌다 — BuildDateRange) · 비울 수 없다(뷰모델 속성이 DateTime).
+					식별자는 그대로 — 칸 자신이 이 AutomationId 로 UIA 에 나온다(T-ACC028).
+				-->
+				<c:ConsoleToolbar.Filters>
+					<StackPanel Orientation="Horizontal" Visibility="{Binding IsAuditRail, Converter={StaticResource BoolToVisibility}}">
+						<c:DateTimeField
+							Width="126"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Accounts.Audit.StartDate"
+							AutomationProperties.Name="감사 로그 시작일"
+							Value="{Binding AuditLogPanelViewModel.StartDate, Mode=TwoWay}" />
+						<TextBlock
+							Margin="6,0"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="~" />
+						<c:DateTimeField
+							Width="126"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Accounts.Audit.EndDate"
+							AutomationProperties.Name="감사 로그 종료일"
+							Value="{Binding AuditLogPanelViewModel.EndDate, Mode=TwoWay}" />
+						<Button
+							Margin="6,0,0,0"
+							AutomationProperties.AutomationId="Console.Accounts.Audit.Search"
+							Click="OnAuditSearch"
+							Content="검색"
+							Style="{StaticResource Console.Button.Ghost}" />
+					</StackPanel>
+				</c:ConsoleToolbar.Filters>
+			</c:ConsoleToolbar>
+		</c:ConsoleShell.Toolbar>
+
+		<!--  목록 — 레일마다 한 벌. 열 정렬 · 열 재정렬은 Console.DataGrid 가 끈다  -->
+		<c:ConsoleShell.List>
+			<Grid ClipToBounds="True">
+				<!--  ① 사용자 — 기본 6열 + "열" 메뉴. 핸들 열에서만 끌 수 있다  -->
+				<DataGrid
+					AutomationProperties.AutomationId="Console.Accounts.Grid.Users"
+					IsReadOnly="True"
+					ItemsSource="{Binding AccountManagerPanelViewModel.ViewModelProvider}"
+					Loaded="OnUsersGridLoaded"
+					SelectionChanged="OnUsersSelectionChanged"
+					SelectionMode="Extended"
+					Style="{StaticResource Console.DataGrid}"
+					Visibility="{Binding IsUsersRail, Converter={StaticResource BoolToVisibility}}">
+					<DataGrid.RowStyle>
+						<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
+							<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Accounts.Row.{0}}" />
+						</Style>
+					</DataGrid.RowStyle>
+					<b:Interaction.Behaviors>
+						<!--  사용자 N명 → 권한 그룹 칩(Draft + [적용]). 칩을 눌러도 같은 일을 한다(폴백)  -->
+						<drag:CaptureDragBehavior
+							DisplayMemberPath="Username"
+							Handler="{Binding GroupDrop}"
+							IsDragEnabled="{Binding CanAssignGroup}"
+															KeyboardFallback="행을 고른 뒤 아래 권한 그룹 칩을 누르세요" />
+					</b:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<DataGridTemplateColumn Width="26" MinWidth="26" CanUserResize="False" CellStyle="{StaticResource Console.DataGrid.Cell.Flush}">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<drag:DragHandle AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.DragHandle.{0}}" />
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<!--
+							U-17 — 열 폭(실창 1120 캡처: 아이디 "BroadcastingManag" · 성명 "Camera 매니ㅈ" 가 잘리고 부서·직급은 넓게 비어 있었고,
+							서랍이 열리면 상태 열이 가로 스크롤 밖으로 밀렸다). 고정 열은 글자에 맞게 줄이고(잠금 64→60 · 구분 92→80 · 상태 80→72),
+							아이디 · 성명은 비율 별(1.5 : 1.2)로 남는 폭을 먼저 가져간다. 부서·직급은 1 비율 + 좁으면 접는다(CollapseBelow) —
+							서랍이 겹친 576 에서도 다섯 열이 잘림 없이 선다. 바닥(MinWidth)은 긴 실데이터 값이 한 줄로 읽히는 폭.
+						-->
+						<DataGridTemplateColumn
+							Width="60"
+							MinWidth="60"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="lock"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="잠금">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel
+										HorizontalAlignment="Center"
+										Orientation="Horizontal"
+										Visibility="{Binding IsLocked, Converter={StaticResource BoolToVisibility}}">
+										<md:PackIcon
+											Width="16"
+											Height="16"
+											VerticalAlignment="Center"
+											Foreground="{DynamicResource StatusCriticalBrush}"
+											Kind="LockOutline"
+											ToolTip="{Binding LockReason}" />
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<DataGridTemplateColumn
+							Width="1.5*"
+							MinWidth="150"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="identity"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="아이디">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<!--  DockPanel — StackPanel 이면 글자가 무한 폭으로 재여 줄임표 없이 칸 끝에서 잘린다  -->
+									<DockPanel LastChildFill="True">
+										<Border
+											Width="22"
+											Height="22"
+											Margin="0,0,7,0"
+											Background="{DynamicResource SurfaceSunkenBrush}"
+											CornerRadius="11"
+											DockPanel.Dock="Left">
+											<Image
+												Source="{Binding Image, Mode=OneWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
+												Stretch="UniformToFill" />
+										</Border>
+										<TextBlock
+											VerticalAlignment="Center"
+											FontFamily="Consolas"
+											FontSize="12.5"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											Text="{Binding Username, Mode=OneWay}"
+											TextTrimming="CharacterEllipsis"
+											ToolTip="{Binding Username, Mode=OneWay}" />
+									</DockPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<DataGridTextColumn
+							Width="1.2*"
+							MinWidth="110"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="name"
+							Binding="{Binding Name, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="성명">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="VerticalAlignment" Value="Center" />
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding Name, Mode=OneWay}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<!--  U-18 — 900 접힘에서 서랍이 열리면(목록 484) 여섯 열 합 498 이 넘쳐 가로 스크롤이 섰다 → 구분은 520 아래에서 접는다(상세 칸에 있다).  -->
+						<DataGridTextColumn
+							Width="80"
+							MinWidth="80"
+							c:ConsoleColumns.CollapseBelow="520"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="role"
+							Binding="{Binding RoleText, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="구분" />
+						<DataGridTextColumn
+							Width="1*"
+							MinWidth="96"
+							c:ConsoleColumns.CollapseBelow="640"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="org"
+							Binding="{Binding OrgText, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="부서·직급">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="VerticalAlignment" Value="Center" />
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding OrgText, Mode=OneWay}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="72"
+							MinWidth="72"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="used"
+							Binding="{Binding UsedText, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="상태" />
+
+						<DataGridTextColumn
+							Width="130"
+							MinWidth="130"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="group"
+							Binding="{Binding GroupText, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="권한 그룹" />
+						<DataGridTextColumn
+							Width="100"
+							MinWidth="100"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="employee"
+							Binding="{Binding EmployeeNumber, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="사번" />
+						<DataGridTextColumn
+							Width="120"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="phone"
+							Binding="{Binding Phone, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="전화" />
+						<DataGridTextColumn
+							Width="180"
+							MinWidth="180"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="email"
+							Binding="{Binding EMail, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="이메일" />
+						<DataGridTextColumn
+							Width="70"
+							MinWidth="70"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="no"
+							Binding="{Binding Id, Mode=OneWay}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="번호" />
+					</DataGrid.Columns>
+				</DataGrid>
+
+				<!--
+					② 권한 설정 — 목업 L1205-L1220 그대로: 가운데 칸 = [그룹 칩(선택)] + [그룹|구성원] 전환 + 매트릭스 표.
+					상세 칸(300)은 요약 · 주의 · 저장만 맡는다. 세 뷰 교대는 없앴다(L1238 · 결정 L-D7).
+				-->
+				<Grid Visibility="{Binding IsPermissionsRail, Converter={StaticResource BoolToVisibility}}">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="*" />
+					</Grid.RowDefinitions>
+
+					<!--
+						.tool — 한 줄 두 칸(A-1): 왼쪽 "권한 그룹" + 칩 줄, 오른쪽 [그룹 권한 | 구성원].
+						종전에는 안내문(≈240px) · 탭을 먼저 도킹하고 남은 폭을 WrapPanel 칩이 받아, 서랍이 겹친 폭에서 칩이 세로 3줄로 접혔다.
+						이제 칩은 접힌 한 줄이 기본이고, 넘치면 끝 자리가 [⌄ 더 보기 +N] — 누르면 칩 칸 안에서 여러 줄로 펼쳐 아래 표를 밀어 낸다
+						(커널 ConsoleChipStrip). 2026-09-28 사용자 보고 "상단 필터쪽이 짤린다 … 아래 꺽쇠로 더 보기" — 종전의 숨긴 가로 스크롤 +
+						가로 휠은 잘린 칩으로 갈 길이 화면에 없었다. 제목과 탭은 첫 줄 높이(34)에 위로 붙여, 펼쳐도 첫 줄에 그대로 선다.
+						전송 방식 안내문("모듈 N종 전부를 한 번에 보냅니다")은 운영자가 알 일이 아니라 뺐다(A-2).
+					-->
+					<Border
+						Grid.Row="0"
+						MinHeight="44"
+						Padding="12,5"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="0,0,0,1">
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="*" />
+								<ColumnDefinition Width="Auto" />
+							</Grid.ColumnDefinitions>
+							<Grid
+								Grid.Column="0"
+								Height="34"
+								Margin="0,0,10,0"
+								VerticalAlignment="Top">
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="권한 그룹" />
+							</Grid>
+							<StackPanel
+								Grid.Column="2"
+								Height="34"
+								Margin="10,0,0,0"
+								VerticalAlignment="Top"
+								Orientation="Horizontal">
+								<RadioButton
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Permissions"
+									Click="OnShowMatrix"
+									Content="그룹 권한"
+									GroupName="AccountsMatrixView"
+									IsChecked="{Binding Matrix.ShowMatrix, Mode=OneWay}"
+									IsEnabled="{Binding HasSelectedGroup}"
+									Style="{StaticResource Console.Tab}"
+									ToolTip="이 그룹의 모듈별 권한" />
+								<RadioButton
+									Margin="0"
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Members"
+									Click="OnShowMembers"
+									Content="구성원"
+									GroupName="AccountsMatrixView"
+									IsChecked="{Binding Matrix.ShowMembers, Mode=OneWay}"
+									IsEnabled="{Binding HasSelectedGroup}"
+									Style="{StaticResource Console.Tab}"
+									ToolTip="이 그룹에 속한 계정" />
+							</StackPanel>
+							<!--
+								그룹 고르기 — 목업의 가운데 칸은 매트릭스가 차지하므로 그룹은 칩으로 고른다.
+								접힌 한 줄 + [⌄ 더 보기 +N](Console.Accounts.GroupStrip.More). 고른 그룹 칩은 접혀도 늘 보인다(커널 규칙).
+								펼침은 첫 줄 34 + 다섯 줄(28)까지 — 그보다 많으면 칩 칸 안에서 세로로 굴린다(그룹이 수십 개여도 표와 [⌃ 접기]가 화면에 남는다).
+							-->
+							<c:ConsoleChipStrip
+								Grid.Column="1"
+								VerticalAlignment="Top"
+								AutomationProperties.AutomationId="Console.Accounts.GroupStrip"
+								AutomationProperties.Name="권한 그룹"
+								FirstLineHeight="34"
+								ItemsSource="{Binding Matrix.Groups}"
+								MaxExpandedHeight="174">
+								<c:ConsoleChipStrip.ItemTemplate>
+									<DataTemplate>
+										<RadioButton
+											Margin="0,2,6,2"
+											AutomationProperties.AutomationId="{Binding GroupId, StringFormat=Console.Accounts.GroupRow.{0}}"
+											Click="OnSelectGroup"
+											Content="{Binding ChipText}"
+											GroupName="AccountsMatrixGroup"
+											Style="{StaticResource Console.Chip}"
+											Tag="{Binding}"
+											ToolTip="{Binding Summary}">
+											<RadioButton.IsChecked>
+												<MultiBinding Converter="{StaticResource SameRef}" Mode="OneWay">
+													<Binding />
+													<Binding Path="DataContext.Matrix.SelectedGroup" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</RadioButton.IsChecked>
+										</RadioButton>
+									</DataTemplate>
+								</c:ConsoleChipStrip.ItemTemplate>
+							</c:ConsoleChipStrip>
+						</Grid>
+					</Border>
+
+					<!--  그룹을 고르지 않았으면 빈 표 대신 무엇을 하라는지(A-7 · X3)  -->
+					<c:ConsoleEmptyState
+						Grid.Row="1"
+						AutomationProperties.AutomationId="Console.Accounts.Matrix.EmptyState"
+						Hint="{Binding NoGroupHint}"
+						Title="{Binding NoGroupTitle}"
+						Visibility="{Binding ShowNoGroupState, Converter={StaticResource BoolToVisibility}}">
+						<c:ConsoleEmptyState.Action>
+							<Button
+								AutomationProperties.AutomationId="Console.Accounts.Matrix.EmptyState.NewGroup"
+								Click="OnAdd"
+								Content="+ 새 그룹"
+								IsEnabled="{Binding CanEditUsers}"
+								Style="{StaticResource Console.Button.Primary}" />
+						</c:ConsoleEmptyState.Action>
+					</c:ConsoleEmptyState>
+
+					<!--  모듈 × 동작 — 가운데 칸에서 스크롤한다(스크롤 영역 하나). 그룹을 골랐을 때만(A-7)  -->
+					<DataGrid
+						Grid.Row="1"
+						AutomationProperties.AutomationId="Console.Accounts.Matrix"
+						IsReadOnly="True"
+						ItemsSource="{Binding Matrix.Modules}"
+						Style="{StaticResource Console.DataGrid}"
+						Visibility="{Binding ShowMatrixGrid, Converter={StaticResource BoolToVisibility}}">
+						<b:Interaction.Behaviors>
+							<matrix:PermissionPaintBehavior KeyboardFallback="Space · 열 머리글 · 행 [전체] 단추" Matrix="{Binding Matrix}" />
+						</b:Interaction.Behaviors>
+						<DataGrid.RowStyle>
+							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
+								<Setter Property="AutomationProperties.AutomationId" Value="{Binding ModuleKey, StringFormat=Accounts.Matrix.Row.{0}}" />
+							</Style>
+						</DataGrid.RowStyle>
+						<DataGrid.Columns>
+							<DataGridTemplateColumn
+								Width="*"
+								MinWidth="150"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								Header="모듈"
+								HeaderStyle="{StaticResource Console.DataGrid.ColumnHeader}">
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<!--
+											행 [전체] — 이 모듈의 켤 수 있는 칸을 한 번에 켜거나 끈다(A-11). 드래그 페인팅 · 열 머리글과 같은 값을 만든다.
+											버튼이라 Tab 으로 닿고 Space/Enter 로 누른다(키보드 폴백).
+										-->
+										<DockPanel LastChildFill="True">
+											<Button
+												Margin="6,0,0,0"
+												VerticalAlignment="Center"
+												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.RowAll.{0}}"
+												Click="OnToggleRow"
+												Content="전체"
+												DockPanel.Dock="Right"
+												IsEnabled="{Binding DataContext.Matrix.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+												Style="{StaticResource Console.Button.Mini}"
+												ToolTip="이 모듈의 권한을 한 번에 켜거나 끕니다" />
+											<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+												<TextBlock
+													VerticalAlignment="Center"
+													FontSize="12.5"
+													Foreground="{DynamicResource TextPrimaryBrush}"
+													Text="{Binding ModuleDisplay}"
+													TextTrimming="CharacterEllipsis">
+													<TextBlock.Style>
+														<Style TargetType="TextBlock">
+															<Style.Triggers>
+																<!--  서버 이름은 모르는 모듈에서만 툴팁으로 — 아는 모듈은 한국어 이름이면 충분하다  -->
+																<DataTrigger Binding="{Binding IsUnknownModule}" Value="True">
+																	<Setter Property="ToolTip" Value="{Binding ModuleKey, StringFormat=서버 값: {0}}" />
+																</DataTrigger>
+															</Style.Triggers>
+														</Style>
+													</TextBlock.Style>
+												</TextBlock>
+												<Border
+													Margin="6,0,0,0"
+													Padding="5,0"
+													VerticalAlignment="Center"
+													Background="{DynamicResource SurfaceSunkenBrush}"
+													CornerRadius="3"
+													ToolTip="새로 추가된 모듈입니다. 이름은 확인 중입니다."
+													Visibility="{Binding IsUnknownModule, Converter={StaticResource BoolToVisibility}}">
+													<TextBlock
+														FontSize="10.5"
+														Foreground="{DynamicResource TextMutedBrush}"
+														Text="신규" />
+												</Border>
+											</StackPanel>
+										</DockPanel>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn
+								Width="62" MinWidth="62" matrix:PermissionColumn.Verb="0"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.0"
+										Click="OnToggleVerb"
+										Content="조회"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="0"
+										ToolTip="누르면 이 열 전체를 켜거나 끕니다" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<!--
+											왼쪽 8 은 보정값이다 — 커널 Console.CheckBox 는 글자 칸을 늘 달고 있어(빈 칸이어도 8 여백)
+											가운데 정렬하면 네모가 열 중심에서 4px 왼쪽으로 앉는다. 이 여백이 그만큼 되민다.
+											이 모듈에 없는 동작은 서버 값과 무관하게 사선 칸만 그린다(A-12 — 회색 체크는 켜진 건지 못 쓰는 건지 모호했다).
+										-->
+										<CheckBox
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.view}">
+											<CheckBox.Style>
+												<Style BasedOn="{StaticResource Console.CheckBox}" TargetType="CheckBox">
+													<Setter Property="IsChecked" Value="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding ViewEnabled}" Value="False">
+															<Setter Property="IsChecked" Value="False" />
+															<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+															<Setter Property="ToolTip" Value="이 모듈에는 조회 동작이 없습니다" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</CheckBox.Style>
+											<CheckBox.IsEnabled>
+												<MultiBinding Converter="{StaticResource AllTrue}">
+													<Binding Path="ViewEnabled" />
+													<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</CheckBox.IsEnabled>
+										</CheckBox>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn
+								Width="62" MinWidth="62" matrix:PermissionColumn.Verb="1"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.1"
+										Click="OnToggleVerb"
+										Content="편집"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="1"
+										ToolTip="누르면 이 열 전체를 켜거나 끕니다" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<CheckBox
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.edit}">
+											<CheckBox.Style>
+												<Style BasedOn="{StaticResource Console.CheckBox}" TargetType="CheckBox">
+													<Setter Property="IsChecked" Value="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding EditEnabled}" Value="False">
+															<Setter Property="IsChecked" Value="False" />
+															<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+															<Setter Property="ToolTip" Value="이 모듈에는 편집 동작이 없습니다" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</CheckBox.Style>
+											<CheckBox.IsEnabled>
+												<MultiBinding Converter="{StaticResource AllTrue}">
+													<Binding Path="EditEnabled" />
+													<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</CheckBox.IsEnabled>
+										</CheckBox>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn
+								Width="62" MinWidth="62" matrix:PermissionColumn.Verb="2"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.2"
+										Click="OnToggleVerb"
+										Content="삭제"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="2"
+										ToolTip="누르면 이 열 전체를 켜거나 끕니다" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<CheckBox
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.delete}">
+											<CheckBox.Style>
+												<Style BasedOn="{StaticResource Console.CheckBox}" TargetType="CheckBox">
+													<Setter Property="IsChecked" Value="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding DeleteEnabled}" Value="False">
+															<Setter Property="IsChecked" Value="False" />
+															<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+															<Setter Property="ToolTip" Value="이 모듈에는 삭제 동작이 없습니다" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</CheckBox.Style>
+											<CheckBox.IsEnabled>
+												<MultiBinding Converter="{StaticResource AllTrue}">
+													<Binding Path="DeleteEnabled" />
+													<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</CheckBox.IsEnabled>
+										</CheckBox>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn
+								Width="110" MinWidth="110" matrix:PermissionColumn.Verb="3"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.3"
+										Click="OnToggleVerb"
+										Content="제어"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="3"
+										ToolTip="누르면 이 열 전체를 켜거나 끕니다" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<!--
+											체크는 <b>언제나 열 가운데</b>다 — 꼬리표는 오른쪽 끝에 따로 붙어 체크를 밀지 않는다.
+										-->
+										<Grid>
+											<CheckBox
+												Margin="8,0,0,0"
+												HorizontalAlignment="Center"
+												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.control}">
+												<CheckBox.Style>
+													<Style BasedOn="{StaticResource Console.CheckBox}" TargetType="CheckBox">
+														<Setter Property="IsChecked" Value="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+														<Style.Triggers>
+															<DataTrigger Binding="{Binding ControlEnabled}" Value="False">
+																<Setter Property="IsChecked" Value="False" />
+																<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+																<Setter Property="ToolTip" Value="이 모듈에는 제어 동작이 없습니다" />
+															</DataTrigger>
+														</Style.Triggers>
+													</Style>
+												</CheckBox.Style>
+												<CheckBox.IsEnabled>
+													<MultiBinding Converter="{StaticResource AllTrue}">
+														<Binding Path="ControlEnabled" />
+														<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+													</MultiBinding>
+												</CheckBox.IsEnabled>
+											</CheckBox>
+											<!--
+												서버가 이 제어 권한을 직접 검사하는 모듈만 — 방패 표시 + 툴팁(A-6: "실집행" 은 구현어였다).
+												글자("서버 적용")는 110 칸에서 가운데 체크와 겹쳐 아이콘으로 둔다. 뜻은 상세 칸 '주의' 가 말한다.
+											-->
+											<md:PackIcon
+												Width="13"
+												Height="13"
+												Margin="0,0,2,0"
+												HorizontalAlignment="Right"
+												VerticalAlignment="Center"
+												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.ServerEnforced.{0}}"
+												Background="Transparent"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Kind="ShieldCheckOutline"
+												ToolTip="서버 적용 — 서버가 이 제어 권한을 직접 검사합니다"
+												Visibility="{Binding IsControlServerEnforced, Converter={StaticResource BoolToVisibility}}" />
+										</Grid>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+						</DataGrid.Columns>
+					</DataGrid>
+
+					<!--
+						구성원 — [그룹 권한 | 구성원] 으로 전환한다(같은 가운데 칸). 위에 [구성원 추가](A-18), 비면 빈 상태 안내.
+						추가는 기존 구성원 관리 경로(PUT /users/{id} group_id) 그대로다.
+					-->
+					<DockPanel
+						Grid.Row="1"
+						LastChildFill="True"
+						Visibility="{Binding ShowMembersPane, Converter={StaticResource BoolToVisibility}}">
+						<Border
+							Padding="12,6"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="0,0,0,1"
+							DockPanel.Dock="Top">
+							<DockPanel LastChildFill="True">
+								<TextBlock
+									Margin="0,0,10,0"
+									VerticalAlignment="Center"
+									DockPanel.Dock="Left"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="구성원 추가" />
+								<Button
+									Margin="8,0,0,0"
+									AutomationProperties.AutomationId="Console.Accounts.Member.AddButton"
+									Click="OnAddMember"
+									Content="추가"
+									DockPanel.Dock="Right"
+									IsEnabled="{Binding CanAddMember}"
+									Style="{StaticResource Console.Button}"
+									ToolTip="고른 계정을 이 그룹에 넣습니다" />
+								<ComboBox
+									Height="30"
+									MaxWidth="320"
+									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.Member.AddAccount"
+									IsEnabled="{Binding CanEditUsers}"
+									ItemsSource="{Binding PermissionMatrixPanelViewModel.AddableAccounts}"
+									SelectedItem="{Binding PermissionMatrixPanelViewModel.SelectedAddAccount, Mode=TwoWay}"
+									ToolTip="이 그룹에 넣을 계정을 고르세요">
+									<ComboBox.ItemTemplate>
+										<DataTemplate>
+											<TextBlock TextTrimming="CharacterEllipsis">
+												<Run Text="{Binding LoginId, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Name, Mode=OneWay}" />
+											</TextBlock>
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+							</DockPanel>
+						</Border>
+						<Grid>
+							<DataGrid
+								AutomationProperties.AutomationId="Console.Accounts.Grid.Members"
+								IsReadOnly="True"
+								ItemsSource="{Binding Matrix.Members}"
+								Style="{StaticResource Console.DataGrid}">
+								<DataGrid.Columns>
+									<!--  사용자 목록과 같은 표기(A-19) · 폭은 별(*)로 — 좁은 서랍 폭에서 가로 스크롤이 서지 않게  -->
+									<DataGridTextColumn Width="1.3*" MinWidth="110" Binding="{Binding LoginId}" CellStyle="{StaticResource Console.DataGrid.Cell}" ElementStyle="{StaticResource Console.DataGrid.CellText}" Header="아이디" HeaderStyle="{StaticResource Console.DataGrid.ColumnHeader}" />
+									<DataGridTextColumn Width="1*" MinWidth="90" Binding="{Binding Name}" CellStyle="{StaticResource Console.DataGrid.Cell}" ElementStyle="{StaticResource Console.DataGrid.CellText}" Header="성명" HeaderStyle="{StaticResource Console.DataGrid.ColumnHeader}" />
+									<DataGridTextColumn Width="80" MinWidth="80" Binding="{Binding Role, Converter={StaticResource RoleText}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="구분" HeaderStyle="{StaticResource Console.DataGrid.ColumnHeader}" />
+									<DataGridTemplateColumn Width="72" MinWidth="72" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="해제" HeaderStyle="{StaticResource Console.DataGrid.ColumnHeader}">
+										<DataGridTemplateColumn.CellTemplate>
+											<DataTemplate>
+												<!--  행 안 단추는 Mini(22 높이) — Ghost(최소 폭 56)는 72 칸에서 잘렸다  -->
+												<Button
+													AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.Member.Remove.{0}}"
+													Click="OnRemoveMember"
+													Content="해제"
+													IsEnabled="{Binding DataContext.CanEditUsers, RelativeSource={RelativeSource AncestorType=UserControl}}"
+													Style="{StaticResource Console.Button.Mini}"
+													ToolTip="이 계정을 그룹에서 뺍니다" />
+											</DataTemplate>
+										</DataGridTemplateColumn.CellTemplate>
+									</DataGridTemplateColumn>
+								</DataGrid.Columns>
+							</DataGrid>
+							<c:ConsoleEmptyState
+								Margin="0,36,0,0"
+								AutomationProperties.AutomationId="Console.Accounts.Members.EmptyState"
+								IsHitTestVisible="False"
+								Title="이 그룹에 구성원이 없습니다"
+								Visibility="{Binding ShowNoMembersState, Converter={StaticResource BoolToVisibility}}" />
+						</Grid>
+					</DockPanel>
+				</Grid>
+
+				<!--  ③ 세션 — 무한 스크롤 유지 · 드래그 정렬 없음. 폭은 별(*)로 나눠 마지막 칸이 0이 되지 않게 한다  -->
+				<DataGrid
+					AutomationProperties.AutomationId="Console.Accounts.Grid.Sessions"
+					IsReadOnly="True"
+					ItemsSource="{Binding UserSessionPanelViewModel.Items}"
+					Loaded="OnSessionsGridLoaded"
+					SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
+					Style="{StaticResource Console.DataGrid}"
+					Visibility="{Binding IsSessionsRail, Converter={StaticResource BoolToVisibility}}">
+					<b:Interaction.Behaviors>
+						<behavior:DataGridScrollEndBehavior Command="{Binding UserSessionPanelViewModel.LoadMoreCommand}" Threshold="50" />
+					</b:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<!--  자기 세션은 형태(알약)로 표시한다 — 강제 종료가 자기를 쫓아내지 않게  -->
+						<!--  U-18 — 56 이면 알약(글 21 + 안쪽 14)이 칸 안쪽 32 보다 넓어 "현재" 끝이 잘렸다(잘림 감사) → 62.  -->
+						<DataGridTemplateColumn
+							Width="62"
+							MinWidth="62"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="current"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="현재">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Border
+										Padding="6,1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										BorderBrush="{DynamicResource PrimaryBrush}"
+										BorderThickness="1"
+										CornerRadius="8"
+										Visibility="{Binding IsCurrentSession, Converter={StaticResource BoolToVisibility}}">
+										<TextBlock
+											FontSize="10.5"
+											Foreground="{DynamicResource PrimaryBrush}"
+											Text="현재" />
+									</Border>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="96"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="user"
+							Binding="{Binding LoginId}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="사용자" />
+						<DataGridTextColumn
+							Width="0.9*"
+							MinWidth="70"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="role"
+							Binding="{Binding Role, Converter={StaticResource RoleText}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="구분" />
+						<DataGridTextColumn
+							Width="1.3*"
+							MinWidth="92"
+							c:ConsoleColumns.CollapseBelow="720"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="client"
+							Binding="{Binding ClientId, TargetNullValue=-}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="클라이언트" />
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="104"
+							c:ConsoleColumns.CollapseBelow="560"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="ip"
+							Binding="{Binding IpAddress}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="IP" />
+						<!--  서랍이 열려 목록이 좁아지면(세션을 고르면 상세가 열린다) 클라이언트 · 사유 · IP 부터 접는다 — 전부 상세 칸에 있다  -->
+						<DataGridTextColumn
+							Width="1.8*"
+							MinWidth="136"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="created"
+							Binding="{Binding CreatedAt, Converter={StaticResource IsoDate}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="로그인 시각" />
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="96"
+							c:ConsoleColumns.CollapseBelow="640"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="reason"
+							Binding="{Binding LogoutReason, Converter={StaticResource LogoutReason}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="사유">
+							<DataGridTextColumn.ElementStyle>
+								<Style BasedOn="{StaticResource Console.DataGrid.CellText}" TargetType="TextBlock">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="알 수 없음">
+											<Setter Property="ToolTip" Value="{Binding LogoutReason, StringFormat=서버 값: {0}}" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridCheckBoxColumn
+							Width="54"
+							MinWidth="54"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="active"
+							Binding="{Binding IsActive}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="활성" />
+						<DataGridTextColumn
+							Width="1.8*"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="expires"
+							Binding="{Binding ExpiresAt, Converter={StaticResource IsoDate}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="만료" />
+						<DataGridTextColumn
+							Width="1.8*"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="loggedout"
+							Binding="{Binding LoggedOutAt, Converter={StaticResource IsoDate}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="로그아웃" />
+					</DataGrid.Columns>
+				</DataGrid>
+
+				<!--  ④ 권한 부여 — 폼은 상세 칸으로  -->
+				<DataGrid
+					AutomationProperties.AutomationId="Console.Accounts.Grid.Grants"
+					IsReadOnly="True"
+					ItemsSource="{Binding GrantManagementPanelViewModel.Grants}"
+					Loaded="OnGrantsGridLoaded"
+					SelectedItem="{Binding SelectedGrant, Mode=TwoWay}"
+					Style="{StaticResource Console.DataGrid}"
+					Visibility="{Binding IsGrantsRail, Converter={StaticResource BoolToVisibility}}">
+					<b:Interaction.Behaviors>
+						<behavior:DataGridScrollEndBehavior Command="{Binding GrantManagementPanelViewModel.LoadMoreCommand}" Threshold="50" />
+					</b:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<!--  폭은 별(*) — 이 레일은 새 부여 폼(상세)이 늘 열려 있어 서랍 폭에서도 가로 스크롤이 서지 않게 한다  -->
+						<DataGridTextColumn Width="1.1*" MinWidth="84" c:ConsoleColumns.IsDefault="True" c:ConsoleColumns.Key="user" Binding="{Binding UserLogin}" CellStyle="{StaticResource Console.DataGrid.Cell}" ElementStyle="{StaticResource Console.DataGrid.CellText}" Header="계정" />
+						<DataGridTextColumn Width="1.2*" MinWidth="90" c:ConsoleColumns.IsDefault="True" c:ConsoleColumns.Key="group" Binding="{Binding GroupName}" CellStyle="{StaticResource Console.DataGrid.Cell}" ElementStyle="{StaticResource Console.DataGrid.CellText}" Header="그룹" />
+						<DataGridTextColumn Width="1.3*" MinWidth="138" c:ConsoleColumns.CollapseBelow="600" c:ConsoleColumns.IsDefault="True" c:ConsoleColumns.Key="from" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="유효 시작" />
+						<DataGridTextColumn Width="1.3*" MinWidth="138" c:ConsoleColumns.IsDefault="True" c:ConsoleColumns.Key="until" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}, TargetNullValue=상시}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="유효 종료" />
+						<!--  상태 — 표시 사전(유효 · 시작 전 · 만료 · 회수) + 24시간 안에 끝나는 유효 부여는 경고 알약(A-34)  -->
+						<DataGridTemplateColumn Width="1*" MinWidth="124" c:ConsoleColumns.IsDefault="True" c:ConsoleColumns.Key="status" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="상태">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+										<TextBlock
+											VerticalAlignment="Center"
+											Text="{Binding Status, Converter={StaticResource Code}, ConverterParameter=grant}"
+											ToolTip="{Binding Status, Converter={StaticResource CodeTip}, ConverterParameter=grant}" />
+										<Border
+											Margin="6,0,0,0"
+											VerticalAlignment="Center"
+											Style="{StaticResource Console.Pill.Warning}"
+											ToolTip="24시간 안에 끝납니다"
+											Visibility="{Binding Converter={StaticResource ExpiringSoon}}">
+											<TextBlock FontSize="11" Text="곧 만료" />
+										</Border>
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+					</DataGrid.Columns>
+				</DataGrid>
+
+				<!--  ⑤ 감사 로그 — 읽기 전용. 별(*) 폭으로 나눠 설명이 잘리지 않게 한다  -->
+				<DataGrid
+					AutomationProperties.AutomationId="Console.Accounts.Grid.Audit"
+					IsReadOnly="True"
+					ItemsSource="{Binding AuditLogPanelViewModel.Items}"
+					Loaded="OnAuditGridLoaded"
+					SelectedItem="{Binding SelectedAuditLog, Mode=TwoWay}"
+					Style="{StaticResource Console.DataGrid}"
+					Visibility="{Binding IsAuditRail, Converter={StaticResource BoolToVisibility}}">
+					<b:Interaction.Behaviors>
+						<behavior:DataGridScrollEndBehavior Command="{Binding AuditLogPanelViewModel.LoadMoreCommand}" Threshold="50" />
+					</b:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<DataGridTextColumn
+							Width="1.9*"
+							MinWidth="166"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="time"
+							Binding="{Binding CreatedAt, Converter={StaticResource ServerTime}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="시각" />
+						<DataGridTextColumn
+							Width="1.9*"
+							MinWidth="130"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="action"
+							Binding="{Binding ActionType, Converter={StaticResource Code}, ConverterParameter=action}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="동작">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding ActionType, Converter={StaticResource CodeTip}, ConverterParameter=action}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="0.7*"
+							MinWidth="64"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="status"
+							Binding="{Binding ActionStatus, Converter={StaticResource Code}, ConverterParameter=status}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="결과">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="ToolTip" Value="{Binding ActionStatus, Converter={StaticResource CodeTip}, ConverterParameter=status}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="96"
+							c:ConsoleColumns.CollapseBelow="560"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="resource"
+							Binding="{Binding ResourceName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="대상명" />
+						<DataGridTextColumn
+							Width="1.3*"
+							MinWidth="92"
+							c:ConsoleColumns.CollapseBelow="640"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="actor"
+							Binding="{Binding ActorLoginId}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="행위자" />
+						<DataGridTextColumn
+							Width="2*"
+							MinWidth="120"
+							c:ConsoleColumns.CollapseBelow="700"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="description"
+							Binding="{Binding Description}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="설명">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding Description}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="1.2*"
+							MinWidth="88"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="resource_type"
+							Binding="{Binding ResourceType, Converter={StaticResource Code}, ConverterParameter=resource}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="대상 종류">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="ToolTip" Value="{Binding ResourceType, Converter={StaticResource CodeTip}, ConverterParameter=resource}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="1.3*"
+							MinWidth="96"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="ip"
+							Binding="{Binding IpAddress}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="IP" />
+					</DataGrid.Columns>
+				</DataGrid>
+
+				<!--
+					빈 목록(X3) — 사용자 · 세션 · 부여 · 감사가 비면 "무엇이 비었고 무엇을 하면 되는지". 머리글은 가리지 않고(위 36),
+					누름은 아래로 통과시킨다(빈 목록이라 누를 행은 없지만 머리글 · 스크롤은 그대로 산다).
+				-->
+				<c:ConsoleEmptyState
+					Margin="0,36,0,0"
+					AutomationProperties.AutomationId="Console.Accounts.List.EmptyState"
+					Hint="{Binding ListEmptyHint}"
+					IsHitTestVisible="False"
+					Title="{Binding ListEmptyTitle}"
+					Visibility="{Binding ShowListEmpty, Converter={StaticResource BoolToVisibility}}" />
+
+				<!--  뷰 찾기는 Caliburn 의 이름 규약으로 — x:Name 을 새로 쓰지 않는다  -->
+				<ContentControl
+					cal:View.Model="{Binding AccountSetupPanelViewModel}"
+					Focusable="False"
+					Visibility="{Binding IsSessionSetupRail, Converter={StaticResource BoolToVisibility}}" />
+			</Grid>
+		</c:ConsoleShell.List>
+
+		<!--  상태 띠 — 건수 · 방금 한 일 · 권한 그룹 칩(드롭존) · Draft 트레이  -->
+		<c:ConsoleShell.StatusBar>
+			<!--  세션 설정 레일은 가운데 칸에 제 저장 막대가 있다 — 빈 상태 줄 띠를 겹쳐 두지 않는다.  -->
+			<Border
+				Padding="12,5"
+				Background="{DynamicResource SurfaceAltBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="0,1,0,0">
+				<Border.Style>
+					<Style TargetType="Border">
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsSessionSetupRail}" Value="True">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Border.Style>
+				<StackPanel>
+					<!--
+						U-18 — 건수(왼쪽)가 먼저 제 폭을 갖고, 안내(오른쪽)가 남는 폭을 쓴다. 예전에는 안내가 먼저 도킹돼 긴 Draft 안내가
+						건수 칸을 0 까지 눌렀다("목록 9건 · 선택 3" 이 통째로 사라짐 — 잘림 감사). 긴 안내는 줄임표 + 잘렸을 때만 툴팁.
+					-->
+					<DockPanel LastChildFill="True">
+						<TextBlock
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Accounts.Status.Count"
+							DockPanel.Dock="Left"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding ListStatusText}" />
+						<TextBlock
+							Margin="12,0,0,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Accounts.Status.Matrix"
+							DockPanel.Dock="Right"
+							FontSize="12"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="{Binding MatrixStatusText}" />
+						<TextBlock
+							Margin="12,0,0,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Accounts.Status.Message"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding StatusText}"
+							TextAlignment="Right"
+							TextTrimming="CharacterEllipsis"
+							theme:TrimmedToolTip.IsEnabled="True" />
+					</DockPanel>
+
+					<!--  놓을 곳 — 끄는 동안 DropZoneChrome 이 형태(파선 vs 사선 해치)로 가능 · 불가를 보인다  -->
+					<DockPanel
+						Margin="0,5,0,0"
+						LastChildFill="True"
+						Visibility="{Binding ShowGroupChips, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock
+							Margin="0,5,8,0"
+							VerticalAlignment="Top"
+							DockPanel.Dock="Left"
+							FontSize="12"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="권한 그룹" />
+						<Grid>
+							<TextBlock
+								VerticalAlignment="Center"
+								FontSize="12"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="권한 그룹이 없습니다. ‘권한 설정’에서 먼저 만드세요.">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Visibility" Value="Collapsed" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding HasGroupChips}" Value="False">
+												<Setter Property="Visibility" Value="Visible" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+							<ItemsControl Focusable="False" ItemsSource="{Binding GroupChips}">
+								<ItemsControl.ItemsPanel>
+									<ItemsPanelTemplate>
+										<WrapPanel />
+									</ItemsPanelTemplate>
+								</ItemsControl.ItemsPanel>
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<drag:DropZoneChrome
+											Margin="0,2,6,2"
+											drag:DropZone.Data="{Binding}"
+											drag:DropZone.Handler="{Binding DataContext.GroupDrop, RelativeSource={RelativeSource AncestorType=UserControl}}"
+											drag:DropZone.Key="account-group"
+											CornerRadius="12">
+											<Button
+												Padding="0"
+												AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.GroupChip.{0}}"
+												Background="Transparent"
+												BorderThickness="0"
+												Click="OnGroupChipClick"
+												Cursor="Hand"
+												Style="{x:Null}"
+												ToolTip="고른 계정을 이 그룹에 넣기">
+												<Button.Template>
+													<ControlTemplate TargetType="Button">
+														<Border Style="{StaticResource GroupChip}">
+															<TextBlock FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}">
+																<Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding UserCount, Mode=OneWay}" />
+															</TextBlock>
+														</Border>
+													</ControlTemplate>
+												</Button.Template>
+											</Button>
+										</drag:DropZoneChrome>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</Grid>
+					</DockPanel>
+
+					<!--  배정 대기 트레이 — 서버 배정이 사용자 1명씩이라 곧바로 보내지 않고 [적용] 을 기다린다  -->
+					<Border
+						Margin="0,6,0,0"
+						Padding="10,5"
+						Background="{DynamicResource TintWarningBrush}"
+						BorderBrush="{DynamicResource StatusWarningBrush}"
+						BorderThickness="4,1,1,1"
+						CornerRadius="4"
+						Visibility="{Binding ShowDraftTray, Converter={StaticResource BoolToVisibility}}">
+						<DockPanel LastChildFill="True">
+							<Button
+								Margin="6,0,0,0"
+								Padding="10,1"
+								AutomationProperties.AutomationId="Console.Accounts.Draft.Apply"
+								Click="OnApplyDraft"
+								Content="적용"
+								DockPanel.Dock="Right"
+								FontSize="12"
+								IsEnabled="{Binding DraftTray.CanApply}"
+								Style="{StaticResource Console.Button.Primary}" />
+							<Button
+								Margin="6,0,0,0"
+								Padding="10,1"
+								AutomationProperties.AutomationId="Console.Accounts.Draft.Revert"
+								Click="OnRevertDraft"
+								Content="버리기"
+								DockPanel.Dock="Right"
+								FontSize="12"
+								IsEnabled="{Binding DraftTray.CanRevert}"
+								Style="{StaticResource Console.Button.Ghost}" />
+							<Button
+								Margin="6,0,0,0"
+								Padding="10,1"
+								AutomationProperties.AutomationId="Console.Accounts.Draft.Undo"
+								Click="OnUndoDraft"
+								Content="되돌리기"
+								DockPanel.Dock="Right"
+								FontSize="12"
+								Style="{StaticResource Console.Button.Ghost}"
+								Visibility="{Binding CanUndoDraft, Converter={StaticResource BoolToVisibility}}" />
+							<TextBlock
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Console.Accounts.Draft.Message"
+								FontSize="12"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding DraftTrayText}"
+								TextTrimming="CharacterEllipsis" />
+						</DockPanel>
+					</Border>
+				</StackPanel>
+			</Border>
+		</c:ConsoleShell.StatusBar>
+
+		<!--  상세 — 여섯 상태 + 고정 적용 막대. 편집 · 삭제 · 잠금 해제를 다이얼로그에서 여기로 흡수했다(L-D4)  -->
+		<c:ConsoleShell.Detail>
+			<c:ConsoleDetailHost
+				ApplyClick="OnApply"
+				ApplyText="{Binding DetailApplyText}"
+				Banner="{Binding DetailBanner}"
+				CanApply="{Binding DetailCanApply}"
+				CanRevert="{Binding DetailCanRevert}"
+				ConsoleKey="Accounts"
+				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
+				FooterText="{Binding DetailFooter}"
+				IsDirty="{Binding DetailIsDirty}"
+				IsReadOnly="{Binding DetailIsReadOnly}"
+				Kind="{Binding DetailKind}"
+				RevertClick="OnRevert"
+				RevertText="{Binding DetailRevertText}"
+				ShakeToken="{Binding DetailShakeToken}"
+				ShowButtons="{Binding DetailShowButtons}"
+				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				Title="{Binding DetailTitle}">
+				<Grid>
+					<!--  ① 사용자 상세 — 사진 머리 + 명세에서 만들어지는 폼 + 읽기 전용 요약 + 동작  -->
+					<StackPanel Visibility="{Binding IsUsersRail, Converter={StaticResource BoolToVisibility}}">
+						<!--  사진(목업 L1163 — 96) · 한 명을 골랐을 때만  -->
+						<DockPanel Margin="0,0,0,10" Visibility="{Binding HasSingleUser, Converter={StaticResource BoolToVisibility}}">
+							<Border
+								Width="96"
+								Height="96"
+								Background="{DynamicResource SurfaceSunkenBrush}"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="1"
+								CornerRadius="6"
+								DockPanel.Dock="Left">
+								<Image
+									AutomationProperties.AutomationId="Console.Accounts.Detail.Photo"
+									Source="{Binding SingleUser.Image, Mode=OneWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
+									Stretch="UniformToFill" />
+							</Border>
+							<StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+								<TextBlock
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding SingleUser.RoleText, Mode=OneWay}" />
+								<TextBlock
+									Margin="0,2,0,0"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding SingleUser.OrgText, Mode=OneWay}"
+									TextTrimming="CharacterEllipsis" />
+								<Button
+									Margin="0,8,0,0"
+									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.Detail.OpenUserDialog"
+									Click="OnOpenUserDialog"
+									Content="비밀번호 · 사진 변경"
+									IsEnabled="{Binding CanOpenUserDialog}"
+									Style="{StaticResource Console.Button}"
+									ToolTip="비밀번호 초기화 · 사진 변경 창 열기" />
+							</StackPanel>
+						</DockPanel>
+
+						<forms:AccountDetailFormView DataContext="{Binding Form}" />
+
+						<!--  절 간격은 커널 기본(14)을 쓴다 — Margin 을 덮어쓰면 제목이 윗글에 붙는다(A-8)  -->
+						<c:ConsoleSection AxisName="user-sessions" Header="세션 요약">
+							<StackPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="활성 세션" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.session_active"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SessionSummaryText, Mode=OneWay}" />
+								</DockPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="마지막 로그인" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.last_login"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LastLoginText, Mode=OneWay}" />
+								</DockPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="부여 이력" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grants"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding GrantSummaryText, Mode=OneWay}" />
+								</DockPanel>
+								<!--  목업의 [세션 종료] — 세션 관리의 [이 사용자 전체 종료] 와 같은 경로(확인 팝업)  -->
+								<Button
+									Margin="0,6,0,0"
+									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.Detail.EndSessions"
+									Click="OnEndUserSessions"
+									Content="세션 모두 종료"
+									IsEnabled="{Binding CanEndUserSessions}"
+									Style="{StaticResource Console.Button.Danger}"
+									ToolTip="이 사용자의 로그인을 모두 끊습니다 (확인 팝업)"
+									Visibility="{Binding HasSingleUser, Converter={StaticResource BoolToVisibility}}" />
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<c:ConsoleSection AxisName="users.is_locked" Header="잠금">
+							<StackPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="상태" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.lock_state"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LockStateText, Mode=OneWay}" />
+								</DockPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="사유" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.lock_reason"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LockReasonText, Mode=OneWay}" />
+								</DockPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="잠긴 시각" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.locked_at"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LockedAtText, Mode=OneWay}" />
+								</DockPanel>
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<WrapPanel Margin="0,10,0,0" Visibility="{Binding HasSingleUser, Converter={StaticResource BoolToVisibility}}">
+							<Button
+								Margin="0,0,6,6"
+								AutomationProperties.AutomationId="Console.Accounts.Detail.Unlock"
+								Click="OnUnlock"
+								Content="잠금 해제"
+								IsEnabled="{Binding CanUnlockSelected}"
+								Style="{StaticResource Console.Button}"
+								ToolTip="계정 잠금을 해제합니다 (확인 팝업)" />
+							<Button
+								Margin="0,0,6,6"
+								AutomationProperties.AutomationId="Console.Accounts.Detail.Delete"
+								Click="OnDeleteSelected"
+								Content="삭제"
+								IsEnabled="{Binding CanDelete}"
+								Style="{StaticResource Console.Button.Danger}"
+								ToolTip="고른 계정을 삭제합니다 (확인 팝업)" />
+						</WrapPanel>
+					</StackPanel>
+
+					<!--
+						② 권한 그룹 상세(300) — 새 그룹/이름 수정 폼(열렸을 때 맨 위, A-9 · A-10) · 요약 · 주의 · 그룹 단추.
+						매트릭스와 구성원은 가운데 칸이 맡는다.
+					-->
+					<StackPanel Visibility="{Binding IsPermissionsRail, Converter={StaticResource BoolToVisibility}}">
+						<!--  이름/설명 폼 — 머리에 "새 권한 그룹" / "그룹 이름/설명 수정", 저장 단추도 만들기 / 저장으로 가른다  -->
+						<c:ConsoleSection
+							AutomationProperties.AutomationId="Console.Accounts.Group.Form"
+							Header="{Binding PermissionMatrixPanelViewModel.FormTitle}"
+							Visibility="{Binding PermissionMatrixPanelViewModel.IsGroupFormOpen, Converter={StaticResource BoolToVisibility}}">
+							<StackPanel>
+								<c:ConsoleField ApiName="name" Header="이름">
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.group_name"
+										Style="{StaticResource Kv.Input}"
+										Text="{Binding PermissionMatrixPanelViewModel.FormName, UpdateSourceTrigger=PropertyChanged}" />
+								</c:ConsoleField>
+								<c:ConsoleField ApiName="description" Header="설명">
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.group_description"
+										Style="{StaticResource Kv.Input}"
+										Text="{Binding PermissionMatrixPanelViewModel.FormDescription, UpdateSourceTrigger=PropertyChanged}" />
+								</c:ConsoleField>
+								<WrapPanel Margin="0,6,0,0">
+									<Button
+										Margin="0,0,6,0"
+										AutomationProperties.AutomationId="Console.Accounts.Group.FormSave"
+										Click="OnSaveGroupForm"
+										Content="{Binding PermissionMatrixPanelViewModel.FormSaveText}"
+										IsEnabled="{Binding PermissionMatrixPanelViewModel.CanSaveGroupForm}"
+										Style="{StaticResource Console.Button.Primary}" />
+									<Button
+										AutomationProperties.AutomationId="Console.Accounts.Group.FormCancel"
+										Click="OnCancelGroupForm"
+										Content="취소"
+										Style="{StaticResource Console.Button.Ghost}" />
+								</WrapPanel>
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<!--  그룹을 고르지 않았으면(폼도 닫혀 있으면) 할 일 한 줄  -->
+						<TextBlock
+							AutomationProperties.AutomationId="Console.Accounts.Detail.NoGroup"
+							FontSize="12.5"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="가운데에서 권한 그룹을 고르세요."
+							TextWrapping="Wrap">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<MultiDataTrigger>
+											<MultiDataTrigger.Conditions>
+												<Condition Binding="{Binding HasSelectedGroup}" Value="False" />
+												<Condition Binding="{Binding PermissionMatrixPanelViewModel.IsGroupFormOpen}" Value="False" />
+											</MultiDataTrigger.Conditions>
+											<Setter Property="Visibility" Value="Visible" />
+										</MultiDataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+
+						<StackPanel Visibility="{Binding HasSelectedGroup, Converter={StaticResource BoolToVisibility}}">
+							<c:ConsoleSection Header="요약" HelpKey="Accounts.Permissions">
+								<StackPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="구성원" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.member_count"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding Matrix.MemberCountText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="켜진 모듈" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.enabled_modules"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding Matrix.EnabledModuleText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="제어 권한" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.control_modules"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding Matrix.ControlModuleText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="미적용" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.dirty_count"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding Matrix.DirtyCountText, Mode=OneWay}" />
+									</DockPanel>
+								</StackPanel>
+							</c:ConsoleSection>
+
+							<!--  '주의'(방패 표시가 없는 모듈의 제어는 화면 단추만 막는다, A-5)는 '요약' 절 "?" 로 옮겼다(help-callout H-3)  -->
+
+							<!--  그룹 자체의 관리 — 툴바 [새 그룹] · [삭제] 와 짝  -->
+							<c:ConsoleSection Header="그룹">
+								<WrapPanel>
+									<Button
+										Margin="0,0,6,6"
+										AutomationProperties.AutomationId="Console.Accounts.Group.Rename"
+										Click="OnRenameGroup"
+										Content="이름/설명 수정"
+										IsEnabled="{Binding Matrix.CanEdit}"
+										Style="{StaticResource Console.Button}" />
+									<Button
+										Margin="0,0,6,6"
+										AutomationProperties.AutomationId="Console.Accounts.Group.Members"
+										Click="OnShowMembers"
+										Content="구성원 보기"
+										Style="{StaticResource Console.Button}" />
+								</WrapPanel>
+							</c:ConsoleSection>
+						</StackPanel>
+					</StackPanel>
+
+					<!--  ③ 세션 상세 — 고른 세션이 있을 때만. 파괴 동작은 아래로 모은다  -->
+					<StackPanel Visibility="{Binding IsSessionsRail, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock
+							AutomationProperties.AutomationId="Console.Accounts.Detail.NoSession"
+							FontSize="12.5"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="목록에서 세션을 고르세요."
+							TextWrapping="Wrap">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding SelectedSession}" Value="{x:Null}">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+						<StackPanel>
+							<StackPanel.Style>
+								<Style TargetType="StackPanel">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding SelectedSession}" Value="{x:Null}">
+											<Setter Property="Visibility" Value="Collapsed" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</StackPanel.Style>
+							<c:ConsoleSection AxisName="user-sessions" Header="세션">
+								<StackPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="구분" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.session_role"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.Role, Converter={StaticResource RoleText}, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="클라이언트" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.client_id"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.ClientId, TargetNullValue=-, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="IP" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.ip"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.IpAddress, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="단말" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.user_agent"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.UserAgent, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="로그인 시각" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.session_created"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.CreatedAt, Converter={StaticResource IsoDate}, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="만료" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.expires"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.ExpiresAt, Converter={StaticResource IsoDate}, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="사유" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.logout_reason"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedSession.LogoutReason, Converter={StaticResource LogoutReason}, Mode=OneWay}" />
+									</DockPanel>
+								</StackPanel>
+							</c:ConsoleSection>
+							<!--
+								되돌릴 수 없는 동작 — 구분선으로 위의 읽기 전용 요약과 갈라 놓고, 두 단추는 같은 폭
+								(칸 전폭)으로 세로로 쌓는다(D-19 실측).
+							-->
+							<StackPanel Margin="0,14,0,0">
+								<Rectangle
+									Height="1"
+									Margin="0,0,0,8"
+									Fill="{DynamicResource DividerBrush}" />
+								<TextBlock
+									Margin="0,0,0,6"
+									AutomationProperties.AutomationId="Console.Accounts.Session.DangerCaption"
+									FontSize="11.5"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Text="되돌릴 수 없는 동작"
+									TextWrapping="Wrap" />
+								<Button
+									Margin="0,0,0,6"
+									HorizontalAlignment="Stretch"
+									HorizontalContentAlignment="Center"
+									AutomationProperties.AutomationId="Console.Accounts.Session.ForceLogout"
+									Click="OnForceLogout"
+									Content="이 세션 종료"
+									IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
+									Style="{StaticResource Console.Button.Danger}" />
+								<Button
+									HorizontalAlignment="Stretch"
+									HorizontalContentAlignment="Center"
+									AutomationProperties.AutomationId="Console.Accounts.Session.ForceLogoutAll"
+									Click="OnForceLogoutAll"
+									Content="{Binding ForceLogoutAllText}"
+									IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
+									Style="{StaticResource Console.Button.Danger}" />
+							</StackPanel>
+						</StackPanel>
+					</StackPanel>
+
+					<!--  ④ 권한 부여 — 새 부여 폼이 상세의 본문이다(이 레일은 상세가 늘 열린다, A-29)  -->
+					<StackPanel Visibility="{Binding IsGrantsRail, Converter={StaticResource BoolToVisibility}}">
+						<c:ConsoleSection
+							AxisName="grants"
+							Header="새 부여"
+							HelpKey="Accounts.Grants">
+							<StackPanel>
+								<c:ConsoleField ApiName="user_id" Header="계정">
+									<ComboBox
+										Height="30"
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_user"
+										DisplayMemberPath="LoginId"
+										ItemsSource="{Binding GrantManagementPanelViewModel.Accounts}"
+										SelectedItem="{Binding GrantManagementPanelViewModel.SelectedAccount, Mode=TwoWay}" />
+								</c:ConsoleField>
+								<c:ConsoleField ApiName="group_id" Header="그룹">
+									<ComboBox
+										Height="30"
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_group"
+										DisplayMemberPath="Name"
+										ItemsSource="{Binding GrantManagementPanelViewModel.Groups}"
+										SelectedItem="{Binding GrantManagementPanelViewModel.SelectedGroup, Mode=TwoWay}" />
+								</c:ConsoleField>
+								<!--
+									B7(#50) — mah:DateTimePicker(입력칸만 콘솔 스타일, 펼친 달력은 MahApps 기본)를 커널 날짜+시각 칸으로.
+									날짜만 고르면 자정이 되어 "오늘 몇 시부터 몇 시까지" 한시 부여가 불가능해진다 — 그래서 IncludeTime.
+									시작은 비울 수 없고(뷰모델 DateTime) 종료는 비울 수 있다(DateTime? — 비우면 기한 없음). 검증(종료 ≤ 시작 · 지난 종료)은 그대로 뷰모델.
+								-->
+								<c:ConsoleField ApiName="valid_from" Header="시작">
+									<c:DateTimeField
+										Height="30"
+										HorizontalAlignment="Left"
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_from"
+										AutomationProperties.Name="부여 시작"
+										IncludeTime="True"
+										Value="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}" />
+								</c:ConsoleField>
+								<c:ConsoleField ApiName="valid_until" Header="종료">
+									<c:DateTimeField
+										Height="30"
+										HorizontalAlignment="Left"
+										AllowEmpty="True"
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_until"
+										AutomationProperties.Name="부여 종료"
+										IncludeTime="True"
+										Placeholder="기한 없음"
+										Value="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}" />
+								</c:ConsoleField>
+								<WrapPanel Margin="0,6,0,0">
+									<Button
+										Margin="0,0,6,6"
+										AutomationProperties.AutomationId="Console.Accounts.Grant.Create"
+										Click="OnCreateGrant"
+										Content="부여"
+										IsEnabled="{Binding GrantManagementPanelViewModel.CanCreateGrant}"
+										Style="{StaticResource Console.Button.Primary}"
+										ToolTip="계정과 그룹을 고르면 켜집니다" />
+								</WrapPanel>
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<!--  고른 부여 — 무엇을 회수하는지 보이고 회수한다(확인 팝업)  -->
+						<c:ConsoleSection Header="고른 부여">
+							<StackPanel>
+								<TextBlock
+									FontSize="12.5"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="목록에서 부여를 고르면 회수할 수 있습니다."
+									TextWrapping="Wrap">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Visibility" Value="Collapsed" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HasSelectedGrant}" Value="False">
+													<Setter Property="Visibility" Value="Visible" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+								<TextBox
+									AutomationProperties.AutomationId="Accounts.Detail.Field.grant_selected"
+									Style="{StaticResource Kv.ReadOnlyValue}"
+									Text="{Binding SelectedGrantSummary, Mode=OneWay}"
+									Visibility="{Binding HasSelectedGrant, Converter={StaticResource BoolToVisibility}}" />
+								<Button
+									Margin="0,8,0,0"
+									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.Grant.Revoke"
+									Click="OnRevokeGrant"
+									Content="회수"
+									IsEnabled="{Binding CanRevokeSelectedGrant}"
+									Style="{StaticResource Console.Button.Danger}"
+									ToolTip="고른 부여를 회수합니다 (확인 팝업)"
+									Visibility="{Binding HasSelectedGrant, Converter={StaticResource BoolToVisibility}}" />
+							</StackPanel>
+						</c:ConsoleSection>
+					</StackPanel>
+
+					<!--  ⑥ 세션 설정 — 이 화면은 입력 칸 한 묶음이라 상세 칸에는 할 일 한 줄만(도킹 폭에서 빈 칸으로 남지 않게). V-34 — "폼" 같은 개발 말을 쓰지 않는다.  -->
+					<TextBlock
+						AutomationProperties.AutomationId="Console.Accounts.Detail.NoDetail"
+						FontSize="12.5"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="왼쪽 칸에서 값을 바꾼 뒤 아래 [저장]을 누르세요."
+						TextWrapping="Wrap"
+						Visibility="{Binding IsSessionSetupRail, Converter={StaticResource BoolToVisibility}}" />
+
+					<!--  ⑤ 감사 로그 상세 — 읽기 전용. 시각 · 행위자 · 대상 · 결과 + 변경 전후 표(A-31, 목업 L1184)  -->
+					<StackPanel Visibility="{Binding IsAuditRail, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock
+							AutomationProperties.AutomationId="Console.Accounts.Detail.NoAudit"
+							FontSize="12.5"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="목록에서 기록을 고르세요."
+							TextWrapping="Wrap">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding SelectedAuditLog}" Value="{x:Null}">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+						<StackPanel>
+							<StackPanel.Style>
+								<Style TargetType="StackPanel">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding SelectedAuditLog}" Value="{x:Null}">
+											<Setter Property="Visibility" Value="Collapsed" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</StackPanel.Style>
+							<c:ConsoleSection AxisName="audit-logs" Header="기록">
+								<StackPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="시각" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_time"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding AuditTimeText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="동작" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_action"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding AuditActionText, Mode=OneWay}"
+											ToolTip="{Binding AuditActionToolTip}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="결과" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_status"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding AuditStatusText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="대상" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_resource"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding AuditResourceText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="행위자" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_actor"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding AuditActorText, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="IP" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_ip"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedAuditLog.IpAddress, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="설명" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_description"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding SelectedAuditLog.Description, Mode=OneWay}" />
+									</DockPanel>
+									<DockPanel Margin="0,2" Visibility="{Binding HasAuditError, Converter={StaticResource BoolToVisibility}}">
+										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="실패 사유" />
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.audit_error"
+											Style="{StaticResource Kv.ReadOnlyValue}"
+											Text="{Binding AuditErrorText, Mode=OneWay}" />
+									</DockPanel>
+								</StackPanel>
+							</c:ConsoleSection>
+
+							<!--  변경 전후 — 항목 / 전 / 후. 값이 바뀐 칸만  -->
+							<c:ConsoleSection Header="변경 전후">
+								<StackPanel>
+									<TextBlock
+										FontSize="12.5"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Text="{Binding AuditNoChangesText}"
+										TextWrapping="Wrap">
+										<TextBlock.Style>
+											<Style TargetType="TextBlock">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding HasAuditChanges}" Value="True">
+														<Setter Property="Visibility" Value="Collapsed" />
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</TextBlock.Style>
+									</TextBlock>
+									<Grid Visibility="{Binding HasAuditChanges, Converter={StaticResource BoolToVisibility}}">
+										<Grid.RowDefinitions>
+											<RowDefinition Height="Auto" />
+											<RowDefinition Height="Auto" />
+										</Grid.RowDefinitions>
+										<Border
+											Padding="0,0,0,4"
+											BorderBrush="{DynamicResource DividerBrush}"
+											BorderThickness="0,0,0,1">
+											<Grid>
+												<Grid.ColumnDefinitions>
+													<ColumnDefinition Width="1*" />
+													<ColumnDefinition Width="1*" />
+													<ColumnDefinition Width="1*" />
+												</Grid.ColumnDefinitions>
+												<TextBlock FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Text="항목" />
+												<TextBlock Grid.Column="1" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Text="전" />
+												<TextBlock Grid.Column="2" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Text="후" />
+											</Grid>
+										</Border>
+										<ItemsControl
+											Grid.Row="1"
+											AutomationProperties.AutomationId="Console.Accounts.Audit.Changes"
+											Focusable="False"
+											ItemsSource="{Binding AuditChanges}">
+											<ItemsControl.ItemTemplate>
+												<DataTemplate>
+													<Grid Margin="0,3" ToolTip="{Binding RawPath}">
+														<Grid.ColumnDefinitions>
+															<ColumnDefinition Width="1*" />
+															<ColumnDefinition Width="1*" />
+															<ColumnDefinition Width="1*" />
+														</Grid.ColumnDefinitions>
+														<TextBlock
+															Margin="0,0,6,0"
+															FontSize="12"
+															Foreground="{DynamicResource TextSecondaryBrush}"
+															Text="{Binding Field}"
+															TextWrapping="Wrap" />
+														<TextBlock
+															Grid.Column="1"
+															Margin="0,0,6,0"
+															FontSize="12"
+															Foreground="{DynamicResource TextMutedBrush}"
+															Text="{Binding Before}"
+															TextWrapping="Wrap" />
+														<TextBlock
+															Grid.Column="2"
+															FontSize="12"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Text="{Binding After}"
+															TextWrapping="Wrap" />
+													</Grid>
+												</DataTemplate>
+											</ItemsControl.ItemTemplate>
+										</ItemsControl>
+									</Grid>
+								</StackPanel>
+							</c:ConsoleSection>
+						</StackPanel>
+					</StackPanel>
+				</Grid>
+			</c:ConsoleDetailHost>
+		</c:ConsoleShell.Detail>
+	</c:ConsoleShell>
+</UserControl>

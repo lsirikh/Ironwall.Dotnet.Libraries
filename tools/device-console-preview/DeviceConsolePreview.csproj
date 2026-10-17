@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Device console preview (device-console-redesign TEST-02): shows the real DeviceDashboardView + view model on fake data,
+    with no host app and no server. Run: dotnet run  |  snapshots: dotnet run (two dashes)snapshot <folder>
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>DeviceConsolePreview</RootNamespace>
+    <AssemblyName>DeviceConsolePreview</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Devices.Ui\Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+  </ItemGroup>
+
+  <!--  D-28: shared host-merge-list dictionaries, linked (not copied) from tools/shared — see that folder's XAML comments.  -->
+  <ItemGroup>
+    <Page Include="..\shared\HostResources.Pre.xaml" Link="HostResources.Pre.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="..\shared\HostResources.Post.xaml" Link="HostResources.Post.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+
+  <!--  2026-09-26: preview windows render off-screen (never visible) - see tools/shared/OffscreenStage.cs.  -->
+  <ItemGroup>
+    <Compile Include="..\shared\OffscreenStage.cs" Link="OffscreenStage.cs" />
+    <Compile Include="..\shared\ClipAudit.cs" Link="ClipAudit.cs" />
+  </ItemGroup>
+
+</Project>

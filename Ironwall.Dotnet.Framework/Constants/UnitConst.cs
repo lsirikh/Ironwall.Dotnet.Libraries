@@ -21,6 +21,8 @@ public static class UnitConst
     public const string SPEAKER = "방송장비";
     public const string RADAR = "레이다";
     public const string OPTICAL_CABLE = "광망센서";
+    public const string ENCLOSURE = "함체";
+    public const string LAMP = "경광등";
 }
 
 public static class UnitConst_en
@@ -38,6 +40,8 @@ public static class UnitConst_en
     public const string SPEAKER = "Broadcasting equipment";
     public const string RADAR = "Radar";
     public const string OPTICAL_CABLE = "Optical sensor";
+    public const string ENCLOSURE = "ENCLOSURE";
+    public const string LAMP = "LAMP";
 }
 
 public static class UnitConst_kr
@@ -55,4 +59,6 @@ public static class UnitConst_kr
     public const string SPEAKER = "방송장비";
     public const string RADAR = "레이다";
     public const string OPTICAL_CABLE = "광망센서";
+    public const string ENCLOSURE = "함체";
+    public const string LAMP = "경광등";
 }

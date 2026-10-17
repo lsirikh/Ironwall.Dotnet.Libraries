@@ -1,0 +1,41 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringTextPromptView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--  글 한 줄 묻기 — T4 · S 400. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.Wiring.TextPrompt"
+		PrimaryAutomationId="Devices.Wiring.TextPrompt.Accept"
+		PrimaryInvoked="OnAccept"
+		PrimaryText="확인"
+		SecondaryAutomationId="Devices.Wiring.TextPrompt.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Small"
+		Title="{Binding Title}">
+		<StackPanel>
+			<TextBlock
+				Margin="0,0,0,6"
+				FontSize="12.5"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding Label}"
+				TextWrapping="Wrap" />
+			<TextBox
+				Height="32"
+				Padding="6,0"
+				VerticalContentAlignment="Center"
+				AutomationProperties.AutomationId="Devices.Wiring.TextPrompt.Text"
+				Background="{DynamicResource SurfaceSunkenBrush}"
+				BorderBrush="{DynamicResource BorderBrush}"
+				CaretBrush="{DynamicResource TextPrimaryBrush}"
+				FontSize="13"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				Loaded="OnTextLoaded"
+				Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+		</StackPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

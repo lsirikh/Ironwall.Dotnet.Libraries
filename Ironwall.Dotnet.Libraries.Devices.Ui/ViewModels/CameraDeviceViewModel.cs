@@ -36,56 +36,51 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             {
                 (_model as ICameraDeviceModel)!.IpAddress = value;
                 NotifyOfPropertyChange(() => IpAddress);
+                NotifyOfPropertyChange(() => AddressDisplay);
             }
         }
 
-        public int Port
+        public int IpPort
         {
-            get => (_model as ICameraDeviceModel)!.Port;
+            get => (_model as ICameraDeviceModel)!.IpPort;
             set
             {
-                (_model as ICameraDeviceModel)!.Port = value;
-                NotifyOfPropertyChange(() => Port);
+                (_model as ICameraDeviceModel)!.IpPort = value;
+                NotifyOfPropertyChange(() => IpPort);
+                NotifyOfPropertyChange(() => AddressDisplay);
             }
         }
 
-        public string? Username
+        /// <summary>
+        /// 콘솔 목록 "IP:포트" 한 칸(device-console-v8 N02-B) — IP 가 비면 "—", 포트가 0(미설정)이면
+        /// IP만 보인다. 제어기·경광등의 같은 이름 속성과 계약이 같다(<see cref="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Lists.DeviceColumnCatalog"/> 공용 바인딩 경로).
+        /// </summary>
+        public string AddressDisplay
         {
-            get => (_model as ICameraDeviceModel)!.Username;
-            set
+            get
             {
-                (_model as ICameraDeviceModel)!.Username = value;
-                NotifyOfPropertyChange(() => Username);
+                if (string.IsNullOrWhiteSpace(IpAddress)) return "—";
+                return IpPort == 0 ? IpAddress : $"{IpAddress}:{IpPort}";
             }
         }
 
-        public string? Password
+        public string? UserName
         {
-            get => (_model as ICameraDeviceModel)!.Password;
+            get => (_model as ICameraDeviceModel)!.UserName;
             set
             {
-                (_model as ICameraDeviceModel)!.Password = value;
-                NotifyOfPropertyChange(() => Password);
+                (_model as ICameraDeviceModel)!.UserName = value;
+                NotifyOfPropertyChange(() => UserName);
             }
         }
 
-        public string? RtspUri
+        public string? UserPassword
         {
-            get => (_model as ICameraDeviceModel)!.RtspUri;
+            get => (_model as ICameraDeviceModel)!.UserPassword;
             set
             {
-                (_model as ICameraDeviceModel)!.RtspUri = value;
-                NotifyOfPropertyChange(() => RtspUri);
-            }
-        }
-
-        public int RtspPort
-        {
-            get => (_model as ICameraDeviceModel)!.RtspPort;
-            set
-            {
-                (_model as ICameraDeviceModel)!.RtspPort = value;
-                NotifyOfPropertyChange(() => RtspPort);
+                (_model as ICameraDeviceModel)!.UserPassword = value;
+                NotifyOfPropertyChange(() => UserPassword);
             }
         }
 
@@ -109,53 +104,43 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             }
         }
 
-        public ICameraInfoModel? Identification
+        public ICameraInfoModel? HardwareSpec
         {
-            get => (_model as ICameraDeviceModel)!.Identification;
+            get => (_model as ICameraDeviceModel)!.HardwareSpec;
             set
             {
-                (_model as ICameraDeviceModel)!.Identification = value;
-                NotifyOfPropertyChange(() => Identification);
+                (_model as ICameraDeviceModel)!.HardwareSpec = value;
+                NotifyOfPropertyChange(() => HardwareSpec);
             }
         }
 
-        public ICameraPtzCapabilityModel? PtzCapability
+        public ICameraUrlsModel? Urls
         {
-            get => (_model as ICameraDeviceModel)!.PtzCapability;
+            get => (_model as ICameraDeviceModel)!.Urls;
             set
             {
-                (_model as ICameraDeviceModel)!.PtzCapability = value;
-                NotifyOfPropertyChange(() => PtzCapability);
+                (_model as ICameraDeviceModel)!.Urls = value;
+                NotifyOfPropertyChange(() => Urls);
             }
         }
 
-        public ICameraPositionModel? Position
+        public ICameraSettingModel? Setting
         {
-            get => (_model as ICameraDeviceModel)!.Position;
+            get => (_model as ICameraDeviceModel)!.Setting;
             set
             {
-                (_model as ICameraDeviceModel)!.Position = value;
-                NotifyOfPropertyChange(() => Position);
+                (_model as ICameraDeviceModel)!.Setting = value;
+                NotifyOfPropertyChange(() => Setting);
             }
         }
 
-        public List<ICameraPresetModel>? Presets
+        public bool? IsRecord
         {
-            get => (_model as ICameraDeviceModel)!.Presets;
+            get => (_model as ICameraDeviceModel)!.IsRecord;
             set
             {
-                (_model as ICameraDeviceModel)!.Presets = value;
-                NotifyOfPropertyChange(() => Presets);
-            }
-        }
-
-        public ICameraOpticsModel? Optics
-        {
-            get => (_model as ICameraDeviceModel)!.Optics;
-            set
-            {
-                (_model as ICameraDeviceModel)!.Optics = value;
-                NotifyOfPropertyChange(() => Optics);
+                (_model as ICameraDeviceModel)!.IsRecord = value;
+                NotifyOfPropertyChange(() => IsRecord);
             }
         }
         #endregion

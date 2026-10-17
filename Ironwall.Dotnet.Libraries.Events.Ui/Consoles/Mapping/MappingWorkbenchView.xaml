@@ -1,0 +1,816 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	Background="{DynamicResource BgBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	SnapsToDevicePixels="True"
+	TextOptions.TextFormattingMode="Display"
+	TextOptions.TextRenderingMode="ClearType"
+	UseLayoutRounding="True">
+	<!--
+		이벤트 맵핑 워크벤치 — 정본 event-mapping-unit-console-wireframe.html §2-1(컨트롤 트리) ·
+		event-mapping-unit-console-storyboard.html 화면 A~F.
+		레일 184 / 매핑 목록 300 / 액션 보드 * / 장비 팔레트 340 — 오른쪽 칸이 상세가 아니라 팔레트인 유일한 창.
+		드롭은 서버를 부르지 않는다. 투입·해제·정렬은 Draft 이고 [적용] 한 번이 전부다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<local:MappingStateTextConverter x:Key="StateText" />
+		<local:MappingIconKindConverter x:Key="IconKind" />
+		<local:MappingCategoryTextConverter x:Key="CategoryText" />
+
+		<!--
+			U-14 — 옛 로컬 Mapping.Button(높이 30 · Primary 윤곽 · Primary 글자)과 Mapping.Button.Primary(쓰는 곳 0)는
+			커널 Console.Button* 으로 옮기고 지웠다. 같은 창의 툴바 · 상세 막대는 이미 커널(32)이라 줄마다 높이와 윤곽색이 달랐다.
+		-->
+		<!--
+			행 컨테이너 — 계측할 자리는 여기뿐이다(ListBoxItem 만 UIA peer 를 갖는다).
+			⚠ Console.ReorderList 는 컨테이너 스타일을 <b>인라인</b>으로 들고 있어, 그냥 덮으면
+			Stretch · 선택 3px 바 · 포커스 링이 함께 사라진다 — 그래서 그 템플릿을 그대로 옮겨 온다.
+		-->
+		<ControlTemplate x:Key="Mapping.RowTemplate" TargetType="ListBoxItem">
+			<Grid>
+				<Border
+					x:Name="Bd"
+					Background="Transparent"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,0,1" />
+				<Rectangle
+					x:Name="Bar"
+					Width="3"
+					HorizontalAlignment="Left"
+					Fill="{DynamicResource PrimaryBrush}"
+					Visibility="Collapsed" />
+				<Border
+					x:Name="Focus"
+					BorderBrush="{DynamicResource FocusRingBrush}"
+					BorderThickness="2"
+					Visibility="Collapsed" />
+				<ContentPresenter Margin="6,0" />
+			</Grid>
+			<ControlTemplate.Triggers>
+				<Trigger Property="IsMouseOver" Value="True">
+					<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+				</Trigger>
+				<Trigger Property="IsSelected" Value="True">
+					<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+					<Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+				</Trigger>
+				<Trigger Property="IsKeyboardFocused" Value="True">
+					<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+				</Trigger>
+			</ControlTemplate.Triggers>
+		</ControlTemplate>
+
+		<Style x:Key="Mapping.MappingRow" TargetType="ListBoxItem">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template" Value="{StaticResource Mapping.RowTemplate}" />
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Mapping.Row.{0}}" />
+		</Style>
+
+		<Style x:Key="Mapping.BoardRow" TargetType="ListBoxItem">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template" Value="{StaticResource Mapping.RowTemplate}" />
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Key, StringFormat=Integrations.Board.Row.{0}}" />
+		</Style>
+
+		<Style x:Key="Mapping.PaletteRow" TargetType="ListBoxItem">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template" Value="{StaticResource Mapping.RowTemplate}" />
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Palette.Item.{0}}" />
+		</Style>
+
+		<!--  팔레트 카드 — 이미 들어간 장비는 흐리게 + "등록됨"  -->
+		<DataTemplate x:Key="PaletteCard" DataType="{x:Type local:MappingPaletteItemViewModel}">
+			<DockPanel Height="38" LastChildFill="True">
+				<drag:DragHandle
+					Width="12"
+					AutomationProperties.AutomationId="{Binding Id, StringFormat=Integrations.Palette.Handle.{0}}"
+					DockPanel.Dock="Left"
+					ToolTip="끌어서 액션 보드에 넣기" />
+				<!--  이미 올라간 장비는 알약 + 체크로 — 흐림은 [＋ 추가] 를 막는 유일한 신호를 지워 버린다  -->
+				<Border
+					Margin="8,0,0,0"
+					Padding="7,1"
+					VerticalAlignment="Center"
+					Background="{DynamicResource SurfaceSunkenBrush}"
+					BorderBrush="{DynamicResource BorderBrush}"
+					BorderThickness="1"
+					CornerRadius="4"
+					DockPanel.Dock="Right"
+					Visibility="{Binding HasStatus, Converter={StaticResource BoolToVis}}">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Margin="0,0,3,0"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Kind="{Binding StatusIcon, Converter={StaticResource IconKind}}" />
+						<TextBlock
+							FontSize="10.5"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding StatusText}" />
+					</StackPanel>
+				</Border>
+				<StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+					<TextBlock
+						FontSize="12"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="{Binding Name}"
+						TextTrimming="CharacterEllipsis"
+						ToolTip="{Binding Name}" />
+					<TextBlock
+						FontSize="10.5"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding Subtitle}"
+						TextTrimming="CharacterEllipsis" />
+				</StackPanel>
+			</DockPanel>
+		</DataTemplate>
+
+		<!--  보드 행 — 핸들 12 · 이름 * · 설정 칩 N · 상태  -->
+		<DataTemplate x:Key="BoardRow" DataType="{x:Type local:MappingRowViewModel}">
+			<Border
+				MinHeight="38"
+				Padding="4,3"
+				Background="Transparent"
+				CornerRadius="5">
+				<Border.Style>
+					<!--  Draft 는 앰버 파선 {6,4} — 기존 {4,3}(그룹 선택)·{5,3}(러버밴드)와 겹치지 않는다  -->
+					<Style TargetType="Border">
+						<Setter Property="BorderBrush" Value="Transparent" />
+						<Setter Property="BorderThickness" Value="1" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsDraft}" Value="True">
+								<Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Border.Style>
+				<DockPanel LastChildFill="True">
+					<drag:DragHandle
+						Width="12"
+						AutomationProperties.AutomationId="{Binding Key, StringFormat=Integrations.Board.Handle.{0}}"
+						DockPanel.Dock="Left"
+						ToolTip="끌어서 순서 바꾸기 · Alt+↑↓" />
+
+					<!--  상태 배지 — 색이 아니라 글자와 형태로 구분한다  -->
+					<Border
+						Margin="6,0,0,0"
+						Padding="7,1"
+						VerticalAlignment="Center"
+						Background="{DynamicResource SurfaceSunkenBrush}"
+						CornerRadius="4"
+						DockPanel.Dock="Right"
+						Visibility="{Binding IsDraft, Converter={StaticResource BoolToVis}}">
+						<TextBlock
+							FontSize="10.5"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding Row.State, Converter={StaticResource StateText}}" />
+					</Border>
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Margin="6,0,0,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Right"
+						Foreground="{DynamicResource StatusWarningBrush}"
+						Kind="AlertCircleOutline"
+						ToolTip="{Binding FailureText}"
+						Visibility="{Binding HasFailure, Converter={StaticResource BoolToVis}}" />
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Margin="6,0,0,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Right"
+						Foreground="{DynamicResource StatusCriticalBrush}"
+						Kind="LinkOff"
+						ToolTip="장비가 끊긴 행입니다. 다시 지정하거나 해제하세요."
+						Visibility="{Binding IsOrphan, Converter={StaticResource BoolToVis}}" />
+
+					<StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+						<TextBlock
+							FontSize="12"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding DeviceName}"
+							TextTrimming="CharacterEllipsis"
+							ToolTip="{Binding DeviceName}">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsRemoved}" Value="True">
+											<Setter Property="TextDecorations" Value="Strikethrough" />
+											<Setter Property="Opacity" Value="0.55" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+						<ItemsControl Margin="0,2,0,0" ItemsSource="{Binding Chips}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<WrapPanel />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<Border
+										MinWidth="56"
+										Margin="0,0,3,0"
+										Padding="7,1"
+										Background="{DynamicResource SurfaceSunkenBrush}"
+										CornerRadius="4">
+										<TextBlock
+											FontSize="10.5"
+											Foreground="{DynamicResource TextSecondaryBrush}"
+											Text="{Binding}"
+											TextTrimming="CharacterEllipsis" />
+									</Border>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</DockPanel>
+			</Border>
+		</DataTemplate>
+	</UserControl.Resources>
+
+	<c:ConsoleShell
+		AutomationProperties.AutomationId="Integrations.Mapping.Panel"
+		ConsoleKey="Mapping"
+		HelpKey="Events.Mapping"
+		IsDetailRequested="True"
+		Subtitle="{Binding MappingTitle}"
+		Title="이벤트 맵핑">
+
+		<!--  ── 레일 : 종류 축 3개 ──  -->
+		<c:ConsoleShell.Rail>
+			<c:ConsoleRail
+				AutomationProperties.AutomationId="Console.Mapping.Rail"
+				ConsoleKey="Mapping"
+				IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				IsEnabled="{Binding IsInputEnabled}"
+				ItemsSource="{Binding RailEntries}"
+				SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
+				<c:ConsoleRail.Resources>
+					<DataTemplate DataType="{x:Type local:MappingConsoleIcon}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
+					</DataTemplate>
+				</c:ConsoleRail.Resources>
+			</c:ConsoleRail>
+		</c:ConsoleShell.Rail>
+
+		<!--  ── 툴바 ──  -->
+		<c:ConsoleShell.Toolbar>
+			<c:ConsoleToolbar
+				AddClick="OnAdd"
+				AddDisabledReason="이벤트 맵핑을 편집할 권한이 없습니다."
+				AddText="맵핑 등록"
+				CanAdd="{Binding CanEdit}"
+				CanDelete="False"
+				CanRefresh="{Binding IsInputEnabled}"
+				ConsoleKey="Mapping"
+				Loaded="OnToolbarLoaded"
+				RefreshClick="OnReload"
+				SearchPlaceholder="맵핑 이름 검색"
+				SearchText="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+				ShowSearch="True" />
+		</c:ConsoleShell.Toolbar>
+
+		<!--  ── 본문 : 매핑 목록 300 + 액션 보드 * ──  -->
+		<c:ConsoleShell.List>
+			<Grid IsEnabled="{Binding IsInputEnabled}">
+				<Grid.ColumnDefinitions>
+					<!--
+						U-14 — 목록은 300 까지만 쓰고(도킹 1300 에서 그대로 300), 서랍이 겹쳐 목록 칸이 좁아지면 2:3 으로 같이 준다.
+						옛 판(300 고정 + 보드 MinWidth 380 = 680)은 서랍 1140 에서 남는 596 에 안 들어가 보드 오른쪽 · [맵핑 저장] ·
+						[◀ 해제] 가 팔레트 서랍 밑으로 잘려 들어갔다(mapping-narrow 실측).
+					-->
+					<ColumnDefinition Width="2*" MinWidth="200" MaxWidth="300" />
+					<ColumnDefinition Width="3*" />
+				</Grid.ColumnDefinitions>
+
+				<!--  ① 매핑 목록  -->
+				<Border
+					Grid.Column="0"
+					Background="{DynamicResource SurfaceBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,1,0">
+					<Grid>
+					<ListBox
+						Padding="8"
+						Background="Transparent"
+						AutomationProperties.AutomationId="Integrations.Mapping.List"
+						ItemContainerStyle="{StaticResource Mapping.MappingRow}"
+						ItemsSource="{Binding Mappings}"
+						SelectedItem="{Binding SelectedMapping, Mode=TwoWay}"
+						Style="{StaticResource Console.ReorderList}">
+						<ListBox.ItemTemplate>
+							<DataTemplate DataType="{x:Type local:MappingListItemViewModel}">
+								<DockPanel Height="38" LastChildFill="True">
+									<Border
+										Margin="8,0,0,0"
+										Padding="7,1"
+										VerticalAlignment="Center"
+										Background="{DynamicResource SurfaceSunkenBrush}"
+										CornerRadius="4"
+										DockPanel.Dock="Right">
+										<TextBlock
+											FontSize="10.5"
+											Foreground="{DynamicResource TextSecondaryBrush}"
+											Text="{Binding CountText}"
+											ToolTip="카메라 · 스피커 · 경광등" />
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock
+											FontSize="12"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											Text="{Binding Name}"
+											TextTrimming="CharacterEllipsis"
+											ToolTip="{Binding Name}" />
+										<TextBlock
+											FontSize="10.5"
+											Foreground="{DynamicResource TextSecondaryBrush}"
+											Text="{Binding CategoryText}"
+											TextTrimming="CharacterEllipsis" />
+									</StackPanel>
+								</DockPanel>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+					<!--  빈 목록 — "없음" · "못 불러옴" · "검색에 안 걸림" 을 가른다(감사 E-10 #5)  -->
+					<c:ConsoleEmptyState
+						Margin="8"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Mapping.EmptyState"
+						Hint="{Binding MappingEmptyHint}"
+						Title="{Binding MappingEmptyTitle}"
+						Visibility="{Binding IsMappingListEmpty, Converter={StaticResource BoolToVis}}" />
+					</Grid>
+				</Border>
+
+				<!--  ② 액션 보드  -->
+				<Grid Grid.Column="1" Background="{DynamicResource SurfaceBrush}">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="*" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+
+					<!--  맵핑 속성 — 본체는 호출 1회라 Draft 없이 바로 저장한다(봉투 규약)  -->
+					<c:ConsoleSection
+						Grid.Row="0"
+						Margin="12,12,12,0"
+						AxisName="event-mappings"
+						Header="맵핑">
+						<StackPanel IsEnabled="{Binding CanEdit}">
+							<c:ConsoleField ApiName="name_event" Header="이름">
+								<TextBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Mapping.NameBox"
+									MaxLength="100"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="device_group_id" Header="장비그룹">
+								<ComboBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									AutomationProperties.AutomationId="Integrations.Mapping.GroupCombo"
+									DisplayMemberPath="Name"
+									ItemsSource="{Binding Groups}"
+									SelectedValue="{Binding EditGroupId}"
+									SelectedValuePath="Id"
+									Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+							</c:ConsoleField>
+							<c:ConsoleField Header="카테고리" ToolTip="이 맵핑이 받을 이벤트 종류">
+								<ComboBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									AutomationProperties.AutomationId="Integrations.Mapping.CategoryCombo"
+									ItemsSource="{Binding Categories}"
+									SelectedItem="{Binding EditCategory}"
+									Style="{StaticResource MaterialDesignOutlinedComboBox}">
+									<ComboBox.ItemTemplate>
+										<DataTemplate>
+											<TextBlock Text="{Binding Converter={StaticResource CategoryText}}" />
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="description" Header="설명">
+								<TextBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Mapping.DescriptionBox"
+									MaxLength="500"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="status" Header="운용">
+								<ToggleButton
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="Integrations.Mapping.StatusToggle"
+									IsChecked="{Binding EditStatus}"
+									Style="{StaticResource Console.ToggleSwitch}" />
+							</c:ConsoleField>
+							<!--  저장 줄 — 같은 높이 30 · 같은 간격 8 · 왼쪽이 취소, 오른쪽이 저장  -->
+							<StackPanel
+								Margin="0,8,0,0"
+								HorizontalAlignment="Right"
+								Orientation="Horizontal">
+								<Button
+									Margin="0,0,8,0"
+									AutomationProperties.AutomationId="Integrations.Mapping.CancelCreateButton"
+									Click="OnCancelCreate"
+									Content="취소"
+									Style="{StaticResource Console.Button}"
+									Visibility="{Binding IsCreatingMapping, Converter={StaticResource BoolToVis}}" />
+								<Button
+									AutomationProperties.AutomationId="Integrations.Mapping.SaveButton"
+									Click="OnSaveMapping"
+									Content="{Binding SaveMappingText}"
+									IsEnabled="{Binding CanSaveMapping}"
+									Style="{StaticResource Console.Button.Primary}"
+									ToolTip="맵핑 정보를 저장합니다" />
+							</StackPanel>
+							<!--  TextBlock 은 UIA 트리에 안 나온다 — 평평한 읽기 전용 TextBox 로 계측 가능하게 둔다.  -->
+							<TextBox
+								Margin="0,4,0,0"
+								AutomationProperties.AutomationId="Integrations.Mapping.FormError"
+								Background="Transparent"
+								BorderThickness="0"
+								FontSize="11"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								IsReadOnly="True"
+								Text="{Binding MappingFormError, Mode=OneWay}"
+								TextWrapping="Wrap"
+								Visibility="{Binding HasFormError, Converter={StaticResource BoolToVis}}" />
+						</StackPanel>
+					</c:ConsoleSection>
+
+					<!--  보드 머리 : 탭 + 순서 버튼 + 해제  -->
+					<Grid
+						Grid.Row="1"
+						Height="40"
+						Margin="12,8,12,0">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							VerticalAlignment="Center"
+							FontSize="13"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding KindLabel, StringFormat={}{0} 연동}"
+							TextTrimming="CharacterEllipsis" />
+						<StackPanel
+							Grid.Column="1"
+							VerticalAlignment="Center"
+							IsEnabled="{Binding IsBoardEnabled}"
+							Orientation="Horizontal">
+							<Button
+								Margin="0,0,8,0"
+								AutomationProperties.AutomationId="Integrations.Board.MoveUp"
+								Click="OnMoveUp"
+								Content="▲ 위로"
+								IsEnabled="{Binding CanMoveUp}"
+								Style="{StaticResource Console.Button}"
+								ToolTip="위로 (Alt+↑)" />
+							<Button
+								Margin="0,0,8,0"
+								AutomationProperties.AutomationId="Integrations.Board.MoveDown"
+								Click="OnMoveDown"
+								Content="▼ 아래로"
+								IsEnabled="{Binding CanMoveDown}"
+								Style="{StaticResource Console.Button}"
+								ToolTip="아래로 (Alt+↓)" />
+							<Button
+								AutomationProperties.AutomationId="Integrations.Board.ReleaseButton"
+								Click="OnRelease"
+								Content="◀ 해제"
+								IsEnabled="{Binding CanReleaseSelected}"
+								Style="{StaticResource Console.Button}"
+								ToolTip="해제 (Delete)" />
+						</StackPanel>
+					</Grid>
+
+					<!--  경고 줄 — 서버가 검사하지 않는 것들  -->
+					<Border
+						Grid.Row="2"
+						Margin="12,8,12,0"
+						Padding="10,6"
+						Background="{DynamicResource TintWarningBrush}"
+						BorderBrush="{DynamicResource StatusWarningBrush}"
+						BorderThickness="1"
+						CornerRadius="5"
+						Visibility="{Binding HasWarning, Converter={StaticResource BoolToVis}}">
+						<DockPanel LastChildFill="True">
+							<md:PackIcon
+								Width="16"
+								Height="16"
+								Margin="0,0,6,0"
+								VerticalAlignment="Center"
+								DockPanel.Dock="Left"
+								Foreground="{DynamicResource StatusWarningBrush}"
+								Kind="AlertOutline" />
+							<TextBlock
+								VerticalAlignment="Center"
+								FontSize="11.5"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								LineHeight="17"
+								Text="{Binding WarningText}"
+								TextWrapping="Wrap" />
+						</DockPanel>
+					</Border>
+
+					<!--  보드 행 — 드롭 타깃 + 드래그 소스  -->
+					<Grid Grid.Row="3" Margin="12,8,12,12">
+						<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+						<Grid>
+							<ListBox
+								Padding="6"
+								Background="Transparent"
+								drag:DropZone.Handler="{Binding}"
+								drag:DropZone.IsReorder="True"
+								drag:DropZone.Key="{Binding BoardZoneKey}"
+								AutomationProperties.AutomationId="Integrations.Board.List"
+								ItemContainerStyle="{StaticResource Mapping.BoardRow}"
+								ItemTemplate="{StaticResource BoardRow}"
+								ItemsSource="{Binding BoardRows}"
+								PreviewKeyDown="OnBoardPreviewKeyDown"
+								SelectionChanged="OnBoardSelectionChanged"
+								SelectionMode="Extended"
+								Style="{StaticResource Console.ReorderList}">
+								<b:Interaction.Behaviors>
+									<drag:CaptureDragBehavior
+										DisplayMemberPath="Display"
+										Handler="{Binding}"
+										IsDragEnabled="{Binding IsDragEnabled}"
+										KeyboardFallback="Alt+↑↓ 로 순서 · Delete 로 해제 · [◀ 해제] 버튼" />
+									<drag:ReorderKeyboardBehavior Handler="{Binding}" />
+								</b:Interaction.Behaviors>
+							</ListBox>
+							<!--
+								빈 보드 안내 — 보드(드롭존) 위에 얹힌 글자라 히트를 막지 않는다. 막으면 가장 먼저 노리는 가운데(이 글자 위)에서
+								놓은 드롭이 드롭존을 못 찾아 말없이 사라진다(2026-09-29 실창 재현: hit=TextBlock · zone=없음).
+							-->
+							<TextBlock
+								Margin="18"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								IsHitTestVisible="False"
+								Text="아직 넣은 장비가 없습니다"
+								TextWrapping="Wrap">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Visibility" Value="Collapsed" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding BoardRows.Count}" Value="0">
+												<Setter Property="Visibility" Value="Visible" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</Grid>
+					</Grid>
+
+					<!--
+						카메라 연동 설정 — 카메라 행을 하나 고르면 뜬다. 값 변경은 Draft(행 '수정')이고 [적용] 한 번에 나간다.
+						프리셋 후보는 그 카메라 것만(서버가 다른 카메라 프리셋을 422 로 거절한다).
+					-->
+					<c:ConsoleSection
+						Grid.Row="4"
+						Margin="12,0,12,12"
+						AutomationProperties.AutomationId="Integrations.Board.CameraEditor"
+						AxisName="event-mapping-cameras"
+						Header="{Binding CameraEditorTitle}"
+						HelpKey="Events.Mapping.Camera"
+						IsEnabled="{Binding IsBoardEnabled}"
+						Visibility="{Binding HasCameraEditor, Converter={StaticResource BoolToVis}}">
+						<StackPanel>
+						<StackPanel IsEnabled="{Binding CanEditCameraRow}">
+							<c:ConsoleField ApiName="target_preset_id" Header="타깃 프리셋">
+								<ComboBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									AutomationProperties.AutomationId="Integrations.Board.TargetPresetCombo"
+									DisplayMemberPath="Display"
+									ItemsSource="{Binding PresetOptions}"
+									SelectedItem="{Binding SelectedTargetPreset, Mode=TwoWay}"
+									Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="home_preset_id" Header="홈 프리셋">
+								<ComboBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									AutomationProperties.AutomationId="Integrations.Board.HomePresetCombo"
+									DisplayMemberPath="Display"
+									ItemsSource="{Binding PresetOptions}"
+									SelectedItem="{Binding SelectedHomePreset, Mode=TwoWay}"
+									Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="delay_time" Header="지연(초)">
+								<TextBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Board.DelayBox"
+									MaxLength="5"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditDelayTime, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+						</StackPanel>
+						<!--  프리셋 관리 — 해제 표시 행이어도 프리셋 자체는 볼 수 있게 위 칸의 IsEnabled 밖에 둔다  -->
+						<Button
+							Margin="0,6,0,0"
+							HorizontalAlignment="Right"
+							AutomationProperties.AutomationId="Integrations.Board.ManagePresets"
+							Click="OnManagePresets"
+							Content="프리셋 관리…"
+							IsEnabled="{Binding CanManagePresets}"
+							Style="{StaticResource Console.Button}" />
+						<TextBlock
+							Margin="0,4,0,0"
+							FontSize="11"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding PresetStatusText}"
+							TextWrapping="Wrap"
+							Visibility="{Binding HasPresetStatus, Converter={StaticResource BoolToVis}}" />
+						</StackPanel>
+					</c:ConsoleSection>
+				</Grid>
+			</Grid>
+		</c:ConsoleShell.List>
+
+		<!--  ── ③ 장비 팔레트 (오른쪽 칸) ──  -->
+		<c:ConsoleShell.Detail>
+			<c:ConsoleDetailHost
+				ApplyClick="OnApply"
+				ApplyText="적용"
+				Banner="{Binding BannerText}"
+				CanApply="{Binding CanApply}"
+				CanRevert="{Binding CanRevert}"
+				ConsoleKey="Mapping"
+				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
+				FooterText="{Binding DraftShortText}"
+				IsDirty="{Binding IsDirty}"
+				IsReadOnly="{Binding IsReadOnly}"
+				Kind="장비 팔레트"
+				RevertClick="OnRevert"
+				RevertText="되돌리기"
+				ShowButtons="{Binding CanEdit}"
+				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				Title="{Binding KindLabel}">
+				<Grid IsEnabled="{Binding IsInputEnabled}">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="*" />
+					</Grid.RowDefinitions>
+
+					<TextBox
+						Grid.Row="0"
+						Height="32"
+						Margin="0,0,0,8"
+						Padding="8,0"
+						VerticalContentAlignment="Center"
+						md:HintAssist.Hint="장비 검색"
+						md:HintAssist.IsFloating="False"
+						AutomationProperties.AutomationId="Integrations.Palette.Search"
+						Style="{StaticResource MaterialDesignOutlinedTextBox}"
+						Text="{Binding PaletteSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
+
+					<Button
+						Grid.Row="1"
+						Margin="0,0,0,8"
+						HorizontalAlignment="Stretch"
+						AutomationProperties.AutomationId="Integrations.Palette.AddButton"
+						Click="OnAddSelected"
+						Content="＋ 추가 ▶"
+						IsEnabled="{Binding CanAddSelected}"
+						Style="{StaticResource Console.Button}"
+						ToolTip="추가 (Enter)" />
+
+					<!--  팔레트 = 해제 드롭존(보드 행을 여기로 끌면 해제)  -->
+					<drag:DropZoneChrome
+						Grid.Row="2"
+						drag:DropZone.Handler="{Binding}"
+						drag:DropZone.Key="{Binding PaletteZoneKey}"
+						CornerRadius="6">
+						<Grid>
+						<ListBox
+							Padding="6"
+							Background="{DynamicResource SurfaceSunkenBrush}"
+							AutomationProperties.AutomationId="Integrations.Palette.List"
+							ItemContainerStyle="{StaticResource Mapping.PaletteRow}"
+							ItemTemplate="{StaticResource PaletteCard}"
+							ItemsSource="{Binding PaletteItems}"
+							PreviewKeyDown="OnPalettePreviewKeyDown"
+							SelectionChanged="OnPaletteSelectionChanged"
+							SelectionMode="Extended"
+							Style="{StaticResource Console.ReorderList}">
+							<b:Interaction.Behaviors>
+								<drag:CaptureDragBehavior
+									DisplayMemberPath="Display"
+									Handler="{Binding}"
+									IsDragEnabled="{Binding IsDragEnabled}"
+									KeyboardFallback="Enter 또는 [＋ 추가 ▶] 버튼" />
+							</b:Interaction.Behaviors>
+						</ListBox>
+						<!--  빈 팔레트 — 드롭존(해제 방향)은 그대로 살아 있어야 하므로 글자만 얹고 히트를 막지 않는다  -->
+						<c:ConsoleEmptyState
+							Margin="8"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Integrations.Palette.EmptyState"
+							Hint="{Binding PaletteEmptyHint}"
+							IsHitTestVisible="False"
+							Title="{Binding PaletteEmptyTitle}"
+							Visibility="{Binding IsPaletteEmpty, Converter={StaticResource BoolToVis}}" />
+						</Grid>
+					</drag:DropZoneChrome>
+				</Grid>
+			</c:ConsoleDetailHost>
+		</c:ConsoleShell.Detail>
+
+		<!--  ── 상태줄 ──  -->
+		<c:ConsoleShell.StatusBar>
+			<Grid Margin="12,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="Auto" />
+				</Grid.ColumnDefinitions>
+				<TextBlock
+					VerticalAlignment="Center"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding SelectionText}" />
+				<TextBlock
+					Grid.Column="1"
+					Margin="12,0,0,0"
+					VerticalAlignment="Center"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding DraftText}" />
+				<TextBox
+					Grid.Column="2"
+					Margin="12,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Integrations.Mapping.Status"
+					Background="Transparent"
+					BorderThickness="0"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					IsReadOnly="True"
+					Text="{Binding StatusText, Mode=OneWay}"
+					TextWrapping="NoWrap" />
+				<TextBlock
+					Grid.Column="3"
+					VerticalAlignment="Center"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding PermissionText}" />
+			</Grid>
+		</c:ConsoleShell.StatusBar>
+	</c:ConsoleShell>
+</UserControl>

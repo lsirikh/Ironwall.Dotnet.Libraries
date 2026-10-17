@@ -1,0 +1,77 @@
+using Autofac;
+using Autofac.Features.Metadata;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Modules;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Gateways;
+using Ironwall.Dotnet.Libraries.Api.Models;
+using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Xunit;
+
+namespace Ironwall.Dotnet.Libraries.Accounts.Api.Tests;
+
+/// <summary>FR-9 AccountApiModule DI 스모크 — 전 부품 해석 + 순환참조 없음 + SingleInstance 공유(V-07).</summary>
+public class AccountApiModuleResolutionTests
+{
+    private static IContainer Build()
+    {
+        var builder = new ContainerBuilder();
+        var setup = new ApiSetupModel { Url = "https://example.local/", Timeout = 10 };
+        builder.RegisterModule(new AccountApiModule(null, setup, "Account"));
+        return builder.Build();
+    }
+
+    [Fact]
+    public void should_resolve_gateway_and_services_without_cycle()
+    {
+        using var c = Build();
+
+        Assert.NotNull(c.Resolve<IAuthGateway>());
+        Assert.NotNull(c.Resolve<IUserDirectoryGateway>());
+        Assert.NotNull(c.Resolve<IProfileGateway>());
+        Assert.NotNull(c.Resolve<IAccountApiService>());
+        Assert.NotNull(c.Resolve<ITokenStorageService>());
+        Assert.NotNull(c.Resolve<IPermissionService>());
+    }
+
+    [Fact]
+    public void should_share_single_gateway_instance_across_three_interfaces()
+    {
+        using var c = Build();
+
+        var auth = c.Resolve<IAuthGateway>();
+        Assert.Same(auth, c.Resolve<IUserDirectoryGateway>());
+        Assert.Same(auth, c.Resolve<IProfileGateway>());
+    }
+
+    [Fact]
+    public void should_share_single_token_store()
+    {
+        using var c = Build();
+        Assert.Same(c.Resolve<ITokenStorageService>(), c.Resolve<ITokenStorageService>());
+    }
+
+    [Fact]
+    public void should_register_apiservice_as_iservice_for_app_initialization()
+    {
+        // 회귀 가드: Account ApiService 는 As<IService> 로도 등록돼야 앱 IService 러너가
+        // ExecuteAsync→Initialize 를 호출(HttpClient 파이프라인 구성). 누락 시 DI 는 통과하나
+        // 런타임에 client=null 로 로그인 실패 — 단위테스트로 잡기 어려운 유형이라 명시 가드.
+        using var c = Build();
+
+        var services = c.Resolve<IEnumerable<IService>>();
+        Assert.Contains(services, s => s is ApiService);
+    }
+
+    [Fact]
+    public void should_register_logout_on_exit_service_with_order_metadata()
+    {
+        // 종료 시 강제 로그아웃(LogoutOnExitService)이 IService 로 등록돼 OnExit 이 StopAsync 를 호출하고,
+        // 모든 IService 가 'Order' 키를 보유해 OnExit 의 OrderBy(Metadata["Order"])가 KeyNotFoundException 을 던지지 않아야 한다.
+        using var c = Build();
+
+        var metas = c.Resolve<IEnumerable<Meta<IService>>>();
+        Assert.Contains(metas, m => m.Value is LogoutOnExitService);
+        Assert.All(metas, m => Assert.True(m.Metadata.ContainsKey("Order")));   // OnExit OrderBy 안전
+    }
+}

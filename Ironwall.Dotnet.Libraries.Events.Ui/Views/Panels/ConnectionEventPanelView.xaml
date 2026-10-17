@@ -21,24 +21,27 @@
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
 	</UserControl.Resources>
+	<!--  events-console FR-02: 목록을 가두던 고정 높이(바깥 Grid Width/Height · 안쪽 DataGrid Height)를 없았다.
+	     ⚠ 이 뷰는 새 콘솔이 호스팅하지 않는다 — 콘솔은 패널의 ViewModelProvider 를 제 그리드에 직접 묶는다.
+	     고친 것은 이 뷰를 다시 쓰게 될 때를 위한 정리이고, 보이는 수정은 콘솔 그리드 쪽이다.  -->
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 		<StackPanel Grid.Row="0" Orientation="Vertical">
+			<!--  날짜 피커: EventDashboardView로 이관 — Column 0~7 숨김  -->
 			<Grid Grid.Row="0" Margin="10,0">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
 					<ColumnDefinition Width="70" />
 					<ColumnDefinition Width="10" />
 					<ColumnDefinition Width="70" />
@@ -50,24 +53,28 @@
 				<TextBlock
 					Grid.Row="0"
 					Grid.Column="0"
+					Visibility="Collapsed"
 					Style="{StaticResource TextBlockTitle}"
-					Text="From" />
+					Text="시작" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="1"
 					Margin="5"
+					Visibility="Collapsed"
 					FontSize="15"
 					FontWeight="Bold"
 					SelectedDateTime="{Binding StartDate, Mode=TwoWay, StringFormat={}{yyyy-MM-dd HH:mm:ss}, UpdateSourceTrigger=PropertyChanged}" />
 				<TextBlock
 					Grid.Row="0"
 					Grid.Column="2"
+					Visibility="Collapsed"
 					Style="{StaticResource TextBlockTitle}"
-					Text="To" />
+					Text="종료" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="3"
 					Margin="5"
+					Visibility="Collapsed"
 					DisplayDateStart="{Binding EndDateDisplay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					FontSize="15"
 					FontWeight="Bold"
@@ -77,11 +84,12 @@
 					x:Name="ClickSearch"
 					Grid.Row="0"
 					Grid.Column="4"
-					Style="{StaticResource IconButtonStyle}">
+					Visibility="Collapsed"
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Search" />
 					</Button.Content>
 				</Button>
@@ -89,11 +97,12 @@
 					x:Name="ClickCancel"
 					Grid.Row="0"
 					Grid.Column="6"
-					Style="{StaticResource IconButtonStyle}">
+					Visibility="Collapsed"
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Cancel" />
 					</Button.Content>
 				</Button>
@@ -102,30 +111,30 @@
 				<!--  Add Button  -->
 				<Button
 					Grid.Column="8"
-					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					IsEnabled="{Binding CanInsertEvent}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="추가하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="AddBox" />
 				</Button>
 
 				<!--  Remove Button  -->
 				<Button
 					Grid.Column="10"
-					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					IsEnabled="{Binding CanDeleteEvent}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="삭제하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="MinusBox" />
 				</Button>
 
@@ -133,7 +142,7 @@
 				<Button
 					Grid.Column="12"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="갱신하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickReloadButton" />
@@ -141,17 +150,18 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
-								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="20"
+					Height="20"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="CircleArrows"
-								ToolTip="갱신하기"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="20"
+					Height="20"
+					Kind="CircleArrows"
+					ToolTip="갱신하기"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						</Grid>
 					</Button.Content>
 
@@ -163,46 +173,51 @@
 					Margin="2,2"
 					VerticalAlignment="Center"
 					md:RippleAssist.IsCentered="True"
-					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource MaterialDesignIconButton}"
+					IsEnabled="{Binding CanSaveEvent}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
-								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="20"
+					Height="20"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsSaving, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="Floppy"
-								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="20"
+					Height="20"
+					Kind="Floppy"
+					ToolTip="저장하기"
+					Visibility="{Binding IsSaving, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 						</Grid>
 					</Button.Content>
 				</Button>
 			</Grid>
 		</StackPanel>
-		<Grid
-			Grid.Row="1"
-			Width="800"
-			Height="310">
+		<Grid Grid.Row="1">
 			<ProgressBar
-				Width="100"
-				Height="20"
+				Width="50"
+				Height="50"
+				Margin="16"
 				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
-				Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Visibility="{Binding IsVisible, Converter={StaticResource BoolToInverseVisibleConverter}}"
+				Value="44" />
 		</Grid>
 		<DataGrid
 			x:Name="DataGridUsers"
 			Grid.Row="1"
-			Height="310"
+			Background="Transparent"
+			Margin="10 0"
+			BorderThickness="1"
+			HeadersVisibility="Column"
+			RowHeaderWidth="0"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
 			ItemsSource="{Binding ViewModelProvider}"
@@ -211,13 +226,14 @@
 			<i:Interaction.Behaviors>
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:ConnectionEventSelectedItemBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
+				<behavior_inner:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -233,39 +249,11 @@
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>
 
-				<!--  EventGroup  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					Header="Event Group"
-					SortMemberPath="EventGroup">
-					<DataGridColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding EventGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<TextBox
-								VerticalAlignment="Center"
-								Text="{Binding EventGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
-
 				<!--  MessageType  -->
-				<DataGridTemplateColumn
+				<!--<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Message Type"
+					IsReadOnly="True"
+					Header="이벤트 종류"
 					SortMemberPath="MessageType">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -305,13 +293,13 @@
 							</ComboBox>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
+				</DataGridTemplateColumn>-->
 
 
 				<!--  Device  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Device"
+					Header="장비"
 					SortMemberPath="Device">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -333,6 +321,9 @@
 								VerticalAlignment="Center"
 								HorizontalContentAlignment="Center"
 								IsEditable="False"
+								IsEnabled="{Binding IsDraft}"
+								ToolTip="이벤트 발생 시점 장비는 변경할 수 없습니다(추적성 보존). 신규 행에서만 지정 가능합니다."
+								ToolTipService.ShowOnDisabled="True"
 								ItemsSource="{Binding Data.DeviceProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
 								SelectedItem="{Binding Device, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 								<ComboBox.ItemsPanel>
@@ -353,11 +344,11 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
-
+	
 				<!--  Status  -->
 				<!--<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Status"
+					Header="상태"
 					SortMemberPath="Status">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -402,7 +393,7 @@
 				<!--  DateTime  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="DateTime"
+					Header="발생시각"
 					SortMemberPath="DateTime">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -422,6 +413,9 @@
 						<DataTemplate>
 							<TextBox
 								VerticalAlignment="Center"
+								IsEnabled="{Binding IsDraft}"
+								ToolTipService.ShowOnDisabled="True"
+								ToolTip="이벤트 발생 시각은 변경할 수 없습니다(추적성 보존). 신규 행에서만 지정 가능합니다."
 								Text="{Binding DateTime, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>
@@ -432,14 +426,27 @@
 
 			</DataGrid.Columns>
 		</DataGrid>
-		<StackPanel
+		<DockPanel
 			Grid.Row="2"
-			Margin="0,10,0,0"
-			Orientation="Horizontal">
-
-			<TextBlock Text="선택된 항목 : " />
-			<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
-		</StackPanel>
+			Margin="10,5,10,5">
+			<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+				<TextBlock VerticalAlignment="Center" Text="선택된 항목 : " />
+				<TextBlock VerticalAlignment="Center" Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+			<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+				<ProgressBar
+					Width="16"
+					Height="16"
+					Margin="0,0,8,0"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsLoadingMore, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
+				<TextBlock
+					VerticalAlignment="Center"
+					Text="{Binding LoadedCountText, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+		</DockPanel>
 	</Grid>
 </UserControl>
 

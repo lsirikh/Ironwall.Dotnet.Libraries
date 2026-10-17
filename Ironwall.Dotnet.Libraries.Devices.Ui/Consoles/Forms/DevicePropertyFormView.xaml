@@ -1,0 +1,416 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms.DevicePropertyFormView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:forms="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:pw="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils">
+	<!--
+		명세에서 만들어지는 상세 폼(device-console-redesign FR-08). DataContext = DevicePropertyFormViewModel.
+		절 → ConsoleSection, 칸 → ConsoleField, 편집기는 칸의 EffectiveEditor 로 고른다.
+		색이 아니라 형태로 구분한다: 잠금 = 자물쇠 + 까닭, 오류 = 아래 한 줄, 손댄 칸 = ConsoleField 의 표지.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+		<Style x:Key="Form.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
+		<!--  비어 있을 때만 보이는 안내("— 여러 값 —"). 이름 없이 스타일 트리거로만 켠다.  -->
+		<Style x:Key="Form.Hint" TargetType="TextBlock">
+			<Setter Property="Margin" Value="8,0,0,0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="IsHitTestVisible" Value="False" />
+			<Setter Property="Visibility" Value="Collapsed" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding Text}" Value="">
+					<Setter Property="Visibility" Value="Visible" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  글자 · 정수 · 실수 — 같은 상자, 검증은 뷰모델(명세의 범위 · 길이)이 한다  -->
+		<DataTemplate x:Key="Editor.Text">
+			<Grid>
+				<TextBox
+					AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+					Style="{StaticResource Form.TextBox}"
+					Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock Style="{StaticResource Form.Hint}" Text="{Binding Placeholder}" />
+			</Grid>
+		</DataTemplate>
+
+		<DataTemplate x:Key="Editor.Number">
+			<Grid>
+				<TextBox
+					AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+					FontFamily="Consolas"
+					Style="{StaticResource Form.TextBox}"
+					Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock Style="{StaticResource Form.Hint}" Text="{Binding Placeholder}" />
+			</Grid>
+		</DataTemplate>
+
+		<DataTemplate x:Key="Editor.Boolean">
+			<CheckBox
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+				IsChecked="{Binding BoolValue}"
+				IsThreeState="{Binding IsMixed}"
+				Style="{StaticResource Console.CheckBox}" />
+		</DataTemplate>
+
+		<DataTemplate x:Key="Editor.Choice">
+			<ComboBox
+				Height="30"
+				md:HintAssist.Hint="{Binding Placeholder}"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+				FontSize="13"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				ItemsSource="{Binding Options}"
+				SelectedItem="{Binding SelectedOption}"
+				ToolTip="{Binding SelectedOption.Display}">
+				<!--  긴 항목(제어기 이름 · 번호)은 글자 중간이 아니라 말줄임으로 자르고 전체는 툴팁으로 보인다  -->
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Display}" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
+		</DataTemplate>
+
+		<DataTemplate x:Key="Editor.Password">
+			<PasswordBox
+				Height="30"
+				Padding="6,0"
+				VerticalContentAlignment="Center"
+				pw:PasswordBoxAssistant.BindPassword="True"
+				pw:PasswordBoxAssistant.BoundPassword="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+				Background="{DynamicResource SurfaceSunkenBrush}"
+				BorderBrush="{DynamicResource BorderBrush}"
+				Foreground="{DynamicResource TextPrimaryBrush}" />
+		</DataTemplate>
+
+		<!--  읽기 전용 · 잠금 — 값만. 자물쇠와 까닭은 ConsoleField 가 그린다(두 번 그리지 않는다)  -->
+		<DataTemplate x:Key="Editor.ReadOnly">
+			<TextBlock
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+				FontSize="13"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding DisplayText}"
+				TextWrapping="Wrap"
+				ToolTip="{Binding RawToolTip}" />
+		</DataTemplate>
+
+		<!--
+			부품 표(component-display-unify FR-02) — 지도 상세 보기 "부품" 탭 · 조립 카드와 같은 칸 · 같은 점 색 · 같은 한글(공용 부품 사전).
+			건강 점: 정상 StatusNormal · 저하 StatusWarning · 고장 StatusCritical · 미상 회색 · 사용 안 함 = 빈 원(모양으로 가른다).
+			x:Name 은 쓰지 않는다 — 점 · 글자색은 요소 자신의 Style 트리거로 바꾼다.
+		-->
+		<Style x:Key="Form.Component.Dot" TargetType="Ellipse">
+			<Setter Property="Width" Value="8" />
+			<Setter Property="Height" Value="8" />
+			<Setter Property="Margin" Value="0,0,5,0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding HealthKind}" Value="Ok">
+					<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding HealthKind}" Value="Warn">
+					<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding HealthKind}" Value="Crit">
+					<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding HealthKind}" Value="OutOfService">
+					<Setter Property="Fill" Value="Transparent" />
+					<Setter Property="Stroke" Value="{DynamicResource TextMutedBrush}" />
+					<Setter Property="StrokeThickness" Value="1" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  요약 줄 점 — 표 전체의 최악(SummaryKind).  -->
+		<Style
+			x:Key="Form.Component.SummaryDot"
+			BasedOn="{StaticResource Form.Component.Dot}"
+			TargetType="Ellipse">
+			<Setter Property="Margin" Value="0,0,6,0" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding SummaryKind}" Value="Ok">
+					<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding SummaryKind}" Value="Warn">
+					<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding SummaryKind}" Value="Crit">
+					<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style x:Key="Form.Component.Head" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+
+		<Style x:Key="Form.Component.Cell" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+
+		<!--  설정과 관측이 어긋난 상태 칸 — 경고 글자색(칸 글 "설정 켬 / 관측 꺼짐" 이 뜻을 나른다)  -->
+		<Style
+			x:Key="Form.Component.StateCell"
+			BasedOn="{StaticResource Form.Component.Cell}"
+			TargetType="TextBlock">
+			<Setter Property="ToolTip" Value="{Binding StateText}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsIntentMismatch}" Value="True">
+					<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  "부품 상태" 절 — 요약 줄 + [선언 순서 / 고장 먼저] + 부품 · 상태 · 건강 · 사유 · 마지막 변화  -->
+		<DataTemplate x:Key="Form.ComponentStatusTable">
+			<StackPanel Margin="0,2,0,8">
+				<DockPanel Margin="0,0,0,6" LastChildFill="True">
+					<ToggleButton
+						AutomationProperties.AutomationId="Devices.Detail.Components.Sort"
+						Content="{Binding SortText}"
+						DockPanel.Dock="Right"
+						IsChecked="{Binding IsFaultFirst, Mode=TwoWay}"
+						Style="{StaticResource Console.Chip}"
+						ToolTip="줄 순서를 바꿉니다 — 선언 순서 / 고장 먼저"
+						Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
+					<Ellipse Style="{StaticResource Form.Component.SummaryDot}" Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
+					<TextBlock
+						VerticalAlignment="Center"
+						FontSize="13"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="{Binding SummaryText}"
+						TextTrimming="CharacterEllipsis"
+						ToolTip="{Binding SummaryText}" />
+				</DockPanel>
+				<!--  줄이 없으면(부품 없음) 요약 한 줄만 — 빈 머리줄 · 외톨이 점 · 빈 정렬 단추를 그리지 않는다  -->
+				<StackPanel Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+				<Grid Margin="0,0,0,3">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" MinWidth="70" />
+						<ColumnDefinition Width="104" />
+						<ColumnDefinition Width="62" />
+						<ColumnDefinition Width="78" />
+						<ColumnDefinition Width="64" />
+					</Grid.ColumnDefinitions>
+					<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Head}" Text="부품" />
+					<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.Head}" Text="상태" />
+					<TextBlock Grid.Column="2" Style="{StaticResource Form.Component.Head}" Text="건강" />
+					<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Head}" Text="사유" />
+					<TextBlock Grid.Column="4" Style="{StaticResource Form.Component.Head}" Text="마지막 변화" />
+				</Grid>
+				<Border Height="1" Background="{DynamicResource DividerBrush}" />
+				<ItemsControl Focusable="False" ItemsSource="{Binding Rows}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid Margin="0,3" Background="Transparent" ToolTip="{Binding DetailToolTip}">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" MinWidth="70" />
+									<ColumnDefinition Width="104" />
+									<ColumnDefinition Width="62" />
+									<ColumnDefinition Width="78" />
+									<ColumnDefinition Width="64" />
+								</Grid.ColumnDefinitions>
+								<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Cell}" Text="{Binding Name}" />
+								<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.StateCell}" Text="{Binding StateText}" />
+								<StackPanel Grid.Column="2" Orientation="Horizontal">
+									<Ellipse Style="{StaticResource Form.Component.Dot}" />
+									<TextBlock Style="{StaticResource Form.Component.Cell}" Text="{Binding HealthText}" ToolTip="{Binding HealthText}" />
+								</StackPanel>
+								<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Cell}" Text="{Binding FaultText}" ToolTip="{Binding FaultText}" />
+								<TextBlock
+									Grid.Column="4"
+									FontFamily="Consolas"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Style="{StaticResource Form.Component.Cell}"
+									Text="{Binding TimeText}"
+									ToolTip="{Binding ObservedAtRaw}" />
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+				</StackPanel>
+			</StackPanel>
+		</DataTemplate>
+
+		<!--  "부품" 절 — 선언: 이름 · 종류 · 채널 · 위치 · 사용 안 함  -->
+		<DataTemplate x:Key="Form.ComponentDeclarationTable">
+			<StackPanel Margin="0,2,0,8">
+				<TextBlock
+					Margin="0,0,0,6"
+					FontSize="13"
+					FontWeight="SemiBold"
+					Foreground="{DynamicResource TextPrimaryBrush}"
+					Text="{Binding DeclarationSummaryText}" />
+				<!--  선언된 부품이 없으면 "부품 없음" 한 줄만  -->
+				<StackPanel Visibility="{Binding HasDeclaredRows, Converter={StaticResource BoolToVisibility}}">
+				<Grid Margin="0,0,0,3">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" MinWidth="70" />
+						<ColumnDefinition Width="110" />
+						<ColumnDefinition Width="44" />
+						<ColumnDefinition Width="64" />
+						<ColumnDefinition Width="64" />
+					</Grid.ColumnDefinitions>
+					<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Head}" Text="부품" />
+					<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.Head}" Text="종류" />
+					<TextBlock Grid.Column="2" Style="{StaticResource Form.Component.Head}" Text="채널" />
+					<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Head}" Text="위치" />
+					<TextBlock Grid.Column="4" Style="{StaticResource Form.Component.Head}" Text="사용" />
+				</Grid>
+				<Border Height="1" Background="{DynamicResource DividerBrush}" />
+				<ItemsControl Focusable="False" ItemsSource="{Binding DeclaredRows}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid Margin="0,3" Background="Transparent" ToolTip="{Binding DetailToolTip}">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" MinWidth="70" />
+									<ColumnDefinition Width="110" />
+									<ColumnDefinition Width="44" />
+									<ColumnDefinition Width="64" />
+									<ColumnDefinition Width="64" />
+								</Grid.ColumnDefinitions>
+								<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Cell}" Text="{Binding Name}" />
+								<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.Cell}" Text="{Binding TypeName}" ToolTip="{Binding TypeName}" />
+								<TextBlock Grid.Column="2" Style="{StaticResource Form.Component.Cell}" Text="{Binding ChannelText}" />
+								<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Cell}" Text="{Binding PositionText}" ToolTip="{Binding PositionText}" />
+								<TextBlock
+									Grid.Column="4"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Style="{StaticResource Form.Component.Cell}"
+									Text="{Binding ServiceText}" />
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+				</StackPanel>
+			</StackPanel>
+		</DataTemplate>
+
+		<!--
+			표를 담는 ContentControl — 표가 null 인 절(장비 공통 등 대부분)에서는 템플릿을 떼고 접는다.
+			ContentTemplate 은 Content 가 null 이어도 세워지고 DataContext 가 절 뷰모델로 이어져,
+			빈 머리줄 두 벌 · 외톨이 회색 점 · 글 없는 정렬 단추가 모든 절에 그려졌다(로컬 ContentTemplate 은 이 트리거가 이기지 못해 Setter 로 건다).
+		-->
+		<Style x:Key="Form.ComponentTableHost" TargetType="ContentControl">
+			<Setter Property="Focusable" Value="False" />
+			<Style.Triggers>
+				<Trigger Property="Content" Value="{x:Null}">
+					<Setter Property="ContentTemplate" Value="{x:Null}" />
+					<Setter Property="Visibility" Value="Collapsed" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+		<Style
+			x:Key="Form.ComponentDeclarationHost"
+			BasedOn="{StaticResource Form.ComponentTableHost}"
+			TargetType="ContentControl">
+			<Setter Property="ContentTemplate" Value="{StaticResource Form.ComponentDeclarationTable}" />
+		</Style>
+		<Style
+			x:Key="Form.ComponentStatusHost"
+			BasedOn="{StaticResource Form.ComponentTableHost}"
+			TargetType="ContentControl">
+			<Setter Property="ContentTemplate" Value="{StaticResource Form.ComponentStatusTable}" />
+		</Style>
+
+		<forms:PropertyEditorTemplateSelector
+			x:Key="EditorSelector"
+			Boolean="{StaticResource Editor.Boolean}"
+			Choice="{StaticResource Editor.Choice}"
+			Number="{StaticResource Editor.Number}"
+			Password="{StaticResource Editor.Password}"
+			ReadOnly="{StaticResource Editor.ReadOnly}"
+			Text="{StaticResource Editor.Text}" />
+	</UserControl.Resources>
+
+	<ItemsControl
+		Focusable="False"
+		ItemsSource="{Binding Sections}">
+		<ItemsControl.ItemTemplate>
+			<DataTemplate>
+				<c:ConsoleSection AxisName="{Binding AxisName}" Header="{Binding Title}">
+					<Grid>
+						<!--  축을 서버가 보내지 않았다 — 값이 없는 것과 다르다  -->
+						<c:NotReceivedBox SectionName="{Binding AxisName}" Visibility="{Binding IsNotReceived, Converter={StaticResource BoolToVisibility}}" />
+						<StackPanel>
+						<!--  부품 · 부품 상태 표(FR-02) — 한 대를 골랐고 축을 받았을 때만 내용이 있다(없으면 아무것도 그리지 않는다)  -->
+						<ContentControl Content="{Binding DeclarationTable}" Style="{StaticResource Form.ComponentDeclarationHost}" />
+						<ContentControl Content="{Binding StatusTable}" Style="{StaticResource Form.ComponentStatusHost}" />
+						<ItemsControl Focusable="False" ItemsSource="{Binding Fields}">
+							<ItemsControl.Style>
+								<Style TargetType="ItemsControl">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsNotReceived}" Value="True">
+											<Setter Property="Visibility" Value="Collapsed" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</ItemsControl.Style>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<!--
+										까닭 한 줄은 값 열(~190px)이 아니라 상세 칸 전폭을 쓴다 — 값 열 안에 두면
+										"…65535 이하여야 합니|다." 로 둘째 줄이 생기고 그 줄이 스크롤 영역 아래로
+										잘려 마지막 글자가 사라진다(D-11 실측).
+									-->
+									<StackPanel>
+										<c:ConsoleField
+											ApiName="{Binding ApiPath}"
+											Header="{Binding HeaderText}"
+											IsLocked="{Binding IsLocked}"
+											IsTouched="{Binding IsTouched}"
+											LockReason="{Binding LockReason}">
+											<ContentControl
+												Content="{Binding}"
+												ContentTemplateSelector="{StaticResource EditorSelector}"
+												Focusable="False" />
+										</c:ConsoleField>
+										<TextBlock
+											Margin="0,1,0,3"
+											AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Error.{0}}"
+											FontSize="11.5"
+											Foreground="{DynamicResource StatusCriticalBrush}"
+											IsVisibleChanged="OnErrorVisibleChanged"
+											Text="{Binding Error, StringFormat=⚠ {0}}"
+											TextWrapping="Wrap"
+											Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+									</StackPanel>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+						</StackPanel>
+					</Grid>
+				</c:ConsoleSection>
+			</DataTemplate>
+		</ItemsControl.ItemTemplate>
+	</ItemsControl>
+</UserControl>

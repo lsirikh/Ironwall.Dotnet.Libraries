@@ -9,12 +9,21 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
 		<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
-		
+
 	</ItemGroup>
 
 	<ItemGroup>
 	  <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
+	</ItemGroup>
+
+	<!-- 시험 전용 내부 장치(KoreanWordWrap.Uninstall · IsInstalled — 호스트 보고 R10)를 시험 어셈블리에만 연다. 앱 동작은 그대로다. -->
+	<ItemGroup>
+	  <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.Utils.Tests" />
+	  <InternalsVisibleTo Include="Consoles.ViewTests" />
+	  <InternalsVisibleTo Include="Accounts.Ui.ViewTests" />
+	  <InternalsVisibleTo Include="Dotnet.Monitoring.Solution.Tests" />
 	</ItemGroup>
 
 </Project>

@@ -1,6 +1,9 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
@@ -31,17 +34,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Implementation of Interface -
         #endregion
         #region - Overrides -
-        public override Task TaskFinal() => SendAction(content: Contents, idUser: IdUser);
         protected abstract Task CloseDialog();
-        public async virtual Task SendAction(string? content, string? idUser)
+        /// <summary>
+        /// 조치보고를 보내고 <b>진짜 결말</b>을 돌려준다(N-07 R1).
+        /// <see cref="SendAction"/> 은 이것을 bool 로 줄인 역사적 입구다 — 다이얼로그는 그대로 쓰고,
+        /// 조치 트레이처럼 "몇 건이 정말 만들어졌는가" 를 세야 하는 곳은 이쪽을 부른다.
+        /// </summary>
+        public virtual async Task<ActionSendResult> SendActionDetailed(string? content, string? idUser, CancellationToken token = default)
+        {
+            var ok = await SendAction(content, idUser);
+            return ok ? ActionSendResult.Created(0) : ActionSendResult.Failed("조치보고 저장에 실패했습니다.");
+        }
+
+        // (EA3) 반환값: 조치보고 서버 저장 성공 여부. 호출자(다이얼로그)는 false 면 닫지 않고 오류를 알린다.
+        public async virtual Task<bool> SendAction(string? content, string? idUser)
         {
             _log?.Info($"CardViewModel SendAction : User({IdUser}), Content({Contents}), Device({Device?.DeviceName}), DateTime({DateTime})");
-            if (Cts != null && !Cts.IsCancellationRequested)
-            {
-                Cts.Cancel();
-                Cts.Dispose();
-            }
             await CloseDialog();
+            return true;
         }
         #endregion
         #region - Binding Methods -
@@ -51,15 +61,106 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - IHanldes -
         #endregion
         #region - Properties -
-        public string? IdUser { get; set; } 
+        public string? IdUser { get; set; }
         public string? Contents { get; set; }
-        public string? EventGroup => _model.EventGroup;  
+        /// <summary>
+        /// 이 카드가 참조하는 장비. <b>null 가능</b> — 장비가 삭제(SYNC_DEVICE DELETED)되면
+        /// 이벤트 모델의 Device 참조가 끊길 수 있다(FR-D4). EQM은 장비 삭제 시 해당 심볼 엔트리를
+        /// 자동 정리하지만, 조치보고 전까지 카드 자체는 리스트에 잔류할 수 있으므로 파생 게터
+        /// (ControllerId/DeviceTypeName/DeviceGroupsText 등)는 모두 null-safe(?. + 가드)로 유지한다.
+        /// </summary>
         public IBaseDeviceModel? Device => _model.Device;
         public EnumTrueFalse Status => _model.Status;
         public EnumEventType MessageType => _model.MessageType;
         public override IExEventModel Model => _model;
+        public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
+        public int? ControllerDeviceNumber
+        {
+            get
+            {
+                var controller = (Device as ISensorDeviceModel)?.Controller;
+                var num = controller?.DeviceNumber;
+                if (num is > 0) return num;
+
+                // 폴백: 장애 전문(BaseDeviceDto)은 컨트롤러 표시번호를 싣지 않고 controller_id(FK)만 준다.
+                //   중첩 Controller nav가 미하이드레이션(번호=0)이면 controller_id로 DeviceProvider에서 재해석 —
+                //   생성 경로(Provider 히트/폴백 스텁/미하이드레이션)와 무관하게 제어기 번호를 복구한다.
+                var controllerId = controller?.Id ?? 0;
+                if (controllerId <= 0) return null;
+                try
+                {
+                    var ctrl = IoC.Get<DeviceProvider>()
+                        .OfType<ControllerDeviceModel>()
+                        .FirstOrDefault(c => c.Id == controllerId);
+                    return ctrl?.DeviceNumber is > 0 ? ctrl.DeviceNumber : null;
+                }
+                catch { return null; }
+            }
+        }
+        public string? DeviceTypeName => Device?.DeviceType switch
+        {
+            EnumDeviceType.Controller => "제어기",
+            EnumDeviceType.IpCamera => "카메라",
+            EnumDeviceType.IpSpeaker => "스피커",
+            EnumDeviceType.Enclosure => "함체",
+            EnumDeviceType.Lamp => "경고등",
+            EnumDeviceType.Gate => "통문",
+            // 종류축 미복원(NONE) — '센서'로 단정하지 않는다(F-03).
+            // 서버 8.0.1 의 `device` 는 참조 프로필 `{id, category_device}` 라 종류축이 없다.
+            // 카테고리가 '센서'라고만 알려준 경우엔 센서 껍데기(ISensorDeviceModel)로 오므로 '센서',
+            // 카테고리조차 모르면 BaseDeviceModel 로 와서 '알 수 없음'이 된다
+            // (껍데기 선택은 `DtoToModelHelper.CreateDeviceShell`).
+            EnumDeviceType.NONE => Device is ISensorDeviceModel ? "센서" : "알 수 없음",
+            not null => "센서",
+            null => null
+        };
+
+        /// <summary>
+        /// 이벤트 장비가 속한 그룹(구역) 이름 목록을 ", "로 결합.
+        /// N:N — 다중 그룹이면 "1, 10", 단일 그룹이면 "1". DeviceGroupProvider로 Id→Name 조회(미발견 시 Id로 fallback).
+        /// (장비 관리 패널 BaseDeviceViewModel.DeviceGroupsText 와 동일 패턴)
+        /// </summary>
+        public string DeviceGroupsText
+        {
+            get
+            {
+                var ids = Device?.DeviceGroups;
+                if (ids == null || ids.Count == 0) return string.Empty;
+                try
+                {
+                    var provider = IoC.Get<DeviceGroupProvider>();
+                    return string.Join(", ", ids.Select(id =>
+                        provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+                }
+                catch { return string.Join(", ", ids); }
+            }
+        }
+
+        /// <summary>
+        /// 카드 1행 표시용 — "그룹 - 장비타입 번호" 단일 문자열(전체폭 라벨, 말줄임 대응).
+        /// 기존 다중 TextBlock 분할이 좁은 카드에서 구역·장비명을 잘라먹던 문제(사용자 보고) 해결.
+        /// 표시 전용 파생값 — 원본 Device/그룹 데이터는 변경하지 않는다.
+        /// </summary>
+        public string ZoneDeviceText
+        {
+            get
+            {
+                // 장비가 지워진 이벤트(v7.0+ device: null) — 빈 줄 대신 서버 스냅샷 이름을 보인다.
+                if (Device is null)
+                    return EventDeviceSnapshot.ShortLabel(null, _model) ?? DELETED_DEVICE_TEXT;
+
+                var group = DeviceGroupsText;
+                var type = DeviceTypeName ?? string.Empty;
+                var num = Device?.DeviceNumber is int n and > 0 ? n.ToString() : string.Empty;
+                var right = string.Join(" ", new[] { type, num }.Where(s => !string.IsNullOrEmpty(s)));
+                if (string.IsNullOrEmpty(group)) return right;
+                return string.IsNullOrEmpty(right) ? group : $"{group} - {right}";
+            }
+        }
         #endregion
         #region - Attributes -
+        /// <summary>장비가 지워졌고 서버 스냅샷도 없을 때의 카드 1행.</summary>
+        public const string DELETED_DEVICE_TEXT = "삭제된 장비";
         protected readonly T _model;
         #endregion
     }

@@ -1,0 +1,304 @@
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
+
+namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Groups;
+
+/// <summary>상태 띠의 권한 그룹 칩 — 끌어 놓을 곳이자, 누르면 같은 일을 하는 버튼(키보드 · 자동화 경로).</summary>
+public sealed class AccountGroupChipViewModel : Caliburn.Micro.PropertyChangedBase
+{
+    private int _userCount;
+
+    public AccountGroupChipViewModel(int id, string name, int userCount)
+    {
+        Id = id;
+        Name = name;
+        _userCount = userCount;
+    }
+
+    public int Id { get; }
+    public string Name { get; }
+
+    public int UserCount
+    {
+        get => _userCount;
+        set { _userCount = Math.Max(0, value); NotifyOfPropertyChange(); }
+    }
+
+    public override string ToString() => Name;
+}
+
+/// <summary>
+/// 사용자 N명을 한 권한 그룹에 넣기 전에 세운 계획 — 무엇을 보내고 무엇을 뺐는지.
+/// </summary>
+/// <param name="GroupId">대상 그룹.</param>
+/// <param name="GroupName">대상 그룹 이름.</param>
+/// <param name="Targets">실제로 보낼 사용자(저장된 계정 · 아직 그 그룹이 아닌 계정).</param>
+/// <param name="AlreadyIn">이미 그 그룹이라 뺀 수.</param>
+/// <param name="Unsaved">아직 저장되지 않아(Id≤0) 뺀 수.</param>
+/// <param name="BlockReason">보낼 수 없는 까닭. 보낼 수 있으면 null.</param>
+public sealed record GroupAssignPlan(
+    int GroupId,
+    string GroupName,
+    IReadOnlyList<AccountViewModel> Targets,
+    int AlreadyIn,
+    int Unsaved,
+    string? BlockReason,
+    int SelfExcluded = 0,
+    int AdminGuardExcluded = 0)
+{
+    public bool CanSend => BlockReason is null;
+}
+
+/// <summary>
+/// 끌어 놓기 판정이 알아야 하는 주변 사실 — 누가 조작하고 있는지, 어느 그룹이 계정 관리 권한을 쥐는지.
+/// </summary>
+/// <param name="SelfUserId">지금 조작하는 계정(0이면 모른다).</param>
+/// <param name="AdminGroupId">계정 관리(users:edit)를 쥔 그룹(0이면 없다/모른다).</param>
+/// <param name="AdminGroupMemberCount">그 그룹의 지금 구성원 수.</param>
+public sealed record GroupDropContext(int SelfUserId, int AdminGroupId, int AdminGroupMemberCount)
+{
+    public static GroupDropContext Unknown { get; } = new(0, 0, 0);
+}
+
+/// <summary>
+/// 사용자 → 권한 그룹 끌어 놓기의 <b>판정(순수 함수)</b>. 화면 없이 단위 테스트한다.
+/// (설계 정본 all-windows-drag-wireframe.html L339-L340 · L421 · L432)
+/// </summary>
+public static class UserGroupDrop
+{
+    public const string ZoneKey = AccountConsoleKeys.GroupZone;
+
+    public const string SelfBlocked = "자기 계정의 권한 그룹은 끌어서 바꿀 수 없습니다 — [구성원] 화면에서 바꾸세요.";
+    public const string LastAdminBlocked = "계정 관리 권한 그룹의 마지막 구성원입니다 — 옮기면 아무도 계정을 관리할 수 없습니다.";
+
+    public static GroupAssignPlan Plan(int groupId, string groupName, IEnumerable<AccountViewModel>? users)
+        => Plan(groupId, groupName, users, GroupDropContext.Unknown);
+
+    public static GroupAssignPlan Plan(int groupId, string groupName, IEnumerable<AccountViewModel>? users, GroupDropContext context)
+    {
+        var list = users?.Where(u => u is not null).ToList() ?? new List<AccountViewModel>();
+
+        if (groupId <= 0)
+            return new GroupAssignPlan(groupId, groupName, Array.Empty<AccountViewModel>(), 0, 0, "아직 저장되지 않은 그룹입니다.");
+        if (list.Count == 0)
+            return new GroupAssignPlan(groupId, groupName, Array.Empty<AccountViewModel>(), 0, 0, "끌어 온 계정이 없습니다.");
+
+        var unsaved = list.Count(u => u.Id <= 0);
+        var saved = list.Where(u => u.Id > 0).ToList();
+        var alreadyIn = saved.Count(u => u.GroupId == groupId);
+        var moving = saved.Where(u => u.GroupId != groupId)
+                          .GroupBy(u => u.Id)
+                          .Select(g => g.First())
+                          .ToList();
+
+        // ① 자기 계정은 끌어서 옮기지 않는다 — 스쳐 고른 뒤 떨어뜨려 스스로 관리 권한을 잃는 사고를 막는다.
+        var self = context.SelfUserId > 0 ? moving.Count(u => u.Id == context.SelfUserId) : 0;
+        if (self > 0) moving = moving.Where(u => u.Id != context.SelfUserId).ToList();
+
+        // ② 계정 관리 그룹을 비우지 않는다(서버 8.0.1 은 마지막 ADMIN 에 409, 6.3.2 는 막지 않는다).
+        var adminGuard = 0;
+        if (context.AdminGroupId > 0 && context.AdminGroupId != groupId)
+        {
+            var leaving = moving.Count(u => u.GroupId == context.AdminGroupId);
+            if (leaving > 0 && leaving >= context.AdminGroupMemberCount)
+            {
+                adminGuard = leaving;
+                moving = moving.Where(u => u.GroupId != context.AdminGroupId).ToList();
+            }
+        }
+
+        string? reason = null;
+        if (moving.Count == 0)
+            reason = adminGuard > 0 ? LastAdminBlocked
+                   : self > 0 ? SelfBlocked
+                   : saved.Count == 0 ? "아직 저장되지 않은 계정입니다."
+                   : "이미 이 그룹에 들어 있습니다.";
+
+        return new GroupAssignPlan(groupId, groupName, moving, alreadyIn, unsaved, reason, self, adminGuard);
+    }
+
+    /// <summary>
+    /// 드롭 직후 상태 띠에 남길 한 줄 — 곧바로 보내지 않고 [적용] 을 기다린다는 것을 운영자 말로 적는다
+    /// (몇 번 보내는지 · 임시 목록 같은 구현 사정은 적지 않는다).
+    /// </summary>
+    public static string DropLine(GroupAssignPlan plan, int draftCount)
+    {
+        var parts = new List<string> { $"{draftCount}명을 ‘{plan.GroupName}’ 그룹으로 옮길 준비가 됐습니다. [적용]을 누르세요." };
+        if (plan.AlreadyIn > 0) parts.Add($"이미 ‘{plan.GroupName}’ 그룹인 {plan.AlreadyIn}명은 뺐습니다.");
+        if (plan.Unsaved > 0) parts.Add($"저장 전 계정 {plan.Unsaved}명은 뺐습니다.");
+        if (plan.SelfExcluded > 0) parts.Add("자기 계정은 뺐습니다.");
+        if (plan.AdminGuardExcluded > 0) parts.Add($"계정 관리 그룹의 마지막 {plan.AdminGuardExcluded}명은 뺐습니다.");
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>[적용] 이 끝난 뒤의 한 줄.</summary>
+    public static string AppliedLine(DraftApplySummary summary)
+    {
+        if (summary.WasCancelled) return $"중단했습니다(적용 {summary.Applied}명).";
+        var head = summary.Applied > 0 ? $"적용했습니다({summary.Applied}명)." : "바뀐 계정이 없습니다.";
+        var failed = summary.Failed + summary.Missing;
+        return failed > 0 ? $"{head} {failed}명은 옮기지 못했습니다 — [적용]을 다시 누르세요." : head;
+    }
+
+    public const string RevertedLine = "옮기려던 것을 취소했습니다.";
+}
+
+/// <summary>되돌리기에 필요한 것 — 방금 바뀐 사용자와 그 이전 그룹.</summary>
+/// <param name="UserId">사용자.</param>
+/// <param name="Display">사람이 읽는 이름.</param>
+/// <param name="PreviousGroupId">바뀌기 전 그룹(없었으면 null).</param>
+public sealed record GroupAssignUndo(int UserId, string Display, int? PreviousGroupId);
+
+/// <summary>
+/// 권한 그룹 칩 드롭존의 처리기. 서버에 <b>벌크 배정 입구가 없어</b> 사용자 1명당 한 번씩 보낸다 —
+/// 그래서 드롭은 곧바로 전송하지 않고 <see cref="DraftTrayViewModel"/> 에 쌓았다가 [적용] 때 모아 보낸다.
+/// </summary>
+/// <remarks>
+/// 칩을 누르는 길(키보드 · 자동화 폴백)도 <see cref="Enqueue"/> 를 그대로 부른다 — 길이 둘이어도 경로는 하나다.
+/// 호출 스레드: UI.
+/// </remarks>
+public sealed class UserGroupDropHandler : IDragDropHandler
+{
+    private readonly IAccountApiService _api;
+    private readonly DraftTrayViewModel _tray;
+    private readonly Func<bool> _canAssign;
+    private readonly ILogService? _log;
+    private readonly List<GroupAssignUndo> _undo = new();
+    private bool _settled = true;
+
+    public UserGroupDropHandler(IAccountApiService api, DraftTrayViewModel tray, Func<bool> canAssign,
+                                ILogService? log = null, Func<GroupDropContext>? context = null)
+    {
+        _api = api ?? throw new ArgumentNullException(nameof(api));
+        _tray = tray ?? throw new ArgumentNullException(nameof(tray));
+        _canAssign = canAssign ?? throw new ArgumentNullException(nameof(canAssign));
+        _log = log;
+        _context = context ?? (() => GroupDropContext.Unknown);
+    }
+
+    private readonly Func<GroupDropContext> _context;
+
+    /// <summary>무엇이 쌓였는지 · 무엇이 바뀌었는지 알린다(상태 띠 한 줄).</summary>
+    public event Action<string>? Announced;
+
+    /// <summary>되돌릴 것이 있는가(적용이 실제로 바꾼 뒤에만 참).</summary>
+    public bool CanUndo => _undo.Count > 0;
+
+    public bool CanDrop(DragPayload payload, DropTarget target)
+    {
+        if (!_canAssign() || _tray.IsApplying) return false;
+        if (target.ZoneKey != UserGroupDrop.ZoneKey || target.ZoneData is not AccountGroupChipViewModel chip) return false;
+        return UserGroupDrop.Plan(chip.Id, chip.Name, Accounts(payload.Items), _context()).CanSend;
+    }
+
+    public void Drop(DragPayload payload, DropTarget target)
+    {
+        if (target.ZoneData is not AccountGroupChipViewModel chip) return;
+        Enqueue(chip, Accounts(payload.Items));
+    }
+
+    /// <summary>드래그 · 칩 클릭이 함께 쓰는 입구. 쌓은 건수를 돌려준다.</summary>
+    public int Enqueue(AccountGroupChipViewModel chip, IReadOnlyList<AccountViewModel> users)
+    {
+        if (chip is null) return 0;
+        if (!_canAssign()) { Announce("권한이 없어 그룹을 바꿀 수 없습니다."); return 0; }
+        if (_tray.IsApplying) { Announce("적용 중에는 더 담을 수 없습니다."); return 0; }
+
+        var plan = UserGroupDrop.Plan(chip.Id, chip.Name, users, _context());
+        if (!plan.CanSend) { Announce(plan.BlockReason!); return 0; }
+
+        // 완전히 끝난 묶음 뒤에 새로 담기 시작하면 되돌리기 장부를 새로 연다(재시도 중에는 이어 쓴다).
+        if (_settled && !_tray.HasEntries)
+        {
+            _undo.Clear();
+            _settled = false;
+        }
+
+        foreach (var user in plan.Targets) _tray.Add(EntryFor(user, chip));
+
+        Announce(UserGroupDrop.DropLine(plan, plan.Targets.Count));
+        return plan.Targets.Count;
+    }
+
+    /// <summary>쌓아 둔 Draft 를 순차 전송한다 — 진행률과 부분 실패 4분류는 트레이가 센다.</summary>
+    public async Task<DraftApplySummary> ApplyAsync(CancellationToken token = default)
+    {
+        // ★ 되돌리기 장부를 여기서 비우지 않는다 — 부분 실패를 다시 [적용] 하면 앞서 성공한 것들이 장부에서 사라져
+        //   [되돌리기] 가 재시도분만 되돌린다. 장부는 "새 묶음을 담기 시작할 때"만 비운다.
+        _settled = false;
+        var summary = await _tray.ApplyAsync(token).ConfigureAwait(true);
+        // 남은 Draft 가 없으면 이 묶음은 끝났다 — 다음에 담는 것은 새 묶음이다.
+        _settled = !_tray.HasEntries;
+        Announce(UserGroupDrop.AppliedLine(summary));
+        return summary;
+    }
+
+    /// <summary>담아 둔 것을 버린다 — 서버에는 아무것도 보내지 않는다.</summary>
+    public void Revert()
+    {
+        _tray.Revert();
+        Announce(UserGroupDrop.RevertedLine);
+    }
+
+    /// <summary>방금 적용한 것을 되돌린다(역방향 N회). 되돌린 뒤에는 다시 되돌릴 것이 없다.</summary>
+    public async Task UndoAsync(CancellationToken token = default)
+    {
+        if (_undo.Count == 0) { Announce("되돌릴 변경이 없습니다."); return; }
+
+        var pending = _undo.ToList();
+        _undo.Clear();
+
+        int done = 0, failed = 0;
+        foreach (var item in pending)
+        {
+            try
+            {
+                var response = await _api.AssignUserGroupAsync(item.UserId, item.PreviousGroupId, token).ConfigureAwait(true);
+                if (response.Success) done++; else failed++;
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                failed++;
+                _log?.Error($"[AccountGroupDrop] undo user={item.UserId}: {ex.Message}");
+            }
+        }
+        Announce(failed > 0 ? $"되돌렸습니다({done}명). {failed}명은 되돌리지 못했습니다." : $"되돌렸습니다({done}명).");
+    }
+
+    /// <summary>끌어 온 행에서 계정 뷰모델만 고른다.</summary>
+    public static IReadOnlyList<AccountViewModel> Accounts(IEnumerable<object> rows)
+        => rows.OfType<AccountViewModel>().ToList();
+
+    private DraftEntry EntryFor(AccountViewModel user, AccountGroupChipViewModel chip)
+    {
+        var before = user.GroupId;
+        return new DraftEntry(
+            $"user:{user.Id}",
+            "PUT users/{id} group_id",
+            $"{user.Username} → {chip.Name}",
+            async token =>
+            {
+                // 담은 뒤 다른 곳에서 바뀌었을 수 있다 — 보내기 직전에 다시 판정한다.
+                if (user.GroupId == chip.Id) return DraftOutcome.Skipped;
+                if (user.Id <= 0) return DraftOutcome.Missing;
+
+                var response = await _api.AssignUserGroupAsync(user.Id, chip.Id, token).ConfigureAwait(true);
+                if (!response.Success) return DraftOutcome.Failed;
+
+                // 서버가 실제로 반영했는지 응답으로 확인한다(그룹 해제를 조용히 무시하는 판본이 있다).
+                if (response.Data is not null && response.Data.GroupId != chip.Id) return DraftOutcome.Failed;
+
+                user.GroupId = chip.Id;
+                user.GroupText = chip.Name;
+                chip.UserCount++;
+                if (_undo.All(u => u.UserId != user.Id)) _undo.Add(new GroupAssignUndo(user.Id, user.Username, before));
+                return DraftOutcome.Applied;
+            });
+    }
+
+    private void Announce(string line) => Announced?.Invoke(line);
+}

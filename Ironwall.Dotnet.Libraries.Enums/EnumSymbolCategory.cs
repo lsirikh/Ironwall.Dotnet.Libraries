@@ -15,5 +15,6 @@
         Symbol = 1,
         Shape = 2,
         Object = 3,
+        Image = 4,
     }
 }

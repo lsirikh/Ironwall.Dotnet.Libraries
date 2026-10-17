@@ -1,0 +1,862 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - text: Ironwall GIS
+      - generic [ref=e6]: · 창 레이아웃 제안
+    - group "테마" [ref=e7]:
+      - button "시스템" [pressed] [ref=e8] [cursor=pointer]
+      - button "라이트" [ref=e9] [cursor=pointer]
+      - button "다크" [ref=e10] [cursor=pointer]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - paragraph [ref=e13]: 장비 정보 창 · 3단 콘솔
+      - heading "목록은 가운데, 고른 장비는 오른쪽에서 읽는다" [level=1] [ref=e14]
+      - paragraph [ref=e15]: 지금 장비 창은 행을 누르면 편집기가 위쪽 요약 카드를 덮고, 목록은 높이 260px에 갇혀 있습니다. 선택 탭 · 목록 · 상세 속성을 세로 3단으로 나누면 목록은 창 높이를 전부 쓰고, 상세는 위에서 아래로 읽는 폼이 됩니다. 같은 틀을 계정 · 이벤트 · 보고서 · 억제 스케줄까지 15개 창에 씁니다.
+    - generic [ref=e16]:
+      - term [ref=e17]: 레일
+      - definition [ref=e18]: 184px · 접힘 56px · 개수 배지
+      - term [ref=e19]: 목록
+      - definition [ref=e20]: 높이 가변 · 핵심 6열 · 선택은 좌측 3px 바
+      - term [ref=e21]: 상세
+      - definition [ref=e22]: 340px · 조절 300–480 · 섹션 순서 고정
+      - term [ref=e23]: 기본 창
+      - definition [ref=e24]: 1050×700 → 1280×760 제안
+      - term [ref=e25]: 근거
+      - definition [ref=e26]:
+        - link "분석 보고서" [ref=e27] [cursor=pointer]:
+          - /url: ../analyses/window-layout-redesign-analysis.md
+  - region [ref=e28]:
+    - generic [ref=e29]:
+      - heading "움직여 보는 장비 콘솔" [level=2] [ref=e30]
+      - paragraph [ref=e31]: 탭 전환 · 행 선택(Ctrl/Shift 다중) · 추가 · 필드 수정 · 경계 드래그
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - text: 창 폭
+        - slider "창 폭" [ref=e34]: "1280"
+        - status [ref=e35]: 1280px
+      - generic [ref=e36]:
+        - checkbox "편집 권한 없는 계정으로 보기" [ref=e37]
+        - text: 편집 권한 없는 계정으로 보기
+      - generic [ref=e38]: 표 안의 장비·IP·좌표는 설명용 예시입니다.
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - strong [ref=e43]: 장비 정보
+        - generic [ref=e44]: 카메라 · 12대
+        - generic [aria-hidden] [ref=e45]:
+          - generic [ref=e46]: ─
+          - generic [ref=e47]: ▢
+          - generic [ref=e48]: ✕
+      - generic [ref=e49]:
+        - complementary "장비 종류" [ref=e50]:
+          - navigation [ref=e51]:
+            - button "그룹 5" [ref=e52] [cursor=pointer]:
+              - generic [ref=e55]: 그룹
+              - generic [ref=e56]: "5"
+            - button "제어기 ▲1 · 9" [ref=e57] [cursor=pointer]:
+              - generic [ref=e61]: 제어기
+              - generic [ref=e62]: ▲1 · 9
+            - button "센서 ▲1 · 46" [ref=e63] [cursor=pointer]:
+              - generic [ref=e67]: 센서
+              - generic [ref=e68]: ▲1 · 46
+            - button "카메라 ▲1 · 12" [ref=e69] [cursor=pointer]:
+              - generic [ref=e73]: 카메라
+              - generic [ref=e74]: ▲1 · 12
+            - button "스피커 6" [ref=e75] [cursor=pointer]:
+              - generic [ref=e79]: 스피커
+              - generic [ref=e80]: "6"
+            - button "함체 ▲1 · 9" [ref=e81] [cursor=pointer]:
+              - generic [ref=e85]: 함체
+              - generic [ref=e86]: ▲1 · 9
+            - button "경광등 4" [ref=e87] [cursor=pointer]:
+              - generic [ref=e91]: 경광등
+              - generic [ref=e92]: "4"
+          - generic [ref=e93]:
+            - generic [ref=e94]: 전체 86대
+            - generic [ref=e95]: 장애 4대
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - button "추가" [ref=e98] [cursor=pointer]
+            - button "삭제" [ref=e101] [cursor=pointer]
+            - button "갱신" [ref=e102] [cursor=pointer]
+            - textbox [ref=e107]:
+              - /placeholder: 장비번호·이름 검색
+            - button "열 6/12" [ref=e108] [cursor=pointer]
+          - table [ref=e110]:
+            - rowgroup [ref=e111]:
+              - row [ref=e112] [cursor=pointer]:
+                - columnheader "상태" [ref=e113]
+                - columnheader "장비번호" [ref=e114]
+                - columnheader "장비명" [ref=e115]
+                - columnheader "유형" [ref=e116]
+                - columnheader "IP:포트" [ref=e117]
+                - columnheader "활성화" [ref=e118]
+            - rowgroup [ref=e119]:
+              - row [selected] [ref=e120] [cursor=pointer]:
+                - cell "정상" [ref=e121]
+                - cell "CAM-0412" [ref=e124]
+                - cell "정문 PTZ" [ref=e125]
+                - cell "PTZ" [ref=e126]
+                - cell "10.20.4.12:554" [ref=e127]
+                - cell "활성" [ref=e128]
+              - row [ref=e130] [cursor=pointer]:
+                - cell "정상" [ref=e131]
+                - cell "CAM-0413" [ref=e134]
+                - cell "북측 3구간 고정" [ref=e135]
+                - cell "고정" [ref=e136]
+                - cell "10.20.4.13:554" [ref=e137]
+                - cell "활성" [ref=e138]
+              - row [ref=e140] [cursor=pointer]:
+                - cell "장애" [ref=e141]
+                - cell "CAM-0415" [ref=e144]
+                - cell "북측 7구간 돔" [ref=e145]
+                - cell "돔" [ref=e146]
+                - cell "10.20.4.15:554" [ref=e147]
+                - cell "활성" [ref=e148]
+              - row [ref=e150] [cursor=pointer]:
+                - cell "정상" [ref=e151]
+                - cell "CAM-0416" [ref=e154]
+                - cell "탄약고 PTZ" [ref=e155]
+                - cell "PTZ" [ref=e156]
+                - cell "10.20.4.16:554" [ref=e157]
+                - cell "활성" [ref=e158]
+              - row [ref=e160] [cursor=pointer]:
+                - cell "점검" [ref=e161]
+                - cell "CAM-0417" [ref=e164]
+                - cell "남문 고정" [ref=e165]
+                - cell "고정" [ref=e166]
+                - cell "10.20.4.17:554" [ref=e167]
+                - cell "활성" [ref=e168]
+              - row [ref=e170] [cursor=pointer]:
+                - cell "미사용" [ref=e171]
+                - cell "CAM-0420" [ref=e174]
+                - cell "통제실 옥상 (예비)" [ref=e175]
+                - cell "돔" [ref=e176]
+                - cell "10.20.4.20:554" [ref=e177]
+                - cell "비활성" [ref=e178]
+          - generic [ref=e180]:
+            - generic [ref=e181]: 총 6건
+            - generic [ref=e182]: 선택 1건
+            - generic [ref=e183]: 예시 데이터
+        - separator "상세 패널 폭" [ref=e184]
+        - complementary "선택 항목 상세" [ref=e185]:
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - generic [ref=e188]: 카메라 · CAM-0412
+              - group "패널 폭" [ref=e189]:
+                - button "S" [ref=e190] [cursor=pointer]
+                - button "M" [pressed] [ref=e191] [cursor=pointer]
+                - button "L" [ref=e192] [cursor=pointer]
+            - heading "정문 PTZ" [level=3] [ref=e193]
+          - generic [ref=e194]:
+            - generic [ref=e195]:
+              - heading "장비 공통" [level=4] [ref=e196]
+              - generic [ref=e197]:
+                - generic [ref=e198]: 장비번호
+                - textbox "장비번호" [ref=e199]:
+                  - /placeholder: ""
+                  - text: CAM-0412
+              - generic [ref=e200]:
+                - generic [ref=e201]: 이름
+                - textbox "이름" [ref=e202]:
+                  - /placeholder: ""
+                  - text: 정문 PTZ
+              - generic [ref=e203]:
+                - generic [ref=e204]: 유형
+                - textbox "유형" [disabled] [ref=e205]:
+                  - /placeholder: ""
+                  - text: PTZ
+              - generic [ref=e206]:
+                - generic [ref=e207]: 버전
+                - textbox "버전" [ref=e208]:
+                  - /placeholder: ""
+                  - text: 5.6.2
+              - generic [ref=e209]:
+                - generic [ref=e210]: 활성화
+                - combobox "활성화" [ref=e211]:
+                  - option "사용" [selected]
+                  - option "사용 안 함"
+              - generic [ref=e212]:
+                - generic [ref=e213]: 상태
+                - generic [ref=e214]: 정상
+            - generic [ref=e217]:
+              - heading "장비별 속성" [level=4] [ref=e218]
+              - generic [ref=e219]:
+                - generic [ref=e220]: IP
+                - textbox "IP" [ref=e221]:
+                  - /placeholder: ""
+                  - text: 10.20.4.12
+              - generic [ref=e222]:
+                - generic [ref=e223]: 포트
+                - textbox "포트" [ref=e224]:
+                  - /placeholder: ""
+                  - text: "554"
+              - generic [ref=e225]:
+                - generic [ref=e226]: 사용자명
+                - textbox "사용자명" [ref=e227]:
+                  - /placeholder: ""
+                  - text: viewer
+              - generic [ref=e228]:
+                - generic [ref=e229]: 비밀번호
+                - textbox "비밀번호" [ref=e230]:
+                  - /placeholder: ""
+                  - text: ••••••••
+              - generic [ref=e231]:
+                - generic [ref=e232]: 모드
+                - textbox "모드" [ref=e233]:
+                  - /placeholder: ""
+                  - text: 자동추적
+              - generic [ref=e234]:
+                - generic [ref=e235]: 분류
+                - textbox "분류" [ref=e236]:
+                  - /placeholder: ""
+                  - text: 감시
+              - generic [ref=e237]:
+                - generic [ref=e238]: 녹화
+                - textbox "녹화" [ref=e239]:
+                  - /placeholder: ""
+                  - text: 상시
+            - generic [ref=e240]:
+              - heading "위치 정보" [level=4] [ref=e241]
+              - generic [ref=e242]:
+                - generic [ref=e243]: 위치
+                - textbox "위치" [ref=e244]:
+                  - /placeholder: ""
+                  - text: 정문 초소 옥상
+              - generic [ref=e245]:
+                - generic [ref=e246]: 위도
+                - textbox "위도" [ref=e247]:
+                  - /placeholder: ""
+                  - text: "37.41890"
+              - generic [ref=e248]:
+                - generic [ref=e249]: 경도
+                - textbox "경도" [ref=e250]:
+                  - /placeholder: ""
+                  - text: "127.12633"
+              - generic [ref=e251]:
+                - generic [ref=e252]: 고도 (m)
+                - textbox "고도 (m)" [ref=e253]:
+                  - /placeholder: ""
+                  - text: "71"
+              - generic [ref=e254]:
+                - generic [ref=e255]: 방위각 (°)
+                - textbox "방위각 (°)" [ref=e256]:
+                  - /placeholder: ""
+                  - text: "184"
+            - generic [ref=e257]:
+              - heading "그룹" [level=4] [ref=e258]
+              - generic [ref=e259]:
+                - generic [ref=e260]: 그룹
+                - combobox "그룹" [ref=e261]:
+                  - option "정문 권역" [selected]
+                  - option "북측 울타리"
+                  - option "탄약고"
+            - generic [ref=e262]:
+              - heading "부가" [level=4] [ref=e263]
+              - button "상세보기" [ref=e264] [cursor=pointer]
+          - generic [ref=e265]:
+            - generic [ref=e266]: 변경 없음
+            - button "되돌리기" [disabled] [ref=e267]
+            - button "적용" [disabled] [ref=e268]
+    - paragraph [ref=e269]: 창 폭 1280px 이상이면 상세가 붙어 있고, 960–1279px이면 행을 누를 때 오른쪽에서 밀려 나오며, 960px 미만이면 레일이 아이콘으로 접힙니다. 경계선은 끌어서 300–480px 사이로 바꾸고, 더블클릭하면 340px로 돌아갑니다. 끄는 중 Esc는 원래 폭으로 되돌립니다.
+  - region [ref=e270]:
+    - generic [ref=e271]:
+      - heading "지금 장비 창이 답답한 이유" [level=2] [ref=e272]
+      - paragraph [ref=e273]: XAML 선언값을 같은 축척(×0.34)으로 그렸습니다
+    - generic [ref=e274]:
+      - generic [ref=e275]:
+        - heading "현행 1050 × 700 · DeviceDashboardView" [level=3] [ref=e276]:
+          - text: 현행
+          - generic [ref=e277]: 1050 × 700 · DeviceDashboardView
+        - generic [ref=e278]:
+          - generic [ref=e279]: 장비 정보
+          - generic [ref=e280]: 요약 카드 280↔ 선택 시 편집기가 덮음
+          - generic [ref=e281]: 레일100
+          - generic [ref=e282]: 추가 · 삭제 · 갱신 · 저장
+          - generic [ref=e283]: 목록 높이 260 고정
+          - generic [ref=e284]: "선택된 항목 : N"
+        - paragraph [ref=e286]: 점선이 카드 높이 700입니다. 헤더 44 + 여백 8 + 요약 280 + 탭 영역 390 + 아래 여백 20 = 742로 선언값 합이 카드를 넘습니다(실제 렌더 잘림 여부는 미확인).
+      - generic [ref=e287]:
+        - heading "제안 1280 × 760 · T1 콘솔" [level=3] [ref=e288]:
+          - text: 제안
+          - generic [ref=e289]: 1280 × 760 · T1 콘솔
+        - generic [ref=e290]:
+          - generic [ref=e291]: 장비 정보 · 카메라 12대
+          - generic [ref=e292]: 레일 184개수 배지
+          - generic [ref=e293]: 툴바 44
+          - generic [ref=e294]: 목록 — 창 높이 전부
+          - generic [ref=e295]: 총 · 선택
+          - generic [ref=e296]: 상세340
+        - paragraph [ref=e297]: 목록 폭은 1280 − 184 − 340 = 756px. 1050px 창을 그대로 두면 526px로 핵심 열도 빠듯해 기본 크기를 올리는 쪽을 권합니다.
+    - list [ref=e298]:
+      - listitem [ref=e299]:
+        - generic [ref=e300]: D-1
+        - generic [ref=e301]:
+          - text: 행을 고르면 요약이 사라집니다.
+          - paragraph [ref=e302]:
+            - text: 편집기와 요약 카드가 같은 칸(
+            - code [ref=e303]: Grid.Row="0"
+            - text: )을
+            - code [ref=e304]: IsSelected
+            - text: 로 번갈아 씁니다 —
+            - code [ref=e305]: DeviceDashboardView.xaml:584
+            - text: .
+      - listitem [ref=e306]:
+        - generic [ref=e307]: D-2
+        - generic [ref=e308]:
+          - text: 목록이 약 7행에서 멈춥니다.
+          - paragraph [ref=e309]:
+            - code [ref=e310]: DataGrid Height="260"
+            - text: ", 레일"
+            - code [ref=e311]: Height="390"
+            - text: 고정이라 창을 키워도 늘지 않습니다.
+      - listitem [ref=e312]:
+        - generic [ref=e313]: D-3
+        - generic [ref=e314]:
+          - text: 편집기가 가로로 눌린 폼입니다.
+          - paragraph [ref=e315]: 20개 남짓한 필드가 자동 폭 6열 격자로 280px 높이에 흩어져 읽는 순서가 보이지 않습니다.
+      - listitem [ref=e316]:
+        - generic [ref=e317]: D-4
+        - generic [ref=e318]:
+          - text: 툴바가 복사본으로 번졌습니다.
+          - paragraph [ref=e319]:
+            - code [ref=e320]: "[250 | 1* | 1* | 70 · 10 · 70 …]"
+            - text: 골격이 장비 7종과 계정 관리에 반복됩니다.
+      - listitem [ref=e321]:
+        - generic [ref=e322]: D-5
+        - generic [ref=e323]:
+          - text: 여러 개를 한꺼번에 고칠 수 있다는 게 드러나지 않습니다.
+          - paragraph [ref=e324]:
+            - text: 편집기는 선택 목록(
+            - code [ref=e325]: IList
+            - text: )을 받는데, 화면에는 몇 개가 바뀌는지 표시가 없습니다.
+  - region [ref=e326]:
+    - generic [ref=e327]:
+      - heading "상세 패널이 가지는 여섯 상태" [level=2] [ref=e328]
+      - paragraph [ref=e329]: 누르면 위 콘솔이 그 상태로 열립니다
+    - generic [ref=e330]:
+      - generic [ref=e331]:
+        - strong [ref=e333]: 선택 없음
+        - generic [ref=e335]: 아무 행도 고르지 않았을 때
+        - paragraph [ref=e336]: 무엇을 하면 되는지 한 줄 안내와 이 종류의 정상·장애 수. 요약 카드를 없앤 대신 여기서 숫자를 봅니다.
+        - button "콘솔에서 보기" [ref=e337] [cursor=pointer]
+      - generic [ref=e338]:
+        - strong [ref=e340]: 한 개
+        - generic [ref=e342]: 행 하나를 골랐을 때
+        - paragraph [ref=e343]: 제목(장비명 · 장비번호)과 상태 배지 아래로 섹션이 계약 순서대로 펼쳐집니다.
+        - button "콘솔에서 보기" [ref=e344] [cursor=pointer]
+      - generic [ref=e345]:
+        - strong [ref=e347]: 여러 개
+        - generic [ref=e349]: Ctrl · Shift 로 여럿을 골랐을 때
+        - paragraph [ref=e350]: 값이 서로 다른 칸은 — 여러 값 —. 장비번호는 잠그고, 손댄 칸만 적용합니다.
+        - button "콘솔에서 보기" [ref=e351] [cursor=pointer]
+      - generic [ref=e352]:
+        - generic [ref=e353]:
+          - strong [ref=e354]: 새로 등록
+          - generic [ref=e355]: +
+        - generic [ref=e356]: 추가를 눌렀을 때
+        - paragraph [ref=e357]: 빈 폼과 필수 항목 안내. 다이얼로그를 따로 띄우지 않고 같은 자리에서 등록합니다.
+        - button "콘솔에서 보기" [ref=e358] [cursor=pointer]
+      - generic [ref=e359]:
+        - strong [ref=e361]: 미적용 변경
+        - generic [ref=e363]: 칸을 고치고 아직 적용 전
+        - paragraph [ref=e364]: 아래 막대가 경고색으로 바뀌고 건수를 보입니다. 이 상태로 다른 행을 누르면 이동을 막고 이유를 알립니다.
+        - button "콘솔에서 보기" [ref=e365] [cursor=pointer]
+      - generic [ref=e366]:
+        - strong [ref=e368]: 읽기 전용
+        - generic [ref=e370]: 편집 권한이 없을 때
+        - paragraph [ref=e371]: 칸은 잠기고 이유 한 줄. 추가·삭제도 비활성 + 툴팁 사유 — 아무 일도 안 일어나는 버튼은 두지 않습니다.
+        - button "콘솔에서 보기" [ref=e372] [cursor=pointer]
+  - region [ref=e373]:
+    - generic [ref=e374]:
+      - heading "자리는 오른쪽으로, 순서는 그대로" [level=2] [ref=e375]
+      - paragraph [ref=e376]: 편집기 6종의 실제 섹션 순서
+    - paragraph [ref=e377]: 속성창은 순서 자체가 정보라서 옮기면서 바꾸지 않습니다. 종류마다 다른 설정(함체 임계값 · 카메라 상세보기)은 늘 맨 아래입니다.
+    - generic [ref=e379]:
+      - generic [ref=e381]:
+        - generic [ref=e382]: "1"
+        - text: 장비 공통
+      - generic [ref=e383]:
+        - generic [ref=e384]: "2"
+        - text: 장비별 속성
+      - generic [ref=e385]:
+        - generic [ref=e386]: "3"
+        - text: 위치 정보
+      - generic [ref=e387]:
+        - generic [ref=e388]: "4"
+        - text: 그룹
+      - generic [ref=e389]:
+        - generic [ref=e390]: "5"
+        - text: 부가
+      - generic [ref=e391]: 제어기
+      - generic [ref=e392]: 장비번호 · 이름 · 유형 · 버전 · 활성화 · 상태
+      - generic [ref=e393]: IP · 포트
+      - generic [ref=e394]: 위치 · 위도 · 경도 · 고도 · 방위각
+      - generic [ref=e395]: 그룹
+      - generic [ref=e396]: —
+      - generic [ref=e397]: 센서
+      - generic [ref=e398]: 같음
+      - generic [ref=e399]: 제어기
+      - generic [ref=e400]: 같음
+      - generic [ref=e401]: 같음
+      - generic [ref=e402]: —
+      - generic [ref=e403]: 카메라
+      - generic [ref=e404]: 같음
+      - generic [ref=e405]: IP · 포트 · 사용자명 · 비밀번호 · 모드 · 분류 · 녹화
+      - generic [ref=e406]: 같음
+      - generic [ref=e407]: 같음
+      - generic [ref=e408]: 상세보기
+      - generic [ref=e409]: 스피커
+      - generic [ref=e410]: 같음
+      - generic [ref=e411]: 유형 · 설명 · 방송서버
+      - generic [ref=e412]: 같음
+      - generic [ref=e413]: 같음
+      - generic [ref=e414]: —
+      - generic [ref=e415]: 함체
+      - generic [ref=e416]: 같음
+      - generic [ref=e417]: 도어 · 히터 · 팬
+      - generic [ref=e418]: 같음
+      - generic [ref=e419]: 같음
+      - generic [ref=e420]: 임계값
+      - generic [ref=e421]: 경광등
+      - generic [ref=e422]: 같음
+      - generic [ref=e423]: IP · 포트 · 사용자 · 비밀번호 · 설명
+      - generic [ref=e424]: 같음
+      - generic [ref=e425]: 같음
+      - generic [ref=e426]: —
+  - region [ref=e427]:
+    - generic [ref=e428]:
+      - heading "목록에 남기는 열" [level=2] [ref=e429]
+      - paragraph [ref=e430]: 나머지는 상세 패널과 ‘열’ 메뉴로
+    - table [ref=e432]:
+      - rowgroup [ref=e433]:
+        - row [ref=e434]:
+          - columnheader "종류" [ref=e435]
+          - columnheader "실제 열 수" [ref=e436]
+          - columnheader "목록 기본" [ref=e437]
+          - columnheader "상세 패널로" [ref=e438]
+      - rowgroup [ref=e439]:
+        - row [ref=e440]:
+          - cell "카메라" [ref=e441]
+          - cell "12" [ref=e442]
+          - cell "상태 · 장비번호 · 장비명 · 유형 · IP:포트 · 활성화" [ref=e443]
+          - cell "모드 · 카테고리 · 녹화 · 위치" [ref=e444]
+        - row [ref=e445]:
+          - cell "센서" [ref=e446]
+          - cell "9" [ref=e447]
+          - cell "상태 · 장비번호 · 장비명 · 유형 · 제어기 · 활성화" [ref=e448]
+          - cell "위치 · 탐지 이력(행 동작으로)" [ref=e449]
+        - row [ref=e450]:
+          - cell "제어기 · 경광등" [ref=e451]
+          - cell "9" [ref=e452]
+          - cell "상태 · 장비번호 · 장비명 · 유형 · IP:포트 · 활성화" [ref=e453]
+          - cell "위치" [ref=e454]
+        - row [ref=e455]:
+          - cell "스피커" [ref=e456]
+          - cell "9" [ref=e457]
+          - cell "상태 · 장비번호 · 장비명 · 스피커 종류 · 방송서버 · 활성화" [ref=e458]
+          - cell "위치" [ref=e459]
+        - row [ref=e460]:
+          - cell "함체" [ref=e461]
+          - cell "10" [ref=e462]
+          - cell "상태 · 장비번호 · 장비명 · 도어 · 히터·팬 · 활성화" [ref=e463]
+          - cell "위치" [ref=e464]
+        - row [ref=e465]:
+          - cell "장비 그룹" [ref=e466]
+          - cell "5" [ref=e467]
+          - cell "이름 · 설명 · 장비수" [ref=e468]
+          - cell "그룹 탐지 이력(행 동작으로)" [ref=e469]
+    - paragraph [ref=e470]:
+      - text: IP와 포트는 한 칸
+      - code [ref=e471]: 10.20.4.12:554
+      - text: 으로 합칩니다. 창을 넓히면 ‘열’ 메뉴에서 전부 되살릴 수 있고, 사용자별로 기억합니다.
+  - region [ref=e472]:
+    - generic [ref=e473]:
+      - heading "창 폭에 따라 접힌다" [level=2] [ref=e474]
+      - paragraph [ref=e475]: 창은 이제 끌어서 크기를 바꿀 수 있습니다 (Surface Kernel)
+    - generic [ref=e476]:
+      - generic [ref=e477]:
+        - term [ref=e478]: 1280px 이상
+        - definition [ref=e479]:
+          - paragraph [ref=e484]: 세 칸이 나란히 붙습니다. 경계는 300–480px로 조절.
+      - generic [ref=e485]:
+        - term [ref=e486]: 960 – 1279px
+        - definition [ref=e487]:
+          - paragraph [ref=e492]: 상세는 행을 누를 때 오른쪽에서 밀려 나와 목록 위에 겹칩니다.
+      - generic [ref=e493]:
+        - term [ref=e494]: 960px 미만
+        - definition [ref=e495]:
+          - paragraph [ref=e500]: 레일이 아이콘 56px로 접히고, 상세는 서랍 그대로.
+    - paragraph [ref=e501]:
+      - text: 판정은
+      - code [ref=e502]: ConsoleLayoutMath.Resolve(width)
+      - text: 한 곳에서 합니다 — 화면 없이 단위 테스트할 수 있게.
+  - region [ref=e503]:
+    - generic [ref=e504]:
+      - heading "창 틀은 여섯 가지면 된다" [level=2] [ref=e505]
+      - paragraph [ref=e506]: 창 30종 + 맵 오버레이 20종을 성격별로 묶었습니다
+    - generic [ref=e507]:
+      - generic [ref=e508]:
+        - generic [ref=e515]:
+          - strong [ref=e516]: T1 · 목록과 상세
+          - generic [ref=e517]: 15개 창
+        - paragraph [ref=e518]: 레일 · 목록 · 상세 3단. 장비 7종, 계정 사용자·세션·권한 부여·감사 로그, 이벤트 내역 4종, 보고서 목록·템플릿, 억제 스케줄.
+      - generic [ref=e519]:
+        - generic [ref=e531]:
+          - strong [ref=e532]: T2 · 설정
+          - generic [ref=e533]: 5개 창
+        - paragraph [ref=e534]: 레일 · 섹션 폼 · 아래 고정 저장 막대(바뀐 게 있을 때만 켜짐). 설정 정보 10탭, 세션 설정, 보고서 생성, 권한 매트릭스(넓은 폼).
+      - generic [ref=e535]:
+        - generic [ref=e544]:
+          - strong [ref=e545]: T3 · 분석
+          - generic [ref=e546]: 2개 창
+        - paragraph [ref=e547]: 레일 · 필터 막대 · 차트 전폭, 점을 누르면 상세가 밀려 나옵니다. 이벤트 차트보기, 탐지 신호 이력.
+      - generic [ref=e548]:
+        - generic [ref=e554]:
+          - strong [ref=e555]: T4 · 작업 다이얼로그
+          - generic [ref=e556]: 10개 창
+        - paragraph [ref=e557]: 폭은 400 · 560 · 720 세 가지만. 아래 고정 버튼 줄 — 보조는 왼쪽, 주 동작은 오른쪽, 지우기는 위험색, 기본 포커스는 취소.
+      - generic [ref=e558]:
+        - generic [ref=e562]:
+          - strong [ref=e563]: T5 · 시스템 알림
+          - generic [ref=e564]: 2 + 공통
+        - paragraph [ref=e565]: 확인 · 안내 · 진행, 토스트, P0 알람. Surface Kernel 기획의 표면 규칙을 그대로 따릅니다.
+      - generic [ref=e566]:
+        - generic [ref=e570]:
+          - strong [ref=e571]: T6 · 맵 오버레이 창
+          - generic [ref=e572]: 2차 · 14개
+        - paragraph [ref=e573]: 헤더 38 · 모서리 10 · 그림자 하나. 계기(나침반·강풍·줌·축척·좌표·장애)는 모양이 곧 기능이라 대상에서 뺍니다.
+  - region [ref=e574]:
+    - generic [ref=e575]:
+      - heading "창마다 어느 틀로 가는가" [level=2] [ref=e576]
+      - paragraph [ref=e577]: 크기는 XAML 고정값
+    - table [ref=e579]:
+      - rowgroup [ref=e580]:
+        - row [ref=e581]:
+          - columnheader "영역" [ref=e582]
+          - columnheader "창" [ref=e583]
+          - columnheader "지금 모양" [ref=e584]
+          - columnheader "지금 크기" [ref=e585]
+          - columnheader "틀" [ref=e586]
+      - rowgroup [ref=e587]:
+        - row [ref=e588]:
+          - cell "장비" [ref=e589]
+          - cell "그룹 · 제어기 · 센서 · 카메라 · 스피커 · 함체 · 경광등" [ref=e590]
+          - cell "요약 280 · 레일 390 · 목록 260 · 선택 시 편집기가 요약을 덮음" [ref=e591]
+          - cell "1050×700" [ref=e592]
+          - cell "T1" [ref=e593]
+        - row [ref=e595]:
+          - cell "계정" [ref=e596]
+          - cell "사용자 · 세션 관리 · 권한 부여 · 감사 로그" [ref=e597]
+          - cell "위쪽 탭 6 · 목록 · 편집은 별도 다이얼로그" [ref=e598]
+          - cell "1120×700" [ref=e599]
+          - cell "T1" [ref=e600]
+        - row [ref=e602]:
+          - cell "계정" [ref=e603]
+          - cell "권한 설정 · 세션 설정" [ref=e604]
+          - cell "표 6개 · 폼" [ref=e605]
+          - cell "—" [ref=e606]
+          - cell "T2" [ref=e607]
+        - row [ref=e609]:
+          - cell "이벤트" [ref=e610]
+          - cell "탐지 · 장애 · 연결 · 조치 내역" [ref=e611]
+          - cell "위쪽 탭(센서/카메라) × 왼쪽 레일 5 — 이중 축" [ref=e612]
+          - cell "1150×760" [ref=e613]
+          - cell "T1" [ref=e614]
+        - row [ref=e616]:
+          - cell "이벤트" [ref=e617]
+          - cell "차트보기 · 탐지 신호 이력" [ref=e618]
+          - cell "차트 · 필터 190×2 + 목록" [ref=e619]
+          - cell "— · 880" [ref=e620]
+          - cell "T3" [ref=e621]
+        - row [ref=e623]:
+          - cell "이벤트" [ref=e624]
+          - cell "억제 스케줄" [ref=e625]
+          - cell "폼이 위(408 + 356 고정) · 목록이 아래" [ref=e626]
+          - cell "1050×720" [ref=e627]
+          - cell "T1" [ref=e628]
+        - row [ref=e630]:
+          - cell "보고서" [ref=e631]
+          - cell "목록 · 템플릿" [ref=e632]
+          - cell "위쪽 탭 3 · 목록" [ref=e633]
+          - cell "960×700" [ref=e634]
+          - cell "T1" [ref=e635]
+        - row [ref=e637]:
+          - cell "보고서" [ref=e638]
+          - cell "생성" [ref=e639]
+          - cell "폼" [ref=e640]
+          - cell "—" [ref=e641]
+          - cell "T2" [ref=e642]
+        - row [ref=e644]:
+          - cell "설정" [ref=e645]
+          - cell "설정 정보 10탭" [ref=e646]
+          - cell "레일 10 · 폼" [ref=e647]
+          - cell "800×500" [ref=e648]
+          - cell "T2" [ref=e649]
+        - row [ref=e651]:
+          - cell "다이얼로그" [ref=e652]
+          - cell "조치보고 2 · 계정 4 · 함체 임계값 · 장비 배정 · 카메라 속성 · 장비 추가" [ref=e653]
+          - cell "폭 400 · 450 · 460 · 500 · 550 · 600 여섯 가지" [ref=e654]
+          - cell "제각각" [ref=e655]
+          - cell "T4" [ref=e656]
+        - row [ref=e658]:
+          - cell "공통" [ref=e659]
+          - cell "확인 · 안내 · 진행 · 로그인 · 로그아웃 · 강풍 모드" [ref=e660]
+          - cell "카드" [ref=e661]
+          - cell "400×250 등" [ref=e662]
+          - cell "T5" [ref=e663]
+        - row [ref=e665]:
+          - cell "지도" [ref=e666]
+          - cell "레이어 · 센서 정보 · 재생 · 추적 설정 · 방송 · TTS · 카메라 팝업 등" [ref=e667]
+          - cell "Control + 스타일, 모서리 3–13" [ref=e668]
+          - cell "제각각" [ref=e669]
+          - cell "T6 · 2차" [ref=e670]
+  - region [ref=e672]:
+    - generic [ref=e673]:
+      - heading "다른 콘솔에 옮기면" [level=2] [ref=e674]
+      - paragraph [ref=e675]: 오른쪽 칸에 무엇이 오는지만 다릅니다
+    - generic [ref=e676]:
+      - generic [ref=e677]:
+        - heading "계정사용자" [level=3] [ref=e678]
+        - generic [ref=e679]:
+          - generic [ref=e680]:
+            - generic [ref=e681]: 사용자
+            - generic [ref=e682]: 권한 설정
+            - generic [ref=e683]: 세션 관리
+            - generic [ref=e684]: 세션 설정
+            - generic [ref=e685]: 감사 로그
+            - generic [ref=e686]: 권한 부여
+          - generic [ref=e694]:
+            - generic [ref=e696]: 인적사항
+            - emphasis [ref=e697]
+            - emphasis [ref=e698]
+            - generic [ref=e699]: 역할
+            - emphasis [ref=e700]
+            - generic [ref=e701]:
+              - generic [ref=e702]: 잠금
+              - generic [ref=e703]: 편집
+        - paragraph [ref=e704]: 위쪽 탭 6개가 레일로 내려오고 권한별 표시 규칙은 그대로 옮깁니다. 편집 · 삭제 · 잠금은 상세 칸으로 흡수하고, 등록과 비밀번호 재설정만 다이얼로그로 남깁니다.
+      - generic [ref=e705]:
+        - heading "이벤트탐지 내역" [level=3] [ref=e706]
+        - generic [ref=e707]:
+          - generic [ref=e708]:
+            - generic [ref=e709]: 차트보기
+            - generic [ref=e710]: 탐지내역
+            - generic [ref=e711]: 장애내역
+            - generic [ref=e712]: 연결내역
+            - generic [ref=e713]: 조치내역
+          - generic [ref=e721]:
+            - generic [ref=e723]: 신호
+            - emphasis [ref=e724]
+            - emphasis [ref=e725]
+            - generic [ref=e726]:
+              - generic [ref=e727]: 지도에서 보기
+              - generic [ref=e728]: 조치보고
+        - paragraph [ref=e729]: 센서 / 카메라 구분은 탭이 아니라 목록 위 필터 칩으로 내려 네비게이션 축을 하나로 줄입니다. 조치보고는 우클릭 메뉴에서 상세 칸의 주 버튼으로 올라옵니다.
+      - generic [ref=e730]:
+        - heading "억제 스케줄" [level=3] [ref=e731]
+        - generic [ref=e732]:
+          - generic [ref=e733]:
+            - generic [ref=e734]: 진행 중
+            - generic [ref=e735]: 예정
+            - generic [ref=e736]: 종료
+          - generic [ref=e744]:
+            - generic [ref=e745]: 억제 시간
+            - emphasis [ref=e746]
+            - generic [ref=e747]: 범위
+            - emphasis [ref=e748]
+            - emphasis [ref=e749]
+            - generic [ref=e750]: 장비
+            - emphasis [ref=e751]
+            - generic [ref=e752]:
+              - generic [ref=e753]: 취소
+              - generic [ref=e754]: 저장
+        - paragraph [ref=e755]: 지금은 폼(408 + 356 고정폭)이 위를 차지해 목록을 아래로 밀어냅니다. 목록을 가운데로 올리고 폼을 오른쪽 칸으로 옮기면, 새 스케줄은 곧 ‘새로 등록’ 상태입니다.
+      - generic [ref=e756]:
+        - heading "보고서템플릿" [level=3] [ref=e757]
+        - generic [ref=e758]:
+          - generic [ref=e759]:
+            - generic [ref=e760]: 목록
+            - generic [ref=e761]: 생성
+            - generic [ref=e762]: 템플릿
+          - generic [ref=e768]:
+            - generic [ref=e769]: 기본 정보
+            - emphasis [ref=e770]
+            - emphasis [ref=e771]
+            - generic [ref=e772]: 기본 기간
+            - emphasis [ref=e773]
+            - generic [ref=e774]:
+              - generic [ref=e775]: 복제
+              - generic [ref=e776]: 저장
+        - paragraph [ref=e777]: 목록 · 생성 · 템플릿을 오가며 미리보기를 확인하던 왕복이 사라집니다. 목록에서는 오른쪽 칸이 미리보기와 메타 정보가 됩니다.
+  - region [ref=e778]:
+    - generic [ref=e779]:
+      - heading "맵 오버레이 창 — 2차로 뺍니다" [level=2] [ref=e780]
+      - paragraph [ref=e781]: 각 오버레이 스타일 파일의 첫 CornerRadius, 실제 크기로
+    - paragraph [ref=e782]: 지도 위에 뜨는 창형 오버레이 14종 가운데 기존 표준(모서리 10 · 헤더 38)을 지키는 것은 7종입니다. 통일할 가치는 분명하지만, 코드 영역·좌표계·검증 방식이 앱 창과 달라 1차에 섞으면 무엇이 무엇을 깨뜨렸는지 가를 수 없습니다.
+    - generic [ref=e783]:
+      - generic [ref=e784]:
+        - generic [ref=e786]: "3"
+        - generic [ref=e787]: 군대부호 등록
+      - generic [ref=e788]:
+        - generic [ref=e790]: "4"
+        - generic [ref=e791]: 앵커 패널
+      - generic [ref=e792]:
+        - generic [ref=e794]: "4"
+        - generic [ref=e795]: 심볼 상세 보기
+      - generic [ref=e796]:
+        - generic [ref=e798]: "5"
+        - generic [ref=e799]: 재생 콘솔
+      - generic [ref=e800]:
+        - generic [ref=e802]: "7"
+        - generic [ref=e803]: 카메라 제어 허브
+      - generic [ref=e804]:
+        - generic [ref=e806]: "8"
+        - generic [ref=e807]: 레이어 패널
+      - generic [ref=e808]:
+        - generic [ref=e810]: "10"
+        - generic [ref=e811]: 센서 정보 · 추적 설정 · 방송 · TTS · 관심지역 · 드로잉 HUD · 지도 등록
+      - generic [ref=e812]:
+        - generic [ref=e814]: "13"
+        - generic [ref=e815]: 카메라 영상 팝업
+      - generic [ref=e816]:
+        - generic [ref=e818]: "6"
+        - generic [ref=e819]: 줌 (계기)
+      - generic [ref=e820]:
+        - generic [ref=e822]: "8"
+        - generic [ref=e823]: 나침반 (계기)
+      - generic [ref=e824]:
+        - generic [ref=e826]: "20"
+        - generic [ref=e827]: 장애 표시 (계기)
+      - generic [ref=e828]:
+        - generic [ref=e830]: "22"
+        - generic [ref=e831]: 강풍 표시 (계기)
+    - generic [ref=e832]:
+      - generic [ref=e833]: 표준 10 (7종)
+      - generic [ref=e835]: 표준에서 벗어난 창 (7종)
+      - generic [ref=e837]: 계기 — 통일 대상 아님
+    - generic [ref=e839]:
+      - table [ref=e841]:
+        - rowgroup [ref=e842]:
+          - row [ref=e843]:
+            - columnheader [ref=e844]
+            - columnheader "1차 · 앱 창" [ref=e845]
+            - columnheader "2차 · 맵 오버레이" [ref=e846]
+        - rowgroup [ref=e847]:
+          - row [ref=e848]:
+            - cell "코드" [ref=e849]
+            - cell "메인 솔루션 + Devices · Accounts · Events · Reports.Ui" [ref=e850]
+            - cell "GMaps.Ui 컨트롤 · 스타일 · 지도 캔버스" [ref=e851]
+          - row [ref=e852]:
+            - cell "좌표" [ref=e853]
+            - cell "셸 창" [ref=e854]
+            - cell "지도 캔버스 픽셀 + 위경도(카메라 리더선)" [ref=e855]
+          - row [ref=e856]:
+            - cell "드래그" [ref=e857]
+            - cell "새로 만듦" [ref=e858]
+            - cell "이미 있음 — 캔버스 부모 구조에 묶여 있음" [ref=e859]
+          - row [ref=e860]:
+            - cell "검증" [ref=e861]
+            - cell "UI 자동화로 상당 부분" [ref=e862]
+            - cell "픽셀 비교 위주" [ref=e863]
+          - row [ref=e864]:
+            - cell "함께 고치는 기획" [ref=e865]
+            - cell "거의 없음" [ref=e866]
+            - cell "3D 하우징 · 그룹 심볼 변환 진행 중" [ref=e867]
+      - generic [ref=e868]:
+        - term [ref=e869]: 외곽
+        - definition [ref=e870]: 표면 색 · 1px 테두리 · 모서리 10 · 그림자 한 종
+        - term [ref=e871]: 헤더
+        - definition [ref=e872]: 38 · 강조색 · 아이콘 16 + 제목 13 + 닫기
+        - term [ref=e873]: 섹션
+        - definition [ref=e874]: 1차 상세 패널과 같은 섹션 라벨 규격
+        - term [ref=e875]: 크기 조절
+        - definition [ref=e876]: 목록형(레이어 · 센서 정보 · 재생)만 오른쪽 아래 손잡이
+        - term [ref=e877]: 센서 정보
+        - definition [ref=e878]: 지도 쪽 ‘선택 그룹 센서 목록’ — 1차 상세 칸과 같은 정보 구조라 시각 규격을 맞춥니다
+        - term [ref=e879]: 착수 조건
+        - definition [ref=e880]: 1차 토큰 확정 · 진행 중 지도 기획 2건과 파일 충돌 합의 · 스크린샷 기준선
+  - region [ref=e881]:
+    - generic [ref=e882]:
+      - heading "진행 순서" [level=2] [ref=e883]
+      - paragraph [ref=e884]: 앞 단계가 다음 단계의 재료입니다
+    - list [ref=e885]:
+      - listitem [ref=e886]:
+        - generic [ref=e887]: 1-A
+        - generic [ref=e888]:
+          - strong [ref=e889]: 틀과 부품
+          - paragraph [ref=e890]: 레일 · 툴바 · 상세 패널 · 저장 막대 · 다이얼로그 폭, 그리고 창 폭 판정 순수 함수.
+        - generic [ref=e891]: Surface Kernel 창 프레임과 함께
+      - listitem [ref=e892]:
+        - generic [ref=e893]: 1-B
+        - generic [ref=e894]:
+          - strong [ref=e895]: 장비 창
+          - paragraph [ref=e896]: 이 문서의 콘솔 그대로 — 7탭, 상세 패널 6상태, 열 우선순위. 상세 패널은 선택마다 새로 만들지 않고 하나를 두고 선택만 바꿉니다.
+        - generic [ref=e897]: 1-A 이후
+      - listitem [ref=e898]:
+        - generic [ref=e899]: 1-C
+        - generic [ref=e900]:
+          - strong [ref=e901]: 콘솔로 넓히기
+          - paragraph [ref=e902]: 계정 → 이벤트 → 보고서 → 억제 스케줄.
+        - generic [ref=e903]: 장비 창 확인 후
+      - listitem [ref=e904]:
+        - generic [ref=e905]: 1-D
+        - generic [ref=e906]:
+          - strong [ref=e907]: 설정과 다이얼로그
+          - paragraph [ref=e908]: 설정 정보를 T2로, 다이얼로그 10종 폭을 세 가지로.
+        - generic [ref=e909]: 1-A 이후, 1-B와 병행 가능
+      - listitem [ref=e910]:
+        - generic [ref=e911]: "2"
+        - generic [ref=e912]:
+          - strong [ref=e913]: 맵 오버레이 창
+          - paragraph [ref=e914]: 창형 14종 크롬 통일, 센서 정보 패널 규격 맞춤.
+        - generic [ref=e915]: 1차 토큰 확정 + 지도 기획 충돌 합의
+  - region [ref=e916]:
+    - generic [ref=e917]:
+      - heading "정해 주실 것" [level=2] [ref=e918]
+      - paragraph [ref=e919]: 권고안으로 진행해도 되는지
+    - table [ref=e921]:
+      - rowgroup [ref=e922]:
+        - row [ref=e923]:
+          - columnheader "#" [ref=e924]
+          - columnheader "내용" [ref=e925]
+          - columnheader "권고" [ref=e926]
+      - rowgroup [ref=e927]:
+        - row [ref=e928]:
+          - cell "L-D1" [ref=e929]
+          - cell "장비 창 기본 크기를 1050×700에서 1280×760으로" [ref=e930]
+          - cell "올림" [ref=e931]
+        - row [ref=e932]:
+          - cell "L-D2" [ref=e933]
+          - cell "목록 기본 열을 핵심 6열로, 나머지는 상세 패널과 ‘열’ 메뉴로" [ref=e934]
+          - cell "채택" [ref=e935]
+        - row [ref=e936]:
+          - cell "L-D3" [ref=e937]
+          - cell "요약 카드 띠(280px)를 없애고 레일 개수 배지 · 선택 없음 상태의 수치로 흡수" [ref=e938]
+          - cell "채택" [ref=e939]
+        - row [ref=e940]:
+          - cell "L-D4" [ref=e941]
+          - cell "계정 편집 · 삭제 · 잠금 다이얼로그를 상세 패널로" [ref=e942]
+          - cell "채택 (등록 · 비밀번호 재설정은 유지)" [ref=e943]
+        - row [ref=e944]:
+          - cell "L-D5" [ref=e945]
+          - cell "이벤트의 센서 / 카메라 위쪽 탭을 필터 칩으로" [ref=e946]
+          - cell "채택" [ref=e947]
+        - row [ref=e948]:
+          - cell "L-D6" [ref=e949]
+          - cell "맵 오버레이 창 통일은 2차로 분리" [ref=e950]
+          - cell "분리" [ref=e951]
+  - contentinfo [ref=e952]:
+    - generic [ref=e953]:
+      - text: Ironwall 콘솔 레이아웃 · 2026-09-14 · 색은
+      - code [ref=e954]: Tokens.Light.xaml
+      - text: /
+      - code [ref=e955]: Tokens.Dark.xaml
+      - text: 실측값
+    - generic [ref=e956]:
+      - text: 근거
+      - link "window-layout-redesign-analysis.md" [ref=e957] [cursor=pointer]:
+        - /url: ../analyses/window-layout-redesign-analysis.md
+      - text: · 창 구조 기획
+      - link "Surface Kernel 스토리보드" [ref=e958] [cursor=pointer]:
+        - /url: window-surface-kernel-storyboard.html
+    - generic [ref=e959]: 콘솔 안의 장비 이름 · IP · 좌표는 설명용 예시입니다. 목업은 실제 앱 화면이 아니라 디자인 검토용 재현입니다.

@@ -312,8 +312,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
 
 
@@ -367,8 +366,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             var sql = @"SELECT * FROM Accounts WHERE Id=@Id;";
             var row = await _conn.QueryFirstOrDefaultAsync<AccountModelSQL>(sql, new { Id = id });
@@ -415,8 +413,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             // 사용자명만으로 row 조회
             const string sql = @"
@@ -474,8 +471,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             var sql = @"
             INSERT INTO Accounts
@@ -523,8 +519,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             var sql = @"
             UPDATE Accounts SET
@@ -565,8 +560,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             var sql = @"
             UPDATE Accounts SET Password=@PasswordHash
@@ -598,8 +592,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             //var fetchAcc = await _conn.ExecuteAsync("SELECT * FROM Accounts WHERE Id=@Id;", new { Id = acc.Id });
 
@@ -616,8 +609,7 @@ internal class AccountDbService : TaskService, IAccountDbService
 
     public async Task<bool> IsUsernameTakenAsync(string username, CancellationToken token = default)
     {
-        if (_conn?.State != ConnectionState.Open)
-            throw new Exception("DB not connected.");
+        await EnsureConnectedAsync(token);
 
         const string sql = @"
         SELECT 1
@@ -636,8 +628,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             var sql = @"SELECT * FROM Logins ORDER BY Id;";
             var rows = await _conn.QueryAsync<LoginModel>(sql);
@@ -657,8 +648,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             var sql = @"SELECT * FROM Logins WHERE Id=@Id;";
             var row = await _conn.QueryFirstOrDefaultAsync<LoginModel>(sql, new { Id = id });
@@ -678,15 +668,14 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             const string sql = @"
             SELECT  Id,
                     Username,
                     IsIdSaved
             FROM    Logins
-            ORDER BY CreatedAt DESC           -- 가장 최근 순
+            ORDER BY CreatedAt DESC, Id DESC   -- 가장 최근 순(같은 초면 나중 번호 — CreatedAt 은 초 단위)
             LIMIT 1;                          -- 한 건만";
 
             var loginModel = await _conn.QueryFirstOrDefaultAsync<LoginModel>(sql);
@@ -707,8 +696,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             const string sql = @"
             INSERT INTO Logins (Username, IsIdSaved)
@@ -732,8 +720,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             const string sql = @"
             UPDATE Logins
@@ -756,8 +743,7 @@ internal class AccountDbService : TaskService, IAccountDbService
     {
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            await EnsureConnectedAsync(token);
 
             await _conn.ExecuteAsync("DELETE FROM Logins WHERE Id=@Id;", new { Id = id });
             _log?.Info($"DeleteLoginAsync 완료 - Id={id}");
@@ -766,6 +752,30 @@ internal class AccountDbService : TaskService, IAccountDbService
         {
             _log?.Error($"DeleteLoginAsync Error: {ex}");
             throw;
+        }
+    }
+
+    private async Task EnsureConnectedAsync(CancellationToken token = default)
+    {
+        if (_conn == null || _conn.State != ConnectionState.Open)
+        {
+            _conn?.Dispose();
+            _conn = new MySqlConnection(BuildConnStr(includeDb: true));
+            await _conn.OpenAsync(token);
+            _log?.Info("[EnsureConnected] 재연결 성공");
+            return;
+        }
+        try
+        {
+            await _conn.PingAsync();
+        }
+        catch
+        {
+            _log?.Warning("[EnsureConnected] Ping 실패 — 재연결 시도");
+            _conn.Dispose();
+            _conn = new MySqlConnection(BuildConnStr(includeDb: true));
+            await _conn.OpenAsync(token);
+            _log?.Info("[EnsureConnected] 재연결 성공");
         }
     }
 

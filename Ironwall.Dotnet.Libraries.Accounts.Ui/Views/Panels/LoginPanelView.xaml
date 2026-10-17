@@ -1,0 +1,351 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.LoginPanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:vd="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs"
+	xmlns:vmd="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs"
+	d:Background="#88000000"
+	AutomationProperties.AutomationId="Accounts.Login.Panel"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	mc:Ignorable="d">
+	<!--
+		로그인 — B3(window-design-inventory-analysis.md #8). 커널 다이얼로그 틀 T4 · S 400.
+		옛 모양: md:Card(Theme=Dark 고정) + 시안 머리(ModernDialogHeader) — 셸 표면 틀 머리와 겹쳐 머리가 두 겹이었다.
+		· 머리 · 버튼 줄은 틀이 그린다. 확인 · 취소는 x:Name 버튼(Caliburn 바인딩 지시자 · UI 시험 앵커)이라 틀 버튼을 비우고
+		  그 버튼을 틀의 버튼 줄 오른쪽(FooterActions)에 앉힌다 — 틀의 자기 속성 안은 Caliburn 이름 관례가 닿지 않으므로 Message.Attach 로 잇는다.
+		· ESC · 머리 ✕ 는 [취소] 버튼으로 간다(코드 숨김 → DialogCancelRoute). 강제 로그인(CanClickCancel=false)이면 ✕ 도 숨고 ESC 도 닫지 않는다.
+		· Enter = [확인] 하나. 옛 창은 [확인] · [취소] 가 둘 다 IsDefault=True 라 Enter 가 비결정적이었다(ui-automation.md) — [취소] 의 IsDefault 를 뺐다.
+		· AutomationId(Accounts.Login.*) · x:Name 은 전부 그대로다.
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+
+			<!--  로그인 결과 띠 — 색만으로 말하지 않는다: 왼쪽 3px 막대 + 글리프(✓ · ⚠) + 글  -->
+			<Style x:Key="Login.ResultBand" TargetType="Border">
+				<Setter Property="Margin" Value="0,12,0,0" />
+				<Setter Property="Padding" Value="10,7" />
+				<Setter Property="BorderThickness" Value="3,0,0,0" />
+				<Setter Property="CornerRadius" Value="0,4,4,0" />
+				<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+				<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+				<Setter Property="Visibility" Value="Collapsed" />
+				<Style.Triggers>
+					<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+						<Setter Property="Visibility" Value="Visible" />
+						<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
+						<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
+					</DataTrigger>
+					<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+						<Setter Property="Visibility" Value="Visible" />
+						<Setter Property="Background" Value="{DynamicResource TintCriticalBrush}" />
+						<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+					</DataTrigger>
+					<!--  SSO 안내(에이전트 로그인 · 허용 창 · 관리자 등록) — 오류가 아니라 다음 행동 안내라 중립색(기본 Setter 그대로)  -->
+					<DataTrigger Binding="{Binding IsLoginInfo}" Value="True">
+						<Setter Property="Visibility" Value="Visible" />
+					</DataTrigger>
+				</Style.Triggers>
+			</Style>
+			<Style x:Key="Login.ResultGlyph" TargetType="TextBlock">
+				<Setter Property="Margin" Value="0,0,8,0" />
+				<Setter Property="VerticalAlignment" Value="Top" />
+				<Setter Property="FontSize" Value="13" />
+				<Setter Property="FontWeight" Value="Bold" />
+				<Style.Triggers>
+					<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+						<Setter Property="Text" Value="✓" />
+						<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
+					</DataTrigger>
+					<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+						<Setter Property="Text" Value="⚠" />
+						<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+					</DataTrigger>
+					<DataTrigger Binding="{Binding IsLoginInfo}" Value="True">
+						<Setter Property="Text" Value="ⓘ" />
+						<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+					</DataTrigger>
+				</Style.Triggers>
+			</Style>
+
+			<!--  로그인 설정 창 — 덮개(아래 ContentControl)가 LoginSettings 가 있을 때만 그린다  -->
+			<DataTemplate DataType="{x:Type vmd:LoginSettingsDialogViewModel}">
+				<vd:LoginSettingsDialogView />
+			</DataTemplate>
+		</ResourceDictionary>
+	</UserControl.Resources>
+
+	<md:DialogHost
+		x:Name="DialogHost"
+		DialogTheme="Inherit"
+		Identifier="LoginPanel">
+		<Grid>
+		<dlg:ConsoleDialogFrame
+			x:Name="CardContents"
+			DialogKey="Accounts.Login"
+			PrimaryText=""
+			SecondaryInvoked="OnSecondaryInvoked"
+			SecondaryText=""
+			ShowClose="{Binding IsEnabled, ElementName=ClickCancel}"
+			Size="Small"
+			Title="로그인">
+
+			<!--
+				톱니 — 로그인 설정(SSO 연동 켜기 · 끄기). 강제 로그인이어도 보인다(SSO 를 꺼야 들어갈 수 있는 경우).
+				호스트가 설정 창구(ILoginSettingsPort)를 등록하지 않았으면 숨는다. 틀의 자기 속성이라 Message.Attach 로 잇는다.
+			-->
+			<dlg:ConsoleDialogFrame.HeaderExtra>
+				<Button
+					Width="28"
+					Height="28"
+					MinWidth="0"
+					Padding="0"
+					AutomationProperties.AutomationId="Accounts.Login.SettingsButton"
+					AutomationProperties.Name="로그인 설정"
+					cal:Message.Attach="ClickLoginSettings"
+					ToolTip="로그인 설정">
+					<Button.Style>
+						<Style BasedOn="{StaticResource Console.Button.Ghost}" TargetType="Button">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsLoginSettingsAvailable}" Value="True">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Kind="CogOutline" />
+				</Button>
+			</dlg:ConsoleDialogFrame.HeaderExtra>
+
+			<dlg:ConsoleDialogFrame.FooterActions>
+				<StackPanel Orientation="Horizontal">
+					<Button
+						x:Name="ClickCancel"
+						Height="34"
+						MinWidth="92"
+						Margin="0,0,8,0"
+						AutomationProperties.AutomationId="Accounts.Login.CancelButton"
+						cal:Message.Attach="ClickCancel"
+						Content="취소"
+						Style="{StaticResource Console.Button}" />
+					<Button
+						x:Name="ClickOk"
+						Height="34"
+						MinWidth="92"
+						AutomationProperties.AutomationId="Accounts.Login.SubmitButton"
+						cal:Message.Attach="ClickOk"
+						Content="확인"
+						IsDefault="True"
+						Style="{StaticResource Console.Button.Primary}" />
+				</StackPanel>
+			</dlg:ConsoleDialogFrame.FooterActions>
+
+			<StackPanel>
+				<c:ConsoleField>
+					<c:ConsoleField.Header>
+						<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="아이디(ID)" />
+					</c:ConsoleField.Header>
+					<TextBox
+						x:Name="TextBoxID"
+						AutomationProperties.AutomationId="Accounts.Login.IdTextBox"
+						Style="{StaticResource Acct.TextBox}"
+						Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}">
+						<i:Interaction.Behaviors>
+							<behavior:TextBoxFocusAndCaretBehavior />
+						</i:Interaction.Behaviors>
+					</TextBox>
+				</c:ConsoleField>
+
+				<c:ConsoleField>
+					<c:ConsoleField.Header>
+						<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="비밀번호(PW)" />
+					</c:ConsoleField.Header>
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<!--  마스킹 PW (눈 버튼 누르는 동안 숨김)  -->
+						<PasswordBox
+							x:Name="TextBoxPW"
+							Grid.Column="0"
+							AutomationProperties.AutomationId="Accounts.Login.PasswordBox">
+							<PasswordBox.Style>
+								<Style BasedOn="{StaticResource Acct.PasswordBox}" TargetType="PasswordBox">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsPressed, ElementName=EyePeek}" Value="True">
+											<Setter Property="Visibility" Value="Collapsed" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</PasswordBox.Style>
+							<i:Interaction.Behaviors>
+								<behavior:PasswordBehavior Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+							</i:Interaction.Behaviors>
+						</PasswordBox>
+						<!--  평문 PW (눈 버튼 누르는 동안만 표시, 읽기전용)  -->
+						<TextBox
+							Grid.Column="0"
+							AutomationProperties.AutomationId="Accounts.Login.PasswordPlainTextBox"
+							IsReadOnly="True"
+							Text="{Binding Password, Mode=OneWay}">
+							<TextBox.Style>
+								<Style BasedOn="{StaticResource Acct.TextBox}" TargetType="TextBox">
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsPressed, ElementName=EyePeek}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBox.Style>
+						</TextBox>
+						<!--  눈알 아이콘 — 누르고 있는 동안 평문 표시(hold-to-reveal)  -->
+						<Button
+							x:Name="EyePeek"
+							Grid.Column="1"
+							Width="32"
+							Height="30"
+							MinWidth="0"
+							Margin="4,0,0,0"
+							Padding="0"
+							AutomationProperties.AutomationId="Accounts.Login.RevealPasswordButton"
+							AutomationProperties.Name="비밀번호 보기"
+							Focusable="False"
+							Style="{StaticResource Console.Button.Ghost}"
+							ToolTip="누르고 있는 동안 비밀번호 표시">
+							<md:PackIcon
+								Width="18"
+								Height="18"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Kind="EyeOutline" />
+						</Button>
+					</Grid>
+				</c:ConsoleField>
+
+				<c:ConsoleField>
+					<CheckBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Accounts.Login.SaveIdCheckBox"
+						Content="아이디 저장"
+						IsChecked="{Binding IsUsernameSaved, Mode=TwoWay}"
+						Style="{StaticResource Console.CheckBox}" />
+				</c:ConsoleField>
+
+				<!--  로그인 결과 — 글은 뷰에 직접 놓인 TextBlock(UIA Text) — 자동화가 AutomationId 로 읽는다  -->
+				<Border Style="{StaticResource Login.ResultBand}">
+					<DockPanel LastChildFill="True">
+						<TextBlock DockPanel.Dock="Left" Style="{StaticResource Login.ResultGlyph}" />
+						<TextBlock AutomationProperties.AutomationId="Accounts.Login.ResultText" Text="{Binding Result}">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="FontSize" Value="13" />
+									<Setter Property="FontWeight" Value="SemiBold" />
+									<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+									<Setter Property="TextWrapping" Value="Wrap" />
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+										<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+										<DataTrigger Binding="{Binding IsLoginInfo}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+					</DockPanel>
+				</Border>
+
+				<!--
+					SSO 로 로그인 — SSO PRD FR-03 · 에이전트 대화형 로그인(SDK SignInInteractiveAsync).
+					에이전트에 세션이 없거나 "이 앱만 로그아웃" 으로 막혔을 때 사람이 다시 들어오는 길. GOP 모드(IsSsoAvailable)에서만 보인다.
+					x:Name 을 두지 않는다(Caliburn 이름 관례 = 바인딩 지시자) — Message.Attach 로 잇고, 가드는 CanClickSsoLogin.
+				-->
+				<Button
+					Height="34"
+					Margin="0,12,0,0"
+					HorizontalAlignment="Stretch"
+					AutomationProperties.AutomationId="Accounts.Login.SsoButton"
+					cal:Message.Attach="ClickSsoLogin"
+					ToolTip="SSO 에이전트로 로그인합니다">
+					<Button.Style>
+						<Style BasedOn="{StaticResource Console.Button}" TargetType="Button">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsSsoAvailable}" Value="True">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Margin="0,0,6,0"
+							VerticalAlignment="Center"
+							Kind="ShieldAccountOutline" />
+						<TextBlock VerticalAlignment="Center" Text="{Binding SsoButtonText}" />
+					</StackPanel>
+				</Button>
+
+				<Rectangle
+					Height="1"
+					Margin="0,16,0,10"
+					Fill="{DynamicResource DividerBrush}" />
+				<DockPanel LastChildFill="True">
+					<Button
+						x:Name="ClickRegister"
+						Height="30"
+						AutomationProperties.AutomationId="Accounts.Login.RegisterButton"
+						DockPanel.Dock="Right"
+						Style="{StaticResource Console.Button.Ghost}"
+						ToolTip="가입하기">
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="16"
+								Height="16"
+								Margin="0,0,6,0"
+								VerticalAlignment="Center"
+								Kind="Register" />
+							<TextBlock VerticalAlignment="Center" Text="가입하기" />
+						</StackPanel>
+					</Button>
+					<TextBlock
+						VerticalAlignment="Center"
+						Style="{StaticResource Acct.Hint}"
+						Text="회원가입이 필요하시면" />
+				</DockPanel>
+			</StackPanel>
+		</dlg:ConsoleDialogFrame>
+
+		<!--  로그인 설정 창 덮개 — 열려 있을 때만 로그인 틀 위를 스크림째 덮는다(로그인 틀의 자식이 아니라 ESC · Enter 가 섞이지 않는다)  -->
+		<ContentControl
+			AutomationProperties.AutomationId="Accounts.Login.SettingsLayer"
+			Content="{Binding LoginSettings}"
+			Focusable="False"
+			IsTabStop="False" />
+		</Grid>
+	</md:DialogHost>
+</UserControl>

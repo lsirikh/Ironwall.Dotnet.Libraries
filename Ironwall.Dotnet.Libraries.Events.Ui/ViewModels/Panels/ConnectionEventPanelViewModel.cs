@@ -1,14 +1,18 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.Specialized;
+using System.Threading;
 using System.Windows;
+using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -25,41 +29,89 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
     #region - Ctors -
     public ConnectionEventPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
+                                       , EventProviderService providerService
                                        , DeviceProvider deviceProvider
                                        , EventProvider eventProvider)
                                        : base(eventAggregator, log)
     {
-        _dbService = eventDbService;
+        _providerService = providerService;
         _eventProvider = eventProvider;
         DeviceProvider = deviceProvider;
+        LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
+    #endregion
+    #region - FR-EN-10/11 권한 게이팅 (events 도메인) -
+    private IPermissionService? _permissionService;
+    private bool _permissionResolved;
+    private IPermissionService? ResolvePermissionService()
+    {
+        if (_permissionResolved) return _permissionService;
+        try { _permissionService = IoC.Get<IPermissionService>(); _permissionResolved = _permissionService != null; }   // 성공 시에만 캐시(영구 fail-open 방지)
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(ConnectionEventPanelViewModel)}] PermissionService 미해석(전체허용 폴백): {ex.Message}");
+            _permissionService = null;
+        }
+        return _permissionService;
+    }
+    private bool CanEditEvents() => ResolvePermissionService()?.CanEdit("events") ?? true;
+    private bool CanDelEvents()  => ResolvePermissionService()?.CanDelete("events") ?? true;
+
+    private void OnPermissionsChanged()
+    {
+        Execute.OnUIThread(() =>
+        {
+            NotifyOfPropertyChange(nameof(CanInsertEvent));
+            NotifyOfPropertyChange(nameof(CanSaveEvent));
+            NotifyOfPropertyChange(nameof(CanDeleteEvent));
+        });
+    }
+    public bool CanInsertEvent => CanEditEvents();
+    public bool CanSaveEvent   => CanEditEvents();
+    public bool CanDeleteEvent => CanDelEvents();
     #endregion
     #region - Implementation of Interface -
     #endregion
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        await DataInitialize(cancellationToken).ConfigureAwait(false);
+        // FR-EN-11: 역할강등 재평가 구독
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged += OnPermissionsChanged;
+
         await base.OnActivateAsync(cancellationToken);
-        IsVisible = true;
-        //UpdateAction?.Invoke(_startDate, _endDate);
+        if (IsCacheValid())
+        {
+            LoadFromCache();
+            IsVisible = true;
+            UpdateAction?.Invoke(_startDate, _endDate);
+        }
+        else
+        {
+            await DataInitialize(cancellationToken);
+        }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
+        // FR-EN-11: 역할강등 재평가 구독 해제
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
+
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         return base.OnDeactivateAsync(close, cancellationToken);
     }
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new ConnectionEventViewModel(new ConnectionEventModel());
+        // FR-EN-10 CRUD 생성 게이트 (CanEdit)
+        if (!CanEditEvents()) return;
+        var vm = new ConnectionEventViewModel(new ConnectionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Connection });
         ViewModelProvider.Add(vm);
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        if (!await _processGate.WaitAsync(0))       // 0 → "비동기로 테스트-후-입장"
             return;
         try
         {
@@ -87,7 +139,19 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
+        // FR-EN-10 CRUD 삭제 게이트 (CanDelete)
+        if (!CanDelEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "이벤트 삭제 권한이 없습니다."
+            });
+            return;
+        }
         if (SelectedItemCount == 0) return;
+        if (IsDeleteBatchExceeded(SelectedItemCount)) return;   // (CRUD 표준) 한 번에 최대 MAX_DELETE_COUNT건 초과 차단
+        _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = "선택한 이벤트를 정말로 삭제하시겠습니까? 해당이벤트의 조치보고도 함께 삭제 됩니다.",
@@ -97,12 +161,22 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
 
     public override async void OnClickSaveButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        // FR-EN-10 CRUD 수정/저장 게이트 (CanEdit)
+        if (!CanEditEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "이벤트 저장 권한이 없습니다."
+            });
+            return;
+        }
+        if (!await _processGate.WaitAsync(0))       // 0 → "비동기로 테스트-후-입장"
             return;
 
         try
         {
-            SaveButtonEnable = false;
+            IsSaving = true;
 
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
             {
@@ -112,21 +186,57 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
             _pCancellationTokenSource = new CancellationTokenSource();
 
             var token = _pCancellationTokenSource.Token;
-            var currentList = _eventProvider;
 
-            var dbList = await _dbService.FetchConnectionEventsAsync(startDate: StartDate, endDate: EndDate, token: token);
-
-            var insertList = currentList.Where(m => m.Id <= 0).ToList();
-            var updateList = ViewModelProvider
-                             .Where(vm => vm.IsEdited && vm.Model.Id > 0)
+            var insertList = ViewModelProvider
+                             .Where(vm => vm.Model.Id <= 0)
                              .Select(vm => (IConnectionEventModel)vm.Model)
                              .ToList();
+            var updateRows = ViewModelProvider
+                             .Where(vm => vm.IsEdited && vm.Model.Id > 0)
+                             .ToList();
 
-            foreach (var model in updateList)
-                await _dbService.UpdateConnectionEventAsync(model, token);
+            // 부분 실패 수집 — 한 건 실패로 전체 중단 방지. 실패/보류 시 재로드 생략해 편집 보존.
+            var saveFailures = new List<string>();
+            int held = 0;
 
-            foreach (var model in insertList.OfType<IConnectionEventModel>())
-                await _dbService.InsertConnectionEventAsync(model, token);
+            foreach (var vm in updateRows)
+            {
+                var model = (IConnectionEventModel)vm.Model;
+                try { await _providerService.UpdateConnectionEventAsync(model, token); vm.IsEdited = false; }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"{model.Id}번 수정");   // 예외 원문은 아래 로그로만
+                    _log?.Error($"UpdateConnectionEventAsync 실패 Id={model.Id}: {ex.Message}");
+                }
+            }
+
+            foreach (var model in insertList)
+            {
+                if (model.Device == null || model.Device.Id <= 0) { held++; continue; }   // 장비 미선택 Draft 보류(서버 device_id FK 필수)
+                try { var created = await _providerService.InsertConnectionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add("새 이벤트 추가");   // 예외 원문은 아래 로그로만
+                    _log?.Error($"InsertConnectionEventAsync 실패: {ex.Message}");
+                }
+            }
+
+            if (saveFailures.Count > 0 || held > 0)
+            {
+                var sb = new System.Text.StringBuilder();
+                if (saveFailures.Count > 0)
+                    sb.AppendLine($"{saveFailures.Count}건을 저장하지 못했습니다({string.Join(", ", saveFailures.Take(5))}). 고친 내용은 그대로 두었습니다. 잠시 뒤 다시 저장하세요.");
+                if (held > 0)
+                    sb.AppendLine($"{held}건은 장비 미선택으로 보류했습니다. 장비를 선택한 뒤 다시 저장하세요.");
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "이벤트 저장 일부 보류/실패",
+                    Explain = sb.ToString().TrimEnd()
+                });
+                return;
+            }
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -137,7 +247,7 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
         finally
         {
             //UpdateAction?.Invoke(_startDate, _endDate);
-            SaveButtonEnable = true;
+            IsSaving = false;
             _processGate.Release();                // 뮤텍스 해제
         }
     }
@@ -201,8 +311,7 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
 
     private static bool EventEquals(IConnectionEventModel a, IConnectionEventModel b)
     {
-        return a.EventGroup == b.EventGroup &&
-               a?.Device?.Id == b?.Device?.Id &&
+        return a?.Device?.Id == b?.Device?.Id &&
                a.MessageType == b.MessageType &&
                a.Status == b.Status &&
                a.DateTime == b.DateTime;
@@ -224,6 +333,7 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
             if (_cancellationTokenSource != null)
                 _cancellationTokenSource.Cancel();
 
+            InvalidateCache();
             _cancellationTokenSource = new CancellationTokenSource();
             await DataInitialize(_cancellationTokenSource.Token).ConfigureAwait(false);
         }
@@ -243,7 +353,7 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
     {
         try
         {
-            if (_cancellationTokenSource == null && _cancellationTokenSource.IsCancellationRequested)
+            if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
                 return;
 
             _cancellationTokenSource.Cancel();
@@ -261,47 +371,164 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
             try
             {
                 IsVisible = false;
-                //await Task.Delay(300, cancellationToken);
 
-                //DB Fetching
-                var events = await _dbService.FetchConnectionEventsAsync(startDate: StartDate, endDate: EndDate, token: cancellationToken);
-                if (events == null) return;
-                _eventProvider.Clear();
-                foreach (var item in events)
+                // 페이지네이션 상태 초기화
+                _currentPage = 0;
+                _totalPages = 1;
+                _totalCount = 0;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // swap-on-success: 첫 페이지 성공 확인 후에만 기존 컬렉션 교체(실패 시 보존+통지 — 화면 공백 방지)
+                PagedResult<IConnectionEventModel> firstPage;
+                try
                 {
-                    _eventProvider.Add(item);
+                    firstPage = await _providerService.FetchConnectionEventsPageAsync(
+                        StartDate, EndDate, 1, 100, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _log?.Error($"DataInitialize 첫 페이지 fetch 실패: {ex.Message}");
+                    firstPage = new PagedResult<IConnectionEventModel> { Success = false };
                 }
 
+                if (!firstPage.Success)
+                {
+                    await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                    {
+                        Explain = "연결 이벤트를 불러오지 못했습니다. 서버 연결 상태를 확인하세요. 기존 목록은 유지됩니다."
+                    }, cancellationToken);
+                    return; // finally 에서 IsVisible=true
+                }
+
+                _currentPage = firstPage.Page;
+                _totalPages = firstPage.TotalPages;
+                _totalCount = firstPage.Total;
+
+                // 성공 → 기존 컬렉션 교체
+                var existingConnection = _eventProvider.OfType<IConnectionEventModel>().ToList();
+                foreach (var e in existingConnection) _eventProvider.Remove(e);
+
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
-                //ViewModelProvider Setting
-                if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-
-
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in _eventProvider.OfType<IConnectionEventModel>().OrderBy(item => item.Id).Select((item, index) => (item, index)))
-                    {
-                        if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new ConnectionEventViewModel(item) { Index = index + 1 });
-                    }
+                });
+                ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
 
-                    NotifyOfPropertyChange(() => ViewModelProvider);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                DispatcherService.Invoke(() =>
+                {
+                    foreach (var item in firstPage.Items)
+                    {
+                        ViewModelProvider.Add(new ConnectionEventViewModel(item)
+                        {
+                            Index = ViewModelProvider.Count + 1
+                        });
+                    }
+                    NotifyOfPropertyChange(() => LoadedCountText);
+                    NotifyOfPropertyChange(() => HasMorePages);
                 });
 
-                ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
+                // 캐시 날짜범위 기록
+                SetCachedDate(_startDate, _endDate);
             }
-            catch (TaskCanceledException ex)
+            catch (OperationCanceledException ex)
             {
-                _log?.Warning($"Raised {nameof(TaskCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
+                _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
             }
             finally
             {
+                IsVisible = true;
                 UpdateAction?.Invoke(_startDate, _endDate);
             }
         });
+    }
+
+    public async Task LoadNextPageAsync(CancellationToken token = default)
+    {
+        if (_isLoadingMore || !HasMorePages) return;
+
+        token.ThrowIfCancellationRequested();
+
+        _isLoadingMore = true;
+        IsLoadingMore = true;
+
+        try
+        {
+            var result = await _providerService.FetchConnectionEventsPageAsync(
+                StartDate, EndDate, _currentPage + 1, 100, token);
+
+            if (token.IsCancellationRequested) return;
+
+            _currentPage = result.Page;
+            _totalPages = result.TotalPages;
+            _totalCount = result.Total;
+
+            DispatcherService.Invoke(() =>
+            {
+                // offset 페이지라 두 쪽 사이에 새 이벤트가 생기면 다음 쪽이 앞 쪽의 행을 다시 준다(실서버 왕복 E9b:
+                //   page1=[511,510] · page2=[510,509]). 이미 붙은 Id 는 건너뛴다 — 같은 행이 두 번 보이면 조치도 두 번 간다.
+                var seenIds = new HashSet<int>(ViewModelProvider.Select(v => v.Model.Id));
+                foreach (var item in result.Items)
+                {
+                    if (!seenIds.Add(item.Id)) continue;
+                    // _eventProvider 동기화는 CollectionChanged 핸들러가 담당
+                    ViewModelProvider.Add(new ConnectionEventViewModel(item)
+                    {
+                        Index = ViewModelProvider.Count + 1
+                    });
+                }
+                NotifyOfPropertyChange(() => LoadedCountText);
+                NotifyOfPropertyChange(() => HasMorePages);
+            });
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex) { _log?.Error($"LoadNextPageAsync failed: {ex.Message}"); }
+        finally
+        {
+            _isLoadingMore = false;
+            IsLoadingMore = false;
+        }
+    }
+
+    private void LoadFromCache()
+    {
+        ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+        DispatcherService.Invoke(() =>
+        {
+            ViewModelProvider.Clear();
+            foreach (var (item, index) in _eventProvider.OfType<IConnectionEventModel>().OrderBy(item => item.Id).Select((item, index) => (item, index)))
+            {
+                ViewModelProvider.Add(new ConnectionEventViewModel(item) { Index = index + 1 });
+            }
+            NotifyOfPropertyChange(() => ViewModelProvider);
+            NotifyOfPropertyChange(() => LoadedCountText);
+            NotifyOfPropertyChange(() => HasMorePages);
+        });
+        ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+    }
+
+    internal bool IsCacheValid()
+    {
+        return _isCacheValid
+            && _cachedStartDate == _startDate
+            && _cachedEndDate == _endDate
+            && _eventProvider.OfType<IConnectionEventModel>().Any();
+    }
+
+    public void SetCachedDate(DateTime startDate, DateTime endDate)
+    {
+        _cachedStartDate = startDate;
+        _cachedEndDate = endDate;
+        _isCacheValid = true;
+    }
+
+    public void InvalidateCache()
+    {
+        _isCacheValid = false;
     }
     #endregion
     #region - IHanldes -
@@ -313,10 +540,13 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in SelectedItems.ToList())
-            {
-                var ret = await _dbService.DeleteConnectionEventAsync((IConnectionEventModel)item.Model, cancellationToken);
-            }
+            await ExecuteDeleteAsync(
+                _pendingDeleteItems,
+                r => r.Model.Id,
+                (id, t) => _providerService.DeleteConnectionEventAsync(id, t),
+                r => _eventProvider.Remove(r.Model),
+                cancellationToken);
+            _pendingDeleteItems = [];
         }, cancellationToken);
 
         await DataInitialize().ConfigureAwait(false);
@@ -361,13 +591,34 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
     public DeviceProvider DeviceProvider { get; }
     public delegate void SendDate(DateTime start, DateTime end);
     public event SendDate? UpdateAction;
+
+    // ─── Pagination Properties ───
+    public bool IsLoadingMore
+    {
+        get => _isLoadingMore;
+        set { _isLoadingMore = value; NotifyOfPropertyChange(() => IsLoadingMore); }
+    }
+
+    public string LoadedCountText => $"{ViewModelProvider.Count} / {_totalCount}건";
+    public bool HasMorePages => _currentPage < _totalPages;
+
+    public ICommand LoadMoreCommand { get; }
     #endregion
     #region - Attributes -
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
-    private IEventDbService _dbService;
+    private EventProviderService _providerService;
     private EventProvider _eventProvider;
+    private DateTime _cachedStartDate;
+    private DateTime _cachedEndDate;
+    private bool _isCacheValid;
 
+    // ─── Pagination State ───
+    private int _currentPage;
+    private int _totalPages = 1;
+    private int _totalCount;
+    private bool _isLoadingMore;
+    private IList<ConnectionEventViewModel> _pendingDeleteItems = [];
     #endregion
 }

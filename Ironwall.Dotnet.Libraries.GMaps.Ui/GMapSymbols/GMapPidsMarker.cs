@@ -1,9 +1,9 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -15,7 +15,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
   Company      : Sensorway Co., Ltd.                                       
   Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
+public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMarker
 {
     #region - Ctors -
     public GMapPidsMarker(ILogService log, IPidsSymbolModel pidsModel)
@@ -23,153 +23,157 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     {
         pidsModel.Update += PidsModel_Update;
     }
-
-    
     #endregion
 
     #region - Animation System -
-    private DispatcherTimer? _animationTimer;
-    private EnumColorType _originalColor = EnumColorType.Blue;
-    private bool _isAnimating = false;
-
-
+    /// <summary>
+    /// 모델 갱신 신호(<c>SetUpdate</c>) — 통지는 <b>항상 UI 스레드에서</b> 낸다.
+    /// </summary>
+    /// <remarks>
+    /// <para>(A4) <c>DeviceSymbolLookupModel.SyncFromDevice</c> 는 SYNC_DEVICE 를 받은 NATS 스레드에서 곧장 <c>SetUpdate</c> 를 부른다
+    /// (다른 경로는 <c>MarshalUpdate</c> 로 UI 스레드에 넘긴다). 그 스레드에서 마커 <c>PropertyChanged(DoorState)</c> 가 나가면
+    /// 열려 있는 속성창(<c>GMapPropertyPidsControl.SyncGateFromMarker</c>)이 WPF 의존 속성을 쓰다 교차 스레드 예외로 죽고,
+    /// 호스트의 SYNC_DEVICE 처리 전체(문 상태 · 제어기 자동복구 · 소속 통지)가 그 예외에 끊긴다.
+    /// → 여기서 한 번에 막는다: UI 스레드가 아니면 합쳐서(<see cref="_updatePending"/>) 한 번만 넘긴다. 넘어간 콜백은 모델의 <b>최신값</b>을 읽는다.</para>
+    /// </remarks>
     private void PidsModel_Update(object? sender, EventArgs e)
     {
+        var dispatcher = Shape?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess() && !dispatcher.HasShutdownStarted)
+        {
+            if (System.Threading.Interlocked.Exchange(ref _updatePending, 1) == 1) return;   // 이미 넘겨 둔 콜백이 최신값을 읽는다
+            dispatcher.BeginInvoke(new Action(() =>
+            {
+                System.Threading.Interlocked.Exchange(ref _updatePending, 0);
+                ApplyModelUpdate();
+            }), System.Windows.Threading.DispatcherPriority.Background);
+            return;
+        }
+        ApplyModelUpdate();
+    }
+
+    private void ApplyModelUpdate()
+    {
+        if (_model is null) return;   // Dispose 뒤 늦게 도착한 콜백
+        // (A7) 갱신마다 Info 를 남기면 이벤트 1건이 로그 여러 줄이 된다(버퍼링 appender · 수백 개 마커). ILogService 에 Debug 수준이 없어
+        //   디버그 빌드 출력으로만 내린다 — 상태 전이 자체는 SymbolEventManager 가 이미 Info 로 남긴다.
+        System.Diagnostics.Debug.WriteLine($"[SYNC→Symbol] PidsModel_Update: '{_model.Title}' OperationState={_model.OperationState}, EventStatus={_model.EventStatus}");
+
         OnPropertyChanged(nameof(EventStatus));
+        OnPropertyChanged(nameof(CompositeStatus));
         OnPropertyChanged(nameof(OperationState));
-    }
+        OnPropertyChanged(nameof(DetectionRange));
+        OnPropertyChanged(nameof(DetectionAngle));
+        OnPropertyChanged(nameof(DetectionBearing));
+        OnPropertyChanged(nameof(DoorState));   // FR-15: 이벤트 경로(DeviceSymbolLookupModel.ApplyDoorState → SetUpdate)는 모델에만 쓴다 — 통지가 없으면 3D 문짝이 안 움직인다(2026-09-08 00:27 실기 결함)
 
+        // SYNC_DEVICE 재조회는 장비 모델의 축 묶음(Axes)을 참조째 갈고 SyncFromDevice → SetUpdate 로 여기 온다 — 부품 요약도 그때 다시 만든다.
+        RefreshComponentSummary(force: false);
+    }
+    #endregion
+
+    #region - Component health (runtime only) -
     /// <summary>
-    /// 모델 속성 변경 감지 (EventStatus 변경 시 자동 애니메이션)
+    /// 연결 장비의 부품 요약 — <b>런타임 전용</b>(직렬화 · 영속 · Undo 대상 아님, 진실은 서버).
+    /// 연결 장비의 축 묶음 참조가 바뀔 때만 다시 만든다.
     /// </summary>
-    private void OnModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+    public Helpers.Components.ComponentHealthSummary ComponentSummary
     {
-        if (e.PropertyName == nameof(IPidsSymbolModel.EventStatus))
+        get => _componentSummary;
+        private set
         {
-            UpdateAnimationFromEventStatus();
+            if (ReferenceEquals(_componentSummary, value)) return;
+            _componentSummary = value;
+            OnPropertyChanged(nameof(ComponentSummary));   // 지도(GMapCustomControl)가 이 통지를 받아 칸 줄 밀도를 다시 센다
         }
     }
 
     /// <summary>
-    /// EventStatus에 따른 애니메이션 자동 업데이트
+    /// 연결 장비의 축 묶음(<c>LinkedDevice.Axes</c>)으로 부품 요약을 다시 만든다. <paramref name="force"/>=false 면 참조가 같을 때 건너뛴다.
     /// </summary>
-    private void UpdateAnimationFromEventStatus()
+    public void RefreshComponentSummary(bool force = false)
     {
-        try
+        if (_model is null) return;
+        var axes = _liveDetached ? null : _model.LinkedDevice?.Axes;
+        if (!force && ReferenceEquals(axes, _summarySource) && _summaryBuilt) return;
+        _summarySource = axes;
+        _summaryBuilt = true;
+        ComponentSummary = Helpers.Components.ComponentHealthSummary.Build(axes, Helpers.Components.MapComponentCatalog.Labels, _model.DeviceType);   // FR-07 카탈로그 한글 · 종류별 대표 칸
+    }
+
+    /// <summary>
+    /// 지도가 센 칸 줄 밀집 여부(FR-04) — <b>런타임 전용</b>. 지도(<c>GMapCustomControl.RefreshComponentStripDensity</c>)가 값이 바뀔 때만
+    /// 모든 PIDS 심볼에 내려 주고, 마커 컨트롤이 이 값을 부품 층으로 넘긴다.
+    /// </summary>
+    public bool ComponentStripCrowded
+    {
+        get => _componentStripCrowded;
+        set
         {
-            switch (_model.EventStatus)
-            {
-                case EnumEventStatus.Normal:
-                    StopAnimation();
-                    SetStaticColor(_originalColor);
-                    break;
-
-                case EnumEventStatus.Detecting:
-                    StartBlinkAnimation(EnumColorType.Green, TimeSpan.FromMilliseconds(500));
-                    break;
-
-                case EnumEventStatus.Fault:
-                    StartBlinkAnimation(EnumColorType.Red, TimeSpan.FromMilliseconds(200));
-                    break;
-
-                case EnumEventStatus.Connection:
-                    SetStaticColor(EnumColorType.Blue);
-                    break;
-
-                default:
-                    SetStaticColor(EnumColorType.Gray);
-                    break;
-            }
-
-            _log?.Info($"애니메이션 상태 변경: {_model.Title} → {_model.EventStatus}");
+            if (_componentStripCrowded == value) return;
+            _componentStripCrowded = value;
+            OnPropertyChanged(nameof(ComponentStripCrowded));
         }
-        catch (Exception ex)
+    }
+
+    /// <summary>조립 카드(L3)가 이 심볼에 열려 있다 — <b>런타임 전용</b>. 칸 줄을 밀집 중에도 그리게 한다.</summary>
+    public bool IsComponentCardOpen
+    {
+        get => _isComponentCardOpen;
+        set
         {
-            _log?.Error($"애니메이션 업데이트 실패: {ex.Message}");
+            if (_isComponentCardOpen == value) return;
+            _isComponentCardOpen = value;
+            OnPropertyChanged(nameof(IsComponentCardOpen));
         }
     }
 
     /// <summary>
-    /// 깜빡임 애니메이션 시작
+    /// 연결 장비가 서버에서 삭제됐다 — 실시간 상태(이벤트 색 · 동작 · 문 · 부품)를 비운다. 저장된 연결(LinkedDeviceId)은 건드리지 않는다.
+    /// 호출 스레드: UI.
     /// </summary>
-    private void StartBlinkAnimation(EnumColorType targetColor, TimeSpan interval)
+    public void ResetLiveState()
     {
-        StopAnimation();
-
-        _isAnimating = true;
-        bool isHighlighted = false;
-
-        _animationTimer = new DispatcherTimer
-        {
-            Interval = interval
-        };
-
-        _animationTimer.Tick += (s, e) =>
-        {
-            try
-            {
-                FillColor = isHighlighted ? _originalColor : targetColor;
-                isHighlighted = !isHighlighted;
-            }
-            catch (Exception ex)
-            {
-                _log?.Error($"애니메이션 틱 오류: {ex.Message}");
-            }
-        };
-
-        _animationTimer.Start();
+        if (_model is null) return;
+        _liveDetached = true;
+        _model.CompositeStatus = EnumCompositeEventStatus.Normal;   // EventStatus 도 함께 Normal
+        _model.DoorState = EnumDoorState.Unknown;
+        OperationState = EnumOperationState.NONE;
+        RefreshComponentSummary(force: true);
+        ApplyModelUpdate();
     }
-
-    /// <summary>
-    /// 정적 색상 설정
-    /// </summary>
-    private void SetStaticColor(EnumColorType color)
-    {
-        StopAnimation();
-        FillColor = color;
-    }
-
-    /// <summary>
-    /// 애니메이션 중지
-    /// </summary>
-    private void StopAnimation()
-    {
-        if (_animationTimer != null)
-        {
-            _animationTimer.Stop();
-            _animationTimer = null;
-        }
-        _isAnimating = false;
-    }
-
     #endregion
 
     #region - Overrides -
     /// <summary>
     /// PIDS 마커 전용 컨트롤 생성
     /// </summary>
+    private static bool s_symbol3DLogged;
+
     protected override UIElement CreateMarkerControl()
     {
-        var markerControl = new GMapMarkerPidsControl(this);
-        _log?.Info($"GMapMarkerPidsControl 생성: {_model.Title}");
+        if (!s_symbol3DLogged)
+        {
+            s_symbol3DLogged = true;
+            var on = Utils.Symbol3DFeature.IsEnabled;   // Lazy 평가 후 진단 문자열이 채워진다
+            _log?.Info($"[Symbol3D] {(on ? "ON → 3D 하우징" : "OFF → 2D")} · {Utils.Symbol3DFeature.LastDiagnostic}");
+        }
+        GMapMarkerPidsControl markerControl = Utils.Symbol3DFeature.IsEnabled && Symbols3D.HousingModels.DeviceKey(_model.DeviceType) != null
+            ? new GMapMarker3DHousingControl(this)
+            : GMapMarkerPidsFallbackControl.NeedsFallback(_model.DeviceType) ? new GMapMarkerPidsFallbackControl(this) : new GMapMarkerPidsControl(this);
+        _log?.Info($"GMapMarkerPidsControl 생성: {_model.Title} · DeviceType={_model.DeviceType} · ModelVariant={_model.ModelVariant ?? "-"} → {markerControl.GetType().Name}");
         return markerControl;
     }
 
-    /// <summary>
-    /// 상태 변경 시 EventStatus 동기화
-    /// </summary>
+    protected override void ConfigureMarkerControl(UIElement marker)
+    {
+        base.ConfigureMarkerControl(marker);
+    }
+
     protected override void OnStatusChanged(EnumOperationState status)
     {
         base.OnStatusChanged(status);
-
-        // OperationState → EventStatus 매핑
-        _model.EventStatus = status switch
-        {
-            EnumOperationState.ACTIVE => EnumEventStatus.Normal,
-            EnumOperationState.DEACTIVE => EnumEventStatus.Fault,
-            EnumOperationState.FAULT => EnumEventStatus.Fault,
-            _ => EnumEventStatus.Normal
-        };
+        // EventStatus는 CompositeStatus setter를 통해서만 설정됨 — 여기서 직접 설정 금지 (SSOT)
     }
 
     /// <summary>
@@ -179,7 +183,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     {
         if (disposing)
         {
-            StopAnimation();
+            _model.Update -= PidsModel_Update;
         }
         base.Dispose(disposing);
     }
@@ -206,18 +210,23 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     }
 
     /// <summary>
-    /// FOV 표시 토글
+    /// FOV 표시 토글 (프리미티브). ShowFOV 프로퍼티 경유로 PropertyChanged를 발화해 바인딩·렌더가 동기화되게 한다.
+    /// <para>FOV 표시는 기본적으로 속성창 체크박스(SSOT)로 제어한다.</para>
     /// </summary>
     public void ToggleFOVDisplay()
     {
-        _model.ShowFOV = !_model.ShowFOV;
-        _log?.Info($"FOV 표시 토글: {_model.ShowFOV}");
+        // ShowFOV 프로퍼티 setter 경유(OnPropertyChanged 발화) — _model 직접 반전 시 TwoWay 바인딩이
+        // 갱신되지 않아 컨트롤 DP·FOV 렌더가 반영 안 되는 문제를 차단.
+        ShowFOV = !ShowFOV;
+        _log?.Info($"FOV 표시 토글: {ShowFOV}");
     }
+
+    
     #endregion
 
     #region - Properties -
     /// <summary>
-    /// 연결된 장치 ID
+    /// 연결된 장치 ID (하위 호환성 유지)
     /// </summary>
     public int LinkedDeviceId
     {
@@ -226,6 +235,23 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         {
             _model.LinkedDeviceId = value;
             OnPropertyChanged(nameof(LinkedDeviceId));
+        }
+    }
+
+    /// <summary>
+    /// 연결된 디바이스 객체 (런타임 바인딩용)
+    /// <para>설정 시 LinkedDeviceId가 자동 동기화됩니다.</para>
+    /// </summary>
+    public IBaseDeviceModel? LinkedDevice
+    {
+        get => _model.LinkedDevice;
+        set
+        {
+            _model.LinkedDevice = value;
+            _liveDetached = false;   // 새로 연결됐다 — 삭제로 비웠던 실시간 상태를 다시 받는다
+            OnPropertyChanged(nameof(LinkedDevice));
+            OnPropertyChanged(nameof(LinkedDeviceId));  // ID도 동기화되므로 알림
+            RefreshComponentSummary(force: true);       // 부팅 재바인딩 · 속성창 연결 변경 — 부품 요약을 새 장비로
         }
     }
 
@@ -239,6 +265,37 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         {
             _model.DeviceType = value;
             OnPropertyChanged(nameof(DeviceType));
+            RefreshComponentSummary(force: true);   // 칸 줄의 종류별 대표 순서가 바뀐다
+        }
+    }
+
+    public string? ModelVariant
+    {
+        get => _model.ModelVariant;
+        set { if (_model.ModelVariant == value) return; _model.ModelVariant = value; OnPropertyChanged(nameof(ModelVariant)); }
+    }
+
+    /// <summary>
+    /// 이벤트 상태 (애니메이션 트리거)
+    /// </summary>
+    public EnumEventStatus EventStatus
+    {
+        get => _model.EventStatus;
+        set
+        {
+            _model.EventStatus = value;
+            OnPropertyChanged(nameof(EventStatus));
+            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
+        }
+    }
+
+    public EnumCompositeEventStatus CompositeStatus
+    {
+        get => _model.CompositeStatus;
+        set
+        {
+            _model.CompositeStatus = value;
+            OnPropertyChanged(nameof(CompositeStatus));
         }
     }
 
@@ -272,6 +329,16 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         }
     }
 
+    public double BaseBearing
+    {
+        get => _model.BaseBearing;
+        set
+        {
+            _model.BaseBearing = value;
+            OnPropertyChanged(nameof(BaseBearing));
+        }
+    }
+
     public bool ShowFOV
     {
         get => _model.ShowFOV;
@@ -302,24 +369,75 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         }
     }
 
-    /// <summary>
-    /// 이벤트 상태 (애니메이션 트리거)
-    /// </summary>
-    public EnumEventStatus EventStatus
+    // ── 통문·함체 개폐(FR-12) — 형태 축은 EventStatus(색 축)와 독립 ──
+    public double? GateWidthM
     {
-        get => _model.EventStatus;
-        set
-        {
-            _model.EventStatus = value;
-            OnPropertyChanged(nameof(EventStatus));
-            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
-        }
+        get => _model.GateWidthM;
+        set { if (Nullable.Equals(_model.GateWidthM, value)) return; _model.GateWidthM = value; OnPropertyChanged(nameof(GateWidthM)); }
+    }
+
+    public bool OpenOnContactOn
+    {
+        get => _model.OpenOnContactOn;
+        set { if (_model.OpenOnContactOn == value) return; _model.OpenOnContactOn = value; OnPropertyChanged(nameof(OpenOnContactOn)); }
+    }
+
+    /// <summary>개폐 형태(런타임) — 3D 문짝 각도 트리거. 값이 바뀔 때만 통지한다.</summary>
+    public EnumDoorState DoorState
+    {
+        get => _model.DoorState;
+        set { if (_model.DoorState == value) return; _model.DoorState = value; OnPropertyChanged(nameof(DoorState)); }
     }
 
     /// <summary>
-    /// 애니메이션 실행 중 여부
+    /// 방송(음원/TTS) 동작 중 여부 — XAML Opacity 펄스 애니메이션 트리거
     /// </summary>
-    public bool IsAnimating => _isAnimating;
+    public bool IsBroadcasting
+    {
+        get => _isBroadcasting;
+        set
+        {
+            _isBroadcasting = value;
+            OnPropertyChanged(nameof(IsBroadcasting));
+        }
+    }
 
+    /// <summary>함체 최신 계측(ENCLOSURE_METRICS) — <b>런타임 전용</b>. 값이 바뀔 때만 통지한다. 호출 스레드: UI.</summary>
+    public Services.Enclosure.EnclosureMetricsReading? EnclosureMetrics
+    {
+        get => _enclosureMetrics;
+        set
+        {
+            if (Equals(_enclosureMetrics, value)) return;
+            _enclosureMetrics = value;
+            OnPropertyChanged(nameof(EnclosureMetrics));
+        }
+    }
+
+    /// <summary>함체 환경 · 부품 판정 경고(운영 이벤트 · 이슈 #7 Q-4a) — <b>런타임 전용</b>. 값이 바뀔 때만 통지한다. 호출 스레드: UI.</summary>
+    public Services.Enclosure.EnclosureAlertSummary? EnclosureAlert
+    {
+        get => _enclosureAlert;
+        set
+        {
+            if (Equals(_enclosureAlert, value)) return;
+            _enclosureAlert = value;
+            OnPropertyChanged(nameof(EnclosureAlert));
+        }
+    }
+
+    #endregion
+
+    #region - Attributes -
+    private bool _isBroadcasting;
+    private Services.Enclosure.EnclosureMetricsReading? _enclosureMetrics;
+    private Services.Enclosure.EnclosureAlertSummary? _enclosureAlert;
+    private int _updatePending;   // 0=없음, 1=UI 스레드로 넘긴 갱신 대기 중(Interlocked)
+    private Helpers.Components.ComponentHealthSummary _componentSummary = Helpers.Components.ComponentHealthSummary.None;
+    private Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceAxesModel? _summarySource;
+    private bool _summaryBuilt;
+    private bool _liveDetached;
+    private bool _isComponentCardOpen;
+    private bool _componentStripCrowded;
     #endregion
 }

@@ -12,7 +12,7 @@ namespace Ironwall.Dotnet.Libraries.Enums;
 public enum EnumOperationState
 {
     NONE,
-    DEACTIVE,
-    ACTIVE,
-    FAULT
+    DEACTIVATED,
+    ACTIVATED,
+    ERROR
 }

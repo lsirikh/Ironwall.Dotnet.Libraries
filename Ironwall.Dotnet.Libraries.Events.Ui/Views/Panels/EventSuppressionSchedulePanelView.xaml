@@ -1,0 +1,1325 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.EventSuppressionSchedulePanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:beh="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
+	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	d:DesignHeight="720"
+	d:DesignWidth="1180"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d"
+	AutomationProperties.AutomationId="Events.SuppressionSchedule.Panel">
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<!--  ⚠ 내장 BooleanToVisibilityConverter 는 ConverterParameter 를 무시한다 — 반전이 필요하면 반드시 이 컨버터를 쓴다  -->
+		<utils:BoolToInverseVisibleConverter x:Key="BoolToVisInv" />
+		<!--  DataGrid 컬럼 헤더는 DataContext를 상속하지 않음 → 패널 VM 접근용 프록시  -->
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+
+		<!--  ══ 폼 전용 로컬 스타일 ══════════════════════════════════════════
+		     ⚠ Events.Ui/Resources/Resources.xaml 는 앱 리소스 트리에 병합되지 않는다(앱은 자체 복제본만 머지).
+		     그래서 이 뷰에서 쓰는 새 스타일은 반드시 여기 '뷰 로컬'에 둔다 —
+		     라이브러리 Resources.xaml 에 넣으면 빌드는 통과하고 런타임에 XamlParseException 이 난다.  -->
+
+		<!--  입력 3종을 '박스형' 하나로 통일.
+		     이전엔 TextBox/ComboBox 는 Material 밑줄, DateTimePicker 는 MahApps 박스라
+		     한 폼 안에 디자인 언어가 두 개였다.
+
+		     🔴 절대 Height 를 강제하지 말 것 —
+		     MDIX Outlined 템플릿은 floating hint(테두리 노치로 떠오르는 라벨)용 세로 공간을
+		     내부에서 예약한다. Height 를 고정하면 그 공간까지 눌려 콘텐츠가 세로로 클리핑되고
+		     글자가 '실선'처럼 뭉개진다(2026-08-07 실측: 작업명 힌트·억제범위 값·장비추가 힌트 전부 깨짐).
+		     힌트를 주지 않은 ComboBox 도 같은 템플릿이라 함께 깨진다.
+		     → 높이는 MinHeight 로만 하한을 주고, hint 는 IsFloating=False(플레이스홀더)로 노치 자체를 없앤다.  -->
+		<Style x:Key="FormTextBox" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}">
+			<Setter Property="MinHeight" Value="36" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
+			<Setter Property="md:HintAssist.IsFloating" Value="False" />
+			<Setter Property="md:HintAssist.Foreground" Value="{DynamicResource TextMutedBrush}" />
+		</Style>
+
+		<Style x:Key="FormComboBox" TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignOutlinedComboBox}">
+			<Setter Property="MinHeight" Value="36" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="md:HintAssist.IsFloating" Value="False" />
+			<Setter Property="md:HintAssist.Foreground" Value="{DynamicResource TextMutedBrush}" />
+		</Style>
+
+		<!--  MahApps 컨트롤이라 Outlined 템플릿의 제약이 없다. 위 두 컨트롤의 자연 높이에
+		     맞추기 위해 하한만 준다(강제 Height 아님).  -->
+		<Style x:Key="FormDateTimePicker" TargetType="mah:DateTimePicker">
+			<Setter Property="MinHeight" Value="36" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+		</Style>
+
+		<!--  MahApps TimePicker — DateTimePicker 와 같은 TimePickerBase 파생이라 같은 규약을 쓴다.
+		     ⚠ Height 금지, MinHeight 만(MDIX Outlined 클리핑 전례와 동일 원칙).
+		     ⚠ 바인딩은 SelectedDateTime 이다 — MahApps 2.4.10 에 SelectedTime 은 존재하지 않는다(실측).  -->
+		<Style x:Key="FormTimePicker" TargetType="mah:TimePicker">
+			<Setter Property="MinHeight" Value="36" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+		</Style>
+
+		<!--  요일 칩(ToggleButton ×7).
+		     선택 = 셀 전체 '채움'(면), 제스처 범위 = 하단 2px '바'(선) — 축이 직교해야 한다.
+		     ⚠ 라이트에서 PrimaryBrush = SelectionBrush = FocusRingBrush 가 완전 동일(#0C6B89, 대비 1.00:1)이라
+		        같은 브러시로 둘을 겹치면 지배적 제스처(칠하기)에서 범위 표시가 원리적으로 안 보인다.
+		        그래서 범위 바는 채움 위에서는 OnPrimaryFixed, 빈 셀 위에서는 Primary 로 나눈다.  -->
+		<Style x:Key="DayToggleChip" TargetType="ToggleButton">
+			<Setter Property="Width" Value="32" />
+			<Setter Property="Height" Value="26" />
+			<Setter Property="Margin" Value="1,0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ToggleButton">
+						<Border
+							x:Name="Chip"
+							Background="{TemplateBinding Background}"
+							BorderBrush="Transparent"
+							BorderThickness="0,0,0,2"
+							CornerRadius="3">
+							<ContentPresenter
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								TextElement.FontSize="{TemplateBinding FontSize}"
+								TextElement.FontWeight="{TemplateBinding FontWeight}"
+								TextElement.Foreground="{TemplateBinding Foreground}" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource PrimaryBrush}" />
+								<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+								<Setter Property="FontWeight" Value="Bold" />
+							</Trigger>
+							<!--  제스처 범위 표식 — '채움(면)' 과 축이 직교한 '하단 바(선)'.
+							     ⚠ 같은 브러시로 겹치면 지배적 제스처(칠하기)에서 범위가 안 보인다:
+							        라이트에서 Primary = Selection = FocusRing 이 완전 동일 색(대비 1.00:1)이다.
+							        그래서 채움 위에서는 OnPrimaryFixed, 빈 셀 위에서는 Primary 로 나눈다.  -->
+							<MultiDataTrigger>
+								<MultiDataTrigger.Conditions>
+									<Condition Binding="{Binding (beh:DayStripDragPaintBehavior.IsInGestureRange), RelativeSource={RelativeSource Self}}" Value="True" />
+									<Condition Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="True" />
+								</MultiDataTrigger.Conditions>
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource OnPrimaryFixedBrush}" />
+							</MultiDataTrigger>
+							<MultiDataTrigger>
+								<MultiDataTrigger.Conditions>
+									<Condition Binding="{Binding (beh:DayStripDragPaintBehavior.IsInGestureRange), RelativeSource={RelativeSource Self}}" Value="True" />
+									<Condition Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="False" />
+								</MultiDataTrigger.Conditions>
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+							</MultiDataTrigger>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.38" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--  활성 억제 배너.
+		     ⚠ 색을 Border 인스턴스의 로컬 값으로 주면 WPF 우선순위(로컬 3 > Trigger 5) 때문에
+		        stale DataTrigger 가 영원히 안 먹는다. 전부 Setter 로 둔다.
+		     ⚠ 글자색은 TextElement.Foreground 로 상속시키고 본문 TextBlock 에는 Foreground 를 주지 않는다.
+		     ⚠ Visibility 는 HasActiveBanner — 폴링 실패로 목록이 0건이어도 stale 을 알려야 한다.  -->
+		<Style x:Key="ActiveSuppressionBanner" TargetType="Border">
+			<Setter Property="Margin" Value="0,0,0,8" />
+			<Setter Property="Padding" Value="10,5" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="4" />
+			<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+			<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusWarningBrush}" />
+			<Setter Property="Visibility" Value="Collapsed" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding HasActiveBanner}" Value="True">
+					<Setter Property="Visibility" Value="Visible" />
+				</DataTrigger>
+				<!--  stale — 목록을 버리지 않고 '언제 기준인지'를 밝힌다(형태로 약화: 테두리 제거 + 무채색).  -->
+				<DataTrigger Binding="{Binding IsActiveStale}" Value="True">
+					<Setter Property="Background" Value="Transparent" />
+					<Setter Property="BorderBrush" Value="{DynamicResource TextMutedBrush}" />
+					<Setter Property="TextElement.Foreground" Value="{DynamicResource TextMutedBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  라벨/값 위계 고정: 라벨 11px 보조색 · 값 12px 기본색  -->
+		<Style x:Key="FormLabel" TargetType="TextBlock" BasedOn="{StaticResource PanelFieldLabel}">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Margin" Value="0,0,0,3" />
+			<Setter Property="VerticalAlignment" Value="Top" />
+		</Style>
+
+		<!--  주 액션 = Primary 채움. 이 화면의 유일한 1차 동작인데 기존엔 회색 flat 이라 존재감이 없었다.
+		     비활성은 38% 불투명 + ToolTipService.ShowOnDisabled 로 '왜 못 누르는지'를 호버로 알린다.  -->
+		<Style x:Key="PrimaryActionButton" TargetType="Button">
+			<Setter Property="Height" Value="34" />
+			<Setter Property="Padding" Value="18,0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+			<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Border
+							x:Name="PART_Bg"
+							Padding="{TemplateBinding Padding}"
+							Background="{TemplateBinding Background}"
+							CornerRadius="4">
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="PART_Bg" Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
+							</Trigger>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter TargetName="PART_Bg" Property="Opacity" Value="0.38" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--  보조 액션 = 외곽선만  -->
+		<Style x:Key="GhostActionButton" TargetType="Button">
+			<Setter Property="Height" Value="34" />
+			<Setter Property="Padding" Value="14,0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Border
+							x:Name="PART_Bg"
+							Padding="{TemplateBinding Padding}"
+							Background="Transparent"
+							BorderBrush="{DynamicResource BorderBrush}"
+							BorderThickness="1"
+							CornerRadius="4">
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="PART_Bg" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--  목록 선택행: 회색 블록 → 좌측 3px 시안 바 + 틴트(앱 전역 Selected 패턴과 일치)  -->
+		<Style
+			x:Key="SuppressionRowStyle"
+			BasedOn="{StaticResource ModernDataGridRow}"
+			TargetType="DataGridRow">
+			<Style.Triggers>
+				<Trigger Property="IsSelected" Value="True">
+					<Setter Property="Background" Value="{DynamicResource TintAccentBrush}" />
+					<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+					<Setter Property="BorderThickness" Value="3,0,0,0" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+	</UserControl.Resources>
+
+	<!--  중앙 정렬 바운드 박스 (최상위 패널 표준, ReportConsole 패턴 — 전체화면 stretch 방지 + 불투명 배경)  -->
+	<Border
+		Width="1050"
+		Height="720"
+		HorizontalAlignment="Center"
+		VerticalAlignment="Center"
+		Background="{DynamicResource SurfaceBrush}"
+		BorderBrush="{DynamicResource BorderBrush}"
+		BorderThickness="1"
+		CornerRadius="10">
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="*" />
+			</Grid.RowDefinitions>
+
+			<!--  ── 시안 헤더 바 (표준) ──  -->
+			<Border
+				Grid.Row="0"
+				CornerRadius="10,10,0,0"
+				Style="{StaticResource ModernDialogHeader}">
+				<DockPanel VerticalAlignment="Center">
+					<Button
+						x:Name="Close"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.CloseButton"
+						DockPanel.Dock="Right"
+						Style="{StaticResource ModernPanelCloseButton}" />
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Kind="CalendarClock" />
+						<TextBlock
+							Margin="8,0,0,0"
+							Style="{StaticResource ModernDialogHeaderText}"
+							Text="이벤트 억제 스케줄 관리"
+							AutomationProperties.AutomationId="Events.SuppressionSchedule.TitleText" />
+					</StackPanel>
+				</DockPanel>
+			</Border>
+
+			<!--  ── 본문 ──  -->
+			<Grid Grid.Row="1" Margin="12">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
+				</Grid.RowDefinitions>
+
+				<!--  툴바 + 필터  -->
+				<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+					<!--  선택 삭제(취소/종료 행 일괄 하드삭제) — 취소항목 정리  -->
+					<Button
+						DockPanel.Dock="Left"
+						Margin="0,0,8,0"
+						IsEnabled="{Binding CanDeleteSelected}"
+						Style="{StaticResource Console.Button}"
+						ToolTip="체크한 취소/종료 항목을 목록에서 완전 삭제(복구 불가)"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.DeleteSelectedButton">
+						<cal:Message.Attach>[Event Click] = [Action OnClickDeleteSelected()]</cal:Message.Attach>
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="18"
+								Height="18"
+								VerticalAlignment="Center"
+								Kind="DeleteSweep" />
+							<TextBlock
+								Margin="5,0,0,0"
+								VerticalAlignment="Center"
+								Text="{Binding DeleteSelectedText}" />
+						</StackPanel>
+					</Button>
+					<!--  취소·종료 항목 모두 정리(§8.2 권장 UI)  -->
+					<Button
+						DockPanel.Dock="Left"
+						Margin="0,0,14,0"
+						Content="취소·종료 모두 정리"
+						IsEnabled="{Binding CanCleanupAll}"
+						Style="{StaticResource Console.Button}"
+						ToolTip="현재 목록의 취소/종료 항목을 모두 삭제(복구 불가)"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.CleanupAllButton">
+						<cal:Message.Attach>[Event Click] = [Action OnClickCleanupAll()]</cal:Message.Attach>
+					</Button>
+					<!--  전체선택 체크박스는 DataGrid 체크박스 컬럼 헤더로 이동(중복 제거)  -->
+
+					<Button
+						DockPanel.Dock="Right"
+						Style="{StaticResource ModernToolbarButton}"
+						ToolTip="갱신"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.ReloadButton">
+						<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
+						<md:PackIcon Width="20" Height="20" Kind="Refresh" />
+					</Button>
+					<TextBlock
+						DockPanel.Dock="Right"
+						Margin="0,0,12,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding LoadedCountText}"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.LoadedCountText" />
+
+					<TextBlock
+						Margin="0,0,4,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="상태" />
+					<ComboBox
+						Width="110"
+						VerticalAlignment="Center"
+						SelectedValue="{Binding FilterStatus, Mode=TwoWay}"
+						SelectedValuePath="Tag"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.StatusFilterComboBox">
+						<ComboBoxItem Content="전체" Tag="" />
+						<ComboBoxItem Content="예정" Tag="pending" />
+						<ComboBoxItem Content="진행중" Tag="active" />
+						<ComboBoxItem Content="종료" Tag="expired" />
+						<ComboBoxItem Content="취소" Tag="cancelled" />
+					</ComboBox>
+					<TextBlock
+						Margin="12,0,4,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="대상" />
+					<ComboBox
+						Width="110"
+						VerticalAlignment="Center"
+						SelectedValue="{Binding FilterTargetType, Mode=TwoWay}"
+						SelectedValuePath="Tag"
+						AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetTypeFilterComboBox">
+						<ComboBoxItem Content="전체" Tag="" />
+						<ComboBoxItem Content="장비" Tag="device" />
+						<ComboBoxItem Content="그룹" Tag="group" />
+						<ComboBoxItem Content="전체대상" Tag="all" />
+					</ComboBox>
+				</DockPanel>
+
+				<!--  생성 폼 (인라인, StandardPanelCard)  -->
+				<Border
+					Grid.Row="1"
+					Margin="0,0,0,8"
+					Padding="12,10"
+					Style="{StaticResource StandardPanelCard}">
+					<StackPanel Orientation="Vertical">
+						<!--  (§7) 활성 억제 상시 인지 — 억제 사실 은폐 방지  -->
+						<!--  ⚠ 색을 로컬 값으로 주면 안 된다 — WPF 우선순위가 로컬(3) > Style Trigger(5) 라
+						     stale 전환 Trigger 가 영원히 안 먹는다. 전부 Style Setter 로 둔다.
+						     Visibility 는 HasActiveBanner — stale 일 때도 떠야 한다(폴링 실패 시 count 0).  -->
+						<Border Style="{StaticResource ActiveSuppressionBanner}">
+							<StackPanel Orientation="Horizontal">
+								<TextBlock
+									FontWeight="Bold"
+									Text="{Binding ActiveCountText}"
+									Visibility="{Binding HasActiveSuppression, Converter={StaticResource BoolToVis}}" />
+								<!--  ⚠ stale 문구가 없으면 배너가 '글자 없는 빈 테두리'로 뜬다 —
+								     활성 0건 + 폴링 실패일 때 ActiveCountText 가 빈 문자열이기 때문이다.
+								     그러면 '억제 0건'과 '서버에 못 물어봄'이 화면상 구분 불가가 되어
+								     이 배너의 존재 이유(억제 은폐 방지)가 정확히 그 지점에서 무너진다.  -->
+								<TextBlock
+									Margin="8,0,0,0"
+									Text="{Binding ActiveStaleText}"
+									Visibility="{Binding IsActiveStale, Converter={StaticResource BoolToVis}}"
+									AutomationProperties.AutomationId="Events.SuppressionSchedule.ActiveStaleText" />
+							</StackPanel>
+						</Border>
+
+						<TextBlock
+							Margin="0,0,0,8"
+							FontWeight="Bold"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Text="＋ 억제 스케줄 추가" />
+
+						<!--  (§5-B) 같은 대상 중복 창 사전 경고  -->
+						<TextBlock
+							Margin="0,0,0,6"
+							Foreground="{DynamicResource StatusWarningBrush}"
+							Text="{Binding DuplicateWarningText}"
+							TextWrapping="Wrap"
+							Visibility="{Binding HasDuplicateWarning, Converter={StaticResource BoolToVis}}" />
+						<!--  폼 오류 1줄 — 기간 상한 + 반복 검증 3종을 흡수한다(새 경고 줄을 만들지 않는다).
+						     ⚠ FormErrorText/HasFormError 는 VM 에 반드시 존재해야 한다. 없으면 WPF 가
+						        예외 없이 빈 문자열+Collapsed 로 떨어져 기존 기간 경고가 조용히 사라진다.  -->
+						<TextBlock
+							Margin="0,0,0,6"
+							Foreground="{DynamicResource StatusCriticalBrush}"
+							Text="{Binding FormErrorText}"
+							TextWrapping="Wrap"
+							AutomationProperties.AutomationId="Events.SuppressionSchedule.FormErrorText"
+							Visibility="{Binding HasFormError, Converter={StaticResource BoolToVis}}" />
+						<!--  자정 넘김은 오류가 아니라 안내다 — 막지 않고 의미만 알린다.  -->
+						<TextBlock
+							Margin="0,0,0,6"
+							Foreground="{DynamicResource StatusInfoBrush}"
+							Text="{Binding OvernightNoticeText}"
+							TextWrapping="Wrap"
+							AutomationProperties.AutomationId="Events.SuppressionSchedule.OvernightNotice"
+							Visibility="{Binding HasOvernightNotice, Converter={StaticResource BoolToVis}}" />
+
+						<!--  ── 폼 본체 ─────────────────────────────────────────────────
+						     좌: 입력 필드(2열 × 3행) · 우: 대상 선택 트레이(고정폭 356 · 트레이 높이 104 고정)
+						     하단: 액션 바(구분선 + 우측 정렬)
+
+						     ⚠ 원래는 폼 전체가 WrapPanel 이라 장비 칩이 늘면 그 칸의 폭이 자라면서
+						     뒤 필드가 줄바꿈으로 밀려났다(장비 100개면 폼이 화면을 덮음).
+						     지금은 칩이 몇 개든 폼 높이·필드 위치가 고정이고, 넘치는 칩은 트레이 안에서만 스크롤된다.
+						     좌우 컬럼은 바닥선이 맞도록 행 수를 맞춰 두었다.  -->
+						<Grid Margin="0,2,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*" />
+								<ColumnDefinition Width="356" />
+							</Grid.ColumnDefinitions>
+
+							<!--  ── 좌: 입력 필드 (모드가 바뀌어도 자리가 이동하지 않는다) ──  -->
+							<Grid Grid.Column="0" Margin="0,0,16,0">
+								<Grid.ColumnDefinitions>
+									<!--  408 = DateTimePicker 196 + '~' 좌우 여백 16 + DateTimePicker 196.
+									     작업명·억제 범위를 억제 시간창과 같은 폭으로 맞추기 위한 고정값 —
+									     이 셋의 오른쪽 끝이 한 줄로 떨어진다. 시간창 폭을 바꾸면 여기도 같이 바꿀 것.  -->
+									<ColumnDefinition Width="408" />
+									<ColumnDefinition Width="*" />
+								</Grid.ColumnDefinitions>
+								<Grid.RowDefinitions>
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<!--  Row3 = 반복 설정(단발이면 Collapsed → 세로 0)  -->
+									<RowDefinition Height="Auto" />
+								</Grid.RowDefinitions>
+
+								<!--  작업명  -->
+								<StackPanel
+									Grid.Row="0"
+									Grid.Column="0"
+									Margin="0,0,0,10">
+									<TextBlock Style="{StaticResource FormLabel}" Text="작업명 *" />
+									<TextBox
+										md:HintAssist.Hint="예: GOP 3구역 펜스 보수"
+										Style="{StaticResource FormTextBox}"
+										Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+										AutomationProperties.AutomationId="Events.SuppressionSchedule.NameTextBox" />
+								</StackPanel>
+
+								<!--  대상 유형  -->
+								<StackPanel
+									Grid.Row="0"
+									Grid.Column="1"
+									Margin="16,0,0,10">
+									<TextBlock Style="{StaticResource FormLabel}" Text="대상 유형 *" />
+									<!--  입력 컨트롤과 같은 리듬을 주되 높이는 하한만(위 스타일과 동일 원칙).
+									     HorizontalAlignment=Left 로 라디오 3개 내용 폭까지만 차지한다(칸 전체를 먹지 않음).  -->
+									<Border
+										MinHeight="36"
+										Padding="12,0"
+										HorizontalAlignment="Left"
+										BorderBrush="{DynamicResource BorderBrush}"
+										BorderThickness="1"
+										CornerRadius="4">
+										<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+											<RadioButton
+												Margin="0,0,14,0"
+												Content="장비"
+												GroupName="tt"
+												IsChecked="{Binding IsDeviceMode, Mode=TwoWay}"
+												Style="{StaticResource Console.RadioButton}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetDeviceRadio" />
+											<RadioButton
+												Margin="0,0,14,0"
+												Content="그룹"
+												GroupName="tt"
+												IsChecked="{Binding IsGroupMode, Mode=TwoWay}"
+												Style="{StaticResource Console.RadioButton}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetGroupRadio" />
+											<RadioButton
+												Content="전체"
+												GroupName="tt"
+												IsChecked="{Binding IsAllMode, Mode=TwoWay}"
+												Style="{StaticResource Console.RadioButton}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetAllRadio" />
+										</StackPanel>
+									</Border>
+								</StackPanel>
+
+								<!--  억제 범위  -->
+								<StackPanel
+									Grid.Row="1"
+									Grid.Column="0"
+									Margin="0,0,0,10">
+									<TextBlock Style="{StaticResource FormLabel}" Text="억제 범위 *" />
+									<ComboBox
+										SelectedValue="{Binding EventScope, Mode=TwoWay}"
+										SelectedValuePath="Tag"
+										Style="{StaticResource FormComboBox}"
+										AutomationProperties.AutomationId="Events.SuppressionSchedule.EventScopeComboBox">
+										<ComboBoxItem Content="전체" Tag="all" />
+										<ComboBoxItem Content="연결" Tag="connection" />
+										<ComboBoxItem Content="탐지" Tag="detection" />
+										<ComboBoxItem Content="장애" Tag="malfunction" />
+										<!--  서버 5번째 값(E-9 #1) — 없으면 운영 억제 스케줄을 여기서 만들 수 없고, 고른 값이 비어 보인다  -->
+										<ComboBoxItem Content="운영" Tag="operation" />
+									</ComboBox>
+								</StackPanel>
+
+								<!--  대상 측(side) — 그룹·전체 대상에만 적용된다.
+								     장비 모드에서는 숨기되, 고정 그리드 칸이라 다른 필드가 밀리지 않는다.
+								     ⚠ 이전엔 내장 BooleanToVisibilityConverter 에 ConverterParameter="invert" 를 줬는데
+								     그 컨버터는 파라미터를 무시한다 → 장비 모드에서 보이고 그룹/전체에서 숨는 정반대 동작이었다.  -->
+								<StackPanel
+									Grid.Row="1"
+									Grid.Column="1"
+									Margin="16,0,0,10"
+									Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVisInv}}">
+									<TextBlock Style="{StaticResource FormLabel}" Text="감지 / 감시" />
+									<ComboBox
+										Width="200"
+										HorizontalAlignment="Left"
+										SelectedValue="{Binding TargetSide, Mode=TwoWay}"
+										SelectedValuePath="Tag"
+										Style="{StaticResource FormComboBox}"
+										AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetSideComboBox">
+										<ComboBoxItem Content="전체(감지+감시)" Tag="both" />
+										<ComboBoxItem Content="감지" Tag="detection" />
+										<ComboBoxItem Content="감시" Tag="surveillance" />
+									</ComboBox>
+								</StackPanel>
+
+								<!--  억제 시간창(시작 ~ 종료)  -->
+								<StackPanel
+									Grid.Row="2"
+									Grid.Column="0"
+									Grid.ColumnSpan="2"
+									Margin="0,0,0,0">
+									<!--  라벨 밴드 2열 — 408(피커 3종) / 218(반복 라디오). 높이 불변.  -->
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="408" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource FormLabel}"
+											Text="{Binding WindowFieldLabelText}" />
+										<TextBlock
+											Grid.Column="1"
+											Margin="12,0,0,3"
+											Style="{StaticResource FormLabel}"
+											Text="반복" />
+									</Grid>
+									<StackPanel Orientation="Horizontal">
+										<mah:DateTimePicker
+											Width="196"
+											SelectedDateTime="{Binding WindowStart, Mode=TwoWay}"
+											Style="{StaticResource FormDateTimePicker}"
+											AutomationProperties.AutomationId="Events.SuppressionSchedule.WindowStartPicker" />
+										<TextBlock
+											Margin="8,0,8,0"
+											VerticalAlignment="Center"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="~" />
+										<!--  종료 피커 ↔ 무제한 플레이스홀더는 '비활성화'가 아니라 '대체'다(자리 이동 0).
+										     ⚠ 게이트는 반드시 파생 IsUnlimitedEffective — 원시 플래그를 쓰면
+										        모드 복귀 시 플래그만 남아 단발+null 이 전송된다(서버 422).  -->
+										<Grid>
+											<mah:DateTimePicker
+												Width="196"
+												SelectedDateTime="{Binding WindowEnd, Mode=TwoWay}"
+												Style="{StaticResource FormDateTimePicker}"
+												Visibility="{Binding IsUnlimitedEffective, Converter={StaticResource BoolToVisInv}}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.WindowEndPicker" />
+											<Border
+												Width="196"
+												MinHeight="36"
+												Background="{DynamicResource SurfaceSunkenBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												CornerRadius="4"
+												Visibility="{Binding IsUnlimitedEffective, Converter={StaticResource BoolToVis}}">
+												<TextBlock
+													HorizontalAlignment="Center"
+													VerticalAlignment="Center"
+													FontSize="11"
+													FontStyle="Italic"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="무제한 — 종료일 없음"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.UnlimitedPlaceholder" />
+											</Border>
+										</Grid>
+										<!--  반복 여부 — 남는 218 에 인라인(세로 비용 0). 대상 유형 Border 와 동일 기하.  -->
+										<Border
+											Margin="12,0,0,0"
+											MinHeight="36"
+											Padding="12,0"
+											HorizontalAlignment="Left"
+											BorderBrush="{DynamicResource BorderBrush}"
+											BorderThickness="1"
+											CornerRadius="4">
+											<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+												<RadioButton
+													Margin="0,0,14,0"
+													Content="단발"
+													GroupName="RecurrenceMode"
+													IsChecked="{Binding IsOneShotMode, Mode=TwoWay}"
+													Style="{StaticResource Console.RadioButton}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceOneShotRadio" />
+												<RadioButton
+													Content="주간 반복"
+													GroupName="RecurrenceMode"
+													IsChecked="{Binding IsWeeklyMode, Mode=TwoWay}"
+													Style="{StaticResource Console.RadioButton}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceWeeklyRadio" />
+											</StackPanel>
+										</Border>
+									</StackPanel>
+								</StackPanel>
+
+								<!--  ══ Row3 — 반복 설정. 단발이면 통째로 Collapsed 라 폼 세로 원가가 0 증가한다. ══  -->
+								<StackPanel
+									Grid.Row="3"
+									Grid.Column="0"
+									Grid.ColumnSpan="2"
+									Margin="0,10,0,0"
+									Visibility="{Binding IsWeeklyMode, Converter={StaticResource BoolToVis}}">
+									<StackPanel Orientation="Horizontal">
+										<!--  요일 246 = 32×7 + 간격 2×6 + padding 8 + border 2  -->
+										<StackPanel Width="246">
+											<TextBlock Style="{StaticResource FormLabel}" Text="요일 *" />
+											<Border
+												MinHeight="36"
+												Padding="4,0"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												CornerRadius="4"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.DayStrip">
+												<i:Interaction.Behaviors>
+													<!--  드래그 범위 페인팅. 컨테이너가 PreviewMouseDown(터널)에서 선점해
+													     ButtonBase 의 캡처 강탈을 막는다(실측 근거는 Behavior 주석 참조).
+													     클릭 폴백 · ESC 취소 · Space/UIA Toggle 은 그대로 살아 있다.  -->
+													<beh:DayStripDragPaintBehavior Mask="{Binding DaysOfWeekMask, Mode=TwoWay}" />
+												</i:Interaction.Behaviors>
+												<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+													<ToggleButton
+														Content="월"
+														IsChecked="{Binding IsMonChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Mon" />
+													<ToggleButton
+														Content="화"
+														IsChecked="{Binding IsTueChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Tue" />
+													<ToggleButton
+														Content="수"
+														IsChecked="{Binding IsWedChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Wed" />
+													<ToggleButton
+														Content="목"
+														IsChecked="{Binding IsThuChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Thu" />
+													<ToggleButton
+														Content="금"
+														IsChecked="{Binding IsFriChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Fri" />
+													<ToggleButton
+														Content="토"
+														IsChecked="{Binding IsSatChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Sat" />
+													<ToggleButton
+														Content="일"
+														IsChecked="{Binding IsSunChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Sun" />
+												</StackPanel>
+											</Border>
+										</StackPanel>
+
+										<!--  일일 시각 216 = 100 + 8+8 + 100.
+										     ⚠ 구분자는 '~' 가 아니라 '–' 다 — 하네스가 첫 번째 '~' TextBlock 을
+										        좌표 앵커로 쓰기 때문에 '~' 가 2개가 되면 엉뚱한 피커에 타이핑한다.  -->
+										<StackPanel Width="216" Margin="12,0,0,0">
+											<TextBlock Style="{StaticResource FormLabel}" Text="일일 시각 *" />
+											<StackPanel Orientation="Horizontal">
+												<mah:TimePicker
+													Width="100"
+													SelectedDateTime="{Binding DailyStart, Mode=TwoWay}"
+													SelectedTimeFormat="Long"
+													Style="{StaticResource FormTimePicker}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.DailyStartPicker" />
+												<TextBlock
+													Margin="8,0,8,0"
+													VerticalAlignment="Center"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="–" />
+												<mah:TimePicker
+													Width="100"
+													SelectedDateTime="{Binding DailyEnd, Mode=TwoWay}"
+													SelectedTimeFormat="Long"
+													Style="{StaticResource FormTimePicker}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.DailyEndPicker" />
+											</StackPanel>
+										</StackPanel>
+
+										<!--  무제한 140  -->
+										<StackPanel Width="140" Margin="12,0,0,0">
+											<TextBlock Style="{StaticResource FormLabel}" Text="유효기간 끝" />
+											<CheckBox
+												MinHeight="36"
+												VerticalContentAlignment="Center"
+												Content="기간 제한 없음"
+												FontSize="12"
+												IsChecked="{Binding IsWindowEndUnlimited, Mode=TwoWay}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.UnlimitedCheckBox" />
+										</StackPanel>
+									</StackPanel>
+
+									<!--  요약 미러 — 피커가 UIA 에 안 뜨므로 값 단언의 유일한 경로이자
+									     운용자가 '내가 만들려던 문장'인지 확인하는 수단이다.  -->
+									<TextBlock
+										Margin="0,8,0,0"
+										FontSize="11.5"
+										Foreground="{DynamicResource PrimaryBrush}"
+										Text="{Binding RecurrenceSummaryText}"
+										TextWrapping="Wrap"
+										AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceSummaryText" />
+								</StackPanel>
+							</Grid>
+
+							<!--  ── 우: 대상 선택 트레이 ──
+							     장비/그룹/전체는 상호배타라 같은 자리에 겹쳐 둔다 → 모드 전환 시 폼이 흔들리지 않는다.  -->
+							<Border
+								Grid.Column="1"
+								Padding="10,8"
+								Background="{DynamicResource SurfaceSunkenBrush}"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="1"
+								CornerRadius="6">
+								<Grid>
+									<!--  ── 장비 선택 ──  -->
+									<Grid Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVis}}">
+										<Grid.RowDefinitions>
+											<RowDefinition Height="Auto" />
+											<RowDefinition Height="104" />
+											<RowDefinition Height="Auto" />
+										</Grid.RowDefinitions>
+
+										<DockPanel Grid.Row="0" Margin="0,0,0,6">
+											<Button
+												Margin="6,0,0,0"
+												VerticalAlignment="Center"
+												Content="모두 지우기"
+												DockPanel.Dock="Right"
+												IsEnabled="{Binding HasSelectedDevices}"
+												Style="{StaticResource Console.Button.Mini}"
+												ToolTip="선택한 장비를 전부 해제"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.ClearDevicesButton">
+												<cal:Message.Attach>[Event Click] = [Action ClearDevices()]</cal:Message.Attach>
+											</Button>
+											<TextBlock
+												VerticalAlignment="Center"
+												DockPanel.Dock="Right"
+												FontSize="11"
+												FontWeight="Bold"
+												Foreground="{DynamicResource PrimaryBrush}"
+												Text="{Binding SelectedDeviceCountText}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.SelectedDeviceCountText" />
+											<TextBlock
+												VerticalAlignment="Center"
+												Style="{StaticResource FormLabel}"
+												Text="장비 선택 *" />
+										</DockPanel>
+
+										<Grid Grid.Row="1">
+											<!--  테두리: 선택이 있으면 실선, 비었으면 점선(의도된 빈 상태)  -->
+											<Rectangle
+												RadiusX="4"
+												RadiusY="4"
+												Fill="{DynamicResource SurfaceBrush}"
+												Stroke="{DynamicResource BorderBrush}"
+												StrokeThickness="1"
+												Visibility="{Binding HasSelectedDevices, Converter={StaticResource BoolToVis}}" />
+											<Rectangle
+												RadiusX="4"
+												RadiusY="4"
+												Fill="{DynamicResource SurfaceBrush}"
+												Stroke="{DynamicResource DividerBrush}"
+												StrokeDashArray="3 3"
+												StrokeThickness="1"
+												Visibility="{Binding HasSelectedDevices, Converter={StaticResource BoolToVisInv}}" />
+
+											<!--  빈 상태 안내  -->
+											<StackPanel
+												HorizontalAlignment="Center"
+												VerticalAlignment="Center"
+												Visibility="{Binding HasSelectedDevices, Converter={StaticResource BoolToVisInv}}">
+												<md:PackIcon
+													Width="22"
+													Height="22"
+													HorizontalAlignment="Center"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Kind="Devices" />
+												<TextBlock
+													Margin="0,4,0,0"
+													HorizontalAlignment="Center"
+													FontSize="11"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="선택된 장비가 없습니다" />
+												<TextBlock
+													Margin="0,1,0,0"
+													HorizontalAlignment="Center"
+													FontSize="10"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="아래에서 장비를 추가하세요" />
+											</StackPanel>
+
+											<ScrollViewer
+												Margin="6,6,2,2"
+												HorizontalScrollBarVisibility="Disabled"
+												VerticalScrollBarVisibility="Auto"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.DeviceChipTray">
+												<ItemsControl ItemsSource="{Binding SelectedDevices}">
+													<ItemsControl.ItemsPanel>
+														<ItemsPanelTemplate>
+															<!--  ItemWidth/ItemHeight 로 칩 크기를 정규화 — 이름 길이와 무관하게 격자로 정렬된다  -->
+															<WrapPanel
+																ItemHeight="26"
+																ItemWidth="148"
+																Orientation="Horizontal" />
+														</ItemsPanelTemplate>
+													</ItemsControl.ItemsPanel>
+													<ItemsControl.ItemTemplate>
+														<DataTemplate>
+															<Border
+																Margin="0,0,4,4"
+																Padding="8,0,2,0"
+																Background="{DynamicResource TintAccentBrush}"
+																BorderBrush="{DynamicResource PrimaryBrush}"
+																BorderThickness="1"
+																CornerRadius="11"
+																ToolTip="{Binding DeviceName}"
+																AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.DeviceChip.{0}}">
+																<DockPanel>
+																	<Button
+																		Margin="2,0,0,0"
+																		Padding="0"
+																		VerticalAlignment="Center"
+																		Background="Transparent"
+																		BorderThickness="0"
+																		Cursor="Hand"
+																		DockPanel.Dock="Right"
+																		ToolTip="제거"
+																		Template="{StaticResource Console.Button.TransparentRow}"
+																		AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.DeviceChipRemove.{0}}">
+																		<cal:Message.Attach>[Event Click] = [Action RemoveDevice($dataContext)]</cal:Message.Attach>
+																		<md:PackIcon
+																			Width="12"
+																			Height="12"
+																			Foreground="{DynamicResource PrimaryBrush}"
+																			Kind="Close" />
+																	</Button>
+																	<!--  이름은 잘라서 표시하고 전체 이름은 ToolTip 으로 — 칩 폭이 이름에 끌려가지 않게  -->
+																	<TextBlock
+																		VerticalAlignment="Center"
+																		FontSize="11"
+																		Foreground="{DynamicResource PrimaryBrush}"
+																		Text="{Binding DeviceName}"
+																		TextTrimming="CharacterEllipsis" />
+																</DockPanel>
+															</Border>
+														</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+											</ScrollViewer>
+										</Grid>
+
+										<ComboBox
+											Grid.Row="2"
+											Margin="0,6,0,0"
+											HorizontalAlignment="Stretch"
+											md:HintAssist.Hint="＋ 장비 추가…"
+											DisplayMemberPath="DeviceName"
+											ItemsSource="{Binding DeviceProvider.CollectionEntity}"
+											SelectedItem="{Binding DeviceToAdd, Mode=TwoWay}"
+											Style="{StaticResource FormComboBox}"
+											AutomationProperties.AutomationId="Events.SuppressionSchedule.DevicePickerComboBox" />
+									</Grid>
+
+									<!--  ── 그룹 선택 ──  -->
+									<Grid Visibility="{Binding IsGroupMode, Converter={StaticResource BoolToVis}}">
+										<Grid.RowDefinitions>
+											<RowDefinition Height="Auto" />
+											<RowDefinition Height="104" />
+											<RowDefinition Height="Auto" />
+										</Grid.RowDefinitions>
+
+										<DockPanel Grid.Row="0" Margin="0,0,0,6">
+											<Button
+												Margin="6,0,0,0"
+												VerticalAlignment="Center"
+												Content="모두 지우기"
+												DockPanel.Dock="Right"
+												IsEnabled="{Binding HasSelectedGroups}"
+												Style="{StaticResource Console.Button.Mini}"
+												ToolTip="선택한 그룹을 전부 해제"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.ClearGroupsButton">
+												<cal:Message.Attach>[Event Click] = [Action ClearGroups()]</cal:Message.Attach>
+											</Button>
+											<TextBlock
+												VerticalAlignment="Center"
+												DockPanel.Dock="Right"
+												FontSize="11"
+												FontWeight="Bold"
+												Foreground="{DynamicResource PrimaryBrush}"
+												Text="{Binding SelectedGroupCountText}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.SelectedGroupCountText" />
+											<TextBlock
+												VerticalAlignment="Center"
+												Style="{StaticResource FormLabel}"
+												Text="그룹 선택 *" />
+										</DockPanel>
+
+										<Grid Grid.Row="1">
+											<Rectangle
+												RadiusX="4"
+												RadiusY="4"
+												Fill="{DynamicResource SurfaceBrush}"
+												Stroke="{DynamicResource BorderBrush}"
+												StrokeThickness="1"
+												Visibility="{Binding HasSelectedGroups, Converter={StaticResource BoolToVis}}" />
+											<Rectangle
+												RadiusX="4"
+												RadiusY="4"
+												Fill="{DynamicResource SurfaceBrush}"
+												Stroke="{DynamicResource DividerBrush}"
+												StrokeDashArray="3 3"
+												StrokeThickness="1"
+												Visibility="{Binding HasSelectedGroups, Converter={StaticResource BoolToVisInv}}" />
+
+											<StackPanel
+												HorizontalAlignment="Center"
+												VerticalAlignment="Center"
+												Visibility="{Binding HasSelectedGroups, Converter={StaticResource BoolToVisInv}}">
+												<md:PackIcon
+													Width="22"
+													Height="22"
+													HorizontalAlignment="Center"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Kind="AccountGroup" />
+												<TextBlock
+													Margin="0,4,0,0"
+													HorizontalAlignment="Center"
+													FontSize="11"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="선택된 그룹이 없습니다" />
+												<TextBlock
+													Margin="0,1,0,0"
+													HorizontalAlignment="Center"
+													FontSize="10"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="아래에서 그룹을 추가하세요" />
+											</StackPanel>
+
+											<ScrollViewer
+												Margin="6,6,2,2"
+												HorizontalScrollBarVisibility="Disabled"
+												VerticalScrollBarVisibility="Auto"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.GroupChipTray">
+												<ItemsControl ItemsSource="{Binding SelectedGroups}">
+													<ItemsControl.ItemsPanel>
+														<ItemsPanelTemplate>
+															<WrapPanel
+																ItemHeight="26"
+																ItemWidth="148"
+																Orientation="Horizontal" />
+														</ItemsPanelTemplate>
+													</ItemsControl.ItemsPanel>
+													<ItemsControl.ItemTemplate>
+														<DataTemplate>
+															<Border
+																Margin="0,0,4,4"
+																Padding="8,0,2,0"
+																Background="{DynamicResource TintAccentBrush}"
+																BorderBrush="{DynamicResource PrimaryBrush}"
+																BorderThickness="1"
+																CornerRadius="11"
+																ToolTip="{Binding Name}"
+																AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.GroupChip.{0}}">
+																<DockPanel>
+																	<Button
+																		Margin="2,0,0,0"
+																		Padding="0"
+																		VerticalAlignment="Center"
+																		Background="Transparent"
+																		BorderThickness="0"
+																		Cursor="Hand"
+																		DockPanel.Dock="Right"
+																		ToolTip="제거"
+																		Template="{StaticResource Console.Button.TransparentRow}"
+																		AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.GroupChipRemove.{0}}">
+																		<cal:Message.Attach>[Event Click] = [Action RemoveGroup($dataContext)]</cal:Message.Attach>
+																		<md:PackIcon
+																			Width="12"
+																			Height="12"
+																			Foreground="{DynamicResource PrimaryBrush}"
+																			Kind="Close" />
+																	</Button>
+																	<TextBlock
+																		VerticalAlignment="Center"
+																		FontSize="11"
+																		Foreground="{DynamicResource PrimaryBrush}"
+																		Text="{Binding Name}"
+																		TextTrimming="CharacterEllipsis" />
+																</DockPanel>
+															</Border>
+														</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+											</ScrollViewer>
+										</Grid>
+
+										<ComboBox
+											Grid.Row="2"
+											Margin="0,6,0,0"
+											HorizontalAlignment="Stretch"
+											md:HintAssist.Hint="＋ 그룹 추가…"
+											DisplayMemberPath="Name"
+											ItemsSource="{Binding DeviceGroupProvider.CollectionEntity}"
+											SelectedItem="{Binding GroupToAdd, Mode=TwoWay}"
+											Style="{StaticResource FormComboBox}"
+											AutomationProperties.AutomationId="Events.SuppressionSchedule.GroupPickerComboBox" />
+									</Grid>
+
+									<!--  ── 전체 대상 — 개별 선택이 없으므로 트레이 자리를 안내로 채운다(빈 칸 방지) ──  -->
+									<Grid Visibility="{Binding IsAllMode, Converter={StaticResource BoolToVis}}">
+										<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+											<md:PackIcon
+												Width="26"
+												Height="26"
+												HorizontalAlignment="Center"
+												Foreground="{DynamicResource StatusWarningBrush}"
+												Kind="SelectAll" />
+											<TextBlock
+												Margin="0,6,0,0"
+												HorizontalAlignment="Center"
+												FontWeight="Bold"
+												Foreground="{DynamicResource TextSecondaryBrush}"
+												Text="전체 대상 — 개별 선택 없음"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.AllTargetNoticeText" />
+											<TextBlock
+												Margin="0,2,0,0"
+												HorizontalAlignment="Center"
+												FontSize="11"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="모든 장비·그룹에 억제가 적용됩니다" />
+										</StackPanel>
+									</Grid>
+								</Grid>
+							</Border>
+						</Grid>
+
+						<!--  ── 액션 바 — 구분선 + 우측 정렬. 이전엔 생성 버튼이 필드 사이 허공에 떠 있었다.  -->
+						<Border
+							Margin="0,12,0,0"
+							Padding="0,10,0,0"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="0,1,0,0">
+							<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+								<Button
+									Content="초기화"
+									Style="{StaticResource GhostActionButton}"
+									ToolTip="입력한 내용을 모두 비웁니다"
+									AutomationProperties.AutomationId="Events.SuppressionSchedule.ResetFormButton">
+									<cal:Message.Attach>[Event Click] = [Action ResetForm()]</cal:Message.Attach>
+								</Button>
+								<Button
+									Margin="8,0,0,0"
+									Content="＋ 억제 스케줄 만들기"
+									IsEnabled="{Binding CanCreate}"
+									Style="{StaticResource PrimaryActionButton}"
+									ToolTip="{Binding CreateHintText}"
+									AutomationProperties.AutomationId="Events.SuppressionSchedule.CreateButton">
+									<cal:Message.Attach>[Event Click] = [Action ClickCreate()]</cal:Message.Attach>
+								</Button>
+							</StackPanel>
+						</Border>
+					</StackPanel>
+				</Border>
+
+				<!--  목록  -->
+				<DataGrid
+					Grid.Row="2"
+					AutoGenerateColumns="False"
+					Background="Transparent"
+					CanUserAddRows="False"
+					CellStyle="{StaticResource ModernDataGridCell}"
+					ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+					HeadersVisibility="Column"
+					IsReadOnly="True"
+					ItemsSource="{Binding Schedules}"
+					RowHeaderWidth="0"
+					MinRowHeight="38"
+					RowStyle="{StaticResource SuppressionRowStyle}"
+					Style="{StaticResource ModernDataGrid}"
+					AutomationProperties.AutomationId="Events.SuppressionSchedule.ScheduleGrid">
+					<i:Interaction.Behaviors>
+						<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
+					</i:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<!--  삭제 선택 체크박스 — 취소/종료(terminal) 행에만 노출  -->
+						<DataGridTemplateColumn Width="60" MinWidth="60">
+							<!--  헤더 전체선택 — 취소/종료(삭제 가능) 행 일괄 체크. 대상 행 없으면 비활성  -->
+							<DataGridTemplateColumn.HeaderTemplate>
+								<DataTemplate>
+									<CheckBox
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										IsChecked="{Binding Data.SelectAllDeletable, Source={StaticResource proxy}, Mode=TwoWay}"
+										IsEnabled="{Binding Data.HasDeletableRows, Source={StaticResource proxy}}"
+										ToolTip="취소/종료 항목 전체 선택"
+										AutomationProperties.AutomationId="Events.SuppressionSchedule.SelectAllCheckBox" />
+								</DataTemplate>
+							</DataGridTemplateColumn.HeaderTemplate>
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<CheckBox
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+										ToolTip="삭제 선택(취소/종료 항목만)"
+										Visibility="{Binding IsDeletable, Converter={StaticResource BoolToVis}}"
+										AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowSelectCheckBox.{0}}" />
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<!--  90 → 132 : 배지(status) 옆에 '억제중'(is_suppressing_now) 표식을 형제로 둔다.
+						     ⚠ 두 값은 서로 다른 축이다 — status 는 창의 생애주기, 억제중은 지금 이 순간.
+						        StatusText 문자열에는 어떤 접미도 붙이지 않는다(하네스 T-SUP028 이 판독).
+						     ⚠ 헤더 이름 '상태'는 불변(T-SUP025 가 All(contains) 로 단언).  -->
+						<DataGridTemplateColumn Width="132" MinWidth="132" Header="상태">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+								  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+									<Border
+										Padding="8,1"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										BorderThickness="1"
+										CornerRadius="9">
+										<Border.Style>
+											<Style TargetType="Border">
+												<Setter Property="BorderBrush" Value="{DynamicResource StatusInfoBrush}" />
+												<Setter Property="Background" Value="{DynamicResource TintInfoBrush}" />
+												<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusInfoBrush}" />
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding Status}" Value="active">
+														<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
+														<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
+														<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusNormalBrush}" />
+													</DataTrigger>
+													<DataTrigger Binding="{Binding Status}" Value="expired">
+														<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+														<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+														<Setter Property="TextElement.Foreground" Value="{DynamicResource TextMutedBrush}" />
+													</DataTrigger>
+													<DataTrigger Binding="{Binding Status}" Value="cancelled">
+														<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+														<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+														<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusWarningBrush}" />
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Border.Style>
+										<TextBlock
+											FontSize="11"
+											FontWeight="Bold"
+											Text="{Binding StatusText}"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowStatusText.{0}}" />
+									</Border>
+									<!--  '억제중' 표식 — 색이 아니라 형태(삼각 글리프 + 굵기)로 구분한다.
+									     라이트에서 Primary/Selection 이 완전 동일 색이라 색만으로는 못 나눈다.  -->
+									<TextBlock
+										Margin="6,0,0,0"
+										VerticalAlignment="Center"
+										FontSize="11"
+										FontWeight="Bold"
+										Foreground="{DynamicResource StatusWarningBrush}"
+										Text="▶ 억제중"
+										Visibility="{Binding IsSuppressingNow, Converter={StaticResource BoolToVis}}"
+										AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowSuppressingText.{0}}" />
+								  </StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<!--  작업명 2줄 — 1줄 작업명 / 2줄 반복 요약(단발이면 빈 문자열이라 1줄 그대로).
+						     새 컬럼을 만들지 않는다(고정 합이 이미 빠듯해 작업명 * 가 붕괴한다).  -->
+						<DataGridTemplateColumn Width="*" MinWidth="140" Header="작업명">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+										<TextBlock
+											FontSize="11"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="{Binding RecurrenceSummary}"
+											TextTrimming="CharacterEllipsis"
+											Visibility="{Binding IsRecurring, Converter={StaticResource BoolToVis}}"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowRecurrenceText.{0}}" />
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+						<DataGridTextColumn Width="170" MinWidth="170" Binding="{Binding TargetSummary}" Header="대상" />
+						<DataGridTextColumn Width="70" MinWidth="70" Binding="{Binding ScopeText}" Header="범위" />
+						<DataGridTextColumn Width="130" MinWidth="130" Binding="{Binding WindowStartText}" Header="시작(KST)" />
+						<!--  종료 2행 — 1행 종료/무제한, 2행 회차 정보.
+						     ⚠ OccurrenceText 는 서버 occurrence_end/next_occurrence_start 를 그대로 쓴다.
+						        유효기간 경계에서 회차가 잘리므로 요약 문자열로 재계산하면 마지막 날에 거짓말을 한다.  -->
+						<DataGridTemplateColumn Width="130" MinWidth="130" Header="종료(KST)">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock
+											Text="{Binding WindowEndText}"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowWindowEndText.{0}}" />
+										<TextBlock
+											FontSize="11"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="{Binding OccurrenceText}"
+											TextTrimming="CharacterEllipsis"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowOccurrenceText.{0}}" />
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<DataGridTemplateColumn Width="70" MinWidth="70" Header="취소">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Button
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										IsEnabled="{Binding IsCancellable}"
+										Style="{StaticResource ModernToolbarButton}"
+										ToolTip="억제 스케줄 취소"
+										AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowCancelButton.{0}}">
+										<cal:Message.Attach>[Event Click] = [Action OnClickCancel($dataContext)]</cal:Message.Attach>
+										<md:PackIcon Width="18" Height="18" Kind="CalendarRemoveOutline" />
+									</Button>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+					</DataGrid.Columns>
+				</DataGrid>
+			</Grid>
+		</Grid>
+	</Border>
+</UserControl>

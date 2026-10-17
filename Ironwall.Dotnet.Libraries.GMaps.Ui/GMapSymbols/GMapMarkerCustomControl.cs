@@ -23,6 +23,16 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     }
     #endregion
 
+    #region Billboard (map-tilt-25d FR-10)
+
+    /// <summary>[결정③] Custom 점 심볼은 빌보드 — 맵 회전 시 정립. Bearing 은 모델에 보존(write-back 금지 R-35).</summary>
+    public override bool IsBillboard => true;
+
+    /// <summary>빌보드: 루트 각 0 고정(3D 선례 동형). FOV 가 없으므로 base(0) 만.</summary>
+    protected override void ApplyDisplayAngle(double angle) => base.ApplyDisplayAngle(IsBillboard ? 0 : angle);
+
+    #endregion
+
     #region Constructors
 
     /// <summary>
@@ -79,7 +89,6 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     #endregion
 
     #region Override Methods (기존 동작 유지)
-
     /// <summary>
     /// 컨트롤 초기화 완료 후 호출 (필요시 오버라이드)
     /// </summary>
@@ -87,7 +96,7 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     {
         // GMapCustomMarker 전용 초기화 로직
         base.OnControlInitialized();
-        System.Diagnostics.Debug.WriteLine("GMapMarkerCustomControl 초기화 완료");
+        //System.Diagnostics.Debug.WriteLine("GMapMarkerCustomControl 초기화 완료");
     }
 
     /// <summary>
@@ -96,12 +105,6 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     protected override void OnMarkerSingleClicked(MouseButtonEventArgs e)
     {
         base.OnMarkerSingleClicked(e);
-
-        // 기하 심볼 전용 클릭 효과 (예: 깜빡임)
-        if (EnableShapeAnimation)
-        {
-            TriggerClickAnimation();
-        }
     }
 
     /// <summary>
@@ -111,77 +114,7 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     {
         base.OnMarkerDoubleClicked(e);
     }
-
-
-
     #endregion
     #region Public Methods
-    /// <summary>
-    /// 클릭 애니메이션 트리거
-    /// </summary>
-    private void TriggerClickAnimation()
-    {
-        if (!EnableShapeAnimation) return;
-
-        try
-        {
-            TransformGroup transformGroup;
-            ScaleTransform scaleTransform;
-            RotateTransform existingRotate = null;
-
-            // 기존 Transform 구조 분석
-            if (RenderTransform is TransformGroup existingGroup)
-            {
-                // 기존 TransformGroup 사용
-                transformGroup = existingGroup;
-                existingRotate = transformGroup.Children.OfType<RotateTransform>().FirstOrDefault();
-                scaleTransform = transformGroup.Children.OfType<ScaleTransform>().FirstOrDefault();
-            }
-            else if (RenderTransform is RotateTransform rotateOnly)
-            {
-                // 기존 RotateTransform만 있는 경우
-                existingRotate = rotateOnly;
-                transformGroup = new TransformGroup();
-                transformGroup.Children.Add(existingRotate); // ✅ 기존 회전 보존
-                scaleTransform = null;
-            }
-            else
-            {
-                // Transform이 없는 경우
-                transformGroup = new TransformGroup();
-                scaleTransform = null;
-            }
-
-            // ScaleTransform 추가/수정
-            if (scaleTransform == null)
-            {
-                scaleTransform = new ScaleTransform(1.0, 1.0);
-                transformGroup.Children.Add(scaleTransform);
-            }
-
-            // TransformGroup 적용 (기존 회전 유지됨)
-            RenderTransform = transformGroup;
-            RenderTransformOrigin = new Point(0.5, 0.5);
-
-            // 애니메이션 실행
-            var animation = new System.Windows.Media.Animation.DoubleAnimation
-            {
-                From = 1.0,
-                To = 1.2,
-                Duration = TimeSpan.FromMilliseconds(100),
-                AutoReverse = true
-            };
-
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-
-            System.Diagnostics.Debug.WriteLine($"애니메이션 실행 - 기존 회전 보존: {existingRotate?.Angle ?? 0:F1}°");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"클릭 애니메이션 실행 실패: {ex.Message}");
-        }
-    }
-
     #endregion
 }

@@ -1,0 +1,92 @@
+﻿using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+
+namespace Ironwall.Dotnet.Libraries.CameraPopup;
+
+/// <summary>팝업 호스트 감시 설정. 기본값이 PRD FR-25 값이다.</summary>
+public sealed class CameraPopupHostOptions
+{
+    public const string DefaultExecutableName = "Ironwall.CameraPopupHost.exe";
+
+    /// <summary>
+    /// 설치 · 출력 폴더 안 호스트 자리(T-02) — 호스트는 자기 의존성 · libvlc 폴더와 함께 하위 폴더에 산다
+    /// (GIS 폴더의 같은 이름 DLL 과 판이 섞이지 않게).
+    /// </summary>
+    public const string DefaultRelativePath = @"CameraPopupHost\" + DefaultExecutableName;
+
+    /// <summary>호스트 exe 경로. 상대 경로면 GIS 실행 폴더(<see cref="AppContext.BaseDirectory"/>) 기준.</summary>
+    public string HostExecutablePath { get; set; } = DefaultRelativePath;
+
+    public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// 이 시간 동안 호스트에게서 아무것도 못 받으면 멈춤으로 보고 강제 종료 · 재시작.
+    /// 심박 응답은 호스트의 <b>배경 스레드</b>가 보낸다 — 이 기준은 "프로세스가 통째로 멈춤 · 파이프 막힘"만 잡는다.
+    /// </summary>
+    public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// 호스트 UI 스레드가 이 시간 넘게 메시지를 돌리지 못하면(심박 응답의 <c>UiStallMs</c>) 멈춤으로 보고 강제 종료 · 재시작.
+    /// 창을 몰아 여는 몇 초짜리 바쁨은 멈춤이 아니다 — 기준을 길게 둔다(T-09: 3.8초 바쁨을 죽였다).
+    /// </summary>
+    public TimeSpan UiHangTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>호스트 시작 후 파이프 연결 · 핸드셰이크 제한 시간.</summary>
+    public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>파이프 한 번 쓰기 제한 시간 — 넘으면 호스트가 막힌 것으로 본다.</summary>
+    public TimeSpan WriteTimeout { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary><see cref="CrashWindow"/> 안에서 허용하는 재시작 수. 넘으면 Suspended.</summary>
+    public int MaxRestartsInWindow { get; set; } = 3;
+
+    public TimeSpan CrashWindow { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>메모리 한도 초과로 인한 계획된 재시작 허용 수(같은 창 안). 폭주 방지용 별도 예산.</summary>
+    public int MaxPlannedRestartsInWindow { get; set; } = 10;
+
+    /// <summary>호스트 자기 메모리 한도(MB) — 스트림이 많으면 <see cref="HostMemoryPerStreamMb"/> 만큼 늘어난다.</summary>
+    public int HostMemoryLimitMb { get; set; } = HostLaunchArguments.DefaultMemoryLimitMb;
+
+    /// <summary>
+    /// 스트림 하나당 더 허용하는 메모리(MB). 실제 한도 = max(<see cref="HostMemoryLimitMb"/>, 512 + 열린 스트림 수 × 이 값).
+    /// 실측(타일 60개): 약 18 MB/스트림 → 기본 24. 0 이면 고정 한도.
+    /// </summary>
+    public int HostMemoryPerStreamMb { get; set; } = HostLaunchArguments.DefaultMemoryPerStreamMb;
+
+    /// <summary>한꺼번에 "연결 중"일 수 있는 카메라 스트림 수 — 나머지는 줄을 선다(60개 동시 연결 방지).</summary>
+    public int MaxConcurrentStreamOpens { get; set; } = HostLaunchArguments.DefaultMaxConcurrentOpens;
+
+    /// <summary>카메라 스트림 수신 버퍼(ms, LibVLC network-caching · live-caching). 줄이면 늦은 그림을 버려 표시 fps 가 떨어진다(실측 — <see cref="HostLaunchArguments.DefaultNetworkCachingMs"/>).</summary>
+    public int StreamNetworkCachingMs { get; set; } = HostLaunchArguments.DefaultNetworkCachingMs;
+
+    /// <summary>명령 대기열 상한(FR-28). 넘으면 오래된 것부터 버리고 로그.</summary>
+    public int CommandQueueCapacity { get; set; } = 256;
+
+    /// <summary>호스트 로그 폴더. 비우면 %LOCALAPPDATA%\Ironwall\CameraPopupHost\logs.</summary>
+    public string? HostLogDirectory { get; set; }
+
+    /// <summary>창을 띄우지 않는 헤드리스 호스트(시험용).</summary>
+    public bool Headless { get; set; }
+
+    /// <summary>디버그 고장 주입 명령 허용(시험용). 운영에서는 false.</summary>
+    public bool EnableDebugCommands { get; set; }
+
+    /// <summary>
+    /// RTSP 서버가 TCP 를 거절(461)할 때 LibVLC 가 UDP 로 갈아타는 것을 허용한다. 기본 false — 갈아타면 호스트가 들어오는
+    /// UDP 포트를 열어 Windows 방화벽 창이 뜨므로 막고, 그 스트림은 실패로 보인다. UDP 로만 되는 카메라가 있을 때만 켠다.
+    /// </summary>
+    public bool AllowRtspUdpFallback { get; set; }
+
+    /// <summary>설정 경로를 절대 경로로(순수).</summary>
+    /// <remarks>상대 경로가 없으면 실행 폴더 바로 아래 <see cref="DefaultExecutableName"/> 로 폴백한다
+    /// (하나의 출력 폴더로 모아 빌드한 개발 · 시험 배치).</remarks>
+    public string ResolveExecutablePath()
+    {
+        var path = string.IsNullOrWhiteSpace(HostExecutablePath) ? DefaultRelativePath : HostExecutablePath;
+        if (Path.IsPathRooted(path)) return path;
+        var full = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+        if (File.Exists(full)) return full;
+        var flat = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, DefaultExecutableName));
+        return File.Exists(flat) ? flat : full;
+    }
+}

@@ -15,13 +15,15 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using LiveChartsCore.Measure;
 using LiveChartsCore.Drawing;
 using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Theme.Services;
+using MaterialDesignThemes.Wpf;
 using System.Xml.Linq;
-using Org.BouncyCastle.Security;
 using LiveChartsCore.Kernel;
 using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
 using MahApps.Metro.Controls;
@@ -40,17 +42,59 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         #region - Ctors -
         public EventInfoViewModel(DeviceProvider deviceProvider
                                 , EventProvider eventProvider
-                                , IEventDbService eventDbService)
+                                , EventProviderService providerService
+                                , IEventAggregator? eventAggregator = null
+                                , ILogService? log = null
+                                , IThemeService? themeService = null)
         {
-
             _deviceProvider = deviceProvider;
             _eventProvider = eventProvider;
             LSeries = new ObservableCollection<ISeries>();
             DSeries = new ObservableCollection<ISeries>();
-            _dbService = eventDbService;
+            _providerService = providerService;
+
+            // BasePanelViewModel initialization
+            _className = this.GetType().Name.ToString();
+            _eventAggregator = eventAggregator ?? IoC.Get<IEventAggregator>();
+            _log = log ?? IoC.Get<ILogService>();
+
+            // IMPL-21: 테마 서비스(선택). EXT-02 등록 전이면 null → 차트는 Light 기본색(graceful).
+            _themeService = themeService ?? TryResolveThemeService();
+            if (_themeService != null)
+                _themeService.ThemeChanged += OnThemeChanged;
+            // 초기 테마색 반영(다크에서 열려도 레전드/툴팁 보이게)
+            LegendTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
+            TooltipTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(CurrentTheme);   // SIM-R009 해소(미지정=기본 밝은 박스)
 
             _names = new[] { "DET", "MAL", "CON", "ACT" };
-            RefreshActiveness(); 
+            RefreshActiveness();
+        }
+
+        /// <summary>IThemeService 미등록(EXT-02 이전) 시 null 반환 — DI 깨짐 방지.</summary>
+        private static IThemeService? TryResolveThemeService()
+        {
+            try { return IoC.Get<IThemeService>(); }
+            catch { return null; }
+        }
+
+        /// <summary>현재 테마 — 서비스 없으면 Light 기본.</summary>
+        private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
+
+        /// <summary>레전드/툴팁 페인트를 지정 테마로 재할당(스칼라 .Color 변경만으론 LiveCharts 미갱신 — 재할당+Notify).</summary>
+        private void ApplyThemePaints(BaseTheme theme)
+        {
+            var c = ChartThemeProvider.TextColor(theme);
+            LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
+            TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);   // 전환 재공급(SIM-X003)
+        }
+
+        /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
+        private void OnThemeChanged(object? sender, BaseTheme theme)
+        {
+            try { ApplyThemePaints(theme); _rebuildChart?.Invoke(); }
+            catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
         #region - Implementation of Interface -
@@ -58,6 +102,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         #region - Overrides -
         protected override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
+            // ★ 싱글턴 VM(SingleInstance) + 닫힘 시 ThemeChanged 해제 → 재활성화에서 재구독·재설정하지 않으면
+            //   테마 stale(라이트 재오픈에 다크 페인트 잔존 — 실기 스크린샷 SIM-L001, singleton VM 생명주기 함정).
+            //   해제-후-구독으로 중복 방지.
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged -= OnThemeChanged;
+                _themeService.ThemeChanged += OnThemeChanged;
+            }
+            ApplyThemePaints(CurrentTheme);
+
             await base.OnActivateAsync(cancellationToken);
             //await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
         }
@@ -66,6 +120,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         {
             LSeries.Clear();
             DSeries.Clear();
+            if (close && _themeService != null)
+                _themeService.ThemeChanged -= OnThemeChanged;   // IMPL-21: 구독 해제(누수 방지)
             return base.OnDeactivateAsync(close, cancellationToken);
         }
         #endregion
@@ -146,129 +202,148 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
 
 
-        ////
-        //public List<double> CreateDetectionCount()
-        //{
-        //    List<double> dCount = DataHelper.GetDetectionCountsByController(_startDate, _endDate,
-        //                DeviceProvider.OfType<IControllerDeviceModel>(),
-        //                _eventProvider.OfType<IDetectionEventModel>());
 
-        //    return dCount;
-        //}
-
-        //public ISeries GetDetectBarDataSet(int index, List<double> dCount)
-        //{
-        //    return ChartHelper.MakeBar(_names[index++], dCount, new SKColor(255, 205, 0), new SKColor(255, 255, 255));
-        //}
-
-        //public ISeries GetDetectDognutDataSet(int index, List<double> dCount)
-        //{
-        //    return ChartHelper.MakeBar(_names[index++], dCount, new SKColor(255, 205, 0), new SKColor(255, 255, 255));
-        //}
-
+        /// <summary>
+        /// 이전 DataInitialize를 취소하고 새 CancellationToken을 반환
+        /// </summary>
+        public CancellationToken CancelAndRestart()
+        {
+            if (_infoCts != null && !_infoCts.IsCancellationRequested)
+            {
+                _infoCts.Cancel();
+                _infoCts.Dispose();
+            }
+            _infoCts = new CancellationTokenSource();
+            return _infoCts.Token;
+        }
 
         public Task DataInitialize(CancellationToken cancellationToken = default)
         {
+            _rebuildChart = () => { _ = DataInitialize(); };   // IMPL-21: 테마 전환 시 재빌드
             return Task.Run(async () =>
             {
                 try
                 {
-                    // 이벤트 인스턴스 가져오기
-                    await _dbService.FetchInstanceAsync(_startDate, _endDate, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    /*──────────────────────────────────────────────────────────────
+                       *  ★ 수정: SetData()에서 설정한 _startDate, _endDate 사용
+                    *──────────────────────────────────────────────────────────────*/
+                    var startDate = _startDate;
+                    var endDate = _endDate;
+
+                    // 만약 날짜가 설정 안 됐으면 기본값 사용
+                    if (startDate == default || endDate == default)
+                    {
+                        endDate = DateTime.Now;
+                        startDate = endDate.AddDays(-7);
+                    }
+
+                    var detectionTask = _providerService.FetchDetectionEventsAsync(startDate, endDate, token: cancellationToken);
+                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(startDate, endDate, token: cancellationToken);
+                    var connectionTask = _providerService.FetchConnectionEventsAsync(startDate, endDate, cancellationToken);
+                    var actionTask = _providerService.FetchActionEventsAsync(startDate, endDate, cancellationToken);
+
+                    await Task.WhenAll(detectionTask, malfunctionTask, connectionTask, actionTask);
+
+                    // Update EventProvider with fetched events
+                    _eventProvider.Clear();
+                    foreach (var item in detectionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in malfunctionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in connectionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in actionTask.Result) _eventProvider.Add(item);
+
+                    // 디버깅: Connection 이벤트 카운트 로그
+                    _log?.Info($"[EventInfoViewModel] Fetched {detectionTask.Result.Count} detection, " +
+                               $"{malfunctionTask.Result.Count} malfunction, " +
+                               $"{connectionTask.Result.Count} connection, " +
+                               $"{actionTask.Result.Count} action events");
+
+                   // //Connection 이벤트의 Device 상태 확인
+                   //var connectionEvents = connectionTask.Result;
+                   // foreach (var ev in connectionEvents)
+                   // {
+                   //     switch (ev.Device.DeviceType)
+                   //     {
+                   //         case Enums.EnumDeviceType.NONE:
+                   //             break;
+                   //         case Enums.EnumDeviceType.Controller:
+                   //             var controller = ev.Device as IControllerDeviceModel;
+                   //             _log?.Info($"[ConnectionEvent] ID={ev.Id}, controller.Id={controller?.Id}, " +
+                   //                        $"Controller.DeviceNumber={controller?.DeviceNumber}");
+                   //             break;
+                   //         case Enums.EnumDeviceType.Multi:
+                   //         case Enums.EnumDeviceType.Fence:
+                   //         case Enums.EnumDeviceType.Underground:
+                   //         case Enums.EnumDeviceType.Contact:
+                   //         case Enums.EnumDeviceType.PIR:
+                   //         case Enums.EnumDeviceType.IoController:
+                   //         case Enums.EnumDeviceType.Laser:
+                   //         case Enums.EnumDeviceType.Cable:
+                   //         case Enums.EnumDeviceType.SmartSensor:
+                   //         case Enums.EnumDeviceType.SmartSensor2:
+                   //         case Enums.EnumDeviceType.SmartCompound:
+                   //         case Enums.EnumDeviceType.Radar:
+                   //         case Enums.EnumDeviceType.OpticalCable:
+                   //             var sensor = ev.Device as ISensorDeviceModel;
+                   //             _log?.Info($"[ConnectionEvent] ID={ev.Id}, Sensor.Id={sensor?.Id}, " +
+                   //                        $"Controller={(sensor?.Controller != null ? sensor.Controller.DeviceNumber.ToString() : "null")}");
+                   //             break;
+                   //         case Enums.EnumDeviceType.IpCamera:
+                   //             break;
+                   //         case Enums.EnumDeviceType.IpSpeaker:
+                   //             break;
+                   //         case Enums.EnumDeviceType.Fence_Group:
+                   //             break;
+                   //         default:
+                   //             break;
+                   //     }
+                   // }
 
                     // 컨트롤러(Device) 번호 → 문자열 레이블
                     var devices = _deviceProvider.OfType<IControllerDeviceModel>()
                                                 .OrderBy(d => d.DeviceNumber);          // 보기 좋게 정렬
-                                               
 
-                    //List<double> mCount = DataHelper.GetMalfunctionCountsByController(_startDate, _endDate,
-                    //    DeviceProvider.OfType<IControllerDeviceModel>(),
-                    //    _eventProvider.OfType<IMalfunctionEventModel>());
+                    // ★ 빈 데이터 폴백: devices가 비어있으면 "데이터 없음" 라벨로 대체(SIM-D002)
+                    var deviceLabels = devices.Any()
+                        ? devices.Select(d => d.DeviceNumber.ToString()).ToArray()
+                        : new[] { "데이터 없음" };
 
-                    //List<double> cCount = DataHelper.GetConnectionCountsByController(_startDate, _endDate,
-                    //    DeviceProvider.OfType<IControllerDeviceModel>(),
-                    //    _eventProvider.OfType<IConnectionEventModel>());
+                    // 한글 축명 — 스키아는 글리프 폴백이 없어 typeface 미지정 시 tofu(SIM-R AxisName)
+                    var legacyTypeface = ChartThemeProvider.KoreanTypeface();
 
-                    //List<double> aCount = DataHelper.GetActionCountsByController(_startDate, _endDate,
-                    //    DeviceProvider.OfType<IControllerDeviceModel>(),
-                    //    _eventProvider.OfType<IActionEventModel>());
-
-                    //int index = 0;
-                    //var totalBarSeries = new[]
-                    //{
-                    //    //ChartHelper.MakeBar(_names[index++], dCount, new SKColor(255, 205, 0), new SKColor(255,255,255)),
-                    //    ChartHelper.MakeBar(_names[index++], mCount, new SKColor( 30,144,255), new SKColor(255,255,255)),
-                    //    ChartHelper.MakeBar(_names[index++], cCount, new SKColor(155, 89,182), new SKColor(255,255,255)),
-                    //    ChartHelper.MakeBar(_names[index++], aCount, new SKColor( 50,205, 50), new SKColor(255,255,255)),
-                    //};
-
-                    //index = 0;
-                    //var totalDognutSeries = new[]
-                    //{
-                    //    //ChartHelper.MakePie(_names[index++], dCount.Sum(), new SKColor(255, 205, 0), new SKColor(255,255,255)),
-                    //    ChartHelper.MakePie(_names[index++], mCount.Sum(), new SKColor( 30,144,255), new SKColor(255,255,255)),
-                    //    ChartHelper.MakePie(_names[index++], cCount.Sum(), new SKColor(155, 89,182), new SKColor(255,255,255)),
-                    //    ChartHelper.MakePie(_names[index++], aCount.Sum(), new SKColor( 50,205, 50), new SKColor(255,255,255)),
-                    //};
-                    // ─── X축: “카테고리” 4개 ────────────────────────────────
-
-
-
+                    // NamePadding 음수는 영문 축명 기준 미세조정이었음 — 한글 축명은 세로 폭이 커져
+                    // 눈금 라벨과 겹침(라이트 실기 스크린샷: '이벤트'가 0.5와 충돌) → 0 정규화 + 12px(SIM-N)
                     var xLabel = new Axis
                     {
-                        Labels = devices.Select(d => d.DeviceNumber.ToString()).ToArray(),
-                        Name = "controller",
+                        Labels = deviceLabels,
+                        Name = "제어기",
                         Position = AxisPosition.Start,
-                        NameTextSize = 15,
-                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        NameTextSize = 12,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = legacyTypeface },
                         UnitWidth = 1,
                         // (선택) 줄눈 제거
-                        NamePadding = new Padding(0, -10, 0, 5),   // L,T,R,B
-                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        NamePadding = new Padding(0),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = legacyTypeface },
                         ShowSeparatorLines = false
                     };
 
                     var yLabels = new Axis
                     {
-                        Name = "events",
+                        Name = "이벤트",
                         Position = AxisPosition.Start,
-                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
-                        NameTextSize = 15,
-                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 0),
-                        NamePadding = new Padding(0, 5, 0, -10),   // L,T,R,B
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        NameTextSize = 12,
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0) { SKTypeface = legacyTypeface },
+                        NamePadding = new Padding(0),
                         MinLimit = 0
                     };
 
 
-                    //DispatcherService.Invoke(async () =>
-                    //{
-                    //    LSeries.Clear();
-                    //    DSeries.Clear();
-                    //    XAxes.Clear();
-                    //    XAxes.Add(xLabel);      // 컬렉션 변경 → 차트가 즉시 갱신
-                    //    YAxes.Clear();
-                    //    YAxes.Add(yLabels);
-
-                    //    int delay = 100;
-
-                    //    foreach (var item in totalBarSeries)
-                    //    {
-                    //        LSeries.Add(item);
-                    //        //await Task.Delay(delay);
-                    //    }
-
-                    //    foreach (var item in totalDognutSeries)
-                    //    {
-                    //        DSeries.Add(item);
-                    //        //await Task.Delay(delay);
-                    //    }
-
-                    //});
-
-
                     DispatcherService.Invoke(() => {
-                        LSeries.Clear();
-                        DSeries.Clear();
+                        var newLSeries = new ObservableCollection<ISeries>();
+                        var newDSeries = new ObservableCollection<ISeries>();
+
                         XAxes.Clear();
                         XAxes.Add(xLabel);
                         YAxes.Clear();
@@ -282,26 +357,119 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                             /* 1) 데이터 계산 */
                             var counts = m.Counter(_startDate, _endDate, devices, _eventProvider);
 
+                            // ★ 빈 데이터 폴백: counts가 비어있으면 0값으로 채움
+                            if (counts.Count == 0)
+                                counts = new List<double> { 0 };
+
                             /* 2) Bar + Pie 시리즈 */
                             var bar = ChartHelper.MakeBar(
-                                m.DisplayName, counts, m.BarColor, SKColors.White);
+                                m.DisplayName, counts, m.BarColor, ChartThemeProvider.OnSeriesFixed);
 
                             var pie = ChartHelper.MakePie(
-                                m.DisplayName, counts.Sum(), m.PieColor, SKColors.White);
+                                m.DisplayName, counts.Sum(), m.PieColor, ChartThemeProvider.OnSeriesFixed);
 
                             /* 3) 추가 */
-                            LSeries.Add(bar);
-                            DSeries.Add(pie);
+                            newLSeries.Add(bar);
+                            newDSeries.Add(pie);
                         }
+
+                        LSeries = newLSeries;
+                        DSeries = newDSeries;
+                        NotifyOfPropertyChange(() => LSeries);
+                        NotifyOfPropertyChange(() => DSeries);
                     });
 
                 }
-                catch (TaskCanceledException ex)
+                catch (OperationCanceledException ex)
                 {
-                    _log?.Warning($"Raised {nameof(TaskCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
+                    _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
                 }
                 finally
                 {
+                }
+            });
+        }
+
+        /// <summary>
+        /// Statistics API DTO를 직접 받아 Bar/Pie 차트를 생성한다.
+        /// EventDashboardViewModel → DataChartPanelViewModel.LastDashboardDto 경유.
+        /// </summary>
+        public Task DataInitializeFromStats(EventSummaryDto summary, EventByDeviceDto byDevice,
+                                            CancellationToken ct = default)
+        {
+            _rebuildChart = () => { _ = DataInitializeFromStats(summary, byDevice); };   // IMPL-21: 테마 전환 시 재빌드
+            IsChartLoading = true;
+            return Task.Run(() =>
+            {
+                try
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    // Bar chart — by-device 기반
+                    var (barSeries, xLabels) = ChartHelper.BuildBarSeriesFromByDevice(byDevice, _names);
+
+                    // Pie chart — summary 기반
+                    var pieSeries = ChartHelper.BuildPieSeriesFromSummary(summary, _names);
+
+                    // 디버그: API에서 받은 제어기 이름 확인
+                    _log?.Info($"[EventInfoViewModel] xLabels: [{string.Join(", ", xLabels)}]");
+
+                    var koreanTypeface = ChartThemeProvider.KoreanTypeface();
+
+                    // 한글 축명 겹침 방지 — NamePadding 0 정규화 + 12px (legacy 경로와 동일, SIM-N)
+                    var xAxis = new Axis
+                    {
+                        Labels = xLabels,
+                        Name = "제어기",
+                        Position = AxisPosition.Start,
+                        NameTextSize = 12,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
+                        {
+                            SKTypeface = koreanTypeface
+                        },
+                        UnitWidth = 1,
+                        NamePadding = new Padding(0),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
+                        {
+                            SKTypeface = koreanTypeface
+                        },
+                        ShowSeparatorLines = false
+                    };
+
+                    var yAxis = new Axis
+                    {
+                        Name = "이벤트",
+                        Position = AxisPosition.Start,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        NameTextSize = 12,
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0)
+                        {
+                            SKTypeface = koreanTypeface
+                        },
+                        NamePadding = new Padding(0),
+                        MinLimit = 0
+                    };
+
+                    DispatcherService.Invoke(() =>
+                    {
+                        XAxes.Clear();
+                        XAxes.Add(xAxis);
+                        YAxes.Clear();
+                        YAxes.Add(yAxis);
+
+                        LSeries = new ObservableCollection<ISeries>(barSeries);
+                        DSeries = new ObservableCollection<ISeries>(pieSeries);
+                        NotifyOfPropertyChange(() => LSeries);
+                        NotifyOfPropertyChange(() => DSeries);
+                    });
+                }
+                catch (OperationCanceledException ex)
+                {
+                    _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitializeFromStats)}) : {ex.Message}");
+                }
+                finally
+                {
+                    DispatcherService.Invoke(() => IsChartLoading = false);
                 }
             });
         }
@@ -337,49 +505,84 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             set { _isActionEnable = value; ToggleVisibility(3, value); }
         }
 
-        public SolidColorPaint LegendTextPaint { get; set; } =
-        new SolidColorPaint
+        // 토글 시 차트가 다시 그리도록 알림 속성으로(재할당+Notify). 스칼라 .Color 변경만으론 LiveCharts 미갱신.
+        private SolidColorPaint _legendTextPaint = new SolidColorPaint
         {
-            Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Caliber")
+            Color = ChartThemeProvider.TextColor(BaseTheme.Light),
+            SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint LegendTextPaint
+        {
+            get => _legendTextPaint;
+            set { _legendTextPaint = value; NotifyOfPropertyChange(nameof(LegendTextPaint)); }
+        }
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
+        private SolidColorPaint _tooltipTextPaint = new SolidColorPaint
+        {
+            Color = ChartThemeProvider.TextColor(BaseTheme.Light),
+            SKTypeface = ChartThemeProvider.KoreanTypeface()
+        };
+        public SolidColorPaint TooltipTextPaint
+        {
+            get => _tooltipTextPaint;
+            set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
+        }
 
-        public ObservableCollection<ISeries> LSeries { get; private set; }
-        public ObservableCollection<ISeries> DSeries { get; private set; }
+        // 툴팁 배경 — 미지정 시 라이브러리 기본 밝은 박스가 다크 텍스트와 충돌(CR=1.04, SIM-R009).
+        private SolidColorPaint _tooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(BaseTheme.Light);
+        public SolidColorPaint TooltipBackgroundPaint
+        {
+            get => _tooltipBackgroundPaint;
+            set { _tooltipBackgroundPaint = value; NotifyOfPropertyChange(nameof(TooltipBackgroundPaint)); }
+        }
+
+        // 재할당이 차트에 반영되도록 알림 속성으로(토글 시 시리즈 교체→차트 갱신→레전드 재생성).
+        private ObservableCollection<ISeries> _lSeries = new();
+        public ObservableCollection<ISeries> LSeries
+        {
+            get => _lSeries;
+            private set { _lSeries = value; NotifyOfPropertyChange(nameof(LSeries)); }
+        }
+        private ObservableCollection<ISeries> _dSeries = new();
+        public ObservableCollection<ISeries> DSeries
+        {
+            get => _dSeries;
+            private set { _dSeries = value; NotifyOfPropertyChange(nameof(DSeries)); }
+        }
 
         public ObservableCollection<Axis> XAxes { get; } = [];
         public ObservableCollection<Axis> YAxes { get; } = [];
 
+        // DisplayName 한글화(SIM-S033~036) — 범례·툴팁 노출 문자열(코드 키 DET/MAL/CON/ACT와 분리)
         private readonly Dictionary<string, CategoryMeta> _meta = new()
         {
             ["DET"] = new(
-                "Detection", 
+                "탐지",
                 new SKColor(255, 205, 0),
-                new SKColor(255, 205, 0), 
-                (from, to, ctrls, evts) => 
-                DataHelper.GetDetectionCountsByController(from, to, ctrls, evts.OfType<IDetectionEventModel>())),
+                new SKColor(255, 205, 0),
+                (from, to, devices, evts) =>
+                DataHelper.GetDetectionCountsByDevice(from, to, devices, evts.OfType<IDetectionEventModel>())),
             ["MAL"] = new(
-                "Malfunction", 
-                new SKColor(30, 144, 255), 
-                new SKColor(30, 144, 255), 
-                (from, to, ctrls, evts) =>
-                DataHelper.GetMalfunctionCountsByController(from, to, ctrls, evts.OfType<IMalfunctionEventModel>())),
+                "장애",
+                new SKColor(30, 144, 255),
+                new SKColor(30, 144, 255),
+                (from, to, devices, evts) =>
+                DataHelper.GetMalfunctionCountsByDevice(from, to, devices, evts.OfType<IMalfunctionEventModel>())),
             ["CON"] = new(
-                "Connection", 
-                new SKColor(155, 89, 182), 
+                "연결",
                 new SKColor(155, 89, 182),
-                (from, to, ctrls, evts) => 
-                DataHelper.GetConnectionCountsByController(from, to, ctrls, evts.OfType<IConnectionEventModel>())),
+                new SKColor(155, 89, 182),
+                (from, to, devices, evts) =>
+                DataHelper.GetConnectionCountsByDevice(from, to, devices, evts.OfType<IConnectionEventModel>())),
             ["ACT"] = new(
-                "Action", 
-                new SKColor(50, 205, 50), 
+                "조치",
                 new SKColor(50, 205, 50),
-                (from, to, ctrls, evts) => 
-                DataHelper.GetActionCountsByController(from, to, ctrls, evts.OfType<IActionEventModel>()))
+                new SKColor(50, 205, 50),
+                (from, to, devices, evts) =>
+                DataHelper.GetActionCountsByDevice(from, to, devices, evts.OfType<IActionEventModel>()))
         };
 
         public bool IsDetectionActive 
@@ -403,12 +606,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             private set => SetFlag(ref _isActionActive, value, nameof(IsActionActive));
         }
 
+        public bool IsChartLoading
+        {
+            get => _isChartLoading;
+            set { _isChartLoading = value; NotifyOfPropertyChange(() => IsChartLoading); }
+        }
+
         #endregion
         #region - Attributes -
-        private IEventDbService _dbService;
+        private EventProviderService _providerService;
         private DeviceProvider _deviceProvider;
         private EventProvider _eventProvider;
+        private CancellationTokenSource? _infoCts;
         private string[] _names;
+        private bool _isChartLoading;
         private DateTime _startDate;
         private DateTime _endDate;
 
@@ -421,6 +632,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         private bool _isMalfunctionEnable = true;
         private bool _isConnectionEnable = true;
         private bool _isActionEnable = true;
+
+        // IMPL-21: 테마 인식 차트
+        private readonly IThemeService? _themeService;
+        private System.Action? _rebuildChart;
         #endregion
     }
 
@@ -431,9 +646,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         SKColor PieColor,
         CountsCounter Counter);
 
-    // delegate 도 “파일 최상위” 에 둔다
+    // delegate 도 "파일 최상위" 에 둔다
     delegate List<double> CountsCounter(
         DateTime from, DateTime to,
-        IEnumerable<IControllerDeviceModel> ctrls,
+        IEnumerable<IBaseDeviceModel> devices,
         IEnumerable<IBaseEventModel> evts);
 }

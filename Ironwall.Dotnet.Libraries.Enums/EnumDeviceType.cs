@@ -30,7 +30,12 @@ namespace Ironwall.Dotnet.Libraries.Enums
         Radar = 15, //15
         OpticalCable = 16, //16
 
-        //Fence_Line = 17, //17
+        Fence_Group = 17,
+        Lamp = 18,
+        Enclosure = 19,
+        SmartMultisensor2 = 20,
+        /// <summary>통문(Gate) — 사용자 결정 D2(2026-09-07): 접점 센서 변형이 아닌 독립 장비 타입 + 전용 3D 모델 "fencegate". 서버 계약은 이름 문자열 "Gate"(operation-event PRD v1.4).</summary>
+        Gate = 21,
     }
     
 }

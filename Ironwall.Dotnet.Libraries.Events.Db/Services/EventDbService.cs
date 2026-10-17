@@ -1361,7 +1361,7 @@ internal class EventDbService : TaskService, IEventDbService
     private MalfunctionEventProvider _malfunctionProvider;
     private ActionEventProvider _actionProvider;
     private DeviceProvider _deviceProvider;
-    private MySqlConnection _conn;
+    private MySqlConnection? _conn;
     private readonly SemaphoreSlim _processGate = new(1, 1);
     protected CancellationTokenSource? _cancellationTokenSource;
 
@@ -1414,7 +1414,7 @@ internal sealed class ExEventSQL
 internal sealed class DetectionSQL
 {
     public int ExEventId { get; set; }
-    public string Result { get; set; }
+    public string? Result { get; set; }
 
     public DetectionEventModel ToDomain(IExEventModel model)
     {

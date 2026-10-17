@@ -23,9 +23,7 @@ public static class SymbolTypeHelper
         { EnumMarkerCategory.MILITARY_SYMBOLS, "군사 심볼" },
         { EnumMarkerCategory.PIDS_EQUIPMENT, "PIDS 장비" },
         { EnumMarkerCategory.AREA_BOUNDARY, "지역/경계" },
-        { EnumMarkerCategory.ANALYSIS, "분석/예측" },
         { EnumMarkerCategory.INFRASTRUCTURE, "인프라/시설" },
-        { EnumMarkerCategory.EVENT_SYMBOLS, "이벤트 심볼" }
     };
 
     /// <summary>
@@ -59,6 +57,8 @@ public static class SymbolTypeHelper
     
         // PIDS_EQUIPMENT
         { "PIR_Sensor", "PIR 센서" },
+        { "SmartSensor", "스마트센서" },
+        { "IpSpeaker", "스피커" },
         //{ "Fence_Sensor", "펜스 센서" },
         //{ "Camera", "카메라" },
         //{ "Radar", "레이더" },
@@ -67,7 +67,7 @@ public static class SymbolTypeHelper
         //{ "Barrier", "차단기" },
     
         // AREA_BOUNDARY
-        { "Zone", "구역" },
+        { "Area", "구역" },
         //{ "Perimeter", "경계선" },
         //{ "Road", "도로" },
         //{ "Building", "건물" },
@@ -75,29 +75,15 @@ public static class SymbolTypeHelper
         //{ "River", "강/하천" },
         //{ "Forest", "산림" },
     
-        // ANALYSIS
-        { "Predicted_Path", "예상 경로" },
-        //{ "Risk_Area", "위험 구역" },
-        //{ "Search_Zone", "수색 구역" },
-        //{ "Target_Area", "목표 지역" },
-        //{ "Escape_Route", "탈출 경로" },
-    
         // INFRASTRUCTURE
-        { "Tower", "타워" },
+        { "Factory", "공장" },
         //{ "Bridge", "교량" },
         //{ "Tunnel", "터널" },
         //{ "Power_Plant", "발전소" },
         //{ "Substation", "변전소" },
         //{ "Antenna", "안테나" },
     
-        // EVENT_SYMBOLS
-        { "Alert", "경고" },
-        //{ "Warning", "주의" },
-        //{ "Emergency", "비상" },
-        //{ "Incident", "사건" },
-        //{ "Explosion", "폭발" },
-        //{ "Fire", "화재" },
-        //{ "Accident", "사고" }
+        
     };
     /// <summary>
     /// 기하학적 도형 표시 이름 딕셔너리

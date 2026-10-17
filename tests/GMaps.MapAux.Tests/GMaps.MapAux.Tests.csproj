@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <!--
+   카탈로그 §1 · §3.5 헤드리스 시나리오 시험(t-20261011-073817-787e) — 부품 카드 · 우클릭 · 상세 · 센서 정보 · 측정 · 그리기 · 군대 부호 ·
+   재생 · 추적 설정 · 방송/TTS · 카메라 허브 · 겹창 순서 · Esc 우선순위 · WINDY 표시 · 툴바 · 지도 "?".
+   창을 띄우지 않는다(뷰모델 · 서비스 · 순수 함수 · 부모 없는 Measure/Arrange). 지도 DB · 운영 서버에 붙지 않는다(가짜만).
+   시험 메서드마다 [Trait("Scenario", "MAP-xxx")] 표지를 단다 — tools/scenario-evidence/collect.py 가 TRX 로 상태표를 만든다.
+   실행: dotnet test tests/GMaps.MapAux.Tests
+ -->
+ <PropertyGroup>
+  <TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable>
+ </PropertyGroup>
+ <ItemGroup><ProjectReference Include="../../Ironwall.Dotnet.Libraries.GMaps.Ui/Ironwall.Dotnet.Libraries.GMaps.Ui.csproj"/></ItemGroup>
+ <ItemGroup><Compile Include="../GMaps.Scenario.Shared/*.cs" Link="Shared/%(Filename)%(Extension)"/></ItemGroup>
+ <ItemGroup>
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0"/>
+  <PackageReference Include="xunit" Version="2.9.3"/>
+  <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2"><PrivateAssets>all</PrivateAssets></PackageReference>
+  <PackageReference Include="Moq" Version="4.20.72"/>
+ </ItemGroup>
+</Project>

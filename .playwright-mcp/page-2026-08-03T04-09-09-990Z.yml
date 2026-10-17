@@ -1,0 +1,136 @@
+- generic [ref=f9e2]:
+  - generic [ref=f9e5]:
+    - generic [ref=f9e7]:
+      - generic [ref=f9e8]: Sensorway Co., Ltd.
+      - generic [ref=f9e10]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f9e23]:
+      - generic [ref=f9e24]:
+        - generic [ref=f9e25]: Sensorway Co., Ltd.
+        - generic [ref=f9e26]: UM-KO-2026-07
+      - generic [ref=f9e27]:
+        - generic [ref=f9e28]: USER MANUAL · 사용자 매뉴얼
+        - heading "Pids Monitoring System" [level=1] [ref=f9e29]
+        - generic [ref=f9e30]: IRONWALL 데스크톱 관제 프로그램 · 사용자 매뉴얼
+        - generic [ref=f9e31]:
+          - generic [ref=f9e32]: 안양발전소
+          - generic [ref=f9e33]: v2.6.0
+          - generic [ref=f9e34]: KO
+        - img "Pids Monitoring System" [ref=f9e36]
+      - generic [ref=f9e37]:
+        - generic [ref=f9e38]: 발행일 2026-07-22
+        - generic [ref=f9e39]: Sensorway Co., Ltd.
+  - generic [ref=f9e42]:
+    - generic [ref=f9e44]:
+      - generic [ref=f9e45]: Sensorway Co., Ltd.
+      - generic [ref=f9e47]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f9e60]:
+      - heading "목차 CONTENTS" [level=1] [ref=f9e61]
+      - list [ref=f9e62]:
+        - listitem [ref=f9e63]:
+          - link "01. 시작하기 — 실행 · 로그인 · 메인 화면" [ref=f9e64] [cursor=pointer]:
+            - /url: "#chap-1"
+        - listitem [ref=f9e67]:
+          - link "1.1 프로그램 실행" [ref=f9e68] [cursor=pointer]:
+            - /url: "#sec-sec-loading"
+        - listitem [ref=f9e71]:
+          - link "1.2 로그인" [ref=f9e72] [cursor=pointer]:
+            - /url: "#sec-sec-login"
+        - listitem [ref=f9e75]:
+          - link "1.3 회원가입 안내" [ref=f9e76] [cursor=pointer]:
+            - /url: "#sec-sec-signup"
+        - listitem [ref=f9e79]:
+          - link "1.4 로그인 후 메인 화면" [ref=f9e80] [cursor=pointer]:
+            - /url: "#sec-sec-main"
+        - listitem [ref=f9e83]:
+          - link "02. 화면 구성 — 상단 메뉴와 도구 모음" [ref=f9e84] [cursor=pointer]:
+            - /url: "#chap-2"
+        - listitem [ref=f9e87]:
+          - link "2.1 상단 메뉴 (File · Maps)" [ref=f9e88] [cursor=pointer]:
+            - /url: "#sec-sec-topmenu"
+        - listitem [ref=f9e91]:
+          - link "2.2 상단 도구 모음과 리소스 표시" [ref=f9e92] [cursor=pointer]:
+            - /url: "#sec-sec-toolbar"
+        - listitem [ref=f9e95]:
+          - link "03. 지도 조작 — 홈 · 사이트 고정 · 지도 도구" [ref=f9e96] [cursor=pointer]:
+            - /url: "#chap-3"
+        - listitem [ref=f9e99]:
+          - link "3.1 홈 위치 이동·설정" [ref=f9e100] [cursor=pointer]:
+            - /url: "#sec-sec-home"
+        - listitem [ref=f9e103]:
+          - link "3.2 사이트 고정 (맵 앵커)" [ref=f9e104] [cursor=pointer]:
+            - /url: "#sec-sec-anchor"
+        - listitem [ref=f9e107]:
+          - link "3.3 화면 중앙 십자가 · 관심지역 · 레이어 관리" [ref=f9e108] [cursor=pointer]:
+            - /url: "#sec-sec-map-tools"
+        - listitem [ref=f9e111]:
+          - link "3.4 추적 재생과 타겟 추적 설정" [ref=f9e112] [cursor=pointer]:
+            - /url: "#sec-sec-tracking"
+        - listitem [ref=f9e115]:
+          - link "04. 맵 편집 — 심볼 배치와 속성" [ref=f9e116] [cursor=pointer]:
+            - /url: "#chap-4"
+        - listitem [ref=f9e119]:
+          - link "4.1 맵 편집 모드와 심볼 조작" [ref=f9e120] [cursor=pointer]:
+            - /url: "#sec-sec-editmode"
+        - listitem [ref=f9e123]:
+          - link "4.2 심볼 공통 속성" [ref=f9e124] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-common"
+        - listitem [ref=f9e127]:
+          - link "4.3 심볼 종류별 속성 (군대부호 · PIDS · 건물)" [ref=f9e128] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-types"
+        - listitem [ref=f9e131]:
+          - link "4.4 라인 심볼 속성" [ref=f9e132] [cursor=pointer]:
+            - /url: "#sec-sec-line"
+        - listitem [ref=f9e135]:
+          - link "05. 환경 설정 (셋업 패널)" [ref=f9e136] [cursor=pointer]:
+            - /url: "#chap-5"
+        - listitem [ref=f9e139]:
+          - link "5.1 셋업 패널 · 이벤트 설정" [ref=f9e140] [cursor=pointer]:
+            - /url: "#sec-sec-setup-event"
+        - listitem [ref=f9e143]:
+          - link "5.2 소리 설정" [ref=f9e144] [cursor=pointer]:
+            - /url: "#sec-sec-setup-sound"
+        - listitem [ref=f9e147]:
+          - link "5.3 서버 연결(브로커) 설정" [ref=f9e148] [cursor=pointer]:
+            - /url: "#sec-sec-setup-broker"
+        - listitem [ref=f9e151]:
+          - link "5.4 지도 · 웹 · 도커 · 프로그램 · 연동 설정" [ref=f9e152] [cursor=pointer]:
+            - /url: "#sec-sec-setup-system"
+        - listitem [ref=f9e155]:
+          - link "06. 장비 관리 (장비 패널)" [ref=f9e156] [cursor=pointer]:
+            - /url: "#chap-6"
+        - listitem [ref=f9e159]:
+          - link "6.1 장비 패널과 장비 그룹" [ref=f9e160] [cursor=pointer]:
+            - /url: "#sec-sec-device-panel"
+        - listitem [ref=f9e163]:
+          - link "6.2 제어기 · 센서 설정" [ref=f9e164] [cursor=pointer]:
+            - /url: "#sec-sec-device-controller-sensor"
+        - listitem [ref=f9e167]:
+          - link "6.3 카메라 설정" [ref=f9e168] [cursor=pointer]:
+            - /url: "#sec-sec-device-camera"
+        - listitem [ref=f9e171]:
+          - link "6.4 스피커 · 함체 · 경광등 설정" [ref=f9e172] [cursor=pointer]:
+            - /url: "#sec-sec-device-others"
+        - listitem [ref=f9e175]:
+          - link "07. 이벤트 이력 (이벤트 패널)" [ref=f9e176] [cursor=pointer]:
+            - /url: "#chap-7"
+        - listitem [ref=f9e179]:
+          - link "7.1 이벤트 패널과 탐지 이력" [ref=f9e180] [cursor=pointer]:
+            - /url: "#sec-sec-event-detection"
+        - listitem [ref=f9e183]:
+          - link "7.2 장애 · 연결 · 조치 이력" [ref=f9e184] [cursor=pointer]:
+            - /url: "#sec-sec-event-fault-etc"
+        - listitem [ref=f9e187]:
+          - link "08. 실시간 관제 — 이벤트 발생과 조치" [ref=f9e188] [cursor=pointer]:
+            - /url: "#chap-8"
+        - listitem [ref=f9e191]:
+          - link "8.1 심볼 우클릭 메뉴" [ref=f9e192] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-menu"
+        - listitem [ref=f9e195]:
+          - link "8.2 탐지 이벤트 발생 화면" [ref=f9e196] [cursor=pointer]:
+            - /url: "#sec-sec-detection-live"
+        - listitem [ref=f9e199]:
+          - link "8.3 장애 이벤트 발생 화면" [ref=f9e200] [cursor=pointer]:
+            - /url: "#sec-sec-fault-live"
+        - listitem [ref=f9e203]:
+          - link "8.4 이벤트 조치 보고" [ref=f9e204] [cursor=pointer]:
+            - /url: "#sec-sec-action-report"

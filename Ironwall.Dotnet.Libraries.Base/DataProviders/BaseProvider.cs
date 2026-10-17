@@ -49,6 +49,5 @@ public abstract class BaseProvider<T> : EntityCollectionProvider<T>
     #region - Properties -
     #endregion
     #region - Attributes -
-    protected ILogService? _log;
     #endregion
 }

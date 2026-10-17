@@ -1,0 +1,299 @@
+﻿using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Gateways;
+using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Monitoring.Models.Accounts;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.IO;
+
+namespace Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
+
+/// <summary>
+/// GOP 서버 JWT 어댑터 (기존 <c>DbAccountGateway</c> 대칭). <see cref="IAuthGateway"/>+<see cref="IUserDirectoryGateway"/>+<see cref="IProfileGateway"/> 구현.
+/// <para>AccountUiModule(useDbAuth=false) 로 등록되면 계정 VM은 무편집으로 DB→서버 인증으로 전환된다(§2.4.1).</para>
+/// <para><b>R1</b>: refresh_token 을 AuthResult 에 싣지 않고 게이트웨이가 <see cref="ITokenStorageService"/>에 직접 보관한다(보안+, §2.4.3).</para>
+/// <para>※ 현 단계는 <b>로그인 경로</b>만 구현. CRUD/프로필은 IMPL-11(AccountApiService CRUD) 후 채운다.
+/// FR-21 typed 실패결과/LogoutAsync 는 Accounts.Ui 동시세션 충돌로 보류 → 현재 계약(AuthResult? / null 실패) 유지.</para>
+/// — GOP-00 PRD FR-7/FR-14/FR-21
+/// </summary>
+public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGateway, ISsoLoginCompleter
+{
+    private readonly IAccountApiService _api;
+    private readonly ITokenStorageService _tokenStore;
+    private readonly IPermissionService _permission;
+    private readonly ISessionLifecycle? _lifecycle;
+    private readonly ILogService? _log;
+
+    public ApiAccountGateway(IAccountApiService api, ITokenStorageService tokenStore, IPermissionService permission, ISessionLifecycle? lifecycle = null, ILogService? log = null)
+    {
+        _api = api;
+        _tokenStore = tokenStore;
+        _permission = permission;
+        _lifecycle = lifecycle;
+        _log = log;
+    }
+
+    // ───────────────────────── IAuthGateway ─────────────────────────
+
+    /// <summary>POST /auth/login → 토큰 보관(R1) + AuthOutcome. 실패 시 서버 Error.Code/Message/LockReason 전달(G1).</summary>
+    public async Task<AuthOutcome> AuthenticateAsync(string username, string password, CancellationToken ct = default)
+    {
+        var res = await _api.LoginAsync(username, password, ct).ConfigureAwait(false);
+        if (!res.Success || res.Data?.User is null || string.IsNullOrEmpty(res.Data.AccessToken))
+        {
+            _log?.Warning($"[ApiAccountGateway] 로그인 실패: {res.Error?.Code ?? "UNKNOWN"}");
+            // v6.3 잠금정책: error.details {failed_count,threshold,remaining,locked} 파싱(있으면). 미존재 계정/잠금비활성이면 null(generic).
+            // ★ as JObject 필수 — DetailsToken은 JValue일 수 있다: 서버 details:null → JValue(Null),
+            //   연결실패 로컬 에러(Details 세터) → JValue(string). ?.는 C# null만 거르므로 JValue["key"]가
+            //   "Cannot access child value on JValue"로 크래시해 FailMessage의 정상 문구를 가로챘다(2026-07-31 실측).
+            var d = res.Error?.DetailsToken as JObject;
+
+            // 서버에 닿지 못한 실패(인증서 신뢰 · 연결 거부 · 시간 초과 · 이름 해석)는 세부 사유 코드를 그대로 넘긴다 —
+            // 로그인 화면이 "서버에 연결할 수 없습니다" 한 줄 대신 원인과 다음 행동(인증서를 신뢰 저장소에 넣기 등)을 보인다.
+            var transport = res.Error?.DetailsErrorCode;
+            if (ApiTransportFailure.IsTransportCode(transport))
+                return AuthOutcome.Fail(transport!, res.Error?.Message);
+
+            return AuthOutcome.Fail(
+                res.Error?.Code ?? "UNAUTHORIZED",
+                res.Error?.Message,
+                res.Data?.User?.LockReason,
+                d?["failed_count"]?.Value<int?>(),
+                d?["threshold"]?.Value<int?>(),
+                d?["remaining"]?.Value<int?>(),
+                d?["locked"]?.Value<bool?>());
+        }
+
+        var data = res.Data;
+        return CompleteLogin(data.User!, data.AccessToken, data.RefreshToken, data.SessionId);
+    }
+
+    /// <summary>
+    /// SSO 교환 성공 뒤의 로그인 완료 — SSO PRD FR-03.
+    /// <para><b>비밀번호 로그인과 같은 코드</b>(<see cref="CompleteLogin"/>)를 탄다. 토큰만 넣고 끝내면
+    /// 권한 엔진이 비어 모든 게이팅이 죽고, 로그인 게이팅이 GIS 초기화를 트리거하지 않는다 —
+    /// 화면은 로그인된 것처럼 보이는데 지도·장비가 안 뜨는 상태가 된다.</para>
+    /// <para>교환은 refresh 를 주지 않으므로 <c>null</c> 로 넣는다 — 그래야 401 때 <c>BearerAuthHandler</c> 가
+    /// SSO 재교환 경로를 탄다.</para>
+    /// </summary>
+    public AuthOutcome CompleteSsoLogin(SsoExchangeResponseDataDto data)
+    {
+        if (data?.User is null || string.IsNullOrEmpty(data.AccessToken))
+            return AuthOutcome.Fail("INVALID_TOKEN_RESPONSE", "교환 응답에 사용자 또는 토큰이 없습니다");
+        return CompleteLogin(data.User, data.AccessToken, refreshToken: null, data.SessionId);
+    }
+
+    /// <summary>
+    /// 로그인 성공의 공통 마무리 — 비밀번호 로그인 · SSO 로그인 둘 다 여기를 지난다.
+    /// 순서가 의미를 갖는다: 토큰 → 권한 → 강제 로그아웃 가드 재무장 → 로그인 게이팅 알림(GIS init 트리거).
+    /// </summary>
+    private AuthOutcome CompleteLogin(AuthUserDto user, string accessToken, string? refreshToken, string? sessionId)
+    {
+        // R1: access+refresh 를 게이트웨이가 직접 TokenStorage 에 보관(VM 엔 access 만 노출)
+        // session_id 는 응답 본문의 값을 '명시' 전달한다(§9.2.2 required). 종전엔 JWT sid 클레임 포착에만 의존해,
+        // 서버가 클레임만 빼도 세션 목록의 '내 세션' 판정이 계정 근사 폴백으로 조용히 격하됐다(allow 정책에서 과다표시).
+        _tokenStore.SetTokens(accessToken, refreshToken, sessionId);
+        // ★ V-PG-01 §7: 로그인 시 권한엔진 적용. 이전엔 Apply() 호출이 0건이라 role/permissions 영구 미적용 →
+        //   모든 Can*/IsAdmin/HasRole 무력(게이팅 dead). 여기서 채워야 UI 게이팅이 살아난다. PermissionsChanged 발화.
+        _permission.Apply(user);
+        _lifecycle?.ResetForLogin();   // FR-FL-04: 새 로그인 → 강제 로그아웃 once-guard 재무장
+        _lifecycle?.NotifyLoginSucceeded();   // B 연계: 로그인 게이팅 — GIS init/Device fetch 트리거(토큰·권한 적용 후)
+
+        var account = AccountDtoMapper.ToAccountModel(user, _api.ServerBaseUrl);
+        var permissions = PermissionsFlattener.Flatten(user.Permissions);
+        var expiresAt = _tokenStore.AccessExpiresAtUtc ?? DateTime.UtcNow.AddHours(24); // exp 미상 시 기본 24h(§2.3.1)
+
+        return AuthOutcome.Ok(new AuthResult(account, accessToken, expiresAt, user.Role ?? "GUEST", permissions));
+    }
+
+    /// <summary>'아이디 저장' 로컬 prefs(G3). 서버엔 로그인 이력 조회 없음(B-5)이라 클라 로컬 파일에 보존.</summary>
+    public Task<ILoginModel?> GetLatestLoginAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var path = AppSettingsLocation.LoginPrefsReadPath;
+            if (!File.Exists(path)) return Task.FromResult<ILoginModel?>(null);
+            var prefs = JsonConvert.DeserializeObject<LoginPrefs>(File.ReadAllText(path));
+            if (prefs is null || !prefs.IsIdSaved || string.IsNullOrEmpty(prefs.Username))
+                return Task.FromResult<ILoginModel?>(null);
+            return Task.FromResult<ILoginModel?>(new LoginModel { Username = prefs.Username, IsIdSaved = true });
+        }
+        catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] 아이디 prefs 읽기 실패: {ex.Message}"); return Task.FromResult<ILoginModel?>(null); }
+    }
+
+    /// <summary>로그인 성공 시 '아이디 저장' 체크 상태를 로컬 prefs에 보존(G3). 체크 해제면 비움.</summary>
+    public Task RecordLoginAsync(string username, bool isUsernameSaved, CancellationToken ct = default)
+    {
+        try
+        {
+            var prefs = new LoginPrefs { Username = isUsernameSaved ? username : string.Empty, IsIdSaved = isUsernameSaved };
+            File.WriteAllText(AppSettingsLocation.PrepareLoginPrefsWrite(), JsonConvert.SerializeObject(prefs));
+        }
+        catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] 아이디 저장 실패: {ex.Message}"); }
+        return Task.CompletedTask;
+    }
+
+    private sealed class LoginPrefs { public string Username { get; set; } = string.Empty; public bool IsIdSaved { get; set; } }
+
+    /// <summary>서버 logout best-effort + 토큰 폐기. access_token 서버 블랙리스트 없음(§2.3.3)이라 로컬 Clear 필수(G2).</summary>
+    public async Task LogoutAsync(CancellationToken ct = default)
+    {
+        try { await _api.LogoutAsync(ct).ConfigureAwait(false); }
+        catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] logout API 실패 — 로컬 폐기 진행: {ex.Message}"); }
+        finally
+        {
+            // FR-FL-04: 수동 로그아웃도 단일 멱등 진입점 경유(NATS/401과 수렴 + ForceLogoutRequested 발화 → GIS PTZ정지·스트림해제)
+            if (_lifecycle != null) _lifecycle.ForceLogoutOnce(EnumRevokeReason.Manual);
+            else { _tokenStore.Clear(); _permission.Clear(); }   // lifecycle 미주입(테스트 등) 폴백
+        }
+    }
+
+    // ──────────────── IUserDirectoryGateway (FR-19) ────────────────
+
+    /// <summary>계정 목록 전량. 서버 limit 상한이 100 이라 단일 호출은 101번째부터 조용히 잘린다 → page 순회(§9.3.2).</summary>
+    public async Task<List<IAccountModel>?> GetAllAccountsAsync(CancellationToken ct = default)
+    {
+        var res = await _api.GetAllUsersAsync(ct).ConfigureAwait(false);
+        if (!res.Success || res.Data is null) return null;
+        return res.Data.Select(d => (IAccountModel)AccountDtoMapper.ToAccountModel(d, _api.ServerBaseUrl)).ToList();
+    }
+
+    public async Task<IAccountModel?> CreateAccountAsync(IAccountModel acc, CancellationToken ct = default)
+    {
+        var res = await _api.CreateUserAsync(AccountDtoMapper.ToUserCreateDto(acc), ct).ConfigureAwait(false);
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
+    }
+
+    public async Task<IAccountModel?> UpdateAccountAsync(IAccountModel acc, CancellationToken ct = default)
+    {
+        var res = await _api.UpdateUserAsync(acc.Id, AccountDtoMapper.ToUserUpdateDto(acc), ct).ConfigureAwait(false);
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>서버 모드: 로컬 목록(서버 목록의 사본)으로 "첫 등록자 = ADMIN" 을 추론하지 않는다 — 역할은 서버 기본값(USER) 또는 관리자 명시값.</summary>
+    public bool CanInferFirstAccountAdmin => false;
+
+    /// <summary>서버 모드: 본인 수정(PUT /users/me) 본문에 employee_number 가 없다 — 사원번호는 관리자 경로로만 바뀐다.</summary>
+    public bool CanSelfEditEmployeeNumber => false;
+
+    /// <summary>
+    /// 서버 모드: 내 정보의 본인 계정 삭제를 막는다(<see cref="IProfileGateway.CanSelfDeleteAccount"/>).
+    /// DELETE /users/{id} 는 비밀번호를 받지 않아 <see cref="RemoveAccountAsync"/> 가 currentPassword 를 확인하지 못하고,
+    /// 확인용 재로그인은 지금 세션을 쫓아내며(단일 세션 정책) 실패가 잠금 횟수에 쌓인다. 서버도 본인 삭제를 409 로 거절한다.
+    /// </summary>
+    public bool CanSelfDeleteAccount => false;
+
+    /// <summary>
+    /// 손댄 칸만 PUT /users/{id} — 콘솔 [적용] · 편집 다이얼로그 [확인] 경로. 비운 칸은 <c>"키": null</c> 로 실어 서버가 해제한다
+    /// (<see cref="AccountDtoMapper.ToUserUpdateDto(IAccountModel, IEnumerable{string})"/>).
+    /// </summary>
+    public async Task<IAccountModel?> UpdateAccountFieldsAsync(IAccountModel acc, IReadOnlyCollection<string> changedFields, CancellationToken ct = default)
+    {
+        var res = await _api.UpdateUserAsync(acc.Id, AccountDtoMapper.ToUserUpdateDto(acc, changedFields), ct).ConfigureAwait(false);
+        if (!res.Success) _log?.Warning($"[ApiAccountGateway] 계정 {acc.Id} 부분 수정 실패: {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>서버 DELETE 엔 비번 게이트/본문 없음(§2.4.4) — currentPassword 서버 미적용(권한은 서버 403).
+    /// 그래서 본인 삭제(비밀번호 확인이 전제인 경로)는 <see cref="CanSelfDeleteAccount"/>=false 로 화면에서 막는다 — 관리자 삭제 전용.</summary>
+    public async Task<bool> RemoveAccountAsync(IAccountModel acc, string currentPassword, CancellationToken ct = default)
+    {
+        var res = await _api.DeleteUserAsync(acc.Id, ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
+    /// <summary>
+    /// 아이디 중복 확인. 전용 엔드포인트는 서버에 없으므로 <c>GET /api/users</c> <b>전량</b>에서 <c>login_id</c> 를 대조한다.
+    /// <para>중복 생성은 서버가 <b>400</b>("중복된 login_id", 409 아님)으로 거부하는데, 종전 구현이 항상 <c>false</c> 를
+    /// 돌려줘 사용자에게 "사용 가능한 아이디입니다" 라고 <b>거짓 안내</b>한 뒤 저장 단계에서 영문 400 을 그대로 노출했다.
+    /// 조회 실패(권한·네트워크)면 종전대로 <c>false</c>(낙관) — 서버 400 이 최종 방어다.</para>
+    /// </summary>
+    public async Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(username)) return false;
+        try
+        {
+            var res = await _api.GetAllUsersAsync(ct).ConfigureAwait(false);
+            if (!res.Success || res.Data is null)
+            {
+                _log?.Warning($"[ApiAccountGateway] IsUsernameTaken: 계정 목록 조회 실패 — 낙관 false({res.Error?.Code ?? "UNKNOWN"})");
+                return false;
+            }
+            return res.Data.Any(u => string.Equals(u.LoginId, username.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[ApiAccountGateway] IsUsernameTaken 확인 실패 — 낙관 false: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<IAccountModel?> ResetAccountPasswordAsync(IAccountModel acc, string newPassword, CancellationToken ct = default)
+    {
+        var res = await _api.ResetUserPasswordAsync(acc.Id, newPassword, ct).ConfigureAwait(false);
+        // 실패 원문(코드 · 메시지)은 로그로만 — 화면은 호출자가 고정 문장으로 안내한다.
+        if (!res.Success) _log?.Warning($"[ApiAccountGateway] 계정 {acc.Id} 비밀번호 초기화 실패: {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+        return res.Success ? acc : null;   // 서버 {success:true}(user 본문 없음) → 입력 모델 에코
+    }
+
+    /// <summary>계정 잠금 해제 — POST /users/{id}/unlock. 서버 {success:true} → true. 403(권한)/실패=false.</summary>
+    public async Task<bool> UnlockAccountAsync(int id, CancellationToken ct = default)
+    {
+        var res = await _api.UnlockUserAsync(id, ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
+    // ──────────────── IProfileGateway (FR-17) ────────────────
+
+    /// <summary>GET /users/me = 토큰 소유자(본인). accountId 는 정보용(서버는 토큰 기준).</summary>
+    public async Task<IAccountModel?> GetProfileAsync(int accountId, CancellationToken ct = default)
+    {
+        var res = await _api.GetMyProfileAsync(ct).ConfigureAwait(false);
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>PUT /users/me. ⚠ photo_url 은 서버 미반영 버그(C-5, v4.7 핫픽스 전).</summary>
+    public async Task<IAccountModel?> UpdateProfileAsync(IAccountModel acc, CancellationToken ct = default)
+    {
+        var res = await _api.UpdateMyProfileAsync(AccountDtoMapper.ToUserSelfUpdateDto(acc), ct).ConfigureAwait(false);
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>POST /users/me/photo — 사진 업로드, 서버가 photo_url(상대 경로) 갱신. 접속 주소 기준 절대 URL 로 만들어 반환(실패 null).</summary>
+    public async Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default)
+    {
+        var res = await _api.UploadMyPhotoAsync(filePath, ct).ConfigureAwait(false);
+        return res.Success ? ServerPhotoUrl.ToDisplay(res.Data?.PhotoUrl, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>DELETE /users/me/photo — 본인 사진 삭제(idempotent). 성공=true(default 아바타 복귀). 실패=false. — MyPage_SelfPhoto_Delete_Fix</summary>
+    public async Task<bool> DeletePhotoAsync(CancellationToken ct = default)
+    {
+        var res = await _api.DeleteMyPhotoAsync(ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
+    /// <summary>관리자: 대상 계정 사진 업로드 — POST /users/{id}/photo. 성공 시 서버 photo_url(상대 경로)을 접속 주소 기준 절대 URL 로 반환. 403/실패=null. — Admin_Photo_Upload</summary>
+    public async Task<string?> UploadPhotoAsync(int userId, string filePath, CancellationToken ct = default)
+    {
+        var res = await _api.UploadUserPhotoAsync(userId, filePath, ct).ConfigureAwait(false);
+        return res.Success ? ServerPhotoUrl.ToDisplay(res.Data?.PhotoUrl, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>관리자: 대상 계정 사진 삭제 — DELETE /users/{id}/photo. 성공=true(default 아바타 복귀). 403/실패=false. — Admin_Photo_Upload</summary>
+    public async Task<bool> DeletePhotoAsync(int userId, CancellationToken ct = default)
+    {
+        var res = await _api.DeleteUserPhotoAsync(userId, ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
+    /// <summary>PUT /users/me/password. 서버는 세션 무효화 안 함(F07-01) → 변경 후 강제 재로그인은 호스트 책임(§2.3.3).</summary>
+    public async Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        var res = await _api.ChangeMyPasswordAsync(currentPassword, newPassword, ct).ConfigureAwait(false);
+        return res.Success ? acc : null;   // 서버 {success:true}(user 본문 없음) → 입력 모델 에코
+    }
+}

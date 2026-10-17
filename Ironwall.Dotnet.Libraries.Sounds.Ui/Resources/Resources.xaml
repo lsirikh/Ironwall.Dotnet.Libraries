@@ -105,7 +105,7 @@
 
 		<Style.Triggers>
 			<Trigger Property="TextBlock.IsEnabled" Value="False">
-				<Setter Property="TextBlock.Foreground" Value="Gray" />
+				<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 			</Trigger>
 		</Style.Triggers>
 	</Style>
@@ -263,16 +263,6 @@
 		<Setter Property="FontWeight" Value="Bold" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="Margin" Value="10,0,0,0" />
-	</Style>
-
-	<!--  Material Design 스타일 기반 버튼  -->
-	<Style
-		x:Key="IconButtonStyle"
-		BasedOn="{StaticResource MaterialDesignIconButton}"
-		TargetType="Button">
-		<Setter Property="VerticalAlignment" Value="Center" />
-		<Setter Property="Margin" Value="2,2" />
-		<Setter Property="md:RippleAssist.IsCentered" Value="True" />
 	</Style>
 
 	<!--  Material Design 스타일 기반 DataGrid  -->

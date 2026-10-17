@@ -5,6 +5,7 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Converters;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -17,13 +18,14 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
+		<!--  enum 한글 표시(단방향, 저장/전송 값 불변)  -->
+		<conv:UiEnumToKoreanConverter x:Key="UiEnumToKorean" />
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
 	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
@@ -45,18 +47,32 @@
 					<ColumnDefinition Width="10" />
 					<ColumnDefinition Width="70" />
 				</Grid.ColumnDefinitions>
+				<!--  Type-axis filter (v7.0+ only)  -->
+				<ComboBox
+					Grid.Column="0"
+					Width="200"
+					HorizontalAlignment="Left"
+					VerticalAlignment="Center"
+					md:HintAssist.Hint="종류 필터"
+					AutomationProperties.AutomationId="Devices.Sensor.TypeAxisFilter"
+					DisplayMemberPath="Display"
+					ItemsSource="{Binding TypeAxis.FilterOptions}"
+					SelectedValue="{Binding TypeAxis.SelectedFilterCode, Mode=TwoWay}"
+					SelectedValuePath="Code"
+					Visibility="{Binding TypeAxis.IsAxisUi, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 				<!--  Add Button  -->
 				<Button
 					Grid.Column="7"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="추가하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="AddBox" />
 				</Button>
 
@@ -64,14 +80,14 @@
 				<Button
 					Grid.Column="9"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="삭제하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="MinusBox" />
 				</Button>
 
@@ -79,7 +95,7 @@
 				<Button
 					Grid.Column="11"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="갱신하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickReloadButton" />
@@ -87,14 +103,14 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
+								Width="20"
 								Height="20"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								Kind="CircleArrows"
 								ToolTip="갱신하기"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -110,25 +126,26 @@
 					VerticalAlignment="Center"
 					md:RippleAssist.IsCentered="True"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource MaterialDesignIconButton}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
-						<Grid>
+						<Grid IsEnabled="{Binding IsButtonEnable}">
 							<ProgressBar
-								Width="100"
+								Width="20"
 								Height="20"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding IsSaving, Converter={StaticResource BooleanToVisibilityConverter}}"
+								Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								Kind="Floppy"
 								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+								Visibility="{Binding IsSaving, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 						</Grid>
 					</Button.Content>
 				</Button>
@@ -137,20 +154,28 @@
 		<Grid
 			Grid.Row="1"
 			Width="800"
-			Height="310">
+			Height="260">
 			<ProgressBar
 				Width="100"
 				Height="20"
 				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
 				Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 		</Grid>
 		<DataGrid
 			x:Name="DataGridUsers"
+			IsReadOnly="{Binding IsGridReadOnly}"
 			Grid.Row="1"
-			Height="310"
+			Height="260"
+			Background="Transparent"
+			Margin="10 0"
+			BorderThickness="1"
+			VerticalAlignment="Top"
+			HeadersVisibility="Column"
+			RowHeaderWidth="0"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
+			ScrollViewer.HorizontalScrollBarVisibility="Auto"
 			ItemsSource="{Binding ViewModelProvider}"
 			SelectionMode="Extended"
 			Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -158,12 +183,33 @@
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:SensorDeviceSelectedItemsBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
 			</i:Interaction.Behaviors>
+			<DataGrid.RowStyle>
+				<Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+					<!--  행 우클릭 → 탐지 이력 (Detection_Signal_History FR-11) — 탐지 패널 '조치보고' BindingProxy 패턴 미러  -->
+					<Setter Property="ContextMenu">
+						<Setter.Value>
+							<ContextMenu>
+								<MenuItem
+									Command="{Binding Data.HistoryCommand, Source={StaticResource proxy}}"
+									CommandParameter="{Binding}"
+									Header="탐지 이력" />
+							</ContextMenu>
+						</Setter.Value>
+					</Setter>
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsDraft}" Value="True">
+							<Setter Property="Background" Value="#FFE0B2" />
+							<Setter Property="ToolTip" Value="미저장 — 저장 시 서버에 등록됩니다" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</DataGrid.RowStyle>
 			<DataGrid.Columns>
 
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -183,7 +229,7 @@
 				<!--  DeviceNumber  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Device Number"
+					Header="장비번호"
 					SortMemberPath="DeviceNumber">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -204,35 +250,6 @@
 							<TextBox
 								VerticalAlignment="Center"
 								Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
-
-				<!--  DeviceGroup  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					Header="Device Group"
-					SortMemberPath="DeviceGroup">
-					<DataGridColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<TextBox
-								VerticalAlignment="Center"
-								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
@@ -241,8 +258,8 @@
 				<!--  DeviceName  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Device Name"
-					SortMemberPath="DeviceNumber">
+					Header="장비명"
+					SortMemberPath="DeviceName">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
 							<Setter Property="HorizontalAlignment" Value="Center" />
@@ -267,10 +284,90 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
+				<!--  DeviceType  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="유형"
+					SortMemberPath="DeviceType"
+					Visibility="{Binding Data.TypeAxis.IsLegacyUi, Source={StaticResource proxy}, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding DeviceType, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<ComboBox
+								VerticalAlignment="Center"
+								HorizontalContentAlignment="Center"
+								IsEditable="False"
+								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceType}}}"
+								SelectedItem="{Binding DeviceType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+								<ComboBox.ItemsPanel>
+									<ItemsPanelTemplate>
+										<VirtualizingStackPanel />
+									</ItemsPanelTemplate>
+								</ComboBox.ItemsPanel>
+								<ComboBox.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding}" TextAlignment="Center" />
+									</DataTemplate>
+								</ComboBox.ItemTemplate>
+								<ComboBox.ItemContainerStyle>
+									<Style TargetType="{x:Type ComboBoxItem}" />
+								</ComboBox.ItemContainerStyle>
+							</ComboBox>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  TypeAxis (v7.0+ type_<category>) - catalog strings, not the client enum (device-console-v8 FR-09)  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="종류"
+					SortMemberPath="TypeAxisCode"
+					Visibility="{Binding Data.TypeAxis.IsAxisUi, Source={StaticResource proxy}, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding TypeAxisDisplay, Mode=OneWay}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<ComboBox
+								VerticalAlignment="Center"
+								HorizontalContentAlignment="Center"
+								DisplayMemberPath="Display"
+								IsEditable="False"
+								ItemsSource="{Binding Data.TypeAxis.Options, Source={StaticResource proxy}}"
+								SelectedValue="{Binding TypeAxisCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								SelectedValuePath="Code" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
 				<!--  Controller  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Controller"
+					Header="제어기"
 					SortMemberPath="Controller">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -312,11 +409,11 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
-				<!--  DeviceType  -->
+				<!--  Location  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Type"
-					SortMemberPath="DeviceType">
+					Header="위치"
+					SortMemberPath="Location">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
 							<Setter Property="HorizontalAlignment" Value="Center" />
@@ -327,52 +424,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding DeviceType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<ComboBox
-								VerticalAlignment="Center"
-								HorizontalContentAlignment="Center"
-								IsEditable="False"
-								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceType}}}"
-								SelectedItem="{Binding DeviceType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-								<ComboBox.ItemsPanel>
-									<ItemsPanelTemplate>
-										<VirtualizingStackPanel />
-									</ItemsPanelTemplate>
-								</ComboBox.ItemsPanel>
-								<ComboBox.ItemTemplate>
-									<DataTemplate>
-										<TextBlock Text="{Binding}" TextAlignment="Center" />
-									</DataTemplate>
-								</ComboBox.ItemTemplate>
-								<ComboBox.ItemContainerStyle>
-									<Style TargetType="{x:Type ComboBoxItem}" />
-								</ComboBox.ItemContainerStyle>
-							</ComboBox>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
-
-				<!--  Version  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					Header="Device Version"
-					SortMemberPath="Version">
-					<DataGridColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -380,7 +432,7 @@
 						<DataTemplate>
 							<TextBox
 								VerticalAlignment="Center"
-								Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
@@ -389,7 +441,7 @@
 				<!--  Status  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Status"
+					Header="상태"
 					SortMemberPath="Status">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -401,7 +453,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding Status, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -431,7 +483,35 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
-
+				<!--  IsEnable  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="활성화"
+					SortMemberPath="IsEnable">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<CheckBox
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								IsChecked="{Binding IsEnable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								IsHitTestVisible="False" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<CheckBox
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								IsChecked="{Binding IsEnable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
 
 			</DataGrid.Columns>
 		</DataGrid>

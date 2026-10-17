@@ -1,0 +1,400 @@
+- generic [ref=f2e2]:
+  - generic [ref=f2e5]:
+    - generic [ref=f2e7]:
+      - generic [ref=f2e8]: Sensorway Co., Ltd.
+      - generic [ref=f2e10]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e23]:
+      - generic [ref=f2e24]:
+        - generic [ref=f2e25]: Sensorway Co., Ltd.
+        - generic [ref=f2e26]: UM-KO-2026-07
+      - generic [ref=f2e27]:
+        - generic [ref=f2e28]: USER MANUAL · 사용자 매뉴얼
+        - heading "Pids Monitoring System" [level=1] [ref=f2e29]
+        - generic [ref=f2e30]: IRONWALL 데스크톱 관제 프로그램 · 사용자 매뉴얼
+        - generic [ref=f2e31]:
+          - generic [ref=f2e32]: 안양발전소
+          - generic [ref=f2e33]: v2.6.0
+          - generic [ref=f2e34]: KO
+        - img "Pids Monitoring System" [ref=f2e36]
+      - generic [ref=f2e37]:
+        - generic [ref=f2e38]: 발행일 2026-07-22
+        - generic [ref=f2e39]: Sensorway Co., Ltd.
+  - generic [ref=f2e42]:
+    - generic [ref=f2e44]:
+      - generic [ref=f2e45]: Sensorway Co., Ltd.
+      - generic [ref=f2e47]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e60]:
+      - heading "목차 CONTENTS" [level=1] [ref=f2e61]
+      - list [ref=f2e62]:
+        - listitem [ref=f2e63]:
+          - link "01. 시작하기 — 실행 · 로그인 · 메인 화면" [ref=f2e64] [cursor=pointer]:
+            - /url: "#chap-1"
+        - listitem [ref=f2e67]:
+          - link "1.1 프로그램 실행" [ref=f2e68] [cursor=pointer]:
+            - /url: "#sec-sec-loading"
+        - listitem [ref=f2e71]:
+          - link "1.2 로그인" [ref=f2e72] [cursor=pointer]:
+            - /url: "#sec-sec-login"
+        - listitem [ref=f2e75]:
+          - link "1.3 회원가입 안내" [ref=f2e76] [cursor=pointer]:
+            - /url: "#sec-sec-signup"
+        - listitem [ref=f2e79]:
+          - link "1.4 로그인 후 메인 화면" [ref=f2e80] [cursor=pointer]:
+            - /url: "#sec-sec-main"
+        - listitem [ref=f2e83]:
+          - link "02. 화면 구성 — 상단 메뉴와 도구 모음" [ref=f2e84] [cursor=pointer]:
+            - /url: "#chap-2"
+        - listitem [ref=f2e87]:
+          - link "2.1 상단 메뉴 (File · Maps)" [ref=f2e88] [cursor=pointer]:
+            - /url: "#sec-sec-topmenu"
+        - listitem [ref=f2e91]:
+          - link "2.2 상단 도구 모음과 리소스 표시" [ref=f2e92] [cursor=pointer]:
+            - /url: "#sec-sec-toolbar"
+        - listitem [ref=f2e95]:
+          - link "03. 지도 조작 — 홈 · 사이트 고정 · 지도 도구" [ref=f2e96] [cursor=pointer]:
+            - /url: "#chap-3"
+        - listitem [ref=f2e99]:
+          - link "3.1 홈 위치 이동·설정" [ref=f2e100] [cursor=pointer]:
+            - /url: "#sec-sec-home"
+        - listitem [ref=f2e103]:
+          - link "3.2 사이트 고정 (맵 앵커)" [ref=f2e104] [cursor=pointer]:
+            - /url: "#sec-sec-anchor"
+        - listitem [ref=f2e107]:
+          - link "3.3 화면 중앙 십자가 · 관심지역 · 레이어 관리" [ref=f2e108] [cursor=pointer]:
+            - /url: "#sec-sec-map-tools"
+        - listitem [ref=f2e111]:
+          - link "3.4 추적 재생과 타겟 추적 설정" [ref=f2e112] [cursor=pointer]:
+            - /url: "#sec-sec-tracking"
+        - listitem [ref=f2e115]:
+          - link "04. 맵 편집 — 심볼 배치와 속성" [ref=f2e116] [cursor=pointer]:
+            - /url: "#chap-4"
+        - listitem [ref=f2e119]:
+          - link "4.1 맵 편집 모드와 심볼 조작" [ref=f2e120] [cursor=pointer]:
+            - /url: "#sec-sec-editmode"
+        - listitem [ref=f2e123]:
+          - link "4.2 심볼 공통 속성" [ref=f2e124] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-common"
+        - listitem [ref=f2e127]:
+          - link "4.3 심볼 종류별 속성 (군대부호 · PIDS · 건물)" [ref=f2e128] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-types"
+        - listitem [ref=f2e131]:
+          - link "4.4 라인 심볼 속성" [ref=f2e132] [cursor=pointer]:
+            - /url: "#sec-sec-line"
+        - listitem [ref=f2e135]:
+          - link "05. 환경 설정 (셋업 패널)" [ref=f2e136] [cursor=pointer]:
+            - /url: "#chap-5"
+        - listitem [ref=f2e139]:
+          - link "5.1 셋업 패널 · 이벤트 설정" [ref=f2e140] [cursor=pointer]:
+            - /url: "#sec-sec-setup-event"
+        - listitem [ref=f2e143]:
+          - link "5.2 소리 설정" [ref=f2e144] [cursor=pointer]:
+            - /url: "#sec-sec-setup-sound"
+        - listitem [ref=f2e147]:
+          - link "5.3 서버 연결(브로커) 설정" [ref=f2e148] [cursor=pointer]:
+            - /url: "#sec-sec-setup-broker"
+        - listitem [ref=f2e151]:
+          - link "5.4 지도 · 웹 · 도커 · 프로그램 · 연동 설정" [ref=f2e152] [cursor=pointer]:
+            - /url: "#sec-sec-setup-system"
+        - listitem [ref=f2e155]:
+          - link "06. 장비 관리 (장비 패널)" [ref=f2e156] [cursor=pointer]:
+            - /url: "#chap-6"
+        - listitem [ref=f2e159]:
+          - link "6.1 장비 패널과 장비 그룹" [ref=f2e160] [cursor=pointer]:
+            - /url: "#sec-sec-device-panel"
+        - listitem [ref=f2e163]:
+          - link "6.2 제어기 · 센서 설정" [ref=f2e164] [cursor=pointer]:
+            - /url: "#sec-sec-device-controller-sensor"
+        - listitem [ref=f2e167]:
+          - link "6.3 카메라 설정" [ref=f2e168] [cursor=pointer]:
+            - /url: "#sec-sec-device-camera"
+        - listitem [ref=f2e171]:
+          - link "6.4 스피커 · 함체 · 경광등 설정" [ref=f2e172] [cursor=pointer]:
+            - /url: "#sec-sec-device-others"
+        - listitem [ref=f2e175]:
+          - link "07. 이벤트 이력 (이벤트 패널)" [ref=f2e176] [cursor=pointer]:
+            - /url: "#chap-7"
+        - listitem [ref=f2e179]:
+          - link "7.1 이벤트 패널과 탐지 이력" [ref=f2e180] [cursor=pointer]:
+            - /url: "#sec-sec-event-detection"
+        - listitem [ref=f2e183]:
+          - link "7.2 장애 · 연결 · 조치 이력" [ref=f2e184] [cursor=pointer]:
+            - /url: "#sec-sec-event-fault-etc"
+        - listitem [ref=f2e187]:
+          - link "08. 실시간 관제 — 이벤트 발생과 조치" [ref=f2e188] [cursor=pointer]:
+            - /url: "#chap-8"
+        - listitem [ref=f2e191]:
+          - link "8.1 심볼 우클릭 메뉴" [ref=f2e192] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-menu"
+        - listitem [ref=f2e195]:
+          - link "8.2 탐지 이벤트 발생 화면" [ref=f2e196] [cursor=pointer]:
+            - /url: "#sec-sec-detection-live"
+        - listitem [ref=f2e199]:
+          - link "8.3 장애 이벤트 발생 화면" [ref=f2e200] [cursor=pointer]:
+            - /url: "#sec-sec-fault-live"
+        - listitem [ref=f2e203]:
+          - link "8.4 이벤트 조치 보고" [ref=f2e204] [cursor=pointer]:
+            - /url: "#sec-sec-action-report"
+  - generic [ref=f2e209]:
+    - generic [ref=f2e211]:
+      - generic [ref=f2e212]: Sensorway Co., Ltd.
+      - generic [ref=f2e214]: Pids Monitoring System 사용자 매뉴얼
+    - list [ref=f2e228]:
+      - listitem [ref=f2e229]:
+        - link "8.5 카메라 영상 팝업" [ref=f2e230] [cursor=pointer]:
+          - /url: "#sec-sec-camera-popup"
+      - listitem [ref=f2e233]:
+        - link "09. 보고서 · 계정 · 권한 관리" [ref=f2e234] [cursor=pointer]:
+          - /url: "#chap-9"
+      - listitem [ref=f2e237]:
+        - link "9.1 보고서(리포트)" [ref=f2e238] [cursor=pointer]:
+          - /url: "#sec-sec-report"
+      - listitem [ref=f2e241]:
+        - link "9.2 계정 관리" [ref=f2e242] [cursor=pointer]:
+          - /url: "#sec-sec-account-mgmt"
+      - listitem [ref=f2e245]:
+        - link "9.3 권한 그룹과 스케쥴 권한" [ref=f2e246] [cursor=pointer]:
+          - /url: "#sec-sec-permission-group"
+      - listitem [ref=f2e249]:
+        - link "9.4 세션 · 감사 로그" [ref=f2e250] [cursor=pointer]:
+          - /url: "#sec-sec-session-audit"
+      - listitem [ref=f2e253]:
+        - link "10. 개인 설정 — 내 정보 · 로그아웃 · 통합 웹 · 강풍 모드" [ref=f2e254] [cursor=pointer]:
+          - /url: "#chap-10"
+      - listitem [ref=f2e257]:
+        - link "10.1 내 정보와 로그아웃" [ref=f2e258] [cursor=pointer]:
+          - /url: "#sec-sec-myinfo-logout"
+      - listitem [ref=f2e261]:
+        - link "10.2 통합 웹 열기와 강풍 모드" [ref=f2e262] [cursor=pointer]:
+          - /url: "#sec-sec-web-wind"
+  - generic [ref=f2e267]:
+    - generic [ref=f2e269]:
+      - generic [ref=f2e270]: Sensorway Co., Ltd.
+      - generic [ref=f2e272]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e284]:
+      - generic [ref=f2e285]:
+        - generic [ref=f2e286]:
+          - generic [ref=f2e287]: "01"
+          - generic [ref=f2e288]:
+            - generic [ref=f2e289]: CHAPTER 1
+            - heading "시작하기 — 실행 · 로그인 · 메인 화면" [level=1] [ref=f2e290]
+        - paragraph [ref=f2e291]: 프로그램 실행과 로그인, 회원가입 안내, 그리고 로그인 후 메인 화면 구성을 설명합니다.
+      - generic [ref=f2e292]:
+        - generic [ref=f2e293]:
+          - generic [ref=f2e294]: CHAPTER 1
+          - heading "1.1프로그램 실행" [level=2] [ref=f2e295]
+        - paragraph [ref=f2e296]: 프로그램을 실행하면 초기 로딩 화면이 잠시 표시된 뒤 로그인 화면으로 넘어갑니다.
+        - generic [ref=f2e297]:
+          - figure "그림 1. 초기 로딩(스플래시) 화면" [ref=f2e298]:
+            - img "초기 로딩(스플래시) 화면" [ref=f2e299]
+          - generic [ref=f2e301]: "프로그램을 실행하면 제품명(Pids Monitoring System)과 버전, 하단의 진행 표시줄과 현재 로딩 상태 메시지(예: 'SoundService — 시작 중...')가 표시되는 로딩 화면이 나타납니다. 구성요소 초기화가 끝나면 이 화면은 자동으로 닫히고 로그인 화면으로 전환됩니다."
+        - generic [ref=f2e303]:
+          - generic [ref=f2e304]: ℹ 실행 준비
+          - generic [ref=f2e305]: 로딩이 오래 걸리면 지도 타일·소리·서버 연결 등 초기화 항목을 준비 중인 상태입니다. 하단 상태 메시지로 진행 단계를 확인할 수 있습니다.
+      - generic [ref=f2e306]:
+        - generic [ref=f2e307]:
+          - generic [ref=f2e308]: CHAPTER 1
+          - heading "1.2로그인" [level=2] [ref=f2e309]
+        - paragraph [ref=f2e310]: 등록된 계정의 아이디와 비밀번호로 로그인하여 관제 화면에 진입합니다.
+        - generic [ref=f2e311]:
+          - figure "그림 2. 로그인 화면" [ref=f2e312]:
+            - img "로그인 화면" [ref=f2e313]
+          - generic [ref=f2e315]: 화면 중앙에 로그인 창이 표시됩니다. 아이디(ID)와 비밀번호(PW)를 입력합니다. 비밀번호 입력란 오른쪽의 눈 아이콘을 누르면 입력한 비밀번호를 잠시 확인할 수 있습니다. '아이디를 저장하시겠습니까?'를 체크한 상태로 로그인하면 다음 실행 시 아이디가 자동으로 채워집니다.
+  - generic [ref=f2e318]:
+    - generic [ref=f2e320]:
+      - generic [ref=f2e321]: Sensorway Co., Ltd.
+      - generic [ref=f2e323]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e335]:
+      - generic [ref=f2e336]:
+        - generic [ref=f2e337]:
+          - figure "그림 3. 아이디·비밀번호 입력 후" [ref=f2e338]:
+            - img "아이디·비밀번호 입력 후" [ref=f2e339]
+          - generic [ref=f2e341]: 아이디와 비밀번호를 모두 입력하면 확인 버튼이 활성화됩니다. 확인을 누르면 인증이 진행되고, 성공하면 관제 메인 화면으로 전환됩니다. 취소를 누르면 입력한 내용이 취소됩니다.
+        - generic [ref=f2e343]:
+          - generic [ref=f2e344]: 💡 아이디 저장
+          - generic [ref=f2e345]: "'아이디를 저장하시겠습니까?'를 체크하면 다음 실행 시 아이디가 자동 입력됩니다. 비밀번호는 저장되지 않으므로 매번 직접 입력하십시오."
+      - generic [ref=f2e346]:
+        - generic [ref=f2e347]:
+          - generic [ref=f2e348]: CHAPTER 1
+          - heading "1.3회원가입 안내" [level=2] [ref=f2e349]
+        - paragraph [ref=f2e350]: 이 프로그램에서는 계정을 직접 만들지 않고, 통합관제 웹에서 회원가입을 진행합니다.
+        - generic [ref=f2e351]:
+          - figure "그림 4. 회원가입 안내 팝업" [ref=f2e352]:
+            - img "회원가입 안내 팝업" [ref=f2e353]
+          - generic [ref=f2e355]: 로그인 창 아래의 Register(회원가입)를 누르면 '회원가입은 통합관제 웹에서 진행해 주세요.'라는 안내 팝업이 표시됩니다. 계정 생성은 데스크톱 프로그램이 아니라 통합관제 웹 포털에서 이루어지므로, 웹에서 계정을 만든 뒤 이 프로그램에 로그인하십시오. 닫기를 눌러 팝업을 닫습니다.
+        - generic [ref=f2e357]:
+          - generic [ref=f2e358]: ℹ 계정 발급
+          - generic [ref=f2e359]: 계정이 없으면 통합관제 웹 포털에서 회원가입하거나 운영 담당자에게 계정 발급을 요청하십시오.
+      - generic [ref=f2e360]:
+        - generic [ref=f2e361]:
+          - generic [ref=f2e362]: CHAPTER 1
+          - heading "1.4로그인 후 메인 화면" [level=2] [ref=f2e363]
+        - paragraph [ref=f2e364]: 로그인하면 GIS 위성지도 기반의 관제 메인 화면이 나타납니다.
+  - generic [ref=f2e367]:
+    - generic [ref=f2e369]:
+      - generic [ref=f2e370]: Sensorway Co., Ltd.
+      - generic [ref=f2e372]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e385]:
+      - generic [ref=f2e386]:
+        - figure "그림 5. 로그인 후 메인 화면 (안양발전소 기준)" [ref=f2e387]:
+          - img "로그인 후 메인 화면 (안양발전소 기준)" [ref=f2e388]
+        - generic [ref=f2e390]: 화면 중앙에 현장 위성지도가 표시되고, 그 위에 구역(구역-01~17), 제어기(제어기1~7), 외곽 센서(외곽1~12), 카메라 등 현장 구성요소가 심볼로 배치됩니다. 상단에는 File·Maps 메뉴, 지도 종류(위성지도) 선택, 이동·홈·편집 도구가 있고, 오른쪽 위에는 시스템 리소스 사용률이 표시됩니다. 좌측에는 기능 아이콘 레일, 우측에는 이벤트 패널이 있으며, 좌측 상단에는 현재 마우스 위치의 좌표(WGS-84)가 표시됩니다.
+      - generic [ref=f2e391]:
+        - figure "그림 6. 우측 이벤트 패널" [ref=f2e392]:
+          - img "우측 이벤트 패널" [ref=f2e393]
+        - generic [ref=f2e395]: 화면 오른쪽의 이벤트 패널은 실시간 이벤트 목록과 현재 '이벤트 수'를 보여줍니다. 상단의 휴지통 아이콘으로 목록을 비우고, X 버튼으로 패널을 닫을 수 있습니다. 탐지·장애 등 이벤트가 발생하면 이 패널에 카드 형태로 나타납니다.
+      - generic [ref=f2e397]:
+        - generic [ref=f2e398]: 💡 좌표 확인
+        - generic [ref=f2e399]: 좌측 상단의 좌표 표시로 마우스가 가리키는 지점의 위도·경도를 실시간으로 확인할 수 있습니다. 좌표계는 상단 Maps 메뉴에서 변경합니다.
+  - generic [ref=f2e402]:
+    - generic [ref=f2e404]:
+      - generic [ref=f2e405]: Sensorway Co., Ltd.
+      - generic [ref=f2e407]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e419]:
+      - generic [ref=f2e420]:
+        - generic [ref=f2e421]:
+          - generic [ref=f2e422]: "02"
+          - generic [ref=f2e423]:
+            - generic [ref=f2e424]: CHAPTER 2
+            - heading "화면 구성 — 상단 메뉴와 도구 모음" [level=1] [ref=f2e425]
+        - paragraph [ref=f2e426]: 상단의 File·Maps 메뉴, 지도 종류 선택, 지도 제어·편집 도구, 오른쪽 위 시스템 리소스 표시 등 화면 상단 구성을 설명합니다.
+      - generic [ref=f2e427]:
+        - generic [ref=f2e428]:
+          - generic [ref=f2e429]: CHAPTER 2
+          - heading "2.1상단 메뉴 (File · Maps)" [level=2] [ref=f2e430]
+        - paragraph [ref=f2e431]: 화면 상단의 File·Maps 메뉴로 지도 불러오기와 좌표계 설정 등 기본 기능을 사용합니다.
+        - generic [ref=f2e432]:
+          - figure "그림 7. File 메뉴" [ref=f2e433]:
+            - img "File 메뉴" [ref=f2e434]
+          - generic [ref=f2e436]: File 메뉴에는 맵 불러오기(Ctrl+L), 이미지 불러오기(Ctrl+I), 새 커스텀 맵 생성(Ctrl+N), 맵 타일 폴더 설정(Ctrl+D), 종료(Exit, Ctrl+E)가 있습니다. 지도 데이터를 불러오거나 맵 타일이 저장된 폴더를 지정할 때 사용합니다.
+        - generic [ref=f2e437]:
+          - figure "그림 8. Maps 메뉴 — 좌표계 선택" [ref=f2e438]:
+            - img "Maps 메뉴 — 좌표계 선택" [ref=f2e439]
+          - generic [ref=f2e441]: Maps 메뉴에서 화면에 표시할 좌표계를 선택합니다. WGS-84 좌표계, MGRS 좌표계, UTM 좌표계 중 하나를 고를 수 있으며, 현재 선택된 항목 앞에 체크 표시가 나타납니다.
+      - generic [ref=f2e442]:
+        - generic [ref=f2e443]:
+          - generic [ref=f2e444]: CHAPTER 2
+          - heading "2.2상단 도구 모음과 리소스 표시" [level=2] [ref=f2e445]
+        - paragraph [ref=f2e446]: 상단 바에는 지도를 다루는 제어 도구와 심볼 편집 도구, 그리고 우측의 시스템 리소스 표시가 모여 있습니다. 지도 화면을 이동하고, 표시 방식을 바꾸고, 현장 심볼을 편집하는 대부분의 조작을 이 영역에서 시작합니다.
+  - generic [ref=f2e449]:
+    - generic [ref=f2e451]:
+      - generic [ref=f2e452]: Sensorway Co., Ltd.
+      - generic [ref=f2e454]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e467]:
+      - generic [ref=f2e468]:
+        - figure "그림 9. 지도 제어 도구 모음" [ref=f2e469]:
+          - img "지도 제어 도구 모음" [ref=f2e470]
+        - generic [ref=f2e472]: 지도를 조작하는 아이콘 버튼들이 가로로 나열되어 있습니다. 집 모양 버튼으로 기본 위치(홈)로 이동하거나 홈을 설정하고, 대괄호 모양 버튼으로 전체화면 보기를, 십자 표적 버튼으로 화면 중앙에 조준선을 표시합니다. 이어서 위치 핀(관심지역), 겹친 사각형(레이어 표시 전환), 재생 버튼(추적 재생), 톱니바퀴(지도 설정) 버튼이 배치되어 있습니다.
+      - generic [ref=f2e473]:
+        - figure "그림 10. 지도 종류 선택 드롭다운" [ref=f2e474]:
+          - img "지도 종류 선택 드롭다운" [ref=f2e475]
+        - generic [ref=f2e477]: 지도 종류를 고르는 드롭다운으로, 현재 위성지도가 선택되어 있습니다. 목록을 펼치면 위성지도와 일반지도 중에서 선택할 수 있으며, 항목을 클릭하면 지도 배경이 즉시 바뀝니다.
+      - generic [ref=f2e478]:
+        - figure "그림 11. 심볼 편집 도구 모음" [ref=f2e479]:
+          - img "심볼 편집 도구 모음" [ref=f2e480]
+        - generic [ref=f2e482]: 지도 위 심볼을 편집하는 도구 모음입니다. 좌측의 편집 스위치를 켜면 심볼을 편집할 수 있고, 그 옆으로 선택 해제, 삭제(휴지통), 실행 취소·다시 실행 버튼이 있습니다. 오른쪽에는 심볼 종류(PIDS 장비)와 세부 항목(스피커)을 고르는 두 개의 드롭다운과 추가 버튼이 있어, 원하는 심볼을 골라 지도에 배치할 수 있습니다.
+      - generic [ref=f2e483]:
+        - figure "그림 12. 시스템 리소스 사용률 표시" [ref=f2e484]:
+          - img "시스템 리소스 사용률 표시" [ref=f2e485]
+        - generic [ref=f2e487]: "상단 바 우측 끝에 표시되는 시스템 자원 사용률입니다. 세 개의 표시가 각각 현재 사용률을 백분율(예: 5%, 14%, 49%)로 보여 주어, 관제 PC의 부하 상태를 한눈에 확인할 수 있습니다."
+  - generic [ref=f2e490]:
+    - generic [ref=f2e492]:
+      - generic [ref=f2e493]: Sensorway Co., Ltd.
+      - generic [ref=f2e495]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e507]:
+      - generic [ref=f2e508]:
+        - generic [ref=f2e509]:
+          - generic [ref=f2e510]: "03"
+          - generic [ref=f2e511]:
+            - generic [ref=f2e512]: CHAPTER 3
+            - heading "지도 조작 — 홈 · 사이트 고정 · 지도 도구" [level=1] [ref=f2e513]
+        - paragraph [ref=f2e514]: 홈 위치 이동·설정, 사이트 고정(맵 앵커), 화면 중앙 십자가, 관심지역·레이어 관리, 추적 재생 등 지도 도구를 설명합니다.
+      - generic [ref=f2e515]:
+        - generic [ref=f2e516]:
+          - generic [ref=f2e517]: CHAPTER 3
+          - heading "3.1홈 위치 이동·설정" [level=2] [ref=f2e518]
+        - paragraph [ref=f2e519]: 자주 보는 위치를 홈으로 지정해 두면 한 번의 클릭으로 그 위치로 돌아올 수 있습니다.
+        - generic [ref=f2e520]:
+          - figure "그림 13. 홈 위치 설정 버튼" [ref=f2e521]:
+            - img "홈 위치 설정 버튼" [ref=f2e522]
+          - generic [ref=f2e524]: 상단 도구 모음의 '홈 위치 설정' 버튼을 누르면 현재 보고 있는 지도 위치를 홈으로 저장합니다. 관제에서 기준이 되는 위치를 홈으로 지정해 두면 편리합니다.
+        - generic [ref=f2e525]:
+          - figure "그림 14. 홈 위치 이동 버튼" [ref=f2e526]:
+            - img "홈 위치 이동 버튼" [ref=f2e527]
+          - generic [ref=f2e529]: "'홈 위치 이동' 버튼을 누르면 미리 저장해 둔 홈 위치로 지도가 즉시 이동합니다. 지도를 여기저기 확대·이동한 뒤 기준 위치로 빠르게 복귀할 때 사용합니다."
+        - generic [ref=f2e531]:
+          - generic [ref=f2e532]: 💡 사용 순서
+          - generic [ref=f2e533]: 먼저 원하는 위치로 지도를 맞춘 뒤 '홈 위치 설정'으로 저장하고, 이후에는 '홈 위치 이동'으로 언제든 그 위치로 돌아옵니다.
+      - generic [ref=f2e534]:
+        - generic [ref=f2e535]:
+          - generic [ref=f2e536]: CHAPTER 3
+          - heading "3.2사이트 고정 (맵 앵커)" [level=2] [ref=f2e537]
+        - paragraph [ref=f2e538]: 사이트 고정(맵 앵커)은 지도를 관제 대상 구역으로 한정해, 지도가 현장 밖으로 벗어나지 않도록 합니다.
+        - generic [ref=f2e539]:
+          - figure "그림 15. 사이트 고정(맵 앵커) 버튼" [ref=f2e540]:
+            - img "사이트 고정(맵 앵커) 버튼" [ref=f2e541]
+          - generic [ref=f2e543]: 상단 도구 모음의 '사이트 고정(맵 앵커)' 버튼입니다. 이 기능을 설정하지 않으면 지도가 현장 구역에 고정되지 않아, 확대·이동 시 지도가 현장을 벗어나 임의 지역까지 이동할 수 있습니다.
+  - generic [ref=f2e546]:
+    - generic [ref=f2e548]:
+      - generic [ref=f2e549]: Sensorway Co., Ltd.
+      - generic [ref=f2e551]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e563]:
+      - generic [ref=f2e564]:
+        - generic [ref=f2e565]:
+          - figure "그림 16. 사이트 고정 패널" [ref=f2e566]:
+            - img "사이트 고정 패널" [ref=f2e567]
+          - generic [ref=f2e569]: "'사이트 고정 활성'을 체크한 뒤, '현재 화면 기준(지금 보는 영역을 좌표로)' 버튼으로 지금 보이는 범위를 고정 영역으로 잡거나, '지도에서 영역 그리기(드래그)'로 직접 영역을 지정합니다. 북서(NW)·남동(SE) 위도/경도와 최소 줌을 지정할 수 있고, '엄격 컨테인먼트(화면밖 완전차단)'를 켜면 지정 영역 밖으로 완전히 나가지 못하게 합니다. '저장·적용'을 눌러 설정을 반영합니다."
+        - generic [ref=f2e570]:
+          - figure "그림 17. 영역 그리기(드래그로 지정)" [ref=f2e571]:
+            - img "영역 그리기(드래그로 지정)" [ref=f2e572]
+          - generic [ref=f2e574]: "'지도에서 영역 그리기(드래그)'를 선택하면 화면 상단에 '지도에서 드래그해 사이트 고정 영역을 그리세요 — (ESC = 취소)' 안내가 나타납니다. 지도 위에서 마우스로 드래그해 사각형 영역을 그리면 그 범위가 고정 영역으로 지정되며, 북서·남동 좌표값이 패널에 자동으로 채워집니다."
+        - generic [ref=f2e576]:
+          - generic [ref=f2e577]: ⚠ 반드시 설정 권장
+          - generic [ref=f2e578]: 사이트 고정을 하지 않으면 지도 조작 중 화면이 관제 현장을 벗어날 수 있습니다. 운영 전에 현장 범위로 사이트 고정을 설정하는 것을 권장합니다.
+      - generic [ref=f2e579]:
+        - generic [ref=f2e580]:
+          - generic [ref=f2e581]: CHAPTER 3
+          - heading "3.3화면 중앙 십자가 · 관심지역 · 레이어 관리" [level=2] [ref=f2e582]
+        - paragraph [ref=f2e583]: 상단 바의 지도 제어 도구 중 화면 중앙 십자가, 관심지역, 레이어 관리 세 가지 기능을 소개합니다. 지도의 중심을 표시하고, 자주 보는 위치를 저장하며, 지도에 표시할 심볼을 골라 켜고 끌 수 있습니다.
+  - generic [ref=f2e586]:
+    - generic [ref=f2e588]:
+      - generic [ref=f2e589]: Sensorway Co., Ltd.
+      - generic [ref=f2e591]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e604]:
+      - generic [ref=f2e605]:
+        - figure "그림 18. 화면 중앙 십자가 버튼" [ref=f2e606]:
+          - img "화면 중앙 십자가 버튼" [ref=f2e607]
+        - generic [ref=f2e609]: 상단 바에 있는 원형 조준점 모양의 버튼으로, 마우스를 올리면 '화면 중앙 십자가'라는 이름이 표시됩니다. 눌러서 지도 화면 정중앙에 십자 표시를 켜거나 끌 수 있어 현재 화면의 중심 위치를 기준 삼을 때 사용합니다.
+      - generic [ref=f2e610]:
+        - figure "그림 19. 관심지역 관리 버튼" [ref=f2e611]:
+          - img "관심지역 관리 버튼" [ref=f2e612]
+        - generic [ref=f2e614]: 상단 바의 위치 핀 모양 버튼으로, 마우스를 올리면 '관심지역 관리'라는 이름이 나타납니다. 눌러 관심지역 창을 열어 자주 확인하는 위치를 저장하고 불러올 수 있습니다.
+      - generic [ref=f2e615]:
+        - figure "그림 20. 관심지역 창" [ref=f2e616]:
+          - img "관심지역 창" [ref=f2e617]
+        - generic [ref=f2e619]: 상단에 저장된 위치 목록이 표시되고, 아래에는 '이동'·'등록'·'삭제' 버튼이 있습니다. 목록에서 위치를 고른 뒤 '이동'을 누르면 그 지점으로 지도가 이동하고, '등록'으로 현재 화면을 새 관심지역으로 저장하며, '삭제'로 선택한 항목을 지웁니다.
+      - generic [ref=f2e620]:
+        - figure "그림 21. 레이어 관리 버튼" [ref=f2e621]:
+          - img "레이어 관리 버튼" [ref=f2e622]
+        - generic [ref=f2e624]: 상단 바의 겹친 층 모양 버튼으로, 마우스를 올리면 '레이어 관리'라는 이름이 표시됩니다. 눌러 지도에 표시할 항목을 켜고 끄는 레이어 창을 엽니다.
+  - generic [ref=f2e627]:
+    - generic [ref=f2e629]:
+      - generic [ref=f2e630]: Sensorway Co., Ltd.
+      - generic [ref=f2e632]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=f2e644]:
+      - generic [ref=f2e646]:
+        - figure "그림 22. 레이어 창 — 표시 항목 켜고 끄기" [ref=f2e647]:
+          - img "레이어 창 — 표시 항목 켜고 끄기" [ref=f2e648]
+        - generic [ref=f2e650]: 오버레이 지도·오버레이 이미지·심볼 그룹이 접었다 펼 수 있는 목록으로 정리되어 있고, 각 항목의 체크박스로 지도 표시 여부를 켜고 끕니다. 심볼 아래에는 PIDS 장비(카메라·센서·제어기)와 PIDS 그룹이 나뉘어 있어 카메라·센서 하나하나까지 개별로 표시를 조절할 수 있으며, 오버레이 이미지 옆 슬라이더로 투명도를 조정합니다.
+      - generic [ref=f2e651]:
+        - generic [ref=f2e652]:
+          - generic [ref=f2e653]: CHAPTER 3
+          - heading "3.4추적 재생과 타겟 추적 설정" [level=2] [ref=f2e654]
+        - paragraph [ref=f2e655]: 과거 특정 시간대에 감지된 대상의 이동 경로를 지도 위에서 되짚어 볼 수 있습니다. 상단 바의 추적 재생 도구로 기간과 세션을 골라 재생하고, 추적 설정 도구로 표시 방식과 재생 옵션을 조정합니다.
+        - generic [ref=f2e656]:
+          - figure "그림 23. 상단 바의 추적 재생 도구" [ref=f2e657]:
+            - img "상단 바의 추적 재생 도구" [ref=f2e658]
+          - generic [ref=f2e660]: 상단 바 오른쪽에 있는 삼각형 재생 모양 아이콘입니다. 마우스를 올리면 '추적 재생(Playback)' 안내가 나타나며, 누르면 추적 재생 패널이 열립니다.
+        - generic [ref=f2e661]:
+          - figure "그림 24. 추적 재생 패널" [ref=f2e662]:
+            - img "추적 재생 패널" [ref=f2e663]
+          - generic [ref=f2e665]: 상단 '기간'에서 최근 5분·30분·1시간·오늘 버튼이나 달력으로 시작/종료 시각을 정한 뒤 '불러오기'를 누르면, '탐지 세션' 목록에 해당 기간의 대상들이 탐지 ID·타입(사람/동물)·등급·시각과 함께 나타납니다. 왼쪽 체크박스로 재생할 세션을 선택하고, 하단 '재생' 영역의 재생 버튼과 진행 막대로 재생하며, 배속(0.5×·1×·2×·4×)을 조절할 수 있습니다.

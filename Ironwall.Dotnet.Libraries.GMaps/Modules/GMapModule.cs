@@ -41,7 +41,16 @@ public class GMapModule : Module
 
             builder.RegisterType<GeometricSymbolProvider>().As<GeometricSymbolProvider>()
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
-
+            builder.RegisterType<PidsSymbolProvider>().As<PidsSymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<MilitarySymbolProvider>().As<MilitarySymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<LineSymbolProvider>().As<LineSymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<InfraSymbolProvider>().As<InfraSymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<PidsGroupSymbolProvider>().As<PidsGroupSymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
         }
         catch
         {

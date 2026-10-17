@@ -1,0 +1,71 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using GMap.NET;
+
+namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
+
+/****************************************************************************
+   Purpose      : v2 커버리지 커맨드 — 런타임 가시성 / 파일이미지 회전 / MapLayers 노드.
+                  Map_Edit_Undo_Redo v2. seam(IUndoApplyContext)으로만 적용.
+   Created On   : 2026-07-03 · Sensorway Co., Ltd.
+****************************************************************************/
+
+/// <summary>런타임 가시성 토글(개별 심볼 / 그룹 멤버) — DB 미영속, marker ShowShape/IsLayerEnabled/IsVisible만.</summary>
+public sealed class VisibilityCommand : UndoableCommandBase
+{
+    private readonly int _id;
+    private readonly bool _before, _after;
+    private readonly bool _isImage;   // Id 충돌 대비 대상 타입 캡처(이미지도 가시성 토글 대상 — TransformCommand 동형)
+    public VisibilityCommand(IUndoApplyContext ctx, int id, bool before, bool after, bool isImage = false) : base(ctx)
+    { _id = id; _before = before; _after = after; _isImage = isImage; }
+
+    public override string Description => _after ? "표시" : "숨김";
+    public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyVisibilityAsync(_id, _after, _isImage, ct);
+    public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyVisibilityAsync(_id, _before, _isImage, ct);
+}
+
+/// <summary>파일 기반 오버레이 이미지(GMapCustomImage) 회전 프리셋 취소/재실행(UserRotation, UpdateImageAsync 영속).</summary>
+public sealed class CustomImageRotationCommand : UndoableCommandBase
+{
+    private readonly int _id;
+    private readonly double _before, _after;
+    public CustomImageRotationCommand(IUndoApplyContext ctx, int id, double before, double after) : base(ctx)
+    { _id = id; _before = before; _after = after; }
+
+    public override string Description => "이미지 회전";
+    public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageRotationAsync(_id, _after, ct);
+    public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageRotationAsync(_id, _before, ct);
+}
+
+/// <summary>파일 오버레이 이미지(GMapCustomImage) 이동/크기/회전 핸들 편집 취소·재실행(ImageBounds+UserRotation, UpdateImageAsync 영속, D1).</summary>
+public sealed class CustomImageEditCommand : UndoableCommandBase
+{
+    private readonly int _id;
+    private readonly RectLatLng _beforeBounds, _afterBounds;
+    private readonly double _beforeRot, _afterRot;
+    public CustomImageEditCommand(IUndoApplyContext ctx, int id, RectLatLng beforeBounds, double beforeRot, RectLatLng afterBounds, double afterRot) : base(ctx)
+    { _id = id; _beforeBounds = beforeBounds; _beforeRot = beforeRot; _afterBounds = afterBounds; _afterRot = afterRot; }
+
+    public override string Description => "이미지 편집";
+    public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageEditAsync(_id, _afterBounds, _afterRot, ct);
+    public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageEditAsync(_id, _beforeBounds, _beforeRot, ct);
+}
+
+/// <summary>MapLayers 노드 필드(이름/투명도/ZOrder) 스냅샷 — null=미변경.</summary>
+public readonly record struct LayerFields(int Id, string? Name, double? Opacity, int? ZOrder);
+
+/// <summary>레이어 패널 노드 조작(이름 변경 / ZOrder 스왑) 취소·재실행 — MapLayers 테이블 필드 기준.</summary>
+public sealed class LayerNodeCommand : UndoableCommandBase
+{
+    private readonly string _desc;
+    private readonly IReadOnlyList<LayerFields> _before, _after;
+    public LayerNodeCommand(IUndoApplyContext ctx, string desc, IReadOnlyList<LayerFields> before, IReadOnlyList<LayerFields> after) : base(ctx)
+    { _desc = desc; _before = before; _after = after; }
+
+    public override string Description => _desc;
+    public override async Task ExecuteAsync(CancellationToken ct = default)
+    { foreach (var f in _after) await Ctx.ApplyLayerFieldsAsync(f.Id, f.Name, f.Opacity, f.ZOrder, ct).ConfigureAwait(false); }
+    public override async Task UndoAsync(CancellationToken ct = default)
+    { foreach (var f in _before) await Ctx.ApplyLayerFieldsAsync(f.Id, f.Name, f.Opacity, f.ZOrder, ct).ConfigureAwait(false); }
+}

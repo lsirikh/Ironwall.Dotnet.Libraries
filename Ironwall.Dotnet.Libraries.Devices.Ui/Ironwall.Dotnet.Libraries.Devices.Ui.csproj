@@ -10,14 +10,23 @@
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.3.0" />
     <PackageReference Include="Caliburn.Micro" Version="4.0.230" />
+    <!-- 장비 대량 등록(device-bulk-import D-7) — 저장소에 이미 쓰는 판본 그대로(Framework · Db 프로젝트와 같다). -->
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
     <PackageReference Include="MaterialDesignColors" Version="5.2.1" />
     <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
 	<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
-    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Db\Ironwall.Dotnet.Libraries.Devices.Db.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Api\Ironwall.Dotnet.Libraries.Devices.Api.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution.Base\Ironwall.Dotnet.Libraries.OnvifSolution.Base.csproj" />
@@ -25,6 +34,23 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
+    <!-- Phase 2 (IMPL-08): Modern Dark/Light 테마 토큰/서비스 (leaf, 순환 없음 — AD-1) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+    <!-- FR-EN-09/11: 장비 CRUD 권한 게이팅 — IPermissionService (순환 없음 확인됨) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <!-- 서버 8.0 unit_id 주입: INatsSetupModel.GroupNats 가 우리 부대 '코드'의 유일한 출처.
+         Nats 프로젝트는 Base 하나만 참조하므로 순환 없음(선례: Events.Ui 도 직접 참조). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Nats\Ironwall.Dotnet.Libraries.Nats.csproj" />
+  </ItemGroup>
+
+  <!-- 결선 펜스 뷰 속성 칸의 제품 사진(wiring-fence-view F-3 · NFR-05: 긴 변 ≤ 256px · ≤ 120KB) -->
+  <ItemGroup>
+    <Resource Include="Consoles\Wiring\Fence\Assets\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Services\" />
+    <Folder Include="Tests\" />
   </ItemGroup>
 
 </Project>

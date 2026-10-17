@@ -1,0 +1,112 @@
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: Sensorway Co., Ltd.
+      - generic [ref=e10]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: Sensorway Co., Ltd.
+        - generic [ref=e26]: UM-KO-2026-07
+      - generic [ref=e27]:
+        - generic [ref=e28]: USER MANUAL · 사용자 매뉴얼
+        - heading "Pids Monitoring System" [level=1] [ref=e29]
+        - generic [ref=e30]: IRONWALL 데스크톱 관제 프로그램 · 사용자 매뉴얼
+        - generic [ref=e31]:
+          - generic [ref=e32]: 안양발전소
+          - generic [ref=e33]: v2.6.0
+          - generic [ref=e34]: KO
+        - img "Pids Monitoring System" [ref=e36]
+      - generic [ref=e37]:
+        - generic [ref=e38]: 발행일 2026-07-22
+        - generic [ref=e39]: Sensorway Co., Ltd.
+  - generic [ref=e42]:
+    - generic [ref=e44]:
+      - generic [ref=e45]: Sensorway Co., Ltd.
+      - generic [ref=e47]: Pids Monitoring System 사용자 매뉴얼
+    - generic [ref=e60]:
+      - heading "목차 CONTENTS" [level=1] [ref=e61]
+      - list [ref=e62]:
+        - listitem [ref=e63]:
+          - link "01. 시작하기 — 실행 · 로그인 · 메인 화면" [ref=e64] [cursor=pointer]:
+            - /url: "#chap-1"
+        - listitem [ref=e67]:
+          - link "1.1 프로그램 실행" [ref=e68] [cursor=pointer]:
+            - /url: "#sec-sec-loading"
+        - listitem [ref=e71]:
+          - link "1.2 로그인" [ref=e72] [cursor=pointer]:
+            - /url: "#sec-sec-login"
+        - listitem [ref=e75]:
+          - link "1.3 회원가입 안내" [ref=e76] [cursor=pointer]:
+            - /url: "#sec-sec-signup"
+        - listitem [ref=e79]:
+          - link "1.4 로그인 후 메인 화면" [ref=e80] [cursor=pointer]:
+            - /url: "#sec-sec-main"
+        - listitem [ref=e83]:
+          - link "02. 화면 구성 — 상단 메뉴와 도구 모음" [ref=e84] [cursor=pointer]:
+            - /url: "#chap-2"
+        - listitem [ref=e87]:
+          - link "2.1 상단 메뉴 (File · Maps)" [ref=e88] [cursor=pointer]:
+            - /url: "#sec-sec-topmenu"
+        - listitem [ref=e91]:
+          - link "2.2 상단 도구 모음과 리소스 표시" [ref=e92] [cursor=pointer]:
+            - /url: "#sec-sec-toolbar"
+        - listitem [ref=e95]:
+          - link "03. 지도 조작 — 홈 · 사이트 고정 · 지도 도구" [ref=e96] [cursor=pointer]:
+            - /url: "#chap-3"
+        - listitem [ref=e99]:
+          - link "3.1 홈 위치 이동·설정" [ref=e100] [cursor=pointer]:
+            - /url: "#sec-sec-home"
+        - listitem [ref=e103]:
+          - link "3.2 사이트 고정 (맵 앵커)" [ref=e104] [cursor=pointer]:
+            - /url: "#sec-sec-anchor"
+        - listitem [ref=e107]:
+          - link "3.3 화면 중앙 십자가 · 관심지역 · 레이어 관리" [ref=e108] [cursor=pointer]:
+            - /url: "#sec-sec-map-tools"
+        - listitem [ref=e111]:
+          - link "3.4 추적 재생과 타겟 추적 설정" [ref=e112] [cursor=pointer]:
+            - /url: "#sec-sec-tracking"
+        - listitem [ref=e115]:
+          - link "04. 맵 편집 — 심볼 배치와 속성" [ref=e116] [cursor=pointer]:
+            - /url: "#chap-4"
+        - listitem [ref=e119]:
+          - link "4.1 맵 편집 모드와 심볼 조작" [ref=e120] [cursor=pointer]:
+            - /url: "#sec-sec-editmode"
+        - listitem [ref=e123]:
+          - link "4.2 심볼 공통 속성" [ref=e124] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-common"
+        - listitem [ref=e127]:
+          - link "4.3 심볼 종류별 속성 (군대부호 · PIDS · 건물)" [ref=e128] [cursor=pointer]:
+            - /url: "#sec-sec-symbol-types"
+        - listitem [ref=e131]:
+          - link "4.4 라인 심볼 속성" [ref=e132] [cursor=pointer]:
+            - /url: "#sec-sec-line"
+        - listitem [ref=e135]:
+          - link "05. 환경 설정 (셋업 패널)" [ref=e136] [cursor=pointer]:
+            - /url: "#chap-5"
+        - listitem [ref=e139]:
+          - link "5.1 셋업 패널 · 이벤트 설정" [ref=e140] [cursor=pointer]:
+            - /url: "#sec-sec-setup-event"
+        - listitem [ref=e143]:
+          - link "5.2 소리 설정" [ref=e144] [cursor=pointer]:
+            - /url: "#sec-sec-setup-sound"
+        - listitem [ref=e147]:
+          - link "5.3 서버 연결(브로커) 설정" [ref=e148] [cursor=pointer]:
+            - /url: "#sec-sec-setup-broker"
+        - listitem [ref=e151]:
+          - link "5.4 지도 · 웹 · 도커 · 프로그램 · 연동 설정" [ref=e152] [cursor=pointer]:
+            - /url: "#sec-sec-setup-system"
+        - listitem [ref=e155]:
+          - link "06. 장비 관리 (장비 패널)" [ref=e156] [cursor=pointer]:
+            - /url: "#chap-6"
+        - listitem [ref=e159]:
+          - link "6.1 장비 패널과 장비 그룹" [ref=e160] [cursor=pointer]:
+            - /url: "#sec-sec-device-panel"
+        - listitem [ref=e163]:
+          - link "6.2 제어기 · 센서 설정" [ref=e164] [cursor=pointer]:
+            - /url: "#sec-sec-device-controller-sensor"
+        - listitem [ref=e167]:
+          - link "6.3 카메라 설정" [ref=e168] [cursor=pointer]:
+            - /url: "#sec-sec-device-camera"
+        - listitem [ref=e171]:
+          - link "6.4 스피커 · 함체 · 경광등 설정" [ref=e172] [cursor=pointer]:
+            - /url: "#sec-sec-device-others"

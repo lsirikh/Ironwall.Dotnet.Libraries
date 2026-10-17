@@ -5,15 +5,43 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      테스트 코드 출하 차단 (GMap_Schema_Migration_Idempotency FR-15)
+      이 프로젝트는 출하 라이브러리이면서 Tests/ 폴더를 같은 어셈블리로 컴파일해 왔다.
+      그 결과 DROP TABLE 을 수행하는 DB 픽스처와 xunit/Moq 런타임이 앱 배포본에 실렸다
+      (배포 폴더에서 xunit.*.dll 실물 확인). 운영 DB 오조준 시 파괴적이므로 기본 빌드에서 제외한다.
+
+      테스트를 돌릴 때만 켠다:
+        dotnet test  Ironwall.Dotnet.Libraries.GMaps.Db -p:IncludeTests=true
+        dotnet build Ironwall.Dotnet.Libraries.GMaps.Db -p:IncludeTests=true
+    -->
+    <IncludeTests Condition="'$(IncludeTests)' == ''">false</IncludeTests>
   </PropertyGroup>
 
+  <!-- 기본 빌드에서는 Tests/ 를 컴파일 대상에서 제거 (FR-15) -->
+  <ItemGroup Condition="'$(IncludeTests)' != 'true'">
+    <Compile Remove="Tests\**\*.cs" />
+    <None Include="Tests\**\*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
 	<PackageReference Include="Autofac" Version="8.3.0" />
 	<PackageReference Include="Dapper" Version="2.1.66" />
 	<PackageReference Include="MySql.Data" Version="9.3.0" />
-	<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
-	<PackageReference Include="xunit" Version="2.9.3" />
+  </ItemGroup>
+
+  <!--
+    테스트 전용 패키지 — IncludeTests=true 일 때만 참조하고, 그때도 PrivateAssets=all 로
+    소비 프로젝트(메인 앱)의 출력으로 전이되지 않게 막는다 (FR-15 이중 방어).
+  -->
+  <ItemGroup Condition="'$(IncludeTests)' == 'true'">
+	<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0">
+		<PrivateAssets>all</PrivateAssets>
+	</PackageReference>
+	<PackageReference Include="xunit" Version="2.9.3">
+		<PrivateAssets>all</PrivateAssets>
+	</PackageReference>
 	<PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
 		<PrivateAssets>all</PrivateAssets>
 		<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

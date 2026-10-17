@@ -19,82 +19,17 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Tests;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
+
+
 /// <summary>
 /// GMapDbSymbolService 전용 Fixture – DB 한 번만 세팅 & 해제
 /// </summary>
-public sealed class GMapDbSymbolFixture : IAsyncLifetime
+public sealed class GMapDbSymbolFixture : GMapBaseSymbolFixture
 {
-    public GeometricSymbolProvider GeometrySymbolProvider { get; private set; }
     #region - Properties -
-    /// <summary>Symbol DB 서비스 인스턴스</summary>
-    public IGMapDbSymbolService Svc { get; private set; } = null!;
-
-    /// <summary>Symbol 데이터 제공자</summary>
-    public SymbolProvider SymbolProvider = new();
-
-    /// <summary>취소 토큰 소스</summary>
-    internal CancellationTokenSource Cts { get; } = new();
-
-    /// <summary>테스트용 Symbol 생성 개수</summary>
-    public int SymbolCount = 20;
-
-    /// <summary>삽입된 Symbol ID 목록</summary>
-    public List<int> InsertedSymbolIds = new List<int>();
-    #endregion
-
-    #region - Constants -
-    /// <summary>테스트용 Symbol 테이블 목록</summary>
-    private static readonly string[] _symbolTables = { "Symbols", "GeometrySymbols" };
-    /// <summary>DB 설정</summary>
-    private readonly GMapDbSetupModel _setup = new()
-    {
-        IpDbServer = "127.0.0.1",
-        PortDbServer = 3306,
-        DbDatabase = "monitor_db",
-        UidDbServer = "root",
-        PasswordDbServer = "root"
-    };
     #endregion
 
     #region - IAsyncLifetime Implementation -
-    /// <summary>
-    /// 테스트 픽스처 초기화 - DB 서비스 시작
-    /// </summary>
-    /// <returns>Task</returns>
-    [Fact(DisplayName = "Initialize Symbol DB Service")]
-    public async Task InitializeAsync()
-    {
-        var log = new LogService();
-        var ea = new EventAggregator();
-        GeometrySymbolProvider = new GeometricSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(
-            log,
-            ea,
-            SymbolProvider,
-            GeometrySymbolProvider,
-            _setup);
-
-        await DropTablesAsync();               // 깨끗한 DB 확보
-        await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance
-
-        Assert.True(Svc.IsConnected);
-    }
-
-    /// <summary>
-    /// 테스트 픽스처 정리 - DB 서비스 중지
-    /// </summary>
-    /// <returns>Task</returns>
-    [Fact(DisplayName = "Dispose Symbol DB Service")]
-    public async Task DisposeAsync()
-    {
-        await Svc.StopService(Cts.Token);
-        await DropTablesAsync();
-
-        if (!Cts.IsCancellationRequested)
-            Cts.Cancel();
-
-        Assert.False(Svc.IsConnected);
-    }
     #endregion
 
     #region - Private Methods -
@@ -102,7 +37,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
     /// DB 내부 테이블만 삭제
     /// </summary>
     /// <returns>Task</returns>
-    private async Task DropTablesAsync()
+    protected async override Task DropTablesAsync()
     {
         var csb = new MySqlConnectionStringBuilder
         {
@@ -143,6 +78,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
             {
                 Pid = 1000 + i,
                 Title = $"테스트_심볼_{i:00}",
+                TitleSize = 13,
                 OperationState = operationStates[random.Next(operationStates.Length)],
                 Latitude = 37.0 + random.NextDouble() * 0.6, // 서울 근처
                 Longitude = 126.0 + random.NextDouble() * 1.0, // 서울 근처
@@ -181,7 +117,8 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
             {
                 Pid = 2000 + i,
                 Title = $"{category}_심볼_{i:00}",
-                OperationState = EnumOperationState.ACTIVE,
+                TitleSize = 13,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.5 + random.NextDouble() * 0.1,
                 Longitude = 126.9 + random.NextDouble() * 0.1,
                 Altitude = 0,
@@ -240,6 +177,11 @@ public class GMapDbSymbol_BasicCrudTests
         Assert.NotNull(all);
         Assert.True(all!.Count >= _fx.SymbolCount);
 
+        foreach (var item in all)
+        {
+            _fx.InsertedSymbolIds.Add(item.Id);
+        }
+
         /* 2) 각각 FetchSymbolAsync로 필드 검증 */
         foreach (var id in _fx.InsertedSymbolIds)
         {
@@ -279,7 +221,7 @@ public class GMapDbSymbol_BasicCrudTests
 
         /* 수정 */
         symbol!.Title = "UPDATED_SYMBOL_TITLE";
-        symbol.OperationState = EnumOperationState.FAULT;
+        symbol.OperationState = EnumOperationState.ERROR;
         symbol.Latitude = 35.123456;
         symbol.Longitude = 129.987654;
         symbol.Bearing = 180.5;
@@ -297,7 +239,7 @@ public class GMapDbSymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(symbol.Id, updated!.Id);
         Assert.Equal("UPDATED_SYMBOL_TITLE", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.123456, updated.Latitude);
         Assert.Equal(129.987654, updated.Longitude);
         Assert.Equal(180.5, updated.Bearing);
@@ -309,6 +251,34 @@ public class GMapDbSymbol_BasicCrudTests
         Assert.Equal(EnumColorType.Yellow, updated.FillColor);
         Assert.Equal(EnumColorType.Black, updated.StrokeColor);
         Assert.Equal(2.5, updated.StrokeThickness);
+    }
+
+    /// <summary>
+    /// 가시성(ShowShape)만 부분 UPDATE — 값이 영속되고 Category 판별자/타 필드는 보존되는지 검증.
+    /// 레이어패널 심볼 Visibility 토글의 DB 영속 경로(전체 행 재기록 회피, 2026-07-15 오염 사고 방지).
+    /// </summary>
+    /// <returns>Task</returns>
+    [Fact(DisplayName = "Symbols – UpdateShowShape (부분 UPDATE, 판별자 보존)")]
+    public async Task should_persist_showshape_and_preserve_discriminator_when_partial_update()
+    {
+        // Arrange
+        await _fx.SeedSymbolsAsync();
+        var before = await _fx.Svc.FetchSymbolAsync(_fx.InsertedSymbolIds.First());
+        Assert.NotNull(before);
+        var target = !before!.ShowShape;      // 현재값 반전 → 시드 기본값 무관하게 쓰기 검증
+        var beforeCategory = before.Category;  // 판별자 보존 검증용
+        var beforeTitle = before.Title;
+
+        // Act — 가시성만 부분 UPDATE
+        bool ok = await _fx.Svc.UpdateSymbolShowShapeAsync(before.Id, target);
+
+        // Assert
+        Assert.True(ok);
+        var after = await _fx.Svc.FetchSymbolAsync(before.Id);
+        Assert.NotNull(after);
+        Assert.Equal(target, after!.ShowShape);        // 가시성 영속
+        Assert.Equal(beforeCategory, after.Category);  // Category 판별자 오염 없음
+        Assert.Equal(beforeTitle, after.Title);        // 타 필드 불변
     }
 
     /// <summary>
@@ -479,14 +449,14 @@ public class GMapDbSymbol_IntegrationTests
         {
             Pid = 9999,
             Title = "통합테스트_심볼",
-            OperationState = EnumOperationState.DEACTIVE,
+            OperationState = EnumOperationState.DEACTIVATED,
             Latitude = 37.5665,
             Longitude = 126.9780,
             Altitude = 50,
             Bearing = 45.5,
             Width = 25,
             Height = 25,
-            Category = EnumMarkerCategory.ANALYSIS,
+            Category = EnumMarkerCategory.BASIC_SHAPES,
             ShowShape = true,
             ShowTitle = false,
             FillColor = EnumColorType.Blue,
@@ -502,16 +472,16 @@ public class GMapDbSymbol_IntegrationTests
         Assert.NotNull(fetchedSymbol);
         Assert.Equal("통합테스트_심볼", fetchedSymbol!.Title);
         Assert.Equal(9999, fetchedSymbol.Pid);
-        Assert.Equal(EnumOperationState.DEACTIVE, fetchedSymbol.OperationState);
-        Assert.Equal(EnumMarkerCategory.ANALYSIS, fetchedSymbol.Category);
+        Assert.Equal(EnumOperationState.DEACTIVATED, fetchedSymbol.OperationState);
+        Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, fetchedSymbol.Category);
 
         // 3. Symbol 상태 변경 (DEACTIVE → ACTIVE)
-        fetchedSymbol.OperationState = EnumOperationState.ACTIVE;
+        fetchedSymbol.OperationState = EnumOperationState.ACTIVATED;
         fetchedSymbol.Title = "활성화된_심볼";
         fetchedSymbol.ShowTitle = true;
 
         var updatedSymbol = await _fx.Svc.UpdateSymbolAsync(fetchedSymbol);
-        Assert.Equal(EnumOperationState.ACTIVE, updatedSymbol!.OperationState);
+        Assert.Equal(EnumOperationState.ACTIVATED, updatedSymbol!.OperationState);
         Assert.Equal("활성화된_심볼", updatedSymbol.Title);
         Assert.True(updatedSymbol.ShowTitle);
 
@@ -580,7 +550,7 @@ public class GMapDbSymbol_IntegrationTests
             {
                 Pid = 10000 + i,
                 Title = $"대량테스트_{i:000}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.0 + random.NextDouble(),
                 Longitude = 126.0 + random.NextDouble(),
                 Altitude = 0,

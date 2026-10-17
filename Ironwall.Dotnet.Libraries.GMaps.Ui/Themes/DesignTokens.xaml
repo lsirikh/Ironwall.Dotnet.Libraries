@@ -1,0 +1,537 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sysres="clr-namespace:Ironwall.Dotnet.Libraries.SystemResources.Models;assembly=Ironwall.Dotnet.Libraries.SystemResources">
+
+	<!-- ═══════════════════ Converters ═══════════════════ -->
+	<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+	<!-- ═══════════════════ Colors ═══════════════════ -->
+	<Color x:Key="PrimaryBlue">#2C5F9E</Color>
+	<Color x:Key="LightBlue">#EEF3FB</Color>
+	<Color x:Key="SurfaceGray">Transparent</Color>
+	<Color x:Key="PanelWhite">#FFFFFF</Color>
+	<Color x:Key="BorderGray">#E8ECF1</Color>
+	<Color x:Key="DangerRed">#C0392B</Color>
+
+	<!-- ═══════════════════ Brushes ═══════════════════ -->
+	<SolidColorBrush x:Key="PrimaryBlueBrush" Color="{StaticResource PrimaryBlue}" />
+	<SolidColorBrush x:Key="LightBlueBrush" Color="{StaticResource LightBlue}" />
+	<SolidColorBrush x:Key="SurfaceGrayBrush" Color="{StaticResource SurfaceGray}" />
+	<SolidColorBrush x:Key="PanelWhiteBrush" Color="{StaticResource PanelWhite}" />
+	<SolidColorBrush x:Key="BorderGrayBrush" Color="{StaticResource BorderGray}" />
+	<SolidColorBrush x:Key="DangerRedBrush" Color="{StaticResource DangerRed}" />
+
+	<!-- 반투명 -->
+	<SolidColorBrush
+		x:Key="PrimaryBlueHoverBrush"
+		Opacity="0.5"
+		Color="{StaticResource PrimaryBlue}" />
+	<SolidColorBrush
+		x:Key="DangerRedLightBrush"
+		Opacity="0.1"
+		Color="{StaticResource DangerRed}" />
+
+	<!-- ═══════════════════ 패널 헤더 "?" 받침 (help-callout H-4) ═══════════════════
+	     커널 HelpTip 은 고리 · 물음표를 PrimaryBrush 로 그린다 — 지도 패널 머리 띠도 PrimaryBrush 라 그대로 두면 보이지 않는다.
+	     띠 위에서만 Surface 원판을 깔아 준다(토큰 DynamicResource — 라이트/다크 매번 다시 찾는다). 원판은 HelpTip 보다 1px 크다. -->
+	<Style x:Key="PanelHeaderHelpDisc" TargetType="Border">
+		<Setter Property="Width" Value="22" />
+		<Setter Property="Height" Value="22" />
+		<Setter Property="CornerRadius" Value="11" />
+		<Setter Property="Margin" Value="0,0,4,0" />
+		<Setter Property="HorizontalAlignment" Value="Right" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+	</Style>
+
+	<!-- ═══════════════════ 패널 헤더 닫기 버튼 ═══════════════════ -->
+	<Style x:Key="PanelCloseButtonStyle" TargetType="Button">
+		<Setter Property="Width" Value="26" />
+		<Setter Property="Height" Value="26" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Background="Transparent"
+						CornerRadius="13">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Kind="Close" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- 패널 헤더 보조 아이콘 버튼(⚙ 추적 설정 등) — PanelCloseButtonStyle 동계열: 무그림자·호버 하이라이트만.
+	     ★ 명시 스타일 필수 — 인라인 Template만 주면 암시적 MD Button 스타일의 Elevation(그림자) Setter가
+	     누수된다(재생 패널 ⚙ 실측, 제어허브 '모두 닫기' 폭 훼손과 동일 계열). -->
+	<Style x:Key="PanelHeaderGearButtonStyle" TargetType="Button">
+		<Setter Property="Width" Value="26" />
+		<Setter Property="Height" Value="26" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Effect" Value="{x:Null}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Background="Transparent"
+						CornerRadius="13">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Kind="CogOutline" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 패널 버튼 (Primary) ═══════════════════ -->
+	<Style x:Key="PanelPrimaryButtonStyle" TargetType="Button">
+		<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+		<Setter Property="FontSize" Value="12" />
+		<Setter Property="FontWeight" Value="Medium" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Padding="10,7"
+						Background="{TemplateBinding Background}"
+						CornerRadius="5">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
+						</Trigger>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 패널 버튼 (Secondary) ═══════════════════ -->
+	<Style x:Key="PanelSecondaryButtonStyle" TargetType="Button">
+		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+		<Setter Property="FontSize" Value="12" />
+		<Setter Property="FontWeight" Value="Medium" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Padding="7,7"
+						Background="{TemplateBinding Background}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="5">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SecondaryHoverBrush}" />
+						</Trigger>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 패널 버튼 (Danger) ═══════════════════ -->
+	<Style x:Key="PanelDangerButtonStyle" TargetType="Button">
+		<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+		<Setter Property="FontSize" Value="12" />
+		<Setter Property="FontWeight" Value="Medium" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Padding="10,7"
+						Background="{TemplateBinding Background}"
+						BorderBrush="{DynamicResource DangerBorderBrush}"
+						BorderThickness="1"
+						CornerRadius="5">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerHoverBrush}" />
+						</Trigger>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 툴바 버튼 ═══════════════════ -->
+	<Style x:Key="ToolbarButtonStyle" TargetType="Button">
+		<Setter Property="Width" Value="32" />
+		<Setter Property="Height" Value="32" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Background="{TemplateBinding Background}"
+						CornerRadius="6">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="IsPressed" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 툴바 토글 버튼 (Active 상태) ═══════════════════ -->
+	<Style x:Key="ToolbarToggleButtonStyle" TargetType="ToggleButton">
+		<Setter Property="Width" Value="32" />
+		<Setter Property="Height" Value="32" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="ToggleButton">
+					<Border
+						x:Name="Bd"
+						Background="{TemplateBinding Background}"
+						CornerRadius="6">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="IsChecked" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+						</Trigger>
+						<!--  비활성 시각(회전 토글: 앵커 활성 중 잠금 표시 등) — Panel 버튼들과 동일 관례  -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.35" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 툴바 그룹 컨테이너 ═══════════════════ -->
+	<Style x:Key="ToolbarGroupStyle" TargetType="Border">
+		<Setter Property="Background" Value="{StaticResource SurfaceGrayBrush}" />
+		<Setter Property="CornerRadius" Value="6" />
+		<Setter Property="Padding" Value="2" />
+	</Style>
+
+	<!-- ═══════════════════ 툴바 세퍼레이터 ═══════════════════ -->
+	<Style x:Key="ToolbarSeparatorStyle" TargetType="Border">
+		<Setter Property="Width" Value="1" />
+		<Setter Property="Height" Value="24" />
+		<Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="Margin" Value="4,0" />
+	</Style>
+
+	<!--  툴바 그룹 마이크로 라벨 (지도/이동/편집/심볼 — MapView 참조 복구)  -->
+	<Style x:Key="ToolbarGroupLabel" TargetType="TextBlock">
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="FontSize" Value="9" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="6,0,3,0" />
+	</Style>
+
+	<!-- ═══════════════════ 속성창 공용 다크 ComboBox (자체완결·스코프안전·stretch 보장) ═══════════════════ -->
+	<!-- BasedOn 없음 / 앱-MD StaticResource 0참조. 색은 전부 DynamicResource 테마 토큰. -->
+	<!-- stretch 핵심: 다크 크롬 Border를 ControlTemplate '루트'로 승격 → WPF가 컨트롤 -->
+	<!-- arranged 크기(col1=* 채운 폭)로 무조건 stretch. ToggleButton은 투명 전체-span 히트레이어. -->
+	<Style x:Key="PropertyComboBox" TargetType="{x:Type ComboBox}">
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="Padding" Value="6,2" />
+		<Setter Property="MinHeight" Value="24" />
+		<Setter Property="HorizontalAlignment" Value="Stretch" />
+		<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+		<Setter Property="VerticalContentAlignment" Value="Center" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+		<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+		<Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+
+		<!-- 드롭다운 행(ComboBoxItem) — 시스템 흰배경/연파랑 하이라이트 제거 -->
+		<Setter Property="ItemContainerStyle">
+			<Setter.Value>
+				<Style TargetType="{x:Type ComboBoxItem}">
+					<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+					<Setter Property="Background" Value="Transparent" />
+					<Setter Property="Padding" Value="6,4" />
+					<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+					<Setter Property="SnapsToDevicePixels" Value="True" />
+					<Setter Property="Template">
+						<Setter.Value>
+							<ControlTemplate TargetType="{x:Type ComboBoxItem}">
+								<Border
+									x:Name="ItemBd"
+									Padding="{TemplateBinding Padding}"
+									Background="{TemplateBinding Background}"
+									SnapsToDevicePixels="True">
+									<ContentPresenter
+										HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+										VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+										TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
+								</Border>
+								<ControlTemplate.Triggers>
+									<Trigger Property="IsMouseOver" Value="True">
+										<Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+									</Trigger>
+									<Trigger Property="IsHighlighted" Value="True">
+										<Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+									</Trigger>
+									<Trigger Property="IsSelected" Value="True">
+										<Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+									</Trigger>
+								</ControlTemplate.Triggers>
+							</ControlTemplate>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</Setter.Value>
+		</Setter>
+
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ComboBox}">
+					<!-- ★ 루트 = 다크 크롬 Border. ControlTemplate 루트는 컨트롤 arranged 크기로 -->
+					<!--   항상 stretch되므로 col1(*)을 채운 ComboBox 전체폭을 그대로 감싼다. -->
+					<Border
+						x:Name="ChromeBorder"
+						Background="{DynamicResource SurfaceSunkenBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="4"
+						SnapsToDevicePixels="True">
+						<Grid>
+							<!-- 전체 영역 클릭 레이어: 단일 셀이라 항상 전체폭을 채움 → Border 어디를 클릭해도 토글 -->
+							<ToggleButton
+								x:Name="ToggleButton"
+								Style="{x:Null}"
+								HorizontalAlignment="Stretch"
+								VerticalAlignment="Stretch"
+								Background="Transparent"
+								BorderThickness="0"
+								ClickMode="Press"
+								Focusable="False"
+								IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+								<ToggleButton.Template>
+									<ControlTemplate TargetType="{x:Type ToggleButton}">
+										<Border
+											Background="Transparent"
+											SnapsToDevicePixels="True" />
+									</ControlTemplate>
+								</ToggleButton.Template>
+							</ToggleButton>
+
+							<!-- 내용+화살표 오버레이: IsHitTestVisible=False → 클릭이 아래 ToggleButton으로 통과(어디든 토글) -->
+							<Grid IsHitTestVisible="False">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="22" />
+								</Grid.ColumnDefinitions>
+								<ContentPresenter
+									x:Name="ContentSite"
+									Grid.Column="0"
+									Margin="8,0,4,0"
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									Content="{TemplateBinding SelectionBoxItem}"
+									ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+									ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+									TextElement.Foreground="{TemplateBinding Foreground}"
+									SnapsToDevicePixels="True" />
+								<Path
+									x:Name="Arrow"
+									Grid.Column="1"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Data="M0,0 L4,4 L8,0 Z"
+									Fill="{DynamicResource TextSecondaryBrush}"
+									SnapsToDevicePixels="True" />
+							</Grid>
+
+							<!-- 드롭다운 팝업: PART_Popup (콤보 전체 폭 기준 바로 아래) -->
+							<Popup
+								x:Name="PART_Popup"
+								AllowsTransparency="True"
+								Focusable="False"
+								IsOpen="{TemplateBinding IsDropDownOpen}"
+								Placement="Bottom"
+								PopupAnimation="Slide">
+								<Border
+									x:Name="DropDownBorder"
+									MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+									MaxHeight="{TemplateBinding MaxDropDownHeight}"
+									Margin="0,2,0,4"
+									Background="{DynamicResource SurfaceAltBrush}"
+									BorderBrush="{DynamicResource BorderBrush}"
+									BorderThickness="1"
+									CornerRadius="4"
+									SnapsToDevicePixels="True">
+									<Border.Effect>
+										<DropShadowEffect
+											BlurRadius="8"
+											Opacity="0.18"
+											ShadowDepth="2"
+											Color="Black" />
+									</Border.Effect>
+									<ScrollViewer CanContentScroll="True" SnapsToDevicePixels="True">
+										<ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" SnapsToDevicePixels="True" />
+									</ScrollViewer>
+								</Border>
+							</Popup>
+						</Grid>
+					</Border>
+
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="ChromeBorder" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+							<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="IsDropDownOpen" Value="True">
+							<Setter TargetName="ChromeBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+							<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource PrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="HasItems" Value="False">
+							<Setter TargetName="DropDownBorder" Property="MinHeight" Value="24" />
+						</Trigger>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ 맵 위 플로팅 패널 공통 ═══════════════════ -->
+	<Style x:Key="MapFloatingPanelStyle" TargetType="Border">
+		<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="CornerRadius" Value="8" />
+		<Setter Property="Padding" Value="8" />
+		<Setter Property="Effect">
+			<Setter.Value>
+				<DropShadowEffect
+					BlurRadius="8"
+					Opacity="0.12"
+					ShadowDepth="2"
+					Color="Black" />
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- ═══════════════════ System Resource Indicator (CPU/GPU/RAM 칩) ═══════════════════ -->
+	<!-- 우측 툴바 리소스 칩. Tag=레벨(히스테리시스)에 따라 아이콘+수치 Foreground 전환. 전부 DynamicResource(테마 스왑). -->
+	<Style x:Key="SysResChip" TargetType="Border">
+		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="CornerRadius" Value="10" />
+		<Setter Property="Padding" Value="9,3" />
+		<Setter Property="MinWidth" Value="72" />
+		<Setter Property="Margin" Value="5,0,0,0" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<!-- 정상 = Tactical 시안 (자식 아이콘/수치가 TextElement.Foreground 상속) -->
+		<Setter Property="TextElement.Foreground" Value="{DynamicResource PrimaryBrush}" />
+		<Style.Triggers>
+			<!-- Tag은 object라 문자열 Value가 enum으로 변환되지 않는다 → x:Static으로 enum 대 enum 비교(P0 수정). -->
+			<DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="{x:Static sysres:ResourceLevel.Warning}">
+				<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusWarningBrush}" />
+			</DataTrigger>
+			<DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="{x:Static sysres:ResourceLevel.Critical}">
+				<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
+	<!-- GPU 칩: 카운터 부재 시 Hidden(공간 예약 — 리플로 방지) -->
+	<Style x:Key="SysResChipGpu" TargetType="Border" BasedOn="{StaticResource SysResChip}">
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding IsGpuAvailable}" Value="False">
+				<Setter Property="Visibility" Value="Hidden" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
+	<!-- 칩 내부 아이콘(Foreground는 부모 칩에서 상속) -->
+	<Style x:Key="SysResChipIcon" TargetType="md:PackIcon">
+		<Setter Property="Width" Value="19" />
+		<Setter Property="Height" Value="19" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+
+	<!-- 칩 내부 수치(고정폭 Consolas — 폭 지터 방지) -->
+	<Style x:Key="SysResChipText" TargetType="TextBlock">
+		<Setter Property="Margin" Value="5,0,0,0" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="FontFamily" Value="Consolas" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="FontWeight" Value="Medium" />
+	</Style>
+
+</ResourceDictionary>

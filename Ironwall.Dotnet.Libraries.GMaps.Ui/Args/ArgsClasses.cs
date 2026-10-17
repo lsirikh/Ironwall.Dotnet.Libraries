@@ -29,6 +29,21 @@ public class MarkerClickEventArgs : EventArgs
     }
 }
 
+/// <summary>
+/// Image 마커 클릭 이벤트 인수 (Phase 24)
+/// </summary>
+public class ImageMarkerClickEventArgs : EventArgs
+{
+    public IImageEditableMarker? Marker { get; }
+    public MouseButtonEventArgs MouseEventArgs { get; }
+
+    public ImageMarkerClickEventArgs(IImageEditableMarker? marker, MouseButtonEventArgs mouseEventArgs)
+    {
+        Marker = marker;
+        MouseEventArgs = mouseEventArgs;
+    }
+}
+
 // 임계값 초과 이벤트 인수
 public class ThresholdExceededEventArgs : EventArgs
 {
@@ -199,6 +214,10 @@ public class MarkerEditCompletedEventArgs : EventArgs
     /// 편집 완료 시간
     /// </summary>
     public DateTime CompletionTime { get; }
+
+    /// <summary>[LineArea_Symbol_Resize FR-04] 라인/폴리곤 리사이즈 시작 시점의 런타임 점 스냅샷.
+    /// 어도너가 line resize일 때만 세팅(그 외 null). `OriginalPosition`을 before 위치로 재사용. RecordLineGeometry before용.</summary>
+    public System.Collections.Generic.List<PointLatLng>? OriginalLinePoints { get; set; }
 
     /// <summary>
     /// 위치가 변경되었는지 여부

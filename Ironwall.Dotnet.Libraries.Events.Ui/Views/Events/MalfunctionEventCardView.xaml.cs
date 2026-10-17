@@ -23,6 +23,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Events
         public MalfunctionEventCardView()
         {
             InitializeComponent();
+            // U-14 — DetectionEventCardView 와 같은 이유: 뒤집기 버튼(routed command)의 CanExecute 를 트리에 붙은 뒤 다시 묻는다.
+            Loaded += (_, _) => CommandManager.InvalidateRequerySuggested();
         }
     }
 }

@@ -1,0 +1,395 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingPresetManagerView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:video="clr-namespace:Ironwall.Dotnet.Libraries.CameraPopup.Wpf;assembly=Ironwall.Dotnet.Libraries.CameraPopup"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		카메라 프리셋 관리 — 워크벤치 카메라 연동 설정의 [프리셋 관리…] 로 연다. T4 · L 720(장비 조립 프리셋 관리 창과 같은 틀).
+		왼쪽 목록(번호 순) · 오른쪽 폼. 저장 · 삭제는 바로 서버로 간다. 삭제는 같은 창 안 확인 줄로 한 번 더 묻는다.
+		색상은 전부 DynamicResource 토큰(라이트/다크).
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+	</UserControl.Resources>
+
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Events.Mapping.Presets"
+		HelpKey="Events.Mapping.Presets"
+		IsBusy="{Binding IsBusy, Mode=OneWay}"
+		Message="{Binding Message, Mode=OneWay}"
+		MessageSeverity="{Binding MessageSeverity, Mode=OneWay}"
+		PrimaryText=""
+		SecondaryAutomationId="Integrations.Presets.Close"
+		SecondaryInvoked="OnClose"
+		SecondaryText="닫기"
+		Size="Large"
+		Title="{Binding Title, Mode=OneWay}">
+		<DockPanel LastChildFill="True">
+		<!--  ③ 카메라 프리셋(ONVIF) — 이벤트 때 GotoPreset 토큰 = 서버 번호라, 서버 프리셋은 카메라 것에서 골라 담는다  -->
+		<c:ConsoleSection
+			Margin="0,12,0,0"
+			AutomationProperties.AutomationId="Integrations.Presets.Camera"
+			AxisName="camera-onvif-presets"
+			DockPanel.Dock="Bottom"
+			Header="카메라 프리셋 (ONVIF)"
+			Visibility="{Binding HasCameraPresetReader, Converter={StaticResource BoolToVis}}">
+			<StackPanel>
+				<DockPanel LastChildFill="True">
+					<Button
+						AutomationProperties.AutomationId="Integrations.Presets.CameraRead"
+						Click="OnReadCamera"
+						Content="카메라에서 읽기"
+						DockPanel.Dock="Right"
+						IsEnabled="{Binding CanReadCameraPresets}"
+						Style="{DynamicResource Console.Button}" />
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Presets.CameraStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding CameraPresetStatus, Mode=OneWay}"
+						TextWrapping="Wrap" />
+				</DockPanel>
+				<TextBox
+					Margin="0,4,0,0"
+					AutomationProperties.AutomationId="Integrations.Presets.CameraMismatch"
+					Background="Transparent"
+					BorderThickness="0"
+					FontSize="12"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					IsReadOnly="True"
+					Text="{Binding CameraMismatchText, Mode=OneWay}"
+					TextWrapping="Wrap"
+					Visibility="{Binding HasCameraMismatch, Converter={StaticResource BoolToVis}}" />
+				<ListBox
+					MaxHeight="132"
+					Margin="0,6,0,0"
+					Padding="4"
+					AutomationProperties.AutomationId="Integrations.Presets.CameraList"
+					Background="{DynamicResource SurfaceSunkenBrush}"
+					ItemsSource="{Binding CameraPresets}">
+					<ListBox.ItemContainerStyle>
+						<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+							<Setter Property="AutomationProperties.Name" Value="{Binding Display}" />
+							<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+						</Style>
+					</ListBox.ItemContainerStyle>
+					<ListBox.ItemTemplate>
+						<DataTemplate>
+							<DockPanel Margin="2,1" LastChildFill="True">
+								<Button
+									Padding="8,0"
+									AutomationProperties.AutomationId="Integrations.Presets.CameraUse"
+									Click="OnUseCameraPreset"
+									Content="서버에 담기"
+									DockPanel.Dock="Right"
+									IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=ListBox}}"
+									Style="{DynamicResource Console.Button}" />
+								<StackPanel VerticalAlignment="Center">
+									<TextBlock
+										FontSize="13"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{Binding Display}"
+										TextTrimming="CharacterEllipsis" />
+									<TextBlock
+										FontSize="11"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Text="{Binding Subtitle}" />
+								</StackPanel>
+							</DockPanel>
+						</DataTemplate>
+					</ListBox.ItemTemplate>
+				</ListBox>
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<Grid MinHeight="320">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="260" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+
+			<!--  ① 목록  -->
+			<DockPanel LastChildFill="True">
+				<Button
+					Margin="0,0,0,8"
+					HorizontalAlignment="Left"
+					AutomationProperties.AutomationId="Integrations.Presets.New"
+					Click="OnNew"
+					Content="＋ 새 프리셋"
+					DockPanel.Dock="Top"
+					IsEnabled="{Binding CanBeginNew}"
+					Style="{DynamicResource Console.Button}" />
+				<Grid>
+					<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+					<ListBox
+						Padding="4"
+						Background="Transparent"
+						AutomationProperties.AutomationId="Integrations.Presets.List"
+						ItemsSource="{Binding Presets}"
+						SelectedItem="{Binding SelectedPreset, Mode=TwoWay}">
+						<ListBox.ItemContainerStyle>
+							<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+								<Setter Property="AutomationProperties.Name" Value="{Binding Display}" />
+								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Presets.Row.{0}}" />
+							</Style>
+						</ListBox.ItemContainerStyle>
+						<ListBox.ItemTemplate>
+							<DataTemplate>
+								<StackPanel Margin="2,2">
+									<TextBlock
+										FontSize="13"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{Binding Display}"
+										TextTrimming="CharacterEllipsis" />
+									<TextBlock
+										FontSize="11"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Text="{Binding Subtitle}" />
+								</StackPanel>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+					<TextBlock
+						Margin="12"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsHitTestVisible="False"
+						Text="등록된 프리셋이 없습니다"
+						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
+				</Grid>
+			</DockPanel>
+
+			<DockPanel Grid.Column="1" Margin="12,0,0,0" LastChildFill="True">
+			<!--  ⓪ 카메라 실시간 영상 — 호스트가 디코딩한 프레임(공유 메모리)을 그리기만 한다. GIS 는 LibVLC 를 부르지 않는다.  -->
+			<StackPanel
+				Margin="0,0,0,10"
+				DockPanel.Dock="Top"
+				Visibility="{Binding HasVideo, Converter={StaticResource BoolToVis}}">
+				<Grid
+					Height="200"
+					AutomationProperties.AutomationId="Integrations.Presets.Video">
+					<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+					<video:HostedVideoView
+						Margin="1"
+						AspectFillTolerance="0.035"
+						FrameSource="{Binding Video.FrameSource}"
+						IsHitTestVisible="False" />
+					<TextBlock
+						Margin="12"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsHitTestVisible="False"
+						Text="{Binding Video.StatusText}"
+						TextAlignment="Center"
+						TextWrapping="Wrap"
+						Visibility="{Binding Video.HasStatusText, Converter={StaticResource BoolToVis}}" />
+				</Grid>
+				<DockPanel Margin="0,6,0,0" LastChildFill="True">
+					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Integrations.Presets.VideoRetry"
+							Click="OnRetryVideo"
+							Content="다시 시도"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding Video.CanRetry, Converter={StaticResource BoolToVis}}" />
+						<Button
+							AutomationProperties.AutomationId="Integrations.Presets.GotoPreset"
+							Click="OnGotoPreset"
+							Content="프리셋 자리로 이동"
+							IsEnabled="{Binding CanGotoPreset}"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding HasGotoPreset, Converter={StaticResource BoolToVis}}" />
+					</StackPanel>
+					<!--  TextBlock 은 UIA 트리에 안 나온다 — 평평한 읽기 전용 TextBox 로 계측 가능하게 둔다.  -->
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Presets.VideoStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding Video.Headline, Mode=OneWay}" />
+				</DockPanel>
+			</StackPanel>
+
+			<Grid>
+			<!--  ② 폼 — 고른 프리셋 또는 새 프리셋  -->
+			<c:ConsoleSection
+				VerticalAlignment="Top"
+				AutomationProperties.AutomationId="Integrations.Presets.Form"
+				AxisName="camera-presets"
+				Header="{Binding FormTitle}"
+				Visibility="{Binding HasForm, Converter={StaticResource BoolToVis}}">
+				<StackPanel>
+				<StackPanel IsEnabled="{Binding CanEdit}">
+					<c:ConsoleField ApiName="preset_index" Header="번호">
+						<TextBox
+							Height="32"
+							Padding="8,0"
+							VerticalContentAlignment="Center"
+							md:HintAssist.IsFloating="False"
+							md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+							AutomationProperties.AutomationId="Integrations.Presets.IndexBox"
+							MaxLength="5"
+							Style="{StaticResource MaterialDesignOutlinedTextBox}"
+							Text="{Binding EditIndex, UpdateSourceTrigger=PropertyChanged}" />
+					</c:ConsoleField>
+					<c:ConsoleField ApiName="preset_name" Header="이름">
+						<TextBox
+							Height="32"
+							Padding="8,0"
+							VerticalContentAlignment="Center"
+							md:HintAssist.IsFloating="False"
+							md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+							AutomationProperties.AutomationId="Integrations.Presets.NameBox"
+							MaxLength="50"
+							Style="{StaticResource MaterialDesignOutlinedTextBox}"
+							Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
+					</c:ConsoleField>
+					<c:ConsoleField ApiName="touring_time" Header="투어링(초)">
+						<TextBox
+							Height="32"
+							Padding="8,0"
+							VerticalContentAlignment="Center"
+							md:HintAssist.IsFloating="False"
+							md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+							AutomationProperties.AutomationId="Integrations.Presets.TouringBox"
+							MaxLength="5"
+							Style="{StaticResource MaterialDesignOutlinedTextBox}"
+							Text="{Binding EditTouringTime, UpdateSourceTrigger=PropertyChanged}" />
+					</c:ConsoleField>
+					<c:ConsoleField ApiName="is_restricted_zone" Header="감시금지구역">
+						<ToggleButton
+							HorizontalAlignment="Left"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Integrations.Presets.RestrictedToggle"
+							IsChecked="{Binding EditRestricted}"
+							Style="{DynamicResource Console.ToggleSwitch}" />
+					</c:ConsoleField>
+
+					<!--  TextBlock 은 UIA 트리에 안 나온다 — 평평한 읽기 전용 TextBox 로 계측 가능하게 둔다.  -->
+					<TextBox
+						Margin="0,4,0,0"
+						AutomationProperties.AutomationId="Integrations.Presets.FormError"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="11"
+						Foreground="{DynamicResource StatusCriticalBrush}"
+						IsReadOnly="True"
+						Text="{Binding ValidationText, Mode=OneWay}"
+						TextWrapping="Wrap"
+						Visibility="{Binding HasValidationText, Converter={StaticResource BoolToVis}}" />
+
+					<!--  저장 줄 — 왼쪽이 삭제, 오른쪽이 저장  -->
+					<StackPanel
+						Margin="0,8,0,0"
+						HorizontalAlignment="Right"
+						Orientation="Horizontal">
+						<Button
+							Margin="0,0,8,0"
+							AutomationProperties.AutomationId="Integrations.Presets.Delete"
+							Click="OnDelete"
+							Content="삭제"
+							IsEnabled="{Binding CanDelete}"
+							Style="{DynamicResource Console.Button.Danger}" />
+						<Button
+							AutomationProperties.AutomationId="Integrations.Presets.Save"
+							Click="OnSave"
+							Content="{Binding SaveText}"
+							IsEnabled="{Binding CanSave}"
+							Style="{DynamicResource Console.Button.Primary}" />
+					</StackPanel>
+
+					<!--  삭제 확인 줄 — 색만이 아니라 세로 바 + 글로 알린다  -->
+					<Border
+						Margin="0,8,0,0"
+						Padding="10,6"
+						AutomationProperties.AutomationId="Integrations.Presets.DeleteConfirm"
+						Background="{DynamicResource TintWarningBrush}"
+						BorderBrush="{DynamicResource StatusWarningBrush}"
+						BorderThickness="4,1,1,1"
+						CornerRadius="4"
+						Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVis}}">
+						<DockPanel LastChildFill="True">
+							<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+								<Button
+									Margin="8,0,8,0"
+									AutomationProperties.AutomationId="Integrations.Presets.DeleteCancel"
+									Click="OnCancelDelete"
+									Content="취소"
+									Style="{DynamicResource Console.Button}" />
+								<Button
+									AutomationProperties.AutomationId="Integrations.Presets.DeleteConfirmButton"
+									Click="OnConfirmDelete"
+									Content="삭제"
+									Style="{DynamicResource Console.Button.Danger}" />
+							</StackPanel>
+							<TextBlock
+								VerticalAlignment="Center"
+								FontSize="12"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding DeleteConfirmText}"
+								TextWrapping="Wrap" />
+						</DockPanel>
+					</Border>
+				</StackPanel>
+
+					<!--  ROI — 편집 권한이 없어도 볼 수 있게 위 폼(CanEdit 로 잠긴다) 밖에 둔다. 새 프리셋은 먼저 만들어야 연다.  -->
+					<c:ConsoleField
+						Margin="0,8,0,0"
+						ApiName="rois"
+						Header="ROI"
+						Visibility="{Binding HasRoiEditor, Converter={StaticResource BoolToVis}}">
+						<Button
+							HorizontalAlignment="Left"
+							AutomationProperties.AutomationId="Integrations.Presets.EditRois"
+							Click="OnEditRois"
+							Content="ROI 설정…"
+							IsEnabled="{Binding CanEditRois}"
+							Style="{DynamicResource Console.Button}" />
+					</c:ConsoleField>
+				</StackPanel>
+			</c:ConsoleSection>
+
+			<TextBlock
+				Margin="12"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				FontSize="12"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="프리셋을 고르거나 [＋ 새 프리셋]을 누르세요"
+				TextWrapping="Wrap">
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="Visibility" Value="Visible" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding HasForm}" Value="True">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+			</Grid>
+			</DockPanel>
+		</Grid>
+		</DockPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

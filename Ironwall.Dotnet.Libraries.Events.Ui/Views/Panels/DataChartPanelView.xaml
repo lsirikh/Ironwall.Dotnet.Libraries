@@ -26,10 +26,9 @@
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
-		<StackPanel Grid.Row="0" Orientation="Vertical">
+		<!--  날짜 피커: EventDashboardView로 이관 — Collapsed  -->
+		<StackPanel Grid.Row="0" Orientation="Vertical" Visibility="Collapsed">
 			<Grid Grid.Row="0" Margin="10,0">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="50" />
@@ -52,7 +51,7 @@
 					Grid.Row="0"
 					Grid.Column="0"
 					Style="{StaticResource TextBlockTitle}"
-					Text="From" />
+					Text="시작" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="1"
@@ -64,7 +63,7 @@
 					Grid.Row="0"
 					Grid.Column="2"
 					Style="{StaticResource TextBlockTitle}"
-					Text="To" />
+					Text="종료" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="3"
@@ -78,11 +77,11 @@
 					x:Name="ClickSearch"
 					Grid.Row="0"
 					Grid.Column="4"
-					Style="{StaticResource IconButtonStyle}">
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Search" />
 					</Button.Content>
 				</Button>
@@ -90,24 +89,36 @@
 					x:Name="ClickCancel"
 					Grid.Row="0"
 					Grid.Column="6"
-					Style="{StaticResource IconButtonStyle}">
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Cancel" />
 					</Button.Content>
 				</Button>
-
-
-
 			</Grid>
 		</StackPanel>
-		<Grid Grid.Row="1" Margin="10">
+		<Grid Grid.Row="1" Margin="6, 0">
+			<ProgressBar
+				Width="50"
+				Height="50"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+				Value="44" />
+			<!--  툴팁 BG/텍스트 theme-aware — 현행은 전무라 라이브러리 기본 박스(다크 이질, SIM-R106 계열)
+			      + 테마 전환 시 열린 툴팁 액티브 리프레시(ChartThemeRefreshBehavior, FR-8)  -->
 			<lvc:CartesianChart
+				behavior_inner:ChartThemeRefreshBehavior.IsEnabled="True"
 				LegendPosition="Right"
+				LegendTextPaint="{Binding LegendTextPaint}"
+				LegendTextSize="12"
 				Series="{Binding Series}"
+				TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
+				TooltipTextPaint="{Binding TooltipTextPaint}"
 				TooltipTextSize="12"
+				Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}"
 				XAxes="{Binding XAxes}"
 				YAxes="{Binding YAxes}"
 				ZoomMode="X" />

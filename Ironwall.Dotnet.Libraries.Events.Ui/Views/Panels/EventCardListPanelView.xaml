@@ -1,5 +1,6 @@
 ﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.EventCardListPanelView"
+	AutomationProperties.AutomationId="Events.CardList.Root"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -17,6 +18,12 @@
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+	<!--  전체 조치보고 버튼 ↔ ProgressCircle 전환용 컨버터 (PRD_Batch_Action_Report)
+	      IsVisible=true → 버튼 표시 / IsVisible=false → ProgressCircle 표시
+	      BoolToInverseVisibleConverter는 Events.Ui/Resources/Resources.xaml에 정의됨  -->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibleConverter" />
+	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
@@ -28,12 +35,12 @@
 		<GridSplitter
 			Grid.Row="0"
 			Height="1"
-			Foreground="#88000000" />
+			Foreground="{DynamicResource TextSecondaryBrush}" />
 		<Grid Grid.Row="1" VerticalAlignment="Center">
 			<Border
 				Margin="0,0,0,0"
 				HorizontalAlignment="Stretch"
-				Background="DodgerBlue"
+				Background="{DynamicResource SurfaceAltBrush}"
 				CornerRadius="2.5"
 				Opacity="0.95"
 				Style="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
@@ -47,27 +54,36 @@
 					<StackPanel
 						Grid.Column="0"
 						Width="5"
-						Background="DodgerBlue"
+						Background="{DynamicResource PrimaryBrush}"
 						Opacity="0.8" />
 					<Viewbox
 						Grid.Column="1"
 						VerticalAlignment="Center"
 						Stretch="UniformToFill">
-						<Button
-							x:Name="ButtonActionAll"
-							md:RippleAssist.IsCentered="True"
-							Foreground="WhiteSmoke"
-							IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
-							Style="{StaticResource MaterialDesignIconForegroundButton}"
-							ToolTip="전체지우기">
-							<cal:Message.Attach>
-								[Event Click] = [Action OnClickButtonActionAll($source, $eventArgs]
-							</cal:Message.Attach>
-							<md:PackIcon
+						<Grid>
+							<Button
+								x:Name="ButtonActionAll"
+								AutomationProperties.AutomationId="Events.CardList.ReportAll"
+								md:RippleAssist.IsCentered="True"
+								IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
+								Style="{StaticResource Console.Button.Icon}"
+								ToolTip="전체 조치보고"
+								Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibleConverter}}">
+								<cal:Message.Attach>
+									[Event Click] = [Action OnClickButtonActionAll($source, $eventArgs)]
+								</cal:Message.Attach>
+								<md:PackIcon
+									Width="23"
+									Height="23"
+									Kind="TrashCanOutline" />
+							</Button>
+							<ProgressBar
 								Width="23"
 								Height="23"
-								Kind="TrashCanOutline" />
-						</Button>
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding IsVisible, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+						</Grid>
 					</Viewbox>
 
 					<StackPanel
@@ -80,7 +96,7 @@
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="15"
-							Foreground="WhiteSmoke"
+							Foreground="{DynamicResource TextSecondaryBrush}"
 							Opacity="0.80"
 							Text="이벤트 수" />
 						<TextBlock
@@ -88,9 +104,9 @@
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="15"
-							Foreground="#40C4FF"
+							Foreground="{DynamicResource AccentBrush}"
 							Opacity="0.80"
-							Text="{Binding ViewModelProvider.Count, FallbackValue=1000}" />
+							Text="{Binding ViewModelProvider.Count, FallbackValue=0}" />
 					</StackPanel>
 				</Grid>
 			</Border>
@@ -109,9 +125,11 @@
 					cal:Message.Attach="[Event MouseDoubleClick] = [Action OnClickEventCard($source, $eventArgs)]"
 					ItemsSource="{Binding ViewModelProvider}"
 					ScrollViewer.CanContentScroll="True"
+					ScrollViewer.HorizontalScrollBarVisibility="Disabled"
 					SelectedItem="{Binding SelectedEventCardViewModel}"
 					VirtualizingPanel.IsVirtualizing="True"
-					VirtualizingPanel.VirtualizationMode="Recycling">
+					VirtualizingPanel.VirtualizationMode="Recycling"
+					VirtualizingPanel.ScrollUnit="Pixel">
 
 					<ListBox.ItemContainerStyle>
 						<Style BasedOn="{StaticResource MaterialDesignListBoxItem}" TargetType="ListBoxItem">
@@ -121,25 +139,13 @@
 						</Style>
 					</ListBox.ItemContainerStyle>
 
-					<ListBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<StackPanel
-								CanHorizontallyScroll="False"
-								Orientation="Vertical"
-								VirtualizingPanel.IsVirtualizing="True"
-								VirtualizingPanel.VirtualizationMode="Recycling" />
-						</ItemsPanelTemplate>
-					</ListBox.ItemsPanel>
+					<!-- StackPanel 제거 — StackPanel은 VirtualizingPanel 미상속 → IsVirtualizing=True 무시됨
+					     ItemsPanel 오버라이드 삭제 시 ListBox 기본 VirtualizingStackPanel이 복원됨
+					     ScrollUnit=Pixel: Flipper 카드 높이 전환 시 항목 단위 스냅 방지 -->
 					<ListBox.ItemTemplate>
 						<DataTemplate>
-							<md:TransitioningContent>
-								<md:TransitioningContent.OpeningEffects>
-									<md:TransitionEffect Kind="SlideInFromRight" Duration="0:0:0.3" />
-								</md:TransitioningContent.OpeningEffects>
-								<Viewbox Stretch="Uniform" StretchDirection="DownOnly">
-									<ContentControl cal:View.Model="{Binding}" />
-								</Viewbox>
-							</md:TransitioningContent>
+							<!--  카드가 칸 폭을 따라가게(카드 별 열 150~224, 판 최대 220) — ContentControl 기본값(Left)이면 카드가 내용 폭으로 줄어든다.  -->
+							<ContentControl HorizontalContentAlignment="Stretch" cal:View.Model="{Binding}" />
 						</DataTemplate>
 					</ListBox.ItemTemplate>
 				</ListBox>

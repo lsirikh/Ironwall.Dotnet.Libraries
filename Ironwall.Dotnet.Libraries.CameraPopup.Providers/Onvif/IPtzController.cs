@@ -1,0 +1,175 @@
+﻿using System.Threading;
+using System.Threading.Tasks;
+using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
+
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Onvif;
+
+/****************************************************************************
+   Purpose      : 팝업 PTZ 제어 단일 소유 앱서비스 (CameraPopup_PTZ_Control)
+                  2026-09-30 camera-popup-modes T-02: GMaps.Ui → CameraPopup.Providers 로 이관(호스트 전용).
+   Created By   : Claude Code
+   Created On   : 2026-06-24
+   Company      : Sensorway Co., Ltd.
+****************************************************************************/
+
+/// <summary>카메라 현재 PTZ 위치(프리셋 저장/복원 단위). space URI를 동봉해 저장↔이동 round-trip 보장.</summary>
+public sealed record PtzPosition(double Pan, double Tilt, double Zoom, string? PanTiltSpace, string? ZoomSpace);
+
+/// <summary>
+/// 영상 위 드래그 한 번의 결과. <see cref="Sent"/> = 카메라에 이동 명령이 나갔다. 안 나갔으면 <see cref="Reason"/>
+/// ("superseded" = 더 새 드래그 · 정지가 앞질렀다 · "not-ready" · "no-space" · "zero" · "failed" · "timeout").
+/// </summary>
+public sealed record PtzDragOutcome(bool Sent, Ptz.PtzDragMoveKind Kind, double Pan, double Tilt, string? Reason)
+{
+    public static PtzDragOutcome NotSent(string reason) => new(false, Ptz.PtzDragMoveKind.None, 0, 0, reason);
+}
+
+/// <summary>카메라 영상 옵션 상태(옵션 탭). <c>IrCutFilter</c>="ON"(주간)/"OFF"(야간)/"AUTO". <c>AutoFocus</c>=오토포커스 여부.</summary>
+public sealed record CameraImagingState(string IrCutFilter, bool AutoFocus);
+
+/// <summary>카메라(ONVIF)에 저장된 프리셋 1건 — 팝업 프리셋 탭 표시/이동/삭제 단위. Name은 빈 값 가능(표시측 폴백). (FR-C1)</summary>
+public sealed record PtzPresetInfo(string Token, string Name);
+
+/// <summary>카메라 메인 스트림 해상도(ONVIF 프로파일 VideoEncoder 해상도 중 최대) — ROI 기준 해상도 채우기.</summary>
+public sealed record CameraVideoResolution(int Width, int Height);
+
+/// <summary>
+/// 팝업 PTZ 제어의 단일 소유 앱서비스. (PRD FR-PTZCTL-01~03 / FR-WRAP-01)
+///
+/// 책임:
+/// - cameraId → (PtzClient, profileToken) 해석(IOnvifService.InitializeFull 캐시).
+/// - cameraId별 GetNode space(Rel/Abs PanTilt·Zoom XRange/YRange/URI) 캐시 — 모든 변환/클램프 진실원.
+/// - ONVIF 호출 직렬화: cameraId별 SemaphoreSlim(1,1)로 직렬(FIFO). 다른 cameraId 병렬, 동일 직렬.
+///   제스처(드래그/줌) Last-Write-Wins: GIS 팝업이 cameraId별 CTS로 직전 제스처를 취소(큐 적체 방지 — 호스트로는 합쳐진 명령만 온다),
+///   취소 토큰을 Continuous/Delay에 전달한다.
+/// - IOnvifService 미노출 메서드(Relative/Absolute/GetStatus/GetNode)는 PtzClient 직접 호출 래퍼.
+///
+/// 스레드 안전(I-05): cameraId 맵=ConcurrentDictionary, PtzClient 동일 인스턴스 병렬 호출 금지.
+/// </summary>
+public interface IPtzController
+{
+    /// <summary>
+    /// 카메라 ONVIF 연결 준비(InitializeFull 캐시) + GetNode space 캐시 적재.
+    /// PTZ 실제 가능 여부(PtzClient≠null AND GetNode 성공 AND space≥1)를 반환(FR-GATE-01).
+    /// </summary>
+    Task<bool> EnsureReadyAsync(string cameraId, IConnectionModel conn, CancellationToken ct = default);
+
+    /// <summary>PTZ 입력 게이팅 진실원 — EnsureReady 후의 강화된 IsPtzPossible.</summary>
+    bool IsPtzCapable(string cameraId);
+
+    /// <summary>ONVIF 모델이 캐시돼 있는가(EnsureReady 가 연결에 성공했다 — PTZ 가능 여부와 별개). (camera-popup-modes T-02)</summary>
+    bool IsReady(string cameraId);
+
+    /// <summary>해당 카메라가 이동 진행 중인지(AbsoluteMove 등 — 추가 입력 차단 판단용).</summary>
+    bool IsBusy(string cameraId);
+
+    /// <summary>
+    /// 픽셀 드래그 델타 기반 상대 이동(RelativeMove). GetNode space로 변환·클램프(고정±1.0 금지),
+    /// Y축 반전 적용. 연속 호출은 Gate로 직렬(FIFO). (FR-DRAG-03/04; LWW는 후속)
+    /// </summary>
+    Task<bool> RelativeMoveByPixelAsync(string cameraId, double dx, double dy,
+        double imageW, double imageH, double sensitivity = 1.0, CancellationToken ct = default);
+
+    /// <summary>
+    /// 영상 위 드래그 → 상대 이동 한 번(드래그 PTZ). <paramref name="viewX"/>/<paramref name="viewY"/> = 영상 상자 크기에 대한
+    /// 드래그 비율(오른쪽 +, 아래 +). 카메라가 지원하는 방식으로 <b>ONVIF 호출 한 번</b>에 보낸다(화각 상대 → 일반 상대 →
+    /// 절대 → 시간 제한 연속) — 좌표 공간 · 줌은 준비 때 읽어 둔 캐시를 쓰고 드래그마다 다시 묻지 않는다.
+    /// 최신 우선: 아직 못 나간 이전 드래그는 버려지고(밀린 드래그가 쌓이지 않는다), 정지가 오면 대기 중 드래그는 취소된다.
+    /// 기본 구현은 "지원 안 함" — 시험용 가짜가 이 멤버 때문에 깨지지 않게.
+    /// </summary>
+    Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct = default)
+        => Task.FromResult(PtzDragOutcome.NotSent("not-supported"));
+
+    /// <summary>
+    /// 속도를 실은 드래그. <paramref name="speed"/> = 0.1..1(팝업 설정 속도), 0 이하 = 카메라 기본 속도. 기본 구현은 속도를 버리고 위 멤버로.
+    /// </summary>
+    Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, double speed, CancellationToken ct = default)
+        => DragMoveAsync(cameraId, viewX, viewY, viewAspect, ct);
+
+    /// <summary>
+    /// 지금 움직이는 중인가(GetStatus 의 MoveStatus — 팬틸트 · 줌 중 하나라도 MOVING 이면 true, 둘 다 IDLE 이면 false).
+    /// 카메라가 MoveStatus 를 안 주거나 읽기 실패면 null(부르는 쪽이 명령 종류별 예상 시간으로 어림). 기본 구현은 null.
+    /// </summary>
+    Task<bool?> GetMoveStatusAsync(string cameraId, CancellationToken ct = default) => Task.FromResult<bool?>(null);
+
+    /// <summary>카메라 기본 PTZ 속도(프로파일 PTZConfiguration.DefaultPTZSpeed ÷ 속도 공간, 0.1..1). 모르면 null. 기본 구현은 null.</summary>
+    (double? PanTilt, double? Zoom) GetDefaultSpeeds(string cameraId) => (null, null);
+
+    /// <summary>상대 줌(휠) — RelativeZoomTranslationSpace로 클램프. zoomDelta +=줌인/-=줌아웃. (FR-PTZCTL-03)</summary>
+    Task<bool> RelativeZoomAsync(string cameraId, double zoomDelta, CancellationToken ct = default);
+
+    /// <summary>연속 이동(ContinuousMove 속도) — 패드 누름/드래그 조이스틱/휠 줌. Relative 미지원 카메라 대응. Stop으로 정지. 속도 [-1,1]. (FR-PTZCTL-03)</summary>
+    Task<bool> ContinuousMoveAsync(string cameraId, double panVel, double tiltVel, double zoomVel, CancellationToken ct = default);
+
+    /// <summary>
+    /// 절대 이동(프리셋 좌표 pan/tilt/zoom). 카메라 절대 space로 클램프. AbsoluteMove는 드래그에 취소되지 않음. (FR-PRESET-02)
+    /// </summary>
+    Task<bool> AbsoluteMoveAsync(string cameraId, double pan, double tilt, double zoom, CancellationToken ct = default);
+
+    /// <summary>현재 PTZ 위치 읽기(프리셋 저장용 GetStatus). 실패 시 null. (FR-PRESET-03)</summary>
+    Task<PtzPosition?> GetStatusAsync(string cameraId, CancellationToken ct = default);
+
+    /// <summary>이동 정지(StopPTZ panTilt+zoom). FR-L1: 뗌 Stop은 제스처 토큰을 전달 — 재누름(새 제스처)이
+    /// 취소하면 Gate 대기 중 Stop이 드롭되고 새 ContinuousMove가 자동 대체(ONVIF §5.3.2).</summary>
+    Task StopAsync(string cameraId, CancellationToken ct = default);
+
+    /*──── ONVIF 프리셋(FR-C1) — 카메라가 진실원. 전부 ctx.Gate 직렬(I-05), 워밍 ctx(PtzClient+ProfileToken) 재사용 ────*/
+
+    /// <summary>카메라 프리셋 목록 조회(GetPresets). 실패/비PTZ=null, 프리셋 없음=빈 목록(FR-C3 구분용).</summary>
+    Task<System.Collections.Generic.IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(string cameraId, CancellationToken ct = default);
+
+    /// <summary>프리셋 토큰으로 이동(GotoPreset — 속도 미지정=카메라 기본). AbsoluteMove처럼 Busy 표시. (FR-C2)</summary>
+    Task<bool> GotoPresetAsync(string cameraId, string presetToken, CancellationToken ct = default);
+
+    /// <summary>현재 위치를 새 프리셋으로 저장(SetPreset — 토큰은 카메라 자동 할당). (FR-C2)</summary>
+    Task<bool> SetPresetAsync(string cameraId, string presetName, CancellationToken ct = default);
+
+    /// <summary>프리셋 삭제(RemovePreset). (FR-C2)</summary>
+    Task<bool> RemovePresetAsync(string cameraId, string presetToken, CancellationToken ct = default);
+
+    /// <summary>현재 위치를 Home으로 지정(SetHomePosition — ONVIF 전용 슬롯, per-preset 개념 아님). (FR-C2/OQ-6)</summary>
+    Task<bool> SetHomePresetAsync(string cameraId, CancellationToken ct = default);
+
+    /// <summary>Home 위치로 이동(GotoHomePosition — Home 미지정 카메라는 실패 반환). (FR-C2/OQ-6)</summary>
+    Task<bool> GotoHomePresetAsync(string cameraId, CancellationToken ct = default);
+
+    /// <summary>영상 옵션(주야간/포커스) 사용 가능 여부 — IsImagingPossible + ImagingClient + VideoSourceToken. (FR-OPT-03)</summary>
+    bool IsImagingCapable(string cameraId);
+
+    /// <summary>현재 영상 옵션(주야간 IrCutFilter / 오토포커스) 조회 — 옵션 탭 표시. 미지원/실패 시 null. (FR-OPT-01/02)</summary>
+    Task<CameraImagingState?> GetImagingAsync(string cameraId, CancellationToken ct = default);
+
+    /// <summary>주야간(IrCutFilter: "ON"=주간/"OFF"=야간/"AUTO") 설정. read-modify-write로 타 필드 보존. (FR-OPT-01)</summary>
+    Task<bool> SetIrCutFilterAsync(string cameraId, string mode, CancellationToken ct = default);
+
+    /// <summary>오토포커스(AUTO/MANUAL) 설정. read-modify-write로 타 필드 보존. (FR-OPT-02)</summary>
+    Task<bool> SetAutoFocusAsync(string cameraId, bool auto, CancellationToken ct = default);
+
+    /// <summary>수동 포커스 연속 이동 시작(누름) — ContinuousFocus(Stop까지 계속). direction +1=far(원경)/-1=near(근경).
+    /// 속도는 카메라 GetMoveOptions(ContinuousFocus Speed) 범위로 클램프(FR-PH-10). IsImagingCapable일 때만.</summary>
+    Task<bool> StartFocusAsync(string cameraId, int direction, CancellationToken ct = default);
+
+    /// <summary>수동 포커스 정지(뗌) — ImagingClient.Stop. StopAsync(PTZ)와 별개 모터 경로(I-05 직교).</summary>
+    Task StopFocusAsync(string cameraId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Onvif조회 모드(CameraPopup_RtspSource_Priority FR-03): ONVIF <c>GetStreamUri</c>로 재생용 RTSP URL 조회.
+    /// 워밍(EnsureReady 캐시) 재사용 — 이중 초기화 없음. 프로파일 선택은 해상도 최소→비오디오→원 순서(preferSub, OQ-01).
+    /// 결과는 카메라 워밍 수명 동안 캐시(FR-07, Release 시 무효화). 실패/미지원/취소 시 null(호출측 URL조회 폴백).
+    /// 반환 URL엔 자격증명이 없다 — 호출측이 조합(FR-04).
+    /// </summary>
+    /// <param name="targetWidth">그릴 크기(물리 픽셀). 0 보다 크면 "이 크기를 덮는 가장 낮은 해상도" 프로파일을 고른다
+    /// (<see cref="Ptz.OnvifProfileSelector"/>) — 작은 타일은 서브, 큰 상자는 메인. 0 이면 <paramref name="preferSub"/> 만 본다.</param>
+    Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default,
+        int targetWidth = 0, int targetHeight = 0);
+
+    /// <summary>
+    /// 메인 스트림 해상도 — 준비(EnsureReady) 때 받아 둔 프로파일 캐시만 읽는다(ONVIF 호출을 더 하지 않는다).
+    /// 준비 안 됨 · 프로파일에 해상도 없음이면 null. 기본 구현은 null — 시험용 가짜가 이 멤버 때문에 깨지지 않게.
+    /// </summary>
+    Task<CameraVideoResolution?> GetMainVideoResolutionAsync(string cameraId, CancellationToken ct = default)
+        => Task.FromResult<CameraVideoResolution?>(null);
+
+    /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
+    void Release(string cameraId);
+}

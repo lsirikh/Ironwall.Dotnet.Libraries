@@ -1,0 +1,523 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:help="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:house="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Symbols3D"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+		<ResourceDictionary Source="BasePropertyStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  그룹 Pending(NaN) 단위 표기 컨버터 — 값=단위 부착, Pending="—"  -->
+	<utils:DoubleNaNToBlankConverter
+		x:Key="NaNDashF0m"
+		BlankText="—"
+		Format="F0"
+		Suffix="m" />
+	<utils:DoubleNaNToBlankConverter
+		x:Key="NaNDashF0deg"
+		BlankText="—"
+		Format="F0"
+		Suffix="°" />
+	<utils:DoubleNaNToBlankConverter
+		x:Key="NaNDashP0"
+		BlankText="—"
+		Format="P0" />
+
+	<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsControl}">
+
+		<Setter Property="HasSpecificProperties" Value="True" />
+		<Setter Property="SpecificPropertiesTitle" Value="PIDS 속성" />
+		<!--  PIDS 특화 UI  -->
+		<Setter Property="SpecificContent">
+			<Setter.Value>
+				<StackPanel>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="Auto"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="색상 강도" Style="{StaticResource PropertyLabel}"/>
+						<!--  첨부 속성 경로는 Path= 로 적는다 — 위치 인자({Binding 경로})는 Binding(string) 생성자가 접두사(house:)를 풀지 못한 PropertyPath 를 만들어
+						      PathError(경로 인자 0개)로 슬라이더가 안 먹었다(결함 P3D-D1 · MAP-122)  -->
+						<Slider Grid.Column="1" Minimum="0" Maximum="1" IsSnapToTickEnabled="True" TickFrequency="0.01" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}"/>
+						<!--  3D 하우징 "?"(help-callout H-4) — 색상 강도 · 설치 높이 · 모델 변형의 뜻. 이 줄들은 3D 일 때만 보인다.  -->
+						<help:HelpTip Grid.Column="2" Margin="6,0,0,0" HelpKey="Map.Property.Housing"/>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="설치 높이" Style="{StaticResource PropertyLabel}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="설치 높이 (0~100, 정수)"/>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<MultiDataTrigger>
+										<MultiDataTrigger.Conditions>
+											<Condition Binding="{Binding SelectedMarker.DeviceType}" Value="IpCamera"/>
+											<Condition Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False"/>
+										</MultiDataTrigger.Conditions>
+										<Setter Property="Visibility" Value="Visible"/>
+									</MultiDataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="모델 변형" Style="{StaticResource PropertyLabel}"/>
+						<ComboBox Grid.Column="1" ItemsSource="{Binding ModelVariants}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding ModelVariant, Mode=TwoWay}" Style="{StaticResource CompactComboBox}"/>
+					</Grid>
+
+					<!--  통문 개폐 (FR-12/18) — DeviceType=Gate: 폭 슬라이더 / 통문·함체 공통: 접점 해석  -->
+					<Grid Margin="0,5" AutomationProperties.AutomationId="GMaps.Property.GateSection">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsGate}" Value="True">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="통문 폭" Style="{StaticResource PropertyLabel}"/>
+						<StackPanel Grid.Column="1" Orientation="Horizontal">
+							<Slider Width="100" Minimum="1" Maximum="8" TickFrequency="0.5" IsSnapToTickEnabled="True" Value="{Binding GateWidthM, Mode=TwoWay}" ToolTip="통문 폭 1~8 m (0.5 m 단위)" AutomationProperties.AutomationId="GMaps.Property.GateWidth"/>
+							<TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="{Binding GateWidthM, StringFormat='{}{0:0.0} m'}"/>
+							<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="10" Opacity="0.75" Text="(기본)" Visibility="{Binding IsGateWidthInherited, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+							<Button Content="기본" Padding="6,1" Margin="6,0,0,0" Command="{Binding ResetGateWidthCommand}" AutomationProperties.AutomationId="GMaps.Property.GateWidthReset"/>
+						</StackPanel>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding HasDoor}" Value="True">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<!--  [symbol-detail-and-door-control FR-01/02] 접점 반전 체크박스(운영자에겐 의미 없는 설치 값)를 걷어내고
+						      실제 개폐 버튼으로 교체. 버튼은 명령만 보내고 상태는 바꾸지 않는다 — 실제 전이는
+						      매니저 보고(OPERATION_EVENT)로만 온다(FR-03/04).  -->
+						<!--  문 "?"(help-callout H-4) — 명령만 보내고 상태는 장비 응답 뒤에 바뀐다 · 통문 폭 저장 시점  -->
+						<StackPanel Orientation="Horizontal">
+							<TextBlock Text="문 상태" Style="{StaticResource PropertyLabel}"/>
+							<help:HelpTip Margin="4,0,0,0" HelpKey="Map.Property.Door"/>
+						</StackPanel>
+						<StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+							<Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
+								<StackPanel Orientation="Horizontal">
+									<Button Content="열림" Padding="14,2" MinWidth="0" BorderThickness="0"
+									        Command="{Binding OpenDoorCommand}" IsEnabled="{Binding CanOpenDoor}"
+									        AutomationProperties.AutomationId="GMaps.Property.DoorOpen">
+										<Button.Style>
+											<Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding DoorDisplayState}" Value="Open">
+														<Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+														<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
+														<Setter Property="FontWeight" Value="Bold"/>
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Button.Style>
+									</Button>
+									<Border Width="1" Background="{DynamicResource BorderBrush}"/>
+									<Button Content="닫힘" Padding="14,2" MinWidth="0" BorderThickness="0"
+									        Command="{Binding CloseDoorCommand}" IsEnabled="{Binding CanCloseDoor}"
+									        AutomationProperties.AutomationId="GMaps.Property.DoorClose">
+										<Button.Style>
+											<Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding DoorDisplayState}" Value="Closed">
+														<Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+														<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
+														<Setter Property="FontWeight" Value="Bold"/>
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Button.Style>
+									</Button>
+								</StackPanel>
+							</Border>
+							<TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11"
+							           Text="{Binding DoorStateText}"
+							           AutomationProperties.AutomationId="GMaps.Property.DoorState">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding DoorDisplayState}" Value="Open">
+												<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}"/>
+											</DataTrigger>
+											<DataTrigger Binding="{Binding DoorDisplayState}" Value="Pending">
+												<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}"/>
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</StackPanel>
+					</Grid>
+
+					<!--  연결된 디바이스  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="연결디바이스" />
+						<ComboBox
+							Grid.Column="1"
+							DisplayMemberPath="DeviceName"
+							ItemsSource="{Binding FilteredDeviceList}"
+							SelectedItem="{Binding LinkedDevice, Mode=TwoWay}"
+							ToolTipService.ShowOnDisabled="True">
+							<ComboBox.Style>
+								<Style BasedOn="{StaticResource CompactComboBox}" TargetType="ComboBox">
+									<Style.Triggers>
+										<!--  그룹 편집: 디바이스 연결은 심볼별 고유 → 일괄변경 금지(오연결 방지)  -->
+										<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+											<Setter Property="IsEnabled" Value="False" />
+											<Setter Property="ToolTip" Value="그룹 편집에서는 디바이스 연결을 변경할 수 없습니다 (심볼별 고유)" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</ComboBox.Style>
+						</ComboBox>
+					</Grid>
+
+					<!--  현재위치 적용 — 콤보박스 폭에 맞춘 네모 버튼(앱 기본 원형 Button 스타일 opt-out)  -->
+					<Grid Margin="0,2,0,6">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<!--  장비 연결 "?"(help-callout H-4) — 연결 · [현재위치 적용] 의 뜻. 단추 앞 빈 라벨 칸에 둔다.  -->
+						<help:HelpTip
+							Grid.Column="0"
+							Margin="0,0,6,0"
+							HorizontalAlignment="Right"
+							HelpKey="Map.Property.Device" />
+						<Button
+							x:Name="PART_ApplyDeviceLocationButton"
+							Grid.Column="1"
+							Height="30"
+							HorizontalAlignment="Stretch"
+							Content="현재위치 적용"
+							Cursor="Hand"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							ToolTipService.ShowOnDisabled="True">
+							<Button.Style>
+								<!--  명시 Style = 앱 기본 원형 Button 스타일 opt-out(기존 x:Null 대체) + 그룹 편집 비활성  -->
+								<Style TargetType="Button">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+											<Setter Property="IsEnabled" Value="False" />
+											<Setter Property="ToolTip" Value="그룹 편집에서는 사용할 수 없습니다 (디바이스별 개별 적용)" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Button.Style>
+							<Button.Template>
+								<ControlTemplate TargetType="Button">
+									<Border
+										x:Name="bd"
+										Background="{DynamicResource PrimaryBrush}"
+										CornerRadius="2"
+										SnapsToDevicePixels="True"
+										TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
+										<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+									</Border>
+									<ControlTemplate.Triggers>
+										<Trigger Property="IsMouseOver" Value="True">
+											<Setter TargetName="bd" Property="Opacity" Value="0.85" />
+										</Trigger>
+										<Trigger Property="IsEnabled" Value="False">
+											<Setter TargetName="bd" Property="Opacity" Value="0.4" />
+										</Trigger>
+									</ControlTemplate.Triggers>
+								</ControlTemplate>
+							</Button.Template>
+						</Button>
+					</Grid>
+
+					<!--  FOV 표시  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 표시" />
+						<CheckBox
+							Grid.Column="1"
+							VerticalAlignment="Center"
+							Content="FOV 영역 표시"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							IsChecked="{Binding ShowFOV}" />
+					</Grid>
+
+					<!--  FOV 색상  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 색상" />
+						<ComboBox
+							Grid.Column="1"
+							ItemsSource="{Binding AvailableColors}"
+							SelectedItem="{Binding FOVColor}"
+							Style="{StaticResource CompactComboBox}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<Rectangle
+											Width="40"
+											Height="12"
+											Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+											Stroke="Gray"
+											StrokeThickness="0.5" />
+										<TextBlock
+											Margin="10,0"
+											FontSize="10"
+											Text="{Binding}" />
+									</StackPanel>
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
+
+					<!--  FOV 투명도  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="30" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 투명도" />
+						<Slider
+							x:Name="FOVOpacitySlider"
+							Grid.Column="1"
+							Margin="5,0"
+							VerticalAlignment="Center"
+							IsSnapToTickEnabled="True"
+							Maximum="1.0"
+							Minimum="0.1"
+							TickFrequency="0.01"
+							Value="{Binding FOVOpacity, Converter={StaticResource NaNBlank}}" />
+						<TextBlock
+							Grid.Column="2"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Text="{Binding FOVOpacity, Converter={StaticResource NaNDashP0}}" />
+					</Grid>
+
+					<!--  탐지 설정 섹션  -->
+					<Border
+						Margin="0,10,0,0"
+						Padding="8,4"
+						Background="{DynamicResource PrimaryBrush}"
+						CornerRadius="5">
+						<StackPanel>
+							<TextBlock
+								HorizontalAlignment="Center"
+								FontSize="12"
+								FontWeight="Bold"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
+								Text="탐지 영역 설정" />
+
+							<!--  탐지 범위  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="탐지범위" />
+								<Slider
+									x:Name="DetectionRangeSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									IsSnapToTickEnabled="True"
+									Maximum="1000"
+									Minimum="10"
+									TickFrequency="1"
+									Value="{Binding DetectionRange, Converter={StaticResource NaNBlank}}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Text="{Binding DetectionRange, Converter={StaticResource NaNDashF0m}}" />
+							</Grid>
+
+							<!--  탐지 각도  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="탐지각도" />
+								<Slider
+									x:Name="DetectionAngleSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									IsSnapToTickEnabled="True"
+									Maximum="180"
+									Minimum="5"
+									TickFrequency="1"
+									Value="{Binding DetectionAngle, Converter={StaticResource NaNBlank}}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Text="{Binding DetectionAngle, Converter={StaticResource NaNDashF0deg}}" />
+							</Grid>
+
+							<!--  탐지 방향  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="탐지방향" />
+								<Slider
+									x:Name="DetectionBearingSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									IsSnapToTickEnabled="True"
+									Maximum="180"
+									Minimum="-180"
+									TickFrequency="1"
+									Value="{Binding DetectionBearing, Converter={StaticResource NaNBlank}}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Text="{Binding DetectionBearing, Converter={StaticResource NaNDashF0deg}}" />
+							</Grid>
+
+							<!--  기준 방향 (BaseBearing)  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="기준방향" />
+								<Slider
+									x:Name="BaseBearingSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									IsSnapToTickEnabled="True"
+									Maximum="360"
+									Minimum="0"
+									TickFrequency="1"
+									Value="{Binding BaseBearing, Converter={StaticResource NaNBlank}}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Text="{Binding BaseBearing, Converter={StaticResource NaNDashF0deg}}" />
+							</Grid>
+						</StackPanel>
+					</Border>
+				</StackPanel>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>

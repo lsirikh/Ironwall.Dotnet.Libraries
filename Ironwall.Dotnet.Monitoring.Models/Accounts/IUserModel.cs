@@ -9,5 +9,6 @@ public interface IUserModel : IBaseModel
     string Password { get; set; }
     string Name { get; set; }
     EnumLevelType Level { get; set; }
+    EnumUserRole Role { get; set; }
     EnumUsedType Used { get; set; }
 }

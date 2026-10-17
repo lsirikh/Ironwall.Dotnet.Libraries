@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    카메라 팝업 호스트 IPC 계약(PRD camera-popup-modes §0 · FR-24~29).
+    GIS 와 CameraPopupHost 가 공유하는 유일한 어셈블리 — WPF · LibVLC 참조 금지.
+    메시지 DTO · 길이 접두 JSON 프레이밍 · 공유 메모리 프레임 배치(seqlock) · 실행 인자 · 순수 함수.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <RootNamespace>Ironwall.Dotnet.Libraries.CameraPopup.Contracts</RootNamespace>
+    <Version>1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.CameraPopup.Tests" />
+  </ItemGroup>
+
+</Project>

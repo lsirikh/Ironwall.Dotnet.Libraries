@@ -13,6 +13,8 @@ public interface ICustomMapModel : IMapModel
 {
     string SourceImagePath { get; set; }
     string TilesDirectoryPath { get; set; }
+    string? MbtilesPath { get; set; }
+    MapStorageType StorageType { get; }
     int OriginalWidth { get; set; }
     int OriginalHeight { get; set; }
     long OriginalFileSize { get; set; }

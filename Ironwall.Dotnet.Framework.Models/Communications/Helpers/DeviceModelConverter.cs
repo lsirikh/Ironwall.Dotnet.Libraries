@@ -34,6 +34,8 @@ namespace Ironwall.Dotnet.Framework.Models.Communications.Helpers
             switch (deviceType)
             {
                 case EnumDeviceType.NONE:
+                case EnumDeviceType.Cable:
+                    device = jo.ToObject<BaseDeviceModel>();
                     break;
                 case EnumDeviceType.Controller:
                     device = jo.ToObject<ControllerDeviceModel>();
@@ -50,17 +52,20 @@ namespace Ironwall.Dotnet.Framework.Models.Communications.Helpers
                 case EnumDeviceType.SmartSensor:
                 case EnumDeviceType.SmartSensor2:
                 case EnumDeviceType.SmartCompound:
-
+                case EnumDeviceType.Fence_Group:
                     device = jo.ToObject<SensorDeviceModel>();
-                    break;
-                case EnumDeviceType.Cable:
                     break;
                 case EnumDeviceType.IpCamera:
                     device = jo.ToObject<CameraDeviceModel>();
                     break;
                 case EnumDeviceType.IpSpeaker:
+                    device = jo.ToObject<SpeakerDeviceModel>();
                     break;
-                case EnumDeviceType.Fence_Line:
+                case EnumDeviceType.Enclosure:
+                    device = jo.ToObject<EnclosureDeviceModel>();
+                    break;
+                case EnumDeviceType.Lamp:
+                    device = jo.ToObject<LampDeviceModel>();
                     break;
                 default:
                     throw new Exception($"Unknown device type: {deviceType}");

@@ -30,8 +30,10 @@ public enum EnumDeviceType
     Radar, //15
     OpticalCable, //16
 
-    //Fence_Line, //17
-
-    
+    Fence_Group = 17,
+    Lamp = 18,
+    Enclosure = 19,
+    SmartMultisensor2 = 20,
+    Gate = 21, // keep in step with Ironwall.Dotnet.Libraries.Enums.EnumDeviceType (device-console-v8 G-6'(a))
 }
 

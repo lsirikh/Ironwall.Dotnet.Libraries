@@ -1,0 +1,163 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.SensorModelsView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:sp="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		센서 모델 창(sensor-mount-preset W1 · W3) — 왼쪽 = 모델 목록, 오른쪽 = 모델 머리 + 탭(위치 프리셋 · 속성 프리셋 · 쓰는 센서).
+		설명은 머리의 "?"(Devices.SensorPresets.Models) · 속성 탭의 "?"(Devices.SensorPresets.Attributes).
+	-->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Devices.SensorPresets.Models"
+		HelpKey="Devices.SensorPresets.Models"
+		Kind="{Binding SummaryText}"
+		Message="{Binding StatusText}"
+		PrimaryAutomationId="Devices.SensorPresets.Models.Close"
+		PrimaryInvoked="OnClose"
+		PrimaryText="닫기"
+		SecondaryText=""
+		Size="Large"
+		Title="센서 모델">
+		<DockPanel>
+			<WrapPanel Margin="0,0,0,8" DockPanel.Dock="Top" IsEnabled="{Binding CanEdit}">
+				<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Add" Click="OnAddModel" Content="+ 모델" Style="{DynamicResource Console.Button}" />
+				<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Export" Click="OnExport" Content="내보내기" Style="{DynamicResource Console.Button}" />
+				<Button Margin="0,0,12,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Import" Click="OnImport" Content="가져오기" Style="{DynamicResource Console.Button}" />
+				<TextBlock VerticalAlignment="Center" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Source" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding SourceText}" />
+			</WrapPanel>
+			<DockPanel Width="230" Margin="0,0,10,0" DockPanel.Dock="Left">
+				<StackPanel Margin="0,6,0,0" DockPanel.Dock="Bottom" Orientation="Horizontal">
+					<TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding BuiltinText}" />
+					<Button Margin="8,0,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Hide" Click="OnToggleHidden" Content="{Binding HideText}" IsEnabled="{Binding CanEdit}" Style="{DynamicResource Console.Button}" />
+					<Button Margin="6,0,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Delete" Click="OnDeleteModel" Content="삭제" IsEnabled="{Binding CanDeleteModel}" Style="{DynamicResource Console.Button}" />
+				</StackPanel>
+				<!--  가상화 끔 — 모델은 많아야 수십 줄이고, 가상화하면 화면 밖 새 줄이 자동화에 보이지 않는다(MNT-R28-102). 고르면 그 줄로 스크롤.  -->
+				<ListBox
+					AutomationProperties.AutomationId="Devices.SensorPresets.Models.List"
+					AutomationProperties.Name="센서 모델 목록"
+					ItemsSource="{Binding Models}"
+					SelectedItem="{Binding SelectedModel}"
+					SelectionChanged="OnListSelectionChanged"
+					VirtualizingPanel.IsVirtualizing="False">
+					<ListBox.ItemContainerStyle>
+						<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+							<Setter Property="AutomationProperties.AutomationId" Value="{Binding Model.Id, StringFormat=Devices.SensorPresets.Models.Row.{0}}" />
+							<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+						</Style>
+					</ListBox.ItemContainerStyle>
+					<ListBox.ItemTemplate>
+						<DataTemplate>
+							<DockPanel>
+								<TextBlock Margin="8,0,0,0" DockPanel.Dock="Right" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding CountText}" />
+								<TextBlock Text="{Binding Name}" />
+							</DockPanel>
+						</DataTemplate>
+					</ListBox.ItemTemplate>
+				</ListBox>
+			</DockPanel>
+			<DockPanel>
+				<!--  모델 이름 — 사용자 추가 모델만 고친다(Enter · 칸을 떠날 때 저장), 회사 기본 7종은 읽기 전용  -->
+				<DockPanel Margin="0,0,0,6" DockPanel.Dock="Top">
+					<TextBlock Margin="0,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left" Text="이름" />
+					<TextBox
+						AutomationProperties.AutomationId="Devices.SensorPresets.Models.Name"
+						AutomationProperties.Name="모델 이름"
+						IsReadOnly="{Binding IsModelNameReadOnly, Mode=OneWay}"
+						KeyDown="OnNameKey"
+						LostKeyboardFocus="OnNameLostFocus"
+						Text="{Binding ModelNameText, UpdateSourceTrigger=PropertyChanged}" />
+				</DockPanel>
+				<TextBlock Margin="0,0,0,6" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Header" DockPanel.Dock="Top" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding ModelHeaderText}" />
+				<TabControl AutomationProperties.AutomationId="Devices.SensorPresets.Models.Tabs" SelectedIndex="{Binding SelectedTab}">
+					<TabItem AutomationProperties.AutomationId="Devices.SensorPresets.Models.Tab.Mount" Header="{Binding MountTabText}">
+						<DockPanel>
+							<WrapPanel Margin="0,6,0,0" DockPanel.Dock="Bottom" IsEnabled="{Binding CanEdit}">
+								<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Mount.Edit" Click="OnEditMount" Content="편집" Style="{DynamicResource Console.Button}" />
+								<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Mount.New" Click="OnNewMount" Content="새로" Style="{DynamicResource Console.Button}" />
+								<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Mount.Duplicate" Click="OnDuplicateMount" Content="복제" Style="{DynamicResource Console.Button}" />
+								<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Mount.Default" Click="OnDefaultMount" Content="★기본으로" Style="{DynamicResource Console.Button}" />
+								<Button AutomationProperties.AutomationId="Devices.SensorPresets.Models.Mount.Delete" Click="OnDeleteMount" Content="삭제" IsEnabled="{Binding CanDeleteMountPreset}" Style="{DynamicResource Console.Button}" />
+							</WrapPanel>
+							<ListBox
+								AutomationProperties.AutomationId="Devices.SensorPresets.Models.Mount.List"
+								AutomationProperties.Name="위치 프리셋 목록"
+								ItemsSource="{Binding MountPresets}"
+								MouseDoubleClick="OnMountDoubleClick"
+								SelectedItem="{Binding SelectedMountPreset}"
+								SelectionChanged="OnListSelectionChanged"
+								VirtualizingPanel.IsVirtualizing="False">
+								<!--  행 id = GIS DB 프리셋 id(`.Mount.Row.{id}`) — 자기 행만 지우는 시험 가드(MNT-R28-224)  -->
+								<ListBox.ItemContainerStyle>
+									<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+										<Setter Property="AutomationProperties.AutomationId" Value="{Binding Preset.Id, StringFormat=Devices.SensorPresets.Models.Mount.Row.{0}}" />
+										<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+									</Style>
+								</ListBox.ItemContainerStyle>
+								<ListBox.ItemTemplate>
+									<DataTemplate>
+										<DockPanel>
+											<TextBlock Margin="8,0,0,0" DockPanel.Dock="Right" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding CountText}" />
+											<TextBlock Text="{Binding Name}" />
+										</DockPanel>
+									</DataTemplate>
+								</ListBox.ItemTemplate>
+							</ListBox>
+						</DockPanel>
+					</TabItem>
+					<TabItem AutomationProperties.AutomationId="Devices.SensorPresets.Models.Tab.Attr" Header="{Binding AttrTabText}">
+						<DockPanel>
+							<DockPanel Margin="0,0,0,6" DockPanel.Dock="Top">
+								<c:HelpTip Margin="6,0,0,0" VerticalAlignment="Center" DockPanel.Dock="Right" HelpKey="Devices.SensorPresets.Attributes" />
+								<ComboBox
+									AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.Preset"
+									AutomationProperties.Name="속성 프리셋"
+									DisplayMemberPath="Name"
+									ItemsSource="{Binding AttributePresets}"
+									SelectedItem="{Binding SelectedAttributePreset}" />
+							</DockPanel>
+							<StackPanel DockPanel.Dock="Bottom">
+								<WrapPanel Margin="0,6,0,0" IsEnabled="{Binding CanEdit}">
+									<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.AddRow" Click="OnAddAttrRow" Content="+ 항목" Style="{DynamicResource Console.Button}" />
+									<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.Save" Click="OnSaveAttr" Content="저장" Style="{DynamicResource Console.Button}" />
+									<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.New" Click="OnNewAttr" Content="새로" Style="{DynamicResource Console.Button}" />
+									<Button Margin="0,0,6,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.Duplicate" Click="OnDuplicateAttr" Content="복제" Style="{DynamicResource Console.Button}" />
+									<Button AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.Default" Click="OnDefaultAttr" Content="★기본으로" Style="{DynamicResource Console.Button}" />
+								</WrapPanel>
+								<TextBlock Margin="0,4,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding AttributeUsageText}" />
+							</StackPanel>
+							<DataGrid
+								AutoGenerateColumns="False"
+								AutomationProperties.AutomationId="Devices.SensorPresets.Models.Attr.Table"
+								AutomationProperties.Name="속성 값"
+								CanUserAddRows="False"
+								CanUserReorderColumns="False"
+								CanUserSortColumns="False"
+								ItemsSource="{Binding AttributeRows}">
+								<DataGrid.Columns>
+									<DataGridTextColumn Width="*" Binding="{Binding Label}" Header="항목" />
+									<DataGridTextColumn Width="80" Binding="{Binding Value}" Header="값" />
+									<DataGridTextColumn Width="50" Binding="{Binding Unit}" Header="단위" />
+									<DataGridComboBoxColumn Width="70" Header="쓰임" SelectedItemBinding="{Binding Use}" ItemsSource="{x:Static sp:AttributeRowViewModel.Uses}" />
+									<DataGridTextColumn Width="110" Binding="{Binding Key}" Header="키" />
+								</DataGrid.Columns>
+							</DataGrid>
+						</DockPanel>
+					</TabItem>
+					<TabItem AutomationProperties.AutomationId="Devices.SensorPresets.Models.Tab.Using" Header="{Binding UsingTabText}">
+						<ListBox
+							AutomationProperties.AutomationId="Devices.SensorPresets.Models.Using.List"
+							AutomationProperties.Name="쓰는 센서"
+							DisplayMemberPath="ChipText"
+							ItemsSource="{Binding UsingSensors}" />
+					</TabItem>
+				</TabControl>
+			</DockPanel>
+		</DockPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

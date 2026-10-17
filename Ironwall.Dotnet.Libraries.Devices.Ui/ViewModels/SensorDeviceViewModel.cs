@@ -38,8 +38,12 @@ public class SensorDeviceViewModel : DeviceViewModel, ISensorDeviceViewModel
         {
             (_model as ISensorDeviceModel)!.Controller = value;
             NotifyOfPropertyChange(() => Controller);
+            NotifyOfPropertyChange(() => ControllerDisplay);
         }
     }
+
+    /// <summary>콘솔 목록 "제어기" 한 칸(device-console-v8 N02-B) — 소속 제어기가 없으면 "—".</summary>
+    public string ControllerDisplay => Controller?.DeviceName ?? "—";
     #endregion
     #region - Attributes -
     #endregion

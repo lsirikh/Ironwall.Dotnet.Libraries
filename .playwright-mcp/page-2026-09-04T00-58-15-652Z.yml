@@ -1,0 +1,893 @@
+- generic [active] [ref=e1]:
+  - heading "지도 심볼 3D 하우징 — 사실적 단순화(로우폴리) 스토리보드 v1.7" [level=1] [ref=e2]
+  - paragraph [ref=e3]: "2026-08-07 · 사용자 확정 방향: 군대부호 제외, 사실적 형태를 3D 로 유지하되 단순화, 지도 회전 시 하우징이 함께 도는 구조 · 이 페이지의 모델은 전부 박스·실린더·절두체 프리미티브의 코드 합성(외부 3D 자산 0) · 광원은 화면 고정 · 카메라는 화면 고정 피치 35° 정사(원근 0)"
+  - generic [ref=e4]:
+    - text: WGS-84 에서 되는가 — 된다. 위경도(WGS-84)는 저장 좌표일 뿐이고 화면은 Web Mercator(
+    - code [ref=e5]: MercatorProjection.Instance
+    - text: ", 벤더 전 프로바이더 공통)로 그려진다. Mercator 는 등각(conformal) 투영이라 한 점에서의 방위각이 화면 각도로 그대로 간다(격자북 보정 없음 — UTM 은 좌표 표시·MGRS 격자에만 쓰이고 방위 계산엔 관여하지 않음). 지도 회전은 뷰포트 중심 기준 화면 어파인("
+    - code [ref=e6]: _rotationMatrix.Angle = −Bearing
+    - text: ","
+    - code [ref=e7]: GMapControl.cs:1570-1572
+    - text: )이고 마커 표시각은
+    - code [ref=e8]: DisplayAngle = Bearing − θ
+    - text: (
+    - code [ref=e9]: RotationMath.cs:52
+    - text: )다. 따라서 3D 하우징의 yaw = Bearing − θ 로 두면 위도·투영과 무관하게 정확하다. 위도가 바꾸는 건 축척(크기)뿐인데 심볼은 픽셀 고정이라 영향이 없다.
+    - generic [ref=e10]:
+      - text: "(코드 직접 확인 완료 — 정본 §7-1:"
+      - code [ref=e11]: MarkerHelper.cs:138 Atan2(dx,−dy)
+      - text: ","
+      - code [ref=e12]: CompassMath.cs:48
+      - text: )
+  - heading "0. SVG 원본 ↔ 3D 하우징 대조 — 센서 · 카메라 · 스피커 · 함체 · 제어기 · 경광등 · 펜스" [level=2] [ref=e13]
+  - paragraph [ref=e14]:
+    - text: "원본:"
+    - code [ref=e15]: e:\01.사업관련자료\20.통제UI정리\Resources\*.svg
+    - text: (사본
+    - code [ref=e16]: docs/assets/svgref/
+    - text: "). 정면 W:H ≈ 0.55, 측면 두께 ≈ 0.35H, 상단 검은 감지 모듈(2×2 감지기) · 중앙 PIR 원형 렌즈 · 하단 어두운 패널 + 라벨 '201' · 모서리 나사 4 · 측면 브래킷. 색은 SVG 실측(#6B7642 / #57643D / #2B2B2B / #F0F0B3 / #969A9C)."
+  - generic [ref=e17]:
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]: 스마트 센서 (SVG 원본 기준) · 원본
+        - generic [ref=e21]:
+          - generic [ref=e22]: 정면
+          - generic [ref=e26]: 측면
+          - generic [ref=e30]: 3/4
+          - generic [ref=e34]: 3/4 ②
+      - generic [ref=e38]:
+        - generic [ref=e39]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e40]:
+          - generic [ref=e41]: 0°
+          - generic [ref=e153]: 45°
+          - generic [ref=e285]: 90°
+          - generic [ref=e407]: 180°
+          - generic [ref=e519]: 30px
+          - generic [ref=e655]: 50px
+      - generic [ref=e791]:
+        - generic [ref=e792]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e793]:
+          - generic [ref=e794]: 0°
+          - generic [ref=e906]: 45°
+          - generic [ref=e1038]: 90°
+          - generic [ref=e1160]: 180°
+          - generic [ref=e1272]: 30px
+          - generic [ref=e1408]: 50px
+    - generic [ref=e1544]:
+      - generic [ref=e1545]:
+        - generic [ref=e1546]: 돔 카메라 (SVG 원본 기준) · 원본
+        - generic [ref=e1547]: 3/4
+      - generic [ref=e1552]:
+        - generic [ref=e1553]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e1554]:
+          - generic [ref=e1555]: 0°
+          - generic [ref=e1667]: 45°
+          - generic [ref=e1779]: 90°
+          - generic [ref=e1895]: 180°
+          - generic [ref=e2007]: 30px
+          - generic [ref=e2123]: 50px
+      - generic [ref=e2239]:
+        - generic [ref=e2240]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e2241]:
+          - generic [ref=e2242]: 0°
+          - generic [ref=e2354]: 45°
+          - generic [ref=e2466]: 90°
+          - generic [ref=e2582]: 180°
+          - generic [ref=e2694]: 30px
+          - generic [ref=e2810]: 50px
+    - generic [ref=e2926]:
+      - generic [ref=e2927]:
+        - generic [ref=e2928]: IP 스피커 혼 (SVG 원본 기준) · 원본
+        - generic [ref=e2929]: 3/4
+      - generic [ref=e2934]:
+        - generic [ref=e2935]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e2936]:
+          - generic [ref=e2937]: 0°
+          - generic [ref=e2989]: 45°
+          - generic [ref=e3051]: 90°
+          - generic [ref=e3104]: 180°
+          - generic [ref=e3156]: 30px
+          - generic [ref=e3218]: 50px
+      - generic [ref=e3280]:
+        - generic [ref=e3281]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e3282]:
+          - generic [ref=e3283]: 0°
+          - generic [ref=e3335]: 45°
+          - generic [ref=e3397]: 90°
+          - generic [ref=e3450]: 180°
+          - generic [ref=e3502]: 30px
+          - generic [ref=e3564]: 50px
+    - generic [ref=e3626]:
+      - generic [ref=e3627]:
+        - generic [ref=e3628]: 함체 (SVG 원본 기준) · 원본
+        - generic [ref=e3629]: 3/4
+      - generic [ref=e3634]:
+        - generic [ref=e3635]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e3636]:
+          - generic [ref=e3637]: 0°
+          - generic [ref=e3661]: 45°
+          - generic [ref=e3697]: 90°
+          - generic [ref=e3725]: 180°
+          - generic [ref=e3749]: 30px
+          - generic [ref=e3785]: 50px
+      - generic [ref=e3821]:
+        - generic [ref=e3822]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e3823]:
+          - generic [ref=e3824]: 0°
+          - generic [ref=e3848]: 45°
+          - generic [ref=e3884]: 90°
+          - generic [ref=e3912]: 180°
+          - generic [ref=e3936]: 30px
+          - generic [ref=e3972]: 50px
+    - generic [ref=e4008]:
+      - generic [ref=e4009]:
+        - generic [ref=e4010]: 제어기 (SVG 원본 기준) · 원본
+        - generic [ref=e4011]: 정면
+      - generic [ref=e4016]:
+        - generic [ref=e4017]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e4018]:
+          - generic [ref=e4019]: 0°
+          - generic [ref=e4069]: 45°
+          - generic [ref=e4147]: 90°
+          - generic [ref=e4201]: 180°
+          - generic [ref=e4251]: 30px
+          - generic [ref=e4329]: 50px
+      - generic [ref=e4407]:
+        - generic [ref=e4408]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e4409]:
+          - generic [ref=e4410]: 0°
+          - generic [ref=e4460]: 45°
+          - generic [ref=e4538]: 90°
+          - generic [ref=e4592]: 180°
+          - generic [ref=e4642]: 30px
+          - generic [ref=e4720]: 50px
+    - generic [ref=e4798]:
+      - generic [ref=e4799]:
+        - generic [ref=e4800]: 경광등(시그널 타워) — 타입 신설 후보 · 원본
+        - generic [ref=e4801]: 3/4
+      - generic [ref=e4806]:
+        - generic [ref=e4807]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e4808]:
+          - generic [ref=e4809]: 0°
+          - generic [ref=e4946]: 45°
+          - generic [ref=e5079]: 90°
+          - generic [ref=e5218]: 180°
+          - generic [ref=e5355]: 30px
+          - generic [ref=e5494]: 50px
+      - generic [ref=e5633]:
+        - generic [ref=e5634]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e5635]:
+          - generic [ref=e5636]: 0°
+          - generic [ref=e5773]: 45°
+          - generic [ref=e5906]: 90°
+          - generic [ref=e6045]: 180°
+          - generic [ref=e6182]: 30px
+          - generic [ref=e6321]: 50px
+    - generic [ref=e6460]:
+      - generic [ref=e6461]:
+        - generic [ref=e6462]: 펜스 표식 (현행 XAML 아이콘 기준) · 원본
+        - generic [ref=e6463]: 현행 XAML(원본 SVG 없음)
+      - generic [ref=e6519]:
+        - generic [ref=e6520]: 다크 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e6521]:
+          - generic [ref=e6522]: 0°
+          - generic [ref=e6577]: 45°
+          - generic [ref=e6642]: 90°
+          - generic [ref=e6697]: 180°
+          - generic [ref=e6752]: 30px
+          - generic [ref=e6817]: 50px
+      - generic [ref=e6882]:
+        - generic [ref=e6883]: 라이트 · 3D 하우징 · yaw 0/45/90/180 · 30/50px
+        - generic [ref=e6884]:
+          - generic [ref=e6885]: 0°
+          - generic [ref=e6940]: 45°
+          - generic [ref=e7005]: 90°
+          - generic [ref=e7060]: 180°
+          - generic [ref=e7115]: 30px
+          - generic [ref=e7180]: 50px
+  - heading "1. 하우징 8종 — yaw 를 돌려볼 것" [level=2] [ref=e7245]
+  - generic [ref=e7246]:
+    - generic [ref=e7247]: 지도 bearing θ
+    - slider [ref=e7248]: "0"
+    - generic [ref=e7249]: 0°
+    - button "0°" [ref=e7250] [cursor=pointer]
+    - button "45°" [ref=e7251] [cursor=pointer]
+    - button "90°" [ref=e7252] [cursor=pointer]
+    - button "180°" [ref=e7253] [cursor=pointer]
+    - generic [ref=e7254]:
+      - checkbox "자동 회전" [ref=e7255]
+      - text: 자동 회전
+    - generic [ref=e7256]:
+      - text: 피치
+      - slider "피치 35°" [ref=e7257]: "35"
+      - text: 35°
+    - generic [ref=e7258]:
+      - checkbox "상태 링" [checked] [ref=e7259]
+      - text: 상태 링
+    - generic [ref=e7260]:
+      - checkbox "접지 그림자" [checked] [ref=e7261]
+      - text: 접지 그림자
+  - generic [ref=e7262]:
+    - generic [ref=e7263]:
+      - generic [ref=e7264]: 다크 · 100px · yaw = Bearing − θ (Bearing 은 모델별 예시)
+      - generic [ref=e7265]:
+        - generic [ref=e7266]: 돔 카메라 (SVG 원본 기준) · B=20°
+        - generic [ref=e7382]: PTZ 카메라 · B=-40°
+        - generic [ref=e7431]: 스마트 센서 (SVG 원본 기준) · B=0°
+        - generic [ref=e7543]: 다중 센서 · B=0°
+        - generic [ref=e7574]: IP 스피커 혼 (SVG 원본 기준) · B=-30°
+        - generic [ref=e7636]: 제어기 (SVG 원본 기준) · B=0°
+        - generic [ref=e7686]: 조명 · B=0°
+        - generic [ref=e7705]: 함체 (SVG 원본 기준) · B=0°
+        - generic [ref=e7729]: 펜스 표식 (현행 XAML 아이콘 기준) · B=0°
+    - generic [ref=e7784]:
+      - generic [ref=e7785]: 라이트 · 100px · yaw = Bearing − θ (Bearing 은 모델별 예시)
+      - generic [ref=e7786]:
+        - generic [ref=e7787]: 돔 카메라 (SVG 원본 기준) · B=20°
+        - generic [ref=e7903]: PTZ 카메라 · B=-40°
+        - generic [ref=e7952]: 스마트 센서 (SVG 원본 기준) · B=0°
+        - generic [ref=e8064]: 다중 센서 · B=0°
+        - generic [ref=e8095]: IP 스피커 혼 (SVG 원본 기준) · B=-30°
+        - generic [ref=e8157]: 제어기 (SVG 원본 기준) · B=0°
+        - generic [ref=e8207]: 조명 · B=0°
+        - generic [ref=e8226]: 함체 (SVG 원본 기준) · B=0°
+        - generic [ref=e8250]: 펜스 표식 (현행 XAML 아이콘 기준) · B=0°
+  - generic [ref=e8305]: 보는 법 — θ 가 바뀌면 모든 하우징이 같은 각도만큼 반대로 돈다(yaw = Bearing − θ). 명암이 함께 바뀌는 건 광원이 화면에 고정돼 있기 때문이고, θ=180 에서도 하우징이 거꾸로 서지 않는다 — 2D 아이콘의 "거꾸로 문제"가 3D 에선 구조적으로 사라진다(빌보드 없이). 렌즈·혼 입구가 어디를 향하는지가 곧 방위다.
+  - heading "1-B. 확장 심볼 — 없던 것을 채운다 (차량 · 건물/인프라 · 아트 없던 PIDS 타입)" [level=2] [ref=e8306]
+  - paragraph [ref=e8307]:
+    - text: 군대부호(APP-6D)만 제외. 현재
+    - code [ref=e8308]: VEHICLES
+    - text: 카테고리는 아트가 없고 배치 경로 자체가 미구현(콤보에서 숨김, VF-15), 건물은
+    - code [ref=e8309]: Factory
+    - text: 1종뿐, PIDS 21종 중 전용 아트는 6종이다. 아래는 그 빈칸을 같은 프리미티브 언어로 채운 시안이다. θ 슬라이더는 위와 공유.
+  - generic [ref=e8310]: 크기 규약 — 지도에선 마커 W/H(픽셀 고정)에 맞춰 모델 바운딩 박스를 단위화한다(OBJ 로더 규약). 여기서도 같은 규칙으로 모델별 배율을 맞췄다 — 실물 크기 비율(PIR 이 감시탑보다 작음)은 지도에서 유지하지 않는다.
+  - generic [ref=e8311]:
+    - generic [ref=e8312]:
+      - generic [ref=e8313]: 다크 · 차량 (VEHICLES) · 100px
+      - generic [ref=e8314]:
+        - generic [ref=e8315]: 승용차
+        - generic [ref=e8343]: 트럭
+        - generic [ref=e8371]: 순찰차(SUV)
+        - generic [ref=e8402]: 보트
+        - generic [ref=e8425]: 드론
+    - generic [ref=e8496]:
+      - generic [ref=e8497]: 라이트 · 차량 (VEHICLES) · 100px
+      - generic [ref=e8498]:
+        - generic [ref=e8499]: 승용차
+        - generic [ref=e8527]: 트럭
+        - generic [ref=e8555]: 순찰차(SUV)
+        - generic [ref=e8586]: 보트
+        - generic [ref=e8609]: 드론
+    - generic [ref=e8680]:
+      - generic [ref=e8681]: 다크 · 건물 · 인프라 (INFRASTRUCTURE) · 100px
+      - generic [ref=e8682]:
+        - generic [ref=e8683]: 공장(현행 Factory)
+        - generic [ref=e8708]: 막사
+        - generic [ref=e8718]: 초소
+        - generic [ref=e8731]: 감시탑
+        - generic [ref=e8764]: 창고
+        - generic [ref=e8777]: 차단기/게이트
+        - generic [ref=e8790]: 안테나 마스트
+        - generic [ref=e8808]: 발전기
+        - generic [ref=e8823]: 물탱크
+        - generic [ref=e8860]: 헬리패드
+        - generic [ref=e8890]: 교량
+        - generic [ref=e8909]: 전신주
+    - generic [ref=e8927]:
+      - generic [ref=e8928]: 라이트 · 건물 · 인프라 (INFRASTRUCTURE) · 100px
+      - generic [ref=e8929]:
+        - generic [ref=e8930]: 공장(현행 Factory)
+        - generic [ref=e8955]: 막사
+        - generic [ref=e8965]: 초소
+        - generic [ref=e8978]: 감시탑
+        - generic [ref=e9011]: 창고
+        - generic [ref=e9024]: 차단기/게이트
+        - generic [ref=e9037]: 안테나 마스트
+        - generic [ref=e9055]: 발전기
+        - generic [ref=e9070]: 물탱크
+        - generic [ref=e9107]: 헬리패드
+        - generic [ref=e9137]: 교량
+        - generic [ref=e9156]: 전신주
+    - generic [ref=e9174]:
+      - generic [ref=e9175]: 다크 · 아트 없던 PIDS 장비 타입 · 100px
+      - generic [ref=e9176]:
+        - generic [ref=e9177]: 레이더(Radar)
+        - generic [ref=e9253]: PIR 센서
+        - generic [ref=e9296]: 접점(Contact) 센서
+        - generic [ref=e9306]: 레이저 센서
+        - generic [ref=e9327]: IO 제어기
+        - generic [ref=e9340]: 스마트 다중센서
+        - generic [ref=e9377]: 지중 센서(표식)
+    - generic [ref=e9402]:
+      - generic [ref=e9403]: 라이트 · 아트 없던 PIDS 장비 타입 · 100px
+      - generic [ref=e9404]:
+        - generic [ref=e9405]: 레이더(Radar)
+        - generic [ref=e9481]: PIR 센서
+        - generic [ref=e9524]: 접점(Contact) 센서
+        - generic [ref=e9534]: 레이저 센서
+        - generic [ref=e9555]: IO 제어기
+        - generic [ref=e9568]: 스마트 다중센서
+        - generic [ref=e9605]: 지중 센서(표식)
+    - generic [ref=e9630]:
+      - generic [ref=e9631]: 다크 · 심볼 타입 신설 후보(원본 SVG 有) · 100px
+      - generic [ref=e9632]: 경광등(시그널 타워) — 타입 신설 후보
+    - generic [ref=e9770]:
+      - generic [ref=e9771]: 라이트 · 심볼 타입 신설 후보(원본 SVG 有) · 100px
+      - generic [ref=e9772]: 경광등(시그널 타워) — 타입 신설 후보
+  - heading "2. 실크기 사다리 — 30 / 50 / 100 px" [level=2] [ref=e9910]
+  - generic [ref=e9911]:
+    - generic [ref=e9912]:
+      - generic [ref=e9913]: 다크 · 30 / 50 / 100 px · 상태 링(정상/탐지/장애)
+      - generic [ref=e9914]:
+        - generic [ref=e9915]: 30px
+        - generic [ref=e10031]: 50px
+        - generic [ref=e10147]: 100px
+        - generic [ref=e10263]: 30px
+        - generic [ref=e10399]: 50px
+        - generic [ref=e10535]: 100px
+        - generic [ref=e10671]: 30px
+        - generic [ref=e10733]: 50px
+        - generic [ref=e10795]: 100px
+        - generic [ref=e10857]: 30px
+        - generic [ref=e10935]: 50px
+        - generic [ref=e11013]: 100px
+    - generic [ref=e11091]:
+      - generic [ref=e11092]: 라이트 · 30 / 50 / 100 px · 상태 링(정상/탐지/장애)
+      - generic [ref=e11093]:
+        - generic [ref=e11094]: 30px
+        - generic [ref=e11210]: 50px
+        - generic [ref=e11326]: 100px
+        - generic [ref=e11442]: 30px
+        - generic [ref=e11578]: 50px
+        - generic [ref=e11714]: 100px
+        - generic [ref=e11850]: 30px
+        - generic [ref=e11912]: 50px
+        - generic [ref=e11974]: 100px
+        - generic [ref=e12036]: 30px
+        - generic [ref=e12114]: 50px
+        - generic [ref=e12192]: 100px
+  - heading "3. 지도 위 — 톱다운 지도 + 피치 하우징" [level=2] [ref=e12270]
+  - generic [ref=e12271]:
+    - generic [ref=e12273]:
+      - generic [ref=e12508]: 돔 카메라 (SVG 원본 기준)
+      - generic [ref=e12623]: 돔 카메라 (SVG 원본 기준)
+      - generic [ref=e12734]: 스마트 센서 (SVG 원본 기준)
+      - generic [ref=e12845]: 스마트 센서 (SVG 원본 기준)
+      - generic [ref=e12956]: 스마트 센서 (SVG 원본 기준)
+      - generic [ref=e13017]: IP 스피커 혼 (SVG 원본 기준)
+      - generic [ref=e13066]: 제어기 (SVG 원본 기준)
+      - generic [ref=e13089]: 함체 (SVG 원본 기준)
+      - generic [ref=e13107]: 조명
+    - generic [ref=e13109]:
+      - generic [ref=e13344]: 돔 카메라 (SVG 원본 기준)
+      - generic [ref=e13459]: 돔 카메라 (SVG 원본 기준)
+      - generic [ref=e13570]: 스마트 센서 (SVG 원본 기준)
+      - generic [ref=e13681]: 스마트 센서 (SVG 원본 기준)
+      - generic [ref=e13792]: 스마트 센서 (SVG 원본 기준)
+      - generic [ref=e13853]: IP 스피커 혼 (SVG 원본 기준)
+      - generic [ref=e13902]: 제어기 (SVG 원본 기준)
+      - generic [ref=e13925]: 함체 (SVG 원본 기준)
+      - generic [ref=e13943]: 조명
+  - generic [ref=e13944]: 규약 — 지도·FOV 부채꼴·철책선은 지오 고정(−θ 회전) · 하우징 yaw = Bearing − θ · 하우징의 세움(피치)·광원·그림자·라벨·상태 링은 화면 고정. 카메라 FOV 정점은 하우징의 렌즈 바닥점(2D apex) 과 같은 픽셀에 둔다.
+  - heading "4. 모델 스펙(초안)" [level=2] [ref=e13945]
+  - generic [ref=e13946]:
+    - generic [ref=e13947]:
+      - heading "돔 카메라 (SVG 원본 기준)" [level=4] [ref=e13948]
+      - paragraph [ref=e13949]: 프리미티브 베이스 실린더 + 반구 돔 + 렌즈 하우징(전방 돌출) + 렌즈삼각형 ≈320방향 식별 렌즈 하우징이 +Z 로 돌출30px 생존 특징 흰 돔 + 검은 렌즈 원
+    - generic [ref=e13950]:
+      - heading "PTZ 카메라" [level=4] [ref=e13951]
+      - paragraph [ref=e13952]: 프리미티브 베이스 실린더 + 목 + 헤드 박스 + 렌즈삼각형 ≈220방향 식별 헤드 박스가 yaw 로 돌며 렌즈가 정면30px 생존 특징 박스 헤드 실루엣
+    - generic [ref=e13953]:
+      - heading "스마트 센서 (SVG 원본 기준)" [level=4] [ref=e13954]
+      - paragraph [ref=e13955]: 프리미티브 본체 + 후드 + 감지 모듈(2×2) + PIR 렌즈 + 하단 패널 + 라벨 + 나사 4 + 브래킷삼각형 ≈420방향 식별 감지 모듈·렌즈가 +Z(정면)30px 생존 특징 올리브 세로 박스 + 상단 검은 모듈 + 중앙 흰 원
+    - generic [ref=e13956]:
+      - heading "다중 센서" [level=4] [ref=e13957]
+      - paragraph [ref=e13958]: 프리미티브 박스 + 렌즈 2 + 상판삼각형 ≈120방향 식별 렌즈 2 정면30px 생존 특징 가로 박스 + 렌즈 두 점
+    - generic [ref=e13959]:
+      - heading "IP 스피커 혼 (SVG 원본 기준)" [level=4] [ref=e13960]
+      - paragraph [ref=e13961]: 프리미티브 혼 절두체(길이 34, 입구 r21) + 입구 캡 + 드라이버 + U 브래킷삼각형 ≈360방향 식별 혼 입구가 +Z30px 생존 특징 나팔 실루엣 + 밝은 입구
+    - generic [ref=e13962]:
+      - heading "제어기 (SVG 원본 기준)" [level=4] [ref=e13963]
+      - paragraph [ref=e13964]: 프리미티브 납작 검은 박스 + 상판 + 라벨 + 포트 3 + LED 2 + 전원 스위치 + 고무발 4삼각형 ≈200방향 식별 포트 면이 +Z30px 생존 특징 납작 검은 박스
+    - generic [ref=e13965]:
+      - heading "조명" [level=4] [ref=e13966]
+      - paragraph [ref=e13967]: 프리미티브 폴 실린더 + 등기구 박스 + 발광면삼각형 ≈80방향 식별 등기구가 폴에서 +Z 로 돌출30px 생존 특징 긴 폴 + 머리
+    - generic [ref=e13968]:
+      - heading "함체 (SVG 원본 기준)" [level=4] [ref=e13969]
+      - paragraph [ref=e13970]: 프리미티브 캐비닛 + 문 + 문 틈 + 잠금 + 경사 지붕(빗물 후드)삼각형 ≈120방향 식별 문이 +Z30px 생존 특징 세로 회색 박스 + 경사 지붕
+    - generic [ref=e13971]:
+      - heading "펜스 표식 (현행 XAML 아이콘 기준)" [level=4] [ref=e13972]
+      - paragraph [ref=e13973]: 프리미티브 베이스 판 2 + 기둥 2 + 캡 2 + 체인링크 메쉬 판(패턴) + 상하 레일삼각형 ≈140방향 식별 없음(선형 객체 표식)30px 생존 특징 두 기둥 + 격자
+    - generic [ref=e13974]:
+      - heading "승용차" [level=4] [ref=e13975]
+      - paragraph [ref=e13976]: 프리미티브 차체 + 캐빈 + 전조등 2 + 바퀴 4삼각형 ≈110방향 식별 전조등이 +Z30px 생존 특징 세로 긴 박스 + 캐빈
+    - generic [ref=e13977]:
+      - heading "트럭" [level=4] [ref=e13978]
+      - paragraph [ref=e13979]: 프리미티브 캡 + 적재함 + 전조등 + 바퀴 4삼각형 ≈100방향 식별 캡이 +Z30px 생존 특징 앞 낮고 뒤 높은 실루엣
+    - generic [ref=e13980]:
+      - heading "순찰차(SUV)" [level=4] [ref=e13981]
+      - paragraph [ref=e13982]: 프리미티브 승용차 + 지붕 경광등삼각형 ≈120방향 식별 전조등 +Z30px 생존 특징 지붕 빨간 바
+    - generic [ref=e13983]:
+      - heading "보트" [level=4] [ref=e13984]
+      - paragraph [ref=e13985]: 프리미티브 선체 절두체(눕힘) + 조타실 + 마스트삼각형 ≈90방향 식별 좁은 쪽이 +Z30px 생존 특징 물방울 실루엣
+    - generic [ref=e13986]:
+      - heading "드론" [level=4] [ref=e13987]
+      - paragraph [ref=e13988]: 프리미티브 본체 + 암 4 + 로터 4삼각형 ≈140방향 식별 전면 로터 색 구분(추후)30px 생존 특징 X 자 실루엣
+    - generic [ref=e13989]:
+      - heading "공장(현행 Factory)" [level=4] [ref=e13990]
+      - paragraph [ref=e13991]: 프리미티브 본체 + 톱니지붕 3 + 굴뚝삼각형 ≈150방향 식별 없음30px 생존 특징 굴뚝
+    - generic [ref=e13992]:
+      - heading "막사" [level=4] [ref=e13993]
+      - paragraph [ref=e13994]: 프리미티브 긴 박스 + 지붕판삼각형 ≈40방향 식별 없음30px 생존 특징 긴 실루엣
+    - generic [ref=e13995]:
+      - heading "초소" [level=4] [ref=e13996]
+      - paragraph [ref=e13997]: 프리미티브 박스 + 창 띠 + 지붕삼각형 ≈50방향 식별 창이 +Z30px 생존 특징 작은 정육면체
+    - generic [ref=e13998]:
+      - heading "감시탑" [level=4] [ref=e13999]
+      - paragraph [ref=e14000]: 프리미티브 다리 4 + 캐빈 + 지붕삼각형 ≈120방향 식별 창이 +Z30px 생존 특징 높이
+    - generic [ref=e14001]:
+      - heading "창고" [level=4] [ref=e14002]
+      - paragraph [ref=e14003]: 프리미티브 박스 + 지붕 + 셔터문삼각형 ≈60방향 식별 문이 +Z30px 생존 특징 납작 넓은 박스
+    - generic [ref=e14004]:
+      - heading "차단기/게이트" [level=4] [ref=e14005]
+      - paragraph [ref=e14006]: 프리미티브 기둥 2 + 바삼각형 ≈40방향 식별 바가 X축(통행 방향 +Z)30px 생존 특징 가로 막대
+    - generic [ref=e14007]:
+      - heading "안테나 마스트" [level=4] [ref=e14008]
+      - paragraph [ref=e14009]: 프리미티브 마스트 + 가로대 2 + 항공등삼각형 ≈60방향 식별 없음30px 생존 특징 가늘고 높음
+    - generic [ref=e14010]:
+      - heading "발전기" [level=4] [ref=e14011]
+      - paragraph [ref=e14012]: 프리미티브 박스 + 배기관 + 패널삼각형 ≈50방향 식별 패널이 +Z30px 생존 특징 배기관
+    - generic [ref=e14013]:
+      - heading "물탱크" [level=4] [ref=e14014]
+      - paragraph [ref=e14015]: 프리미티브 다리 4 + 원통삼각형 ≈110방향 식별 없음30px 생존 특징 원통
+    - generic [ref=e14016]:
+      - heading "헬리패드" [level=4] [ref=e14017]
+      - paragraph [ref=e14018]: 프리미티브 원판 + H삼각형 ≈60방향 식별 없음30px 생존 특징 H
+    - generic [ref=e14019]:
+      - heading "교량" [level=4] [ref=e14020]
+      - paragraph [ref=e14021]: 프리미티브 교각 2 + 상판 + 난간 2삼각형 ≈70방향 식별 X축 방향30px 생존 특징 가로 판
+    - generic [ref=e14022]:
+      - heading "전신주" [level=4] [ref=e14023]
+      - paragraph [ref=e14024]: 프리미티브 기둥 + 가로대 + 애자 2삼각형 ≈40방향 식별 없음30px 생존 특징 T 자
+    - generic [ref=e14025]:
+      - heading "경광등(시그널 타워) — 타입 신설 후보" [level=4] [ref=e14026]
+      - paragraph [ref=e14027]: 프리미티브 베이스 + 폴 + 흰/녹/적 3단 + 링 3 + 캡삼각형 ≈300방향 식별 없음(전방위)30px 생존 특징 적/녹 띠
+    - generic [ref=e14028]:
+      - heading "레이더(Radar)" [level=4] [ref=e14029]
+      - paragraph [ref=e14030]: 프리미티브 베이스 + 기둥 + 레이돔삼각형 ≈180방향 식별 없음(전방위)30px 생존 특징 흰 반구
+    - generic [ref=e14031]:
+      - heading "PIR 센서" [level=4] [ref=e14032]
+      - paragraph [ref=e14033]: 프리미티브 박스 + 렌즈 돔삼각형 ≈70방향 식별 돔이 +Z30px 생존 특징 작은 흰 박스
+    - generic [ref=e14034]:
+      - heading "접점(Contact) 센서" [level=4] [ref=e14035]
+      - paragraph [ref=e14036]: 프리미티브 박스 2 (자석/스위치)삼각형 ≈24방향 식별 +Z30px 생존 특징 쌍 박스
+    - generic [ref=e14037]:
+      - heading "레이저 센서" [level=4] [ref=e14038]
+      - paragraph [ref=e14039]: 프리미티브 폴 + 헤드 + 발광부삼각형 ≈60방향 식별 발광부가 +Z30px 생존 특징 빨간 점
+    - generic [ref=e14040]:
+      - heading "IO 제어기" [level=4] [ref=e14041]
+      - paragraph [ref=e14042]: 프리미티브 박스 + 슬롯 2삼각형 ≈36방향 식별 슬롯 +Z30px 생존 특징 작은 랙
+    - generic [ref=e14043]:
+      - heading "스마트 다중센서" [level=4] [ref=e14044]
+      - paragraph [ref=e14045]: 프리미티브 스마트센서 변형(렌즈 3)삼각형 ≈120방향 식별 렌즈 +Z30px 생존 특징 올리브 + 3점
+    - generic [ref=e14046]:
+      - heading "지중 센서(표식)" [level=4] [ref=e14047]
+      - paragraph [ref=e14048]: 프리미티브 원판 + 캡 + 안테나 (케이블 자체는 2.5D 리본)삼각형 ≈70방향 식별 없음30px 생존 특징 원판
+  - heading "6. 심볼 팔레트 — 미리보기 선택 + 드래그 배치 (사용자 지시 2026-09-04)" [level=2] [ref=e14049]
+  - paragraph [ref=e14050]:
+    - text: 현행은 카테고리 콤보 → 세부타입 콤보 → [추가] → 배치 모드 → 지도 클릭(
+    - code [ref=e14051]: MapViewModel.cs:739 EnterSymbolPlacementMode
+    - text: →
+    - code [ref=e14052]: GMapCustomControl.cs:1041 SymbolPlacementClicked
+    - text: ). 신규는 [아이콘 등록] → 팔레트에서 3D 미리보기를 보고 고름 → 지도로 드래그 → 드롭 위치에 배치. 팔레트 셀은 지도와 같은 하우징 모델을 같은 피치로 렌더하므로 "고른 것 = 놓이는 것"이 보장된다.
+  - generic [ref=e14053]:
+    - generic [ref=e14054]: 카테고리 콤보
+    - generic [ref=e14055]: →
+    - generic [ref=e14056]: 세부타입 콤보
+    - generic [ref=e14057]: →
+    - generic [ref=e14058]: "[추가] 버튼"
+    - generic [ref=e14059]: ⇒ 대체 ⇒
+    - generic [ref=e14060]: "[아이콘 등록]"
+    - generic [ref=e14061]: →
+    - generic [ref=e14062]: 팔레트 미리보기 선택
+    - generic [ref=e14063]: →
+    - generic [ref=e14064]: 드래그
+    - generic [ref=e14065]: →
+    - generic [ref=e14066]: 지도 드롭
+    - generic [ref=e14067]:
+      - text: "(공통 후단 유지:"
+      - code [ref=e14068]: Add*Marker(geo, type, title)
+      - text: )
+  - generic [ref=e14069]:
+    - generic [ref=e14070]:
+      - generic [ref=e14071]: 다크 · 심볼 팔레트(선택 = 카메라)
+      - generic [ref=e14072]:
+        - generic [ref=e14073]:
+          - text: 아이콘 등록
+          - generic [ref=e14074]: ✕
+        - generic [ref=e14075]:
+          - generic [ref=e14076]: PIDS 장비
+          - generic [ref=e14077]: 기반시설
+          - generic [ref=e14078]: 도형
+          - generic [ref=e14079]: 기본
+        - generic [ref=e14080]: 🔍 이름으로 찾기
+        - generic [ref=e14081]:
+          - generic [ref=e14082]: IP 카메라
+          - generic [ref=e14193]: PTZ 카메라
+          - generic [ref=e14233]: 스마트 센서
+          - generic [ref=e14344]: 다중 센서
+          - generic [ref=e14374]: IP 스피커
+          - generic [ref=e14425]: 제어기
+          - generic [ref=e14474]: 함체
+          - generic [ref=e14497]: 조명
+          - generic [ref=e14515]: 레이더
+          - generic [ref=e14590]: PIR
+          - generic [ref=e14632]: 접점
+          - generic [ref=e14641]: 레이저
+        - generic [ref=e14661]: 셀을 지도로 끌어다 놓으면 그 위치에 생성 · ESC 취소
+    - generic [ref=e14662]:
+      - generic [ref=e14663]: 라이트 · 심볼 팔레트(선택 = 카메라)
+      - generic [ref=e14664]:
+        - generic [ref=e14665]:
+          - text: 아이콘 등록
+          - generic [ref=e14666]: ✕
+        - generic [ref=e14667]:
+          - generic [ref=e14668]: PIDS 장비
+          - generic [ref=e14669]: 기반시설
+          - generic [ref=e14670]: 도형
+          - generic [ref=e14671]: 기본
+        - generic [ref=e14672]: 🔍 이름으로 찾기
+        - generic [ref=e14673]:
+          - generic [ref=e14674]: IP 카메라
+          - generic [ref=e14785]: PTZ 카메라
+          - generic [ref=e14825]: 스마트 센서
+          - generic [ref=e14936]: 다중 센서
+          - generic [ref=e14966]: IP 스피커
+          - generic [ref=e15017]: 제어기
+          - generic [ref=e15066]: 함체
+          - generic [ref=e15089]: 조명
+          - generic [ref=e15107]: 레이더
+          - generic [ref=e15182]: PIR
+          - generic [ref=e15224]: 접점
+          - generic [ref=e15233]: 레이저
+        - generic [ref=e15253]: 셀을 지도로 끌어다 놓으면 그 위치에 생성 · ESC 취소
+  - heading "6-B. 드래그 4단계" [level=3] [ref=e15254]
+  - generic [ref=e15256]:
+    - generic [ref=e15257]: 드래그 시퀀스 — 카메라를 지도에 놓기
+    - generic [ref=e15258]:
+      - generic [ref=e15259]: ① 선택팔레트 셀 클릭 — 테두리 강조
+      - generic [ref=e15372]:
+        - generic [ref=e15373]: ➤
+        - generic [ref=e15375]: ② 드래그 개시커서에 반투명 고스트 부착
+      - generic [ref=e15376]:
+        - generic [ref=e15377]: 38.0421, 127.1183
+        - generic [ref=e15380]: ③ 지도 위 이동드롭마크(접지 타원) + 좌표 크럼
+      - generic [ref=e15381]:
+        - generic [ref=e15382]: 생성됨
+        - generic [ref=e15385]: ④ 드롭그 위경도에 마커 생성 · 팔레트 유지
+  - heading "6-C. 팔레트 배선(실측 기준)" [level=3] [ref=e15386]
+  - table [ref=e15387]:
+    - rowgroup [ref=e15388]:
+      - row [ref=e15389]:
+        - columnheader "항목" [ref=e15390]
+        - columnheader "내용" [ref=e15391]
+        - columnheader "상태" [ref=e15392]
+      - row [ref=e15393]:
+        - cell "팔레트 호스트" [ref=e15394]
+        - cell [ref=e15395]:
+          - text: 맵 오버레이 패널 표준(
+          - code [ref=e15396]: LayerPanelStyle.xaml
+          - text: ·
+          - code [ref=e15397]: MapAnchorPanelStyle.xaml
+          - text: 패턴 = Control + Style) 재사용. 토글은 편집 스트립의 [아이콘 등록] 버튼
+        - cell "패턴 재사용" [ref=e15398]
+      - row [ref=e15399]:
+        - cell "셀 미리보기" [ref=e15400]
+        - cell [ref=e15401]:
+          - text: 지도 마커 컨트롤을
+          - code [ref=e15402]: IsPreviewMode
+          - text: 로 재사용 — 현재 이 DP 는
+          - code [ref=e15403]: GMapMarkerMilitarySymbolControl
+          - text: 에만 있다(
+          - code [ref=e15404]: :155
+          - text: ). 베이스에 신설 필요(히트테스트 off · 라벨/배지 숨김 · 맵 부모 없음)
+        - cell "신설" [ref=e15405]
+      - row [ref=e15406]:
+        - cell "드래그 개시" [ref=e15407]
+        - cell [ref=e15408]:
+          - code [ref=e15409]: DragDrop.DoDragDrop(cell, new DataObject(SymbolDragData), Copy)
+          - text: . GMaps.Ui 에 DnD 코드 0건(
+          - code [ref=e15410]: AllowDrop
+          - text: ·
+          - code [ref=e15411]: DoDragDrop
+          - text: ·
+          - code [ref=e15412]: DataObject
+          - text: 전무) → 전부 신설
+        - cell "신설" [ref=e15413]
+      - row [ref=e15414]:
+        - cell "드롭 대상" [ref=e15415]
+        - cell [ref=e15416]:
+          - code [ref=e15417]: GMapCustomControl.AllowDrop=true
+          - text: +
+          - code [ref=e15418]: OnDragOver
+          - text: (고스트·드롭마크 갱신) +
+          - code [ref=e15419]: OnDrop
+          - text: (좌표 확정). 좌표는
+          - code [ref=e15420]: FromLocalToLatLng
+          - text: — 배치 클릭 경로(
+          - code [ref=e15421]: :1020
+          - text: )가
+          - code [ref=e15422]: (int)
+          - text: 절단을 쓰므로 드롭도 같은 절단 규약을 따르거나 둘 다 서브픽셀(
+          - code [ref=e15423]: SubPixelGeo
+          - text: )로 올린다
+        - cell "신설 + 규약 결정" [ref=e15424]
+      - row [ref=e15425]:
+        - cell "후단 재사용" [ref=e15426]
+        - cell [ref=e15427]:
+          - text: 드롭 →
+          - code [ref=e15428]: OnSymbolPlacementClicked
+          - text: 와 동일한 4분기(
+          - code [ref=e15429]: MapViewModel.cs:769-790
+          - text: ": BASIC/GEOMETRICS/PIDS/INFRA)로 합류 → 저장·Undo·레이어 동기화 경로 무변경"
+        - cell "무변경" [ref=e15430]
+      - row [ref=e15431]:
+        - cell "모드 상호배제" [ref=e15432]
+        - cell [ref=e15433]:
+          - text: 드래그 진입 시 조준·라인드로잉·측정 정리(현행
+          - code [ref=e15434]: EnterSymbolPlacementMode
+          - text: :743-745 규약 승계). 드래그 중 지도 팬 금지(
+          - code [ref=e15435]: OnDragOver
+          - text: 가 마우스를 점유)
+        - cell "규약 승계" [ref=e15436]
+      - row [ref=e15437]:
+        - cell "취소" [ref=e15438]
+        - cell [ref=e15439]:
+          - text: ESC · 패널 밖 드롭 · 지도 밖 드롭 = 무동작(마커 0개 생성). 현행 ESC 훅(
+          - code [ref=e15440]: EnsureAimEscWindowHook
+          - text: ) 재사용
+        - cell "신설" [ref=e15441]
+      - row [ref=e15442]:
+        - cell "차량 카테고리" [ref=e15443]
+        - cell [ref=e15444]:
+          - code [ref=e15445]: UnsupportedMarkerCategories
+          - text: 로 숨겨져 있어 팔레트에도 나오지 않는다 — 별도 PRD 로 열기 전까지 탭 비노출
+        - cell "범위 밖" [ref=e15446]
+  - heading "6-D. 마커 에디터 속성 ↔ 3D 매칭 (전 카테고리 실측)" [level=3] [ref=e15447]
+  - paragraph [ref=e15448]:
+    - text: 속성 패널 8종(
+    - code [ref=e15449]: BasePropertyStyle
+    - text: 공통 + 카테고리 7종)의 모든 필드를 3D 하우징 기준으로 판정했다. 무변경=코드·의미 그대로, 재정의=소비 지점이 바뀜, 의미 상실=3D 에서 칠할 대상이 사라짐(결정 필요).
+  - table [ref=e15450]:
+    - rowgroup [ref=e15451]:
+      - row [ref=e15452]:
+        - columnheader "패널" [ref=e15453]
+        - columnheader "속성" [ref=e15454]
+        - columnheader "현행 소비 지점(실측)" [ref=e15455]
+        - columnheader "3D 매칭" [ref=e15456]
+        - columnheader "판정" [ref=e15457]
+      - row [ref=e15458]:
+        - cell [ref=e15459]:
+          - text: 공통
+          - code [ref=e15460]: BasePropertyStyle
+        - cell "크기 W/H" [ref=e15461]
+        - cell [ref=e15462]:
+          - text: 컨트롤
+          - code [ref=e15463]: Width/Height
+          - text: DP ↔ 모델 TwoWay(
+          - code [ref=e15464]: :372-373
+          - text: )
+        - cell "N3 정규화의 입력 전용. 3D 는 읽기만 하고 절대 되쓰지 않는다(3채널 차단)" [ref=e15465]
+        - cell "재정의" [ref=e15466]
+      - row [ref=e15467]:
+        - cell "회전(Bearing)" [ref=e15468]
+        - cell [ref=e15469]:
+          - text: 컨트롤 전체 2D
+          - code [ref=e15470]: RenderTransform
+          - text: (
+          - code [ref=e15471]: :818
+          - text: )
+        - cell [ref=e15472]:
+          - text: 3D yaw(
+          - code [ref=e15473]: RotateTransform3D
+          - text: Y축). 2D 각은 0 으로 고정
+        - cell "재정의" [ref=e15474]
+      - row [ref=e15475]:
+        - cell "최소 줌" [ref=e15476]
+        - cell [ref=e15477]:
+          - code [ref=e15478]: ZoomLadder.IsVisibleAtEffectiveZoom
+        - cell "동일 술어 그대로" [ref=e15479]
+        - cell "무변경" [ref=e15480]
+      - row [ref=e15481]:
+        - cell "Z-ORDER" [ref=e15482]
+        - cell [ref=e15483]:
+          - code [ref=e15484]: Panel.ZIndex
+          - text: 심볼 밴드(1000+)
+        - cell "동일. 마커 간 겹침은 여전히 2D ZIndex — 3D 깊이 정렬은 컨트롤 내부에서만 유효(뒤 심볼이 앞으로 그려지는 것은 사양)" [ref=e15485]
+        - cell "무변경" [ref=e15486]
+      - row [ref=e15487]:
+        - cell "채우기(MarkerFill)" [ref=e15488]
+        - cell [ref=e15489]:
+          - text: PIDS=아이콘 뒤 원판
+          - code [ref=e15490]: Border.Background
+          - text: / 기하=Shape Fill / 인프라=
+          - code [ref=e15491]: BuildingType
+          - text: 코드 분기(
+          - code [ref=e15492]: GMapMarkerInfraControl.cs:224
+          - text: ) / 핀=상태 분기(
+          - code [ref=e15493]: Base:425-433
+          - text: )
+        - cell "3D 하우징엔 원판이 없어 칠할 대상이 사라진다 — ① 필드 숨김 ② 상태 링 색으로 재정의 ③ 하우징 아래 2D 원판 유지 중 택일" [ref=e15494]
+        - cell "의미 상실 G-7" [ref=e15495]
+      - row [ref=e15496]:
+        - cell "테두리(MarkerStroke) · 선두께" [ref=e15497]
+        - cell [ref=e15498]:
+          - text: 같은 요소의 테두리 / 인프라=
+          - code [ref=e15499]: BuildingUsage
+          - text: 분기(
+          - code [ref=e15500]: :231
+          - text: )
+        - cell "채우기와 동일 운명. 선두께는 3D 메시에 대응 개념 없음" [ref=e15501]
+        - cell "의미 상실 G-7" [ref=e15502]
+      - row [ref=e15503]:
+        - cell "제목·글꼴·글자색·글자체·제목크기·제목폭·배경색" [ref=e15504]
+        - cell [ref=e15505]:
+          - code [ref=e15506]: LabelAdorner
+          - text: (화면 고정 2D)
+        - cell "라벨은 3D 밖 표면이라 전부 그대로. 점 심볼 footprint 는 모델 W/H 라 위치도 불변" [ref=e15507]
+        - cell "무변경" [ref=e15508]
+      - row [ref=e15509]:
+        - cell [ref=e15510]:
+          - text: PIDS 장비
+          - code [ref=e15511]: PidsPropertyStyle
+        - cell "FOV 표시 · FOV 색상 · FOV 투명도" [ref=e15512]
+        - cell [ref=e15513]:
+          - code [ref=e15514]: PART_FOVCanvas
+          - text: 2D 지오메트리
+        - cell "2D 캔버스 유지 — 하우징과 형제. z 순서만 결정(V-12)" [ref=e15515]
+        - cell "무변경" [ref=e15516]
+      - row [ref=e15517]:
+        - cell "탐지방향 · 탐지각도 · 탐지범위" [ref=e15518]
+        - cell [ref=e15519]:
+          - code [ref=e15520]: ApplyFOVValues
+          - text: 각/반경(
+          - code [ref=e15521]: :586-617
+          - text: )
+        - cell [ref=e15522]:
+          - text: 반경·각도 그대로, 방향만 표시각 보정
+          - code [ref=e15523]: (D−b)+CurrentDisplayAngle
+          - text: . 원점은 렌즈 정사영으로 파생
+        - cell "재정의" [ref=e15524]
+      - row [ref=e15525]:
+        - cell [ref=e15526]:
+          - text: 기반시설
+          - code [ref=e15527]: InfraPropertyStyle
+        - cell "건물종류(BuildingType)" [ref=e15528]
+        - cell [ref=e15529]:
+          - text: 현재는 색 분기(Gray/Brown,
+          - code [ref=e15530]: :224
+          - text: ) + 템플릿 트리거 3변형
+        - cell "3D 모델 키 선택자로 승격(factory·barracks·guardpost… 12종). 읽기 매퍼의 Factory 하드코딩 수정이 전제" [ref=e15531]
+        - cell "재정의" [ref=e15532]
+      - row [ref=e15533]:
+        - cell "건물용도(BuildingUsage)" [ref=e15534]
+        - cell [ref=e15535]:
+          - text: 테두리 색 분기(Gold/White,
+          - code [ref=e15536]: :231
+          - text: )
+        - cell "모델 색 불변 정책과 충돌 — 배지 또는 링 색으로 이관해야 한다" [ref=e15537]
+        - cell "결정 G-12" [ref=e15538]
+      - row [ref=e15539]:
+        - cell "지상층 · 지하층" [ref=e15540]
+        - cell [ref=e15541]:
+          - code [ref=e15542]: ShowFloorCount
+          - text: 트리거로 텍스트만 표시(
+          - code [ref=e15543]: InfraMarkerStyle.xaml:415
+          - text: )
+        - cell "3D 에선 높이 배율(층수×층고)로 쓸 수 있으나 N3 정규화가 W/H 박스에 맞추므로 층수가 늘수록 평면이 작아진다 — 텍스트 유지가 안전" [ref=e15544]
+        - cell "결정 G-13" [ref=e15545]
+      - row [ref=e15546]:
+        - cell "면적" [ref=e15547]
+        - cell "정보 필드(렌더 미사용)" [ref=e15548]
+        - cell "동일" [ref=e15549]
+        - cell "무변경" [ref=e15550]
+      - row [ref=e15551]:
+        - cell [ref=e15552]:
+          - text: 기하 도형
+          - code [ref=e15553]: GeometricPropertyStyle
+        - cell "모양 · 투명도" [ref=e15554]
+        - cell [ref=e15555]:
+          - text: 동적
+          - code [ref=e15556]: Shape
+          - text: +
+          - code [ref=e15557]: MarkerOpacity
+        - cell "등급 C(하우징 아님, 접지 그림자만) — 3D 대상 밖이라 전부 현행 유지" [ref=e15558]
+        - cell "무변경" [ref=e15559]
+      - row [ref=e15560]:
+        - cell "이미지 · 라인 · 장비그룹 · 군대부호" [ref=e15561]
+        - cell "파일경로·위경도·비율유지 / 패턴·포인트·총거리 / 장비 그룹 / 부호 코드" [ref=e15562]
+        - cell "각 전용 컨트롤" [ref=e15563]
+        - cell "3D 하우징 비대상(등급 B/D) — 라인·철책은 2.5D 리본 별건, 군대부호는 사용자 지시로 제외" [ref=e15564]
+        - cell "무변경" [ref=e15565]
+  - paragraph [ref=e15566]: "요약: 전 필드 중 무변경 다수, 재정의 4(크기·회전·탐지방향·건물종류), 결정 필요 3(채우기/테두리/선두께 G-7 · 건물용도 G-12 · 층수 G-13). 속성 패널 자체의 레이아웃 변경은 필요 없다."
+  - heading "5. 구현 배선(검증 완료 — 정본 §7-2)" [level=2] [ref=e15567]
+  - table [ref=e15568]:
+    - rowgroup [ref=e15569]:
+      - row [ref=e15570]:
+        - columnheader "항목" [ref=e15571]
+        - columnheader "내용" [ref=e15572]
+        - columnheader "상태" [ref=e15573]
+      - row [ref=e15574]:
+        - cell "호스팅" [ref=e15575]
+        - cell [ref=e15576]:
+          - text: 기존
+          - code [ref=e15577]: GMapMarkerXControl
+          - text: 템플릿
+          - code [ref=e15578]: PART_MainContainer
+          - text: 안에
+          - code [ref=e15579]: Viewport3D
+          - text: (OrthographicCamera, 화면 고정 피치, DirectionalLight 화면 고정). 히트 AABB·어도너·드래그 계약은 Shape 가 Control 로 남으므로 유지
+        - cell "반증 완료(C1)" [ref=e15580]
+      - row [ref=e15581]:
+        - cell "yaw 라우팅" [ref=e15582]
+        - cell [ref=e15583]:
+          - text: 피치 카메라를 쓰면 컨트롤을 2D 로 돌리면 안 된다(기울어진 그림이 통째로 돎). 베이스의
+          - code [ref=e15584]: _displayRotate.Angle
+          - text: 을 0 으로 두고
+          - code [ref=e15585]: DisplayAngle
+          - text: 을 3D 모델
+          - code [ref=e15586]: RotateTransform3D(Y)
+          - text: 로 보낸다
+        - cell [ref=e15587]:
+          - text: 확정 —
+          - code [ref=e15588]: _displayRotate
+          - text: private·
+          - code [ref=e15589]: OnMapBearingChanged
+          - text: non-virtual 이라 베이스에 virtual seam 1개 추가 불가피(additive)
+      - row [ref=e15590]:
+        - cell "히트테스트" [ref=e15591]
+        - cell [ref=e15592]:
+          - code [ref=e15593]: GetMarkerAtScreen
+          - text: 은 rect 를 DisplayAngle 로 역회전한다 — 정사각 W/H 면 모서리 영역만 오차(PoC 허용). 정확히는 3D 컨트롤이
+          - code [ref=e15594]: AppliesMapRotation=false
+          - text: 보고 + hit 각도 0 처리 1줄
+        - cell "확정" [ref=e15595]
+      - row [ref=e15596]:
+        - cell "W/H write-back" [ref=e15597]
+        - cell [ref=e15598]:
+          - code [ref=e15599]: OnRenderSizeChanged
+          - text: 의
+          - code [ref=e15600]: ActualWidth→Marker.Width
+          - text: 를 3D 컨트롤에서 차단(모델 W/H 오염 방지)
+        - cell "확정(C1)" [ref=e15601]
+      - row [ref=e15602]:
+        - cell "FOV apex" [ref=e15603]
+        - cell [ref=e15604]:
+          - code [ref=e15605]: PART_FOVCanvas
+          - text: "2D 유지. 2D 회전을 끄므로 FOV 각에 표시각을 더한다:"
+          - code [ref=e15606]: (D−b)+(b−θ)=D−θ
+          - text: (PIDS 컨트롤 1줄). 3D 렌즈 바닥점의 투영 픽셀 = 원점 y=43.6/200
+        - cell "확정" [ref=e15607]
+      - row [ref=e15608]:
+        - cell "편집 핸들" [ref=e15609]
+        - cell [ref=e15610]:
+          - code [ref=e15611]: MarkerEditAdorner
+          - text: 는
+          - code [ref=e15612]: RenderSize
+          - text: ·
+          - code [ref=e15613]: TransformToAncestor
+          - text: (컨트롤 자신 RenderTransform 제외) 기준이라 그대로 동작. 회전 핸들 → 모델 Bearing → 3D yaw 로 자연 전달
+        - cell "확정" [ref=e15614]
+      - row [ref=e15615]:
+        - cell "자산" [ref=e15616]
+        - cell [ref=e15617]:
+          - text: 외부 3D 파일 0. 박스·실린더·절두체·반구(계단식 절두체) 프리미티브를 코드로 합성(
+          - code [ref=e15618]: MeshGeometry3D
+          - text: Freeze 공유). 재질은 테마 토큰
+          - code [ref=e15619]: SolidColorBrush
+          - text: 바인딩
+        - cell "확정 방향" [ref=e15620]
+      - row [ref=e15621]:
+        - cell "성능 게이트" [ref=e15622]
+        - cell "N=100/350/500 회전 tick p95 · RDP Tier 0 · kill-switch OFF 16장 pixel-diff 0" [ref=e15623]
+        - cell "PoC 계측" [ref=e15624]

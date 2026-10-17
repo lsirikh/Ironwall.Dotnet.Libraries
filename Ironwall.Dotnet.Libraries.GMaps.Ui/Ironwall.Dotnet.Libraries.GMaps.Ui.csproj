@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
+    <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
 
 	
@@ -17,21 +18,66 @@
 	<PackageReference Include="MaterialDesignColors" Version="5.2.1" />
 	<PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
 	<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+	<!-- 지도 3D 화면(map-3d POC) — Reports.Ui · 메인 앱과 같은 판 — 2957.106 부터 WebView2CompositionControl 공개 -->
+	<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2957.106" />
 	<PackageReference Include="System.Drawing.Common" Version="9.0.7" />
+	<!-- Test packages -->
+	<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+	<PackageReference Include="Moq" Version="4.20.72" />
+	<PackageReference Include="xunit" Version="2.9.3" />
+	<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+	  <PrivateAssets>all</PrivateAssets>
+	  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+	</PackageReference>
+  </ItemGroup>
+
+  <!-- GMap.NET 타입 직접 참조 파일: wpftmp(XAML 디자인타임)에 GMap.NET 참조 없으므로 제외 -->
+  <ItemGroup Condition="'$(DesignTimeBuild)'=='true'">
+    <Compile Remove="Services\CustomMapService.cs" />
+    <Compile Remove="Services\MBTilesOverlayMapProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>
 	<ProjectReference Include="..\GMap.NET\GMap.NET\GMap.NET.Core\GMap.NET.Core.csproj" />
 	<ProjectReference Include="..\GMap.NET\GMap.NET\GMap.NET.WindowsPresentation\GMap.NET.WindowsPresentation.csproj" />
-	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.AdornerDecorator\Ironwall.Dotnet.Libraries.AdornerDecorator.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.SystemResources\Ironwall.Dotnet.Libraries.SystemResources.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
+	<!-- symbol-detail-and-door-control FR-03: 개폐 명령 REST(POST .../control). Accounts.Api 선례와 동형, 순환 없음 -->
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Api\Ironwall.Dotnet.Libraries.Devices.Api.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps.Db\Ironwall.Dotnet.Libraries.GMaps.Db.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps\Ironwall.Dotnet.Libraries.GMaps.csproj" />
+	<!-- camera-popup-modes T-02: 팝업 영상 · PTZ 는 호스트 프로세스(CameraPopup.Host)가 한다 — GMaps.Ui 는 LibVLC(Streaming) · ONVIF(OnvifSolution)를 참조하지 않는다.
+	     감시자 · 조작 창구 · 공유 메모리 프레임 표시기(HostedVideoView)만 쓴다. -->
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup\Ironwall.Dotnet.Libraries.CameraPopup.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Tracking.Api\Ironwall.Dotnet.Libraries.Tracking.Api.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
   </ItemGroup>
 
+  <!-- no-data 기본 타일 중앙 로고(pack URI 임베드) -->
+  <ItemGroup>
+    <Content Include="Resources\Symbols3D\**\*.obj;Resources\Symbols3D\**\*.mtl;Resources\Symbols3D\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+	<Resource Include="Resources\Images\sensorway.png" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="GMaps.Housing.Tests" />
+		<InternalsVisibleTo Include="GMaps.Ui.Tests" />
+		<InternalsVisibleTo Include="GMaps.PropertyPanel.Tests" />
+		<!-- 지도 헤드리스 시나리오 시험(카탈로그 §1 · §3.5) -->
+		<InternalsVisibleTo Include="GMaps.MapNav.Tests" />
+		<InternalsVisibleTo Include="GMaps.MapLayer.Tests" />
+		<InternalsVisibleTo Include="GMaps.MapEdit.Tests" />
+		<InternalsVisibleTo Include="GMaps.MapAux.Tests" />
+	</ItemGroup>
 </Project>

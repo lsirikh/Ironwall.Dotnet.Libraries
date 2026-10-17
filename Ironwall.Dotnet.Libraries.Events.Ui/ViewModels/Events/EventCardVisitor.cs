@@ -13,5 +13,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
     {
         public abstract void Visit(DetectionEventCardViewModel viewModel);
         public abstract void Visit(MalfunctionEventCardViewModel viewModel);
+        public virtual void Visit(OperationEventCardViewModel viewModel) { }
     }
 }

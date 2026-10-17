@@ -17,8 +17,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Providers;
 public class PidsSymbolProvider : BaseSymbolProvider<IPidsSymbolModel>
 {
     #region - Ctors -
-    public PidsSymbolProvider(ILogService log, SymbolProvider provider)
-        :base(log, provider)
+    public PidsSymbolProvider(ILogService log, SymbolProvider provider) :base(log, provider)
     {
     }
     #endregion

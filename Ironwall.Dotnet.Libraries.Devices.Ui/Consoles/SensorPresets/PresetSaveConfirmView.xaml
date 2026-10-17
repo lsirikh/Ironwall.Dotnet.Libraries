@@ -1,0 +1,57 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.PresetSaveConfirmView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		프리셋 저장 확인(sensor-mount-preset W5 · FR-12) — 쓰는 센서가 있을 때만. 첫 포커스는 [취소](틀의 파괴적이지 않은 쪽) — Enter 실수로 아무 일도 없다.
+	-->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.SensorPresets.SaveConfirm"
+		PrimaryAutomationId="Devices.SensorPresets.SaveConfirm.Save"
+		PrimaryInvoked="OnSave"
+		PrimaryText="저장"
+		SecondaryAutomationId="Devices.SensorPresets.SaveConfirm.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Small"
+		Title="프리셋 저장">
+		<dlg:ConsoleDialogFrame.FooterExtra>
+			<Button
+				AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.SaveAsNew"
+				Click="OnSaveAsNew"
+				Content="새 프리셋으로 저장"
+				Style="{DynamicResource Console.Button}" />
+		</dlg:ConsoleDialogFrame.FooterExtra>
+		<StackPanel>
+			<TextBlock AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Message" FontWeight="SemiBold" Text="{Binding Message}" TextWrapping="Wrap" />
+			<!--
+				칩 = 쓰임 하나씩(Usages) — 글자(Chips)로 묶으면 번호가 같은 두 센서가 UIA 항목 하나로 합쳐져 "N=10 · 칩 9" 가 됐다(실창 4회차 MNT-R28-451).
+			-->
+			<ItemsControl Margin="0,8,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Chips" ItemsSource="{Binding Usages}">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<WrapPanel />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Border Margin="0,0,6,6" Padding="7,1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9">
+							<TextBlock FontSize="11" Text="{Binding ChipText}" />
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+			<!--  W5 차례대로 칩 아래 — 좁은 창(S 400)의 버튼 줄에서는 세 단추에 밀려 글이 보이지 않았다(MNT-R28-451 안내 '')  -->
+			<dlg:ConsoleDialogText
+				Margin="0,4,0,0"
+				AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Note"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding KeepText}"
+				TextWrapping="Wrap" />
+		</StackPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

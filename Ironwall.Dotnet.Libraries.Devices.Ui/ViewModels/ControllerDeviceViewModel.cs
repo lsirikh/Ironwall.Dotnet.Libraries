@@ -39,6 +39,7 @@ public class ControllerDeviceViewModel : DeviceViewModel, IControllerDeviceViewM
         {
             (_model as IControllerDeviceModel)!.IpAddress = value;
             NotifyOfPropertyChange(() => IpAddress);
+            NotifyOfPropertyChange(() => AddressDisplay);
         }
     }
 
@@ -49,6 +50,20 @@ public class ControllerDeviceViewModel : DeviceViewModel, IControllerDeviceViewM
         {
             (_model as IControllerDeviceModel)!.Port = value;
             NotifyOfPropertyChange(() => Port);
+            NotifyOfPropertyChange(() => AddressDisplay);
+        }
+    }
+
+    /// <summary>
+    /// 콘솔 목록 "IP:포트" 한 칸(device-console-v8 N02-B) — IP 가 비면 "—", 포트가 0(미설정)이면
+    /// 포트를 덧붙이지 않고 IP만 보인다(<c>:0</c> 은 아무 의미가 없는 값이라 그대로 보이면 오독을 부른다).
+    /// </summary>
+    public string AddressDisplay
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(IpAddress)) return "—";
+            return Port == 0 ? IpAddress : $"{IpAddress}:{Port}";
         }
     }
     #endregion
