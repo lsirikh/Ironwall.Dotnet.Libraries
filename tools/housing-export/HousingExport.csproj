@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    지도 3D 하우징 모형 내보내기 — 2D 지도의 3D 심볼(Symbols3D/HousingModels, 절차적 모형)을 키마다 OBJ + JSON 으로 쓴다.
+    map-3d 3D 화면이 같은 모양 · 같은 치수(브로셔 실측, 1 단위 = 200 mm)로 그리게 하려는 것.
+    실행: dotnet run (두 줄표)- <출력 폴더>   예) dotnet run (두 줄표)- C:\workspace_python\map-3d\map3d\static\models
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>HousingExport</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Ironwall.Dotnet.Libraries.GMaps.Ui.csproj" />
+  </ItemGroup>
+
+</Project>

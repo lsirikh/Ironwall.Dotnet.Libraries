@@ -26,7 +26,15 @@ public sealed class Map3DViewHost : Grid
     public bool UseComposition { get; set; } = true;
     private bool _coreHooked;
     private string? _job;
+    private string? _url;
     private bool _ready;
+    private bool _guarding;
+
+    /// <summary>지금 쓰는 방식 — "composition"(WPF 안, 오버레이가 3D 위에 보임) · "hwnd"(네이티브 창) · "none"(아직 안 만듦).</summary>
+    public string HostMode => _el is WebView2CompositionControl ? "composition" : _el != null ? "hwnd" : "none";
+
+    /// <summary>CompositionControl 을 쓸 수 없어 네이티브 창으로 바꿨다(사유) — 로그용.</summary>
+    public event Action<string>? HostFallback;
 
     /// <summary>3D → GIS 메시지(ready · camera · pick · overlay.resync). ready 는 이 호스트가 먼저 기록한 뒤 올린다.</summary>
     public event Action<Map3DMessage>? MessageReceived;
@@ -46,6 +54,7 @@ public sealed class Map3DViewHost : Grid
         EnsureWebView();
         Park();
         _job = job;
+        _url = url;
         _ready = false;
         try
         {
@@ -109,10 +118,16 @@ public sealed class Map3DViewHost : Grid
     private void EnsureWebView()
     {
         if (_web != null) return;
+        if (UseComposition && !CompositionSupported())
+        {
+            UseComposition = false;
+            HostFallback?.Invoke("Windows SDK 투영(Microsoft.Windows.SDK.NET)이 없다 — 앱 대상이 net8.0-windows10.0.17763.0 이상이어야 한다");
+        }
         if (UseComposition)
         {
             var c = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Black };
             _web = c; _el = c;
+            if (!_guarding) { Dispatcher.UnhandledException += OnDispatcherUnhandled; _guarding = true; }
         }
         else
         {
@@ -121,6 +136,36 @@ public sealed class Map3DViewHost : Grid
         }
         System.Windows.Automation.AutomationProperties.SetAutomationId(_el, "GMaps.Map3D.View");
         Children.Add(_el);
+    }
+
+    /// <summary>CompositionControl 실행에 필요한 Windows SDK 투영이 있는가 — 없으면 Loaded 순간 처리되지 않은 예외로 앱이 죽는다(2026-10-17 실기).</summary>
+    private static bool CompositionSupported()
+    {
+        try { System.Reflection.Assembly.Load("Microsoft.Windows.SDK.NET"); return true; }
+        catch (Exception) { return false; }
+    }
+
+    /// <summary>
+    /// ★ GIS 는 3D 때문에 죽으면 안 된다 — CompositionControl 이 붙는 순간(Loaded 등 디스패처 안) 던진 예외만 잡아 삼키고
+    /// 네이티브 창 방식으로 바꿔 같은 주소를 다시 연다. 다른 예외는 건드리지 않는다.
+    /// </summary>
+    private void OnDispatcherUnhandled(object? sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+    {
+        if (_el is not WebView2CompositionControl) return;
+        if (!(e.Exception.ToString().Contains(nameof(WebView2CompositionControl), StringComparison.Ordinal))) return;
+        e.Handled = true;
+        SwitchToHwnd($"CompositionControl 실패 → 네이티브 창으로: {e.Exception.GetType().Name}: {e.Exception.Message}");
+    }
+
+    private void SwitchToHwnd(string reason)
+    {
+        var old = _el;
+        Children.Remove(old);
+        (old as IDisposable)?.Dispose();
+        _web = null; _el = null; _coreHooked = false; _ready = false; IsRevealed = false;
+        UseComposition = false;
+        HostFallback?.Invoke(reason);
+        if (_job is { } job && _url is { } url) _ = LoadAsync(job, url);
     }
 
     private void OnWebMessage(string json)

@@ -1274,10 +1274,50 @@
 			</AdornerDecorator>
 
 			<!--  지도 3D 화면(map-3d POC) 호스트 — 지도와 같은 칸. 평소엔 비어 있고(WebView2 미생성), 3D 진입 시 WebView2 를 1회 만들어 재사용한다.  -->
+			<!--  ZIndex 0 = 지도(AdornerDecorator) 바로 위 · 뒤에 선언한 오버레이(축척바 · 좌표 · 줌 · 나침반 등, 모두 ZIndex 0 이상) 아래.
+			      1 로 두면 ZIndex 없는 축척바 · 좌표 · 줌이 3D 밑에 깔렸다(2026-10-17 실기). WPF 안에서 그리는 3D(CompositionControl)일 때만 의미가 있다.  -->
 			<ContentControl
-				Panel.ZIndex="1"
+				Panel.ZIndex="0"
 				Content="{Binding Map3DHost}"
 				Focusable="False" />
+
+			<!--  3D 전환 · 굽기 진행 패널 — 지도 가운데. 원(끝 모를 때 돈다) + 막대(%) + 단계 문구. 입력은 막지 않는다(IsHitTestVisible=False).
+			      지도 HUD 와 같은 MapFloatingPanelStyle · 토큰(DynamicResource).  -->
+			<Border
+				Panel.ZIndex="160"
+				MinWidth="260"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3D.Progress"
+				IsHitTestVisible="False"
+				Style="{StaticResource MapFloatingPanelStyle}"
+				Visibility="{Binding IsMap3DBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel Margin="8,6">
+					<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<ProgressBar
+							Width="22"
+							Height="22"
+							Foreground="{DynamicResource PrimaryBrush}"
+							IsIndeterminate="True"
+							Style="{DynamicResource MaterialDesignCircularProgressBar}" />
+						<TextBlock
+							Margin="10,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="13"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding Map3DBusyText}" />
+					</StackPanel>
+					<ProgressBar
+						Height="4"
+						Margin="0,10,0,0"
+						Background="{DynamicResource DividerBrush}"
+						Foreground="{DynamicResource PrimaryBrush}"
+						IsIndeterminate="{Binding Map3DBusyIndeterminate}"
+						Maximum="100"
+						Value="{Binding Map3DBusyPercent, Mode=OneWay}" />
+				</StackPanel>
+			</Border>
 
 			<!--  스케일바 + 기울임 배지(map-tilt-25d FR-09 · G6 세로 축척 이탈 표시: 수평 축척은 유지, 세로는 cosφ 배 — φ>0.1° 만 표시).
 			      배지는 색이 아니라 형태(1px 스트로크 필 + 아이콘)로 구분, 토큰은 DynamicResource(라이트/다크 재해석).  -->

@@ -39,6 +39,26 @@ public partial class MapViewModel
     private Map3DClient? _map3DClient;
     private Map3DViewHost? _map3DHost;
     private Map3DState _map3DState;
+
+    // ── 3D 전환 · 굽기 진행 표시(지도 가운데 패널, MapView.xaml "GMaps.Map3D.Progress") ──
+    private bool _isMap3DBusy;
+    private string _map3DBusyText = "";
+    private double _map3DBusyPercent;
+    private bool _map3DBusyIndeterminate = true;
+    public bool IsMap3DBusy { get => _isMap3DBusy; private set { _isMap3DBusy = value; NotifyOfPropertyChange(); } }
+    public string Map3DBusyText { get => _map3DBusyText; private set { _map3DBusyText = value; NotifyOfPropertyChange(); } }
+    public double Map3DBusyPercent { get => _map3DBusyPercent; private set { _map3DBusyPercent = value; NotifyOfPropertyChange(); } }
+    public bool Map3DBusyIndeterminate { get => _map3DBusyIndeterminate; private set { _map3DBusyIndeterminate = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>진행 패널 — text 가 null 이면 닫는다. percent 가 null 이면 끝을 모르는 진행(원이 돈다).</summary>
+    private void SetMap3DBusy(string? text, double? percent = null)
+    {
+        if (text == null) { IsMap3DBusy = false; return; }
+        Map3DBusyText = text;
+        Map3DBusyIndeterminate = percent == null;
+        Map3DBusyPercent = percent ?? 0;
+        IsMap3DBusy = true;
+    }
     private string? _map3DJob;
     private bool _isMap3DDrawMode;
     private bool _isMap3DBaking;
@@ -69,6 +89,7 @@ public partial class MapViewModel
         var host = new Map3DViewHost();
         host.MessageReceived += OnMap3DMessage;
         host.LoadFailed += OnMap3DLoadFailed;
+        host.HostFallback += reason => _log?.Warning($"[Map3D] {reason}");
         return host;
     }
 
@@ -154,6 +175,7 @@ public partial class MapViewModel
             while (!job.IsDone && !job.IsError)
             {
                 SetAimStatus($"3D 만드는 중… {job.Progress:P0}{(string.IsNullOrEmpty(job.Message) ? "" : $" — {job.Message}")}");
+                SetMap3DBusy(string.IsNullOrEmpty(job.Message) ? "3D 를 만드는 중…" : $"3D 를 만드는 중… {job.Message}", job.Progress * 100);
                 await Task.Delay(1000);
                 job = await _map3DClient.GetJobAsync(job.Id);
             }
@@ -184,6 +206,7 @@ public partial class MapViewModel
         }
         finally
         {
+            if (_map3DState != Map3DState.Pending) SetMap3DBusy(null);
             _isMap3DBaking = false;
             DrawMap3DAreaCommand.RaiseCanExecuteChanged();
         }
@@ -218,7 +241,7 @@ public partial class MapViewModel
         else if (!active && _map3DState == Map3DState.Pending)
         {
             _log?.Info($"[Map3D] 로딩 중 게이트 이탈(zoom={zoom:F1}) → 취소");
-            _map3DState = Map3DState.Off;
+            _map3DState = Map3DState.Off; SetMap3DBusy(null);
             Map3DHost.Park();
         }
     }
@@ -273,6 +296,7 @@ public partial class MapViewModel
     {
         if (MainMap == null || IsMap3DBlockedByInputMode()) return;
         _map3DState = Map3DState.Pending;
+        SetMap3DBusy("3D 로 전환하는 중…");
         _map3DJob = scene.Id;
         _log?.Info($"[Map3D] 진입 시작 job={scene.Id} zoom={MainMap.EffectiveZoom:F1}");
         if (Map3DHost.IsReadyFor(scene.Id)) { Reveal3D(); return; }
@@ -286,6 +310,7 @@ public partial class MapViewModel
     {
         if (MainMap == null) return;
         _map3DState = Map3DState.Shown;
+        SetMap3DBusy(null);
         _map3DLastCamera = null;
         Map3DOverlay.Start(MainMap);                                                     // 오버레이 전체 스냅샷(ready 직후 · 재사용 펼침)
         Map3DHost.PostCamera(Current2DCamera(0d), animate: false);                    // 지금 2D 와 같은 자리 · 축척(로딩 중 움직였을 수 있다)
@@ -293,13 +318,13 @@ public partial class MapViewModel
         Map3DHost.PostCamera(Current2DCamera(Map3DMath.DefaultPitchDeg), animate: true); // 0.6 s 동안 눕힌다
         MainMap.IsHitTestVisible = false;                                               // 3D 가 보이는 동안 2D 입력 막음
         EnsureAimEscWindowHook();
-        _log?.Info($"[Map3D] 3D 표시 job={_map3DJob}");
+        _log?.Info($"[Map3D] 3D 표시 job={_map3DJob} host={Map3DHost.HostMode}");
     }
 
     private void Leave3D(Map3DCamera? cam, string cause)
     {
         if (MainMap == null) return;
-        _map3DState = Map3DState.Off;
+        _map3DState = Map3DState.Off; SetMap3DBusy(null);
         _map3DOverlay?.Stop();
         Map3DHost.Park();
         MainMap.IsHitTestVisible = true;
@@ -318,6 +343,12 @@ public partial class MapViewModel
 
     private void OnMap3DMessage(Map3DMessage msg)
     {
+        if (msg.Type == "progress")
+        {
+            if (_map3DState == Map3DState.Pending)
+                SetMap3DBusy(msg.Reason switch { "model" => "3D 장면을 받는 중…", "scene" => "3D 장면 정보를 읽는 중…", _ => "3D 화면을 여는 중…" }, msg.Progress);
+            return;
+        }
         if (msg.Type == "ready")
         {
             _log?.Info($"[Map3D] ready job={msg.Job}");
@@ -337,7 +368,10 @@ public partial class MapViewModel
         }
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
-        if (Map3DMath.ShouldLeave3D(cam.Zoom)) Leave3D(cam, $"zoom {cam.Zoom:F2}");
+        if (Map3DMath.ShouldLeave3D(cam.Zoom)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
+        // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
+        // 3D 카메라(위치 · 줌 · 방위)에 맞춰 오버레이가 3D 상태를 보이게 하고, 2D 로 돌아갈 때도 끊기지 않게 한다(2026-10-17 실기: 나침반이 0° 에 멈춰 있었다).
+        if (Map3DHost.HostMode == "composition") Apply3DCameraTo2D(cam);
     }
 
     private void OnMap3DLoadFailed(string reason)
@@ -346,7 +380,7 @@ public partial class MapViewModel
         if (_map3DState == Map3DState.Off) return;
         _map3DEntrySuppressed = true;   // 같은 줌에서 계속 다시 시도하지 않게
         if (_map3DState == Map3DState.Shown) Leave3D(_map3DLastCamera, "load-failed");
-        else { _map3DState = Map3DState.Off; Map3DHost.Park(); }
+        else { _map3DState = Map3DState.Off; SetMap3DBusy(null); Map3DHost.Park(); }
         SetAimStatus(reason.Contains("ConnectionAborted") || reason.Contains("CannotConnect") ? Map3DUnavailableText : reason, autoHide: true);
     }
 
@@ -368,7 +402,7 @@ public partial class MapViewModel
         else if (_map3DState == Map3DState.Pending)
         {
             _log?.Info("[Map3D] 로딩 중 입력 모드 시작 → 취소");
-            _map3DState = Map3DState.Off;
+            _map3DState = Map3DState.Off; SetMap3DBusy(null);
             Map3DHost.Park();
         }
     }
@@ -423,6 +457,9 @@ public partial class MapViewModel
     private void LeaveMap3DForPanel(string cause)
     {
         if (_map3DState != Map3DState.Shown) return;
+        // WPF 안에서 그리는 방식이면 상세 창(지도 옆 패널)은 3D 위에 그대로 보인다 — 2D 로 돌아갈 필요가 없다.
+        // 카드 · 카메라 상자는 2D 심볼 화면 위치에 붙어 있어 3D 에서는 자리가 맞지 않으므로 계속 2D 로 돌아온다.
+        if (cause == "symbol-detail" && Map3DHost.HostMode == "composition") return;
         _map3DEntrySuppressed = true;
         Leave3D(_map3DLastCamera, cause);
     }

@@ -120,6 +120,18 @@ public class Map3DMathTests
     }
 
     [Fact]
+    public void should_read_load_progress_when_3d_reports_it()
+    {
+        var m = Map3DMath.ParseMessage("{\"type\":\"progress\",\"stage\":\"model\",\"pct\":45}");
+        Assert.NotNull(m);
+        Assert.Equal("progress", m!.Type);
+        Assert.Equal("model", m.Reason);
+        Assert.Equal(45, m.Progress);
+        Assert.Equal(100, Map3DMath.ParseMessage("{\"type\":\"progress\",\"pct\":150}")!.Progress);
+        Assert.Null(Map3DMath.ParseMessage("{\"type\":\"progress\",\"stage\":\"page\"}")!.Progress);
+    }
+
+    [Fact]
     public void should_ask_low_quality_3d_when_remote_session()
     {
         var cam = new Map3DCamera(127.5, 37.25, 17, 0, 0);

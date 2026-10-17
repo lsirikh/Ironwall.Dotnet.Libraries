@@ -20,10 +20,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 /// <summary>3D 카메라 — 경도 · 위도 · 메르카토르 줌 · 화면 위쪽 방위(북 0, 시계) · 기울기(0 = 바로 위).</summary>
 public readonly record struct Map3DCamera(double Lon, double Lat, double Zoom, double Bearing, double Pitch);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "camera" | "pick" | "overlay.resync". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D → GIS 메시지. Type = "ready" | "camera" | "pick" | "overlay.resync" | "progress". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
+
+    /// <summary>progress 일 때 0~100(모르면 null). 단계 이름은 <see cref="Reason"/>("page" · "scene" · "model").</summary>
+    public double? Progress { get; init; }
 }
 
 /// <summary>3D 클릭 — Action = "click" | "dblclick" | "context". Kind · Id 가 없으면 빈 곳. 화면 좌표는 3D 화면 기준 DIP(없으면 null).</summary>
@@ -159,6 +162,12 @@ public static class Map3DMath
             if (type == "ready") return new Map3DMessage(type, null, o["job"]?.ToString(), null);
             if (type == "overlay.resync") return new Map3DMessage(type, null, null, null);
             if (type == "pick") return ParsePick(o);
+            if (type == "progress")
+            {
+                double? pct = Finite(o["pct"]);
+                return new Map3DMessage(type, o["stage"]?.Type == JTokenType.String ? o.Value<string>("stage") : null, null, null)
+                    { Progress = pct is double v ? Math.Clamp(v, 0, 100) : null };
+            }
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;
