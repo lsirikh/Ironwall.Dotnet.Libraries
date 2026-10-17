@@ -124,7 +124,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     {
         if (_isMap3DBaking) { SetAimStatus("이미 3D 를 만드는 중입니다", autoHide: true); return; }
         _log?.Info($"[Map3D] 영역 다시 만들기 id={item.Id}");
-        _ = BakeMap3DAsync(item.Bbox);
+        RequestMap3DBake(item.Bbox);   // 영역 그리기와 같은 굽기 방식 패널
     }
 
     /// <summary>「지우기」 — 표준 확인 팝업(EventAggregator). "확인" → HandleAsync(CallDeleteMap3DAreaProcessMessageModel).</summary>

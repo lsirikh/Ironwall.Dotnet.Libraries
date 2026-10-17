@@ -228,6 +228,9 @@ internal sealed class Map3DOverlayBridge
     public GMapCustomImage? FindCustomImage(int id)
         => _customImageIds.FirstOrDefault(kv => kv.Value == id).Key;
 
+    /// <summary>지도 CustomImages 이미지의 3D id(음수 — 스냅샷과 같은 값). 굽기 요청 overlays 의 id 로 쓴다.</summary>
+    public int IdOf(GMapCustomImage image) => CustomImageId(image);
+
     /// <summary>
     /// 모델에서 값을 복사해 3D 항목 JSON 을 만든다(아이콘 · 이미지 픽셀 제외 — 그 둘은 다리 인스턴스가 붙인다).
     /// 대상이 아니거나 해제된 마커 · 이미지 마커면 null.

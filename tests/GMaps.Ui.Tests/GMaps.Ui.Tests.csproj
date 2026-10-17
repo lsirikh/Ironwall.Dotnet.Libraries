@@ -91,6 +91,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DMath.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DClient.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\Map3DModel.cs" />
+    <!-- 지도 3D 굽기 방식(오버레이 이미지 포함 여부) — 겹침 판정 · 요청 본문 · 기본값 순수 함수 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DBake.cs" />
     <!-- 지도 3D 전환 안내 · 영역 표시 · 그리기 크기 판정 순수 함수(지도 3D 시나리오 R4~R7) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DGuide.cs" />
     <!-- 지도 3D 오버레이 다리 DTO · patch 비교 · 메시지(2차) — 실코드 링크. 상태 enum 은 실코드 -->

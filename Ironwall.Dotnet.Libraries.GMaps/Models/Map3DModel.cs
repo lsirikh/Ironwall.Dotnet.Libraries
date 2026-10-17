@@ -23,9 +23,14 @@ public class Map3DModel
     /// 끄면 네이티브 창(WebView2) — 더 빠르지만 같은 자리의 WPF 를 덮는다(공역). RDP · 저사양에서 느리면 끈다.</summary>
     public bool UseCompositionHost { get; set; } = true;
 
-    /// <summary>주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 바뀌었으면 true.</summary>
+    /// <summary>오버레이 이미지 기본 굽기 방식(마지막 고른 값) — "tiles"(기본, 위성 타일만) | "composite"(그림 합성) | "extract"(합성 + 건물 추출).</summary>
+    public string OverlayMode { get; set; } = "tiles";
+
+    /// <summary>주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 굽기 방식이 셋 중 하나가 아니면 tiles. 주소가 바뀌었으면 true.</summary>
     public bool Normalize()
     {
+        string mode = OverlayMode?.Trim().ToLowerInvariant() ?? "";
+        OverlayMode = mode is "composite" or "extract" ? mode : "tiles";
         string before = ServerUrl;
         if (!Uri.TryCreate(ServerUrl?.Trim(), UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
@@ -36,5 +41,5 @@ public class Map3DModel
     }
 
     public override string ToString()
-        => string.Format(CultureInfo.InvariantCulture, "Map3D[enabled={0}, server={1}, composition={2}]", IsEnabled, ServerUrl, UseCompositionHost);
+        => string.Format(CultureInfo.InvariantCulture, "Map3D[enabled={0}, server={1}, composition={2}, overlay={3}]", IsEnabled, ServerUrl, UseCompositionHost, OverlayMode);
 }
