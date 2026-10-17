@@ -20,13 +20,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 /// <summary>3D 카메라 — 경도 · 위도 · 메르카토르 줌 · 화면 위쪽 방위(북 0, 시계) · 기울기(0 = 바로 위).</summary>
 public readonly record struct Map3DCamera(double Lon, double Lat, double Zoom, double Bearing, double Pitch);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "camera" | "pick" | "overlay.resync" | "progress". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "progress". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
 
     /// <summary>progress 일 때 0~100(모르면 null). 단계 이름은 <see cref="Reason"/>("page" · "scene" · "model").</summary>
     public double? Progress { get; init; }
+
+    /// <summary>rendered 일 때 3D 가 그린 오버레이 항목 수(모르면 null).</summary>
+    public int? Items { get; init; }
 }
 
 /// <summary>
@@ -48,6 +51,8 @@ public static class Map3DMath
     public const double ExitZoom = 16.5;
     /// <summary>3D 로 들어갈 때 눕힐 기울기(°).</summary>
     public const double DefaultPitchDeg = 60.0;
+    /// <summary>장면을 미리 불러오기 시작하는 실효줌("3D 가능" 칩이 보이는 영역 안).</summary>
+    public const double PreloadZoom = 15.0;
 
     /// <summary>
     /// 3D 게이트 판정. 장면이 없으면 항상 false. 직전에 3D(또는 3D 준비 중)였으면 <see cref="ExitZoom"/> 이상 유지,
@@ -68,6 +73,15 @@ public static class Map3DMath
     /// </summary>
     public static bool ShouldStay3DAfterMove(double effectiveZoom, bool insideScene)
         => insideScene && !double.IsNaN(effectiveZoom) && effectiveZoom >= ExitZoom;
+
+    /// <summary>
+    /// 2D 에서 장면을 1×1 대기 상태로 미리 열까 — 지도 가운데가 구운 장면 안이고 실효줌 ≥ 15, 호스트가 그 장면을 아직 열지 않았고
+    /// (실패했어도 같은 장면은 다시 열지 않는다 — 진입 때 다시 연다) 다른 장면을 불러오는 중도 아닐 때(한 번에 한 장면).
+    /// blocked = 3D 설정 꺼짐 · 3D 표시 · 로딩 중 · 굽는 중 · 입력 모드 중. NaN 은 false.
+    /// </summary>
+    public static bool ShouldPreload(double effectiveZoom, string? sceneAtCenter, string? hostJob, bool hostLoading, bool blocked)
+        => !blocked && !hostLoading && sceneAtCenter != null && sceneAtCenter != hostJob
+           && !double.IsNaN(effectiveZoom) && effectiveZoom >= PreloadZoom;
 
     /// <summary>독점 입력 모드(편집 · 선 그리기 · 측정 · 심볼 배치 · 조준 · 홈/앵커 배치) 중에는 3D 에 들어가지 않는다 — 막으면 true.</summary>
     public static bool IsBlockedByInputMode(bool isEditMode, bool isExclusiveInputMode) => isEditMode || isExclusiveInputMode;
@@ -168,6 +182,9 @@ public static class Map3DMath
             if (token is not JObject o) return null;
             string? type = o.Value<string>("type");
             if (type == "ready") return new Map3DMessage(type, null, o["job"]?.ToString(), null);
+            if (type == "rendered")
+                return new Map3DMessage(type, null, o["job"]?.ToString(), null)
+                    { Items = o["items"]?.Type == JTokenType.Integer ? o.Value<int>("items") : null };
             if (type == "overlay.resync") return new Map3DMessage(type, null, null, null);
             if (type == "pick") return ParsePick(o);
             if (type == "progress")

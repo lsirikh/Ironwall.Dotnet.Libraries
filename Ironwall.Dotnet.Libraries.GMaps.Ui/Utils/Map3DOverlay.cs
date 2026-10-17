@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Fence;
 using Newtonsoft.Json;
@@ -85,6 +86,12 @@ public static class Map3DOverlay
 
     /// <summary>오버레이 이미지 PNG 의 긴 변 상한(px).</summary>
     public const int MaxImageSide = 4096;
+
+    /// <summary>디스크 캐시에 넣는 오버레이 이미지 인코딩의 긴 변 상한(px).</summary>
+    public const int CachedImageSide = 2048;
+
+    /// <summary>투명 픽셀이 없는 오버레이 이미지의 JPEG 품질.</summary>
+    public const int JpegQuality = 85;
 
     /// <summary>라벨 배경 알파(2D LabelAdorner.ChipAlpha 와 같은 0xCD).</summary>
     private const string LabelChipAlpha = "CD";
@@ -243,6 +250,27 @@ public static class Map3DOverlay
 
     /// <summary>PNG 바이트 → data URL.</summary>
     public static string PngDataUrl(byte[] png) => "data:image/png;base64," + Convert.ToBase64String(png);
+
+    /// <summary>이미지 바이트 → data URL(mime = "image/png" | "image/jpeg").</summary>
+    public static string DataUrl(byte[] bytes, string mime) => $"data:{mime};base64," + Convert.ToBase64String(bytes);
+
+    /// <summary>
+    /// 오버레이 이미지 디스크 캐시 키 — 원본 파일 경로(대소문자 무시) + 크기 + 수정 시각 + 인코딩 조건(긴 변 · 품질).
+    /// 파일이 바뀌면(크기 · 시각) 키가 달라져 다시 인코딩한다. 파일 이름에 쓸 수 있는 16진 16자.
+    /// </summary>
+    public static string ImageCacheKey(string path, long length, DateTime lastWriteUtc)
+        => HashKey(Encoding.UTF8.GetBytes($"{path.ToLowerInvariant()}|{length}|{lastWriteUtc.Ticks}|{CachedImageSide}|{JpegQuality}"));
+
+    /// <summary>BGRA32 픽셀에 덜 불투명한(알파 &lt; 255) 픽셀이 하나라도 있는가.</summary>
+    public static bool HasTransparentPixel(ReadOnlySpan<byte> bgra)
+    {
+        for (int i = 3; i < bgra.Length; i += 4)
+            if (bgra[i] != 255) return true;
+        return false;
+    }
+
+    /// <summary>캐시 인코딩 형식 — 투명이 있으면 PNG, 없으면 JPEG(같은 그림이 훨씬 작다).</summary>
+    public static string ImageMime(bool hasTransparency) => hasTransparency ? "image/png" : "image/jpeg";
 
     /// <summary>긴 변이 max 이하가 되게 비율을 지켜 줄인 크기(이미 작으면 그대로, 짧은 변은 최소 1).</summary>
     public static (int Width, int Height) FitLongSide(int width, int height, int max = MaxImageSide)

@@ -37,9 +37,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D;
                     OperationState · DoorState(구역은 ActiveSensorDeviceIds 포함)로 다시 통지하므로 모델에 따로 붙지 않는다.
                     통지는 50 ms 모아(코얼레싱) 직전에 보낸 JSON 과 비교해 바뀐 필드만 patch 로 보낸다(선택 · 크기 등 무관한 통지는 버려진다).
                   ★ 점 아이콘(규약 v2): 2D 마커 Shape 를 VisualBrush → RenderTargetBitmap(2배) 으로 그린 PNG(overlay.icon, 내용 SHA-1 키).
-                    시각 서명(Map3DOverlay.IconSignature — 상태 · 스타일 · 크기)이 같으면 다시 그리지 않는다. 그리기 실패면 아이콘 없이 보낸다.
+                    시각 서명(Map3DOverlay.IconSignature — 상태 · 스타일 · 크기) → PNG 를 세션 동안 메모리에 두어 같은 서명은 다시 그리지 않는다.
+                    그리기 실패면 아이콘 없이 보낸다.
                     VisualBrush 는 루트의 RenderTransform(2D 표시 회전 · 클릭 펄스)을 그리지 않는다 — 회전은 bearing 으로 따로 간다.
-                  ★ 이미지 픽셀은 PNG(긴 변 4096 px 이하)로 한 번만 만들어(ImageSource 별 캐시) overlay.imageData 로 보낸다. 가림(mask)은 기본 true.
+                  ★ 이미지 픽셀은 긴 변 2048 px 이하 JPEG(투명이면 PNG)로 한 번만 만들어(ImageSource 별 · 원본 파일 기준 디스크 캐시 Map3DImageCache)
+                    overlay.imageData 로 보낸다. 가림(mask)은 기본 true.
+                  ★ 3D 를 접으면 Pause(구독만 풂 · 보낸 기록 유지), 다시 펼치면 Resume(그 사이 바뀐 것만 rev 이어서). 새 페이지(ready)는 Start(전체 스냅샷).
                     지도 CustomImages 는 DB 키가 없어(대개 Id 0) 다리가 음수 id(-1, -2, …)를 붙인다 — 3D pick 은 FindCustomImage 로 되찾는다.
                   ★ overlay.icon · overlay.imageData 는 같은 key 를 한 번만 보내고, 스냅샷 때 기록을 비워 그 스냅샷에 쓰이는 것을 먼저 다시 보낸다.
                   ★ 어느 스레드에서 통지가 와도 UI 스레드에서 처리한다.
@@ -65,9 +68,12 @@ internal sealed class Map3DOverlayBridge
     /// <summary>3D 에 보낸 추적 id.</summary>
     private readonly HashSet<string> _sentTracks = new();
     private readonly Dictionary<GMapCustomImage, int> _customImageIds = new();
-    private readonly ConditionalWeakTable<GMapMarker, IconEntry> _icons = new();
+    /// <summary>시각 서명 → 아이콘 PNG(세션 동안 — 다시 들어갈 때 다시 그리지 않는다).</summary>
+    private readonly Dictionary<string, IconEntry> _icons = new();
     private readonly ConditionalWeakTable<ImageSource, Blob> _imageBlobs = new();
     private GMapCustomControl? _map;
+    /// <summary>접어 둔 지도(Pause) — 보낸 기록은 이 지도 기준으로 남아 있다.</summary>
+    private GMapCustomControl? _paused;
     private DispatcherTimer? _timer;
     private long _rev;
     private int _nextCustomImageId = -1;
@@ -94,8 +100,70 @@ internal sealed class Map3DOverlayBridge
         SendSnapshot();
     }
 
-    /// <summary>구독을 모두 풀고 보낸 기록을 버린다(3D 가 꺼짐).</summary>
+    /// <summary>구독을 모두 풀고 보낸 기록을 버린다(3D 페이지가 바뀜 · 상태를 잃음 — 다음엔 전체 스냅샷).</summary>
     public void Stop()
+    {
+        Detach();
+        _paused = null;
+        Unsubscribe();
+    }
+
+    /// <summary>
+    /// 3D 를 접었다(페이지는 1×1 로 살아 있다) — 구독만 풀고 보낸 기록 · rev 는 남긴다. 2D 동안 아무것도 보내지 않는다.
+    /// 다시 펼칠 때 <see cref="Resume"/> 가 그 사이 바뀐 것만 보낸다.
+    /// </summary>
+    public void Pause()
+    {
+        if (_map == null) return;
+        var map = _map;
+        Detach();
+        _paused = map;
+        foreach (var s in _subscribed) s.PropertyChanged -= OnSourcePropertyChanged;
+        _subscribed.Clear();
+        _dirty.Clear();
+    }
+
+    /// <summary>
+    /// 3D 를 펼친다 — 이미 붙어 있으면(ready 직후 스냅샷을 보낸 그대로) 아무것도 하지 않고, 같은 지도에서 접혀 있었으면
+    /// 그 사이 바뀐 것만(add · patch · remove, rev 이어서) 보낸다. 기록이 없으면 전체 스냅샷(<see cref="Start"/>).
+    /// </summary>
+    public void Resume(GMapCustomControl map)
+    {
+        if (ReferenceEquals(_map, map)) return;
+        if (!ReferenceEquals(_paused, map)) { Start(map); return; }
+        _paused = null;
+        _map = map;
+        map.Markers.CollectionChanged += OnMarkersChanged;
+        map.CustomImages.CollectionChanged += OnCustomImagesChanged;
+
+        var seen = new HashSet<string>();
+        var tracks = new List<GMapTrackingMarker>();
+        foreach (var marker in map.Markers.ToList())
+        {
+            if (marker is GMapTrackingMarker t) { Subscribe(t); tracks.Add(t); continue; }
+            if (Resend(marker) is { } key) seen.Add(key);
+        }
+        foreach (var image in map.CustomImages.ToList())
+            if (Resend(image) is { } key) seen.Add(key);
+        foreach (var gone in _customImageIds.Keys.Where(i => !map.CustomImages.Contains(i)).ToList()) _customImageIds.Remove(gone);
+        int removed = 0;
+        foreach (var (key, item) in _sent.Where(kv => !seen.Contains(kv.Key)).ToList())
+        {
+            _sent.Remove(key);
+            _post(Map3DOverlay.RemoveJson(++_rev, item.Value<string>("kind")!, item.Value<int>("id")));
+            removed++;
+        }
+        var liveTracks = tracks.Select(TrackIdOf).ToHashSet();
+        foreach (var id in _sentTracks.Where(id => !liveTracks.Contains(id)).ToList())
+        {
+            _sentTracks.Remove(id);
+            _post(Map3DOverlay.TrackRemoveJson(id));
+        }
+        foreach (var t in tracks) PostTrack(t);
+        _log?.Info($"[Map3D] 오버레이 이어 보내기 rev={_rev} 항목 {seen.Count} · 지움 {removed} · 추적 {_sentTracks.Count}");
+    }
+
+    private void Detach()
     {
         if (_map != null)
         {
@@ -103,8 +171,18 @@ internal sealed class Map3DOverlayBridge
             _map.CustomImages.CollectionChanged -= OnCustomImagesChanged;
         }
         _map = null;
-        Unsubscribe();
         _timer?.Stop();
+    }
+
+    /// <summary>접혀 있던 항목 하나를 다시 구독하고 직전 기록과 비교해 보낸다 — 키(대상이 아니거나 실패면 null).</summary>
+    private string? Resend(INotifyPropertyChanged source)
+    {
+        JObject? item;
+        try { item = Build(source); }
+        catch (Exception ex) { _log?.Warning($"[Map3D] 오버레이 항목 만들기 실패(건너뜀): {ex.Message}"); return null; }
+        if (item == null) return null;
+        Subscribe(source);
+        return PostChange(item);
     }
 
     /// <summary>전체 스냅샷(3D ready 직후 · 재사용 펼침 · 3D 의 overlay.resync 요청).</summary>
@@ -273,15 +351,18 @@ internal sealed class Map3DOverlayBridge
 
     /// <summary>오버레이 이미지 픽셀 → PNG. 긴 변이 max 를 넘으면 비율을 지켜 줄인다.</summary>
     internal static byte[] EncodeImagePng(BitmapSource source, int max = Map3DOverlay.MaxImageSide)
+        => EncodePng(Fit(source, max));
+
+    /// <summary>긴 변이 max 를 넘으면 비율을 지켜 줄인 그림(이미 작으면 그대로).</summary>
+    internal static BitmapSource Fit(BitmapSource source, int max)
     {
         var (w, h) = Map3DOverlay.FitLongSide(source.PixelWidth, source.PixelHeight, max);
-        BitmapSource fitted = w == source.PixelWidth && h == source.PixelHeight
+        return w == source.PixelWidth && h == source.PixelHeight
             ? source
             : new TransformedBitmap(source, new ScaleTransform((double)w / source.PixelWidth, (double)h / source.PixelHeight));
-        return EncodePng(fitted);
     }
 
-    private static byte[] EncodePng(BitmapSource source)
+    internal static byte[] EncodePng(BitmapSource source)
     {
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(source));
@@ -350,34 +431,37 @@ internal sealed class Map3DOverlayBridge
         }
     }
 
-    /// <summary>점 아이콘 — 서명이 같으면 캐시, 아니면 다시 그린다. 처음 쓰는 키는 overlay.icon 으로 먼저 보낸다.</summary>
+    /// <summary>점 아이콘 — 같은 시각 서명은 세션 동안 메모리 캐시, 처음 보는 서명만 그린다. 처음 쓰는 키는 overlay.icon 으로 먼저 보낸다.</summary>
     private Map3DOverlayIcon? IconOf(GMapMarker marker, JObject item)
     {
         if (marker.Shape is not FrameworkElement element) return null;
         var size = element.RenderSize;
         string signature = Map3DOverlay.IconSignature(item, $"{StyleOf(marker)}|{element.IsVisible}", size.Width, size.Height);
-        if (!_icons.TryGetValue(marker, out var entry) || entry.Signature != signature)
+        if (!_icons.TryGetValue(signature, out var entry))
         {
             byte[]? png = null;
             try { png = RenderIconPng(element); }
             catch (Exception ex) { _log?.Warning($"[Map3D] 아이콘 그리기 실패(원 표식): {ex.Message}"); }
             entry = png == null
-                ? new IconEntry(signature, null, null)
-                : new IconEntry(signature, new Map3DOverlayIcon(Map3DOverlay.HashKey(png), size.Width, size.Height), Map3DOverlay.PngDataUrl(png));
-            _icons.AddOrUpdate(marker, entry);
+                ? new IconEntry(null, null)
+                : new IconEntry(new Map3DOverlayIcon(Map3DOverlay.HashKey(png), size.Width, size.Height), Map3DOverlay.PngDataUrl(png));
+            _icons[signature] = entry;
         }
         if (entry.Icon is { } icon && _sentBlobs.Add(icon.Key)) _post(Map3DOverlay.IconJson(icon.Key, entry.DataUrl!));
         return entry.Icon;
     }
 
-    /// <summary>이미지 픽셀 PNG(ImageSource 별 1회 인코딩). 처음 쓰는 키는 overlay.imageData 로 먼저 보낸다. 픽셀이 없으면 null.</summary>
+    /// <summary>
+    /// 이미지 픽셀(ImageSource 별 1회 — 원본 파일이 있으면 디스크 캐시, Map3DImageCache). 처음 쓰는 키는 overlay.imageData 로 먼저 보낸다.
+    /// 픽셀이 없으면 null.
+    /// </summary>
     private Blob? BlobOf(ImageSource? source)
     {
         if (source is not BitmapSource bitmap) return null;
         if (!_imageBlobs.TryGetValue(source, out var blob))
         {
-            var png = EncodeImagePng(bitmap);
-            blob = new Blob(Map3DOverlay.HashKey(png), Map3DOverlay.PngDataUrl(png));
+            var (bytes, mime) = Map3DImageCache.GetOrEncode(bitmap, Map3DImageCache.DefaultDirectory, _log);
+            blob = new Blob(Map3DOverlay.HashKey(bytes), Map3DOverlay.DataUrl(bytes, mime));
             _imageBlobs.AddOrUpdate(source, blob);
         }
         if (_sentBlobs.Add(blob.Key)) _post(Map3DOverlay.ImageDataJson(blob.Key, blob.DataUrl));
@@ -499,25 +583,31 @@ internal sealed class Map3DOverlayBridge
             try
             {
                 if (source is GMapTrackingMarker t) { PostTrack(t); continue; }
-                var item = Build(source);
-                if (item == null) continue;
-                string kind = item.Value<string>("kind")!;
-                int id = item.Value<int>("id");
-                string key = Map3DOverlay.Key(kind, id);
-                if (!_sent.TryGetValue(key, out var previous))
-                {
-                    _sent[key] = item;
-                    _post(Map3DOverlay.AddJson(++_rev, item));
-                    continue;
-                }
-                if (Map3DOverlay.Diff(previous, item) is not { } set) continue;
-                _sent[key] = item;
-                _post(Map3DOverlay.PatchJson(++_rev, kind, id, set));
+                if (Build(source) is { } item) PostChange(item);
             }
             catch (Exception ex) { _log?.Warning($"[Map3D] 오버레이 patch 실패(건너뜀): {ex.Message}"); }
         }
     }
 
-    private sealed record IconEntry(string Signature, Map3DOverlayIcon? Icon, string? DataUrl);
+    /// <summary>처음이면 add, 직전에 보낸 것과 다르면 바뀐 필드만 patch. 항목 키를 돌려준다.</summary>
+    private string PostChange(JObject item)
+    {
+        string kind = item.Value<string>("kind")!;
+        int id = item.Value<int>("id");
+        string key = Map3DOverlay.Key(kind, id);
+        if (!_sent.TryGetValue(key, out var previous))
+        {
+            _sent[key] = item;
+            _post(Map3DOverlay.AddJson(++_rev, item));
+        }
+        else if (Map3DOverlay.Diff(previous, item) is { } set)
+        {
+            _sent[key] = item;
+            _post(Map3DOverlay.PatchJson(++_rev, kind, id, set));
+        }
+        return key;
+    }
+
+    private sealed record IconEntry(Map3DOverlayIcon? Icon, string? DataUrl);
     private sealed record Blob(string Key, string DataUrl);
 }

@@ -107,7 +107,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     {
         if (MainMap == null) return;
         if (_map3DState == Map3DState.Shown) Leave3D(null, "area-view");
-        else if (_map3DState == Map3DState.Pending) { _map3DState = Map3DState.Off; SetMap3DBusy(null); Map3DHost.Park(); }
+        else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
 
         var (lat, lon) = Map3DGuide.AreaCenter(item.Bbox);
         _map3DEntrySuppressed = false;
@@ -154,7 +154,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             if (_map3DJob == item.Id)
             {
                 if (_map3DState == Map3DState.Shown) Leave3D(_map3DLastCamera, "area-delete");
-                else if (_map3DState == Map3DState.Pending) { _map3DState = Map3DState.Off; SetMap3DBusy(null); Map3DHost.Park(); }
+                else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
             }
             bool removed = await _map3DClient.DeleteSceneAsync(item.Id, cancellationToken);
             RemoveMap3DArea(item.Id);

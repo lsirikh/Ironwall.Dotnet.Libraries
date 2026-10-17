@@ -15,6 +15,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
                     map-3d 의 ready 가 늦거나 안 올 수 있어, ready 전에는 1×1 로 "보이되 안 보이게" 둔다. ready 뒤 Reveal 로 펼친다.
                   ★ 기본은 WebView2CompositionControl(WPF 안에서 그림) — 네이티브 창 WebView2 는 펼친 동안 같은 자리의 WPF
                     (상세 창 · 카메라 상자 · 조립 카드 · 상태 배너)를 덮었다(공역, 2026-10-17). UseComposition=false 면 네이티브 창.
+                  ★ 전환 시간(2026-10-17 실측 첫 진입 5.7 s 중 WebView2 기동 4.36 s): 지도가 뜬 뒤 PrewarmAsync 로 기동만 미리 해 두고,
+                    줌 15 이상 영역 안이면 VM 이 장면을 1×1 로 미리 연다. ready · rendered 시각을 남겨 전환 시간 로그에 쓴다.
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
 ****************************************************************************/
 public sealed class Map3DViewHost : Grid
@@ -25,10 +27,30 @@ public sealed class Map3DViewHost : Grid
     /// <summary>처음 WebView2 를 만들 때 쓸 방식 — true 면 WebView2CompositionControl(공역 없음). 만든 뒤 바꾸면 다음 실행부터.</summary>
     public bool UseComposition { get; set; } = true;
     private bool _coreHooked;
+    private Task? _coreTask;
     private string? _job;
     private string? _url;
     private bool _ready;
+    private bool _rendered;
+    private bool _failed;
+    private ulong _navigationId;
     private bool _guarding;
+
+    /// <summary>지금 열었거나 여는 장면(실패했어도 남는다 — 같은 장면을 다시 미리 열지 않게). 없으면 null.</summary>
+    public string? Job => _job;
+
+    /// <summary>장면을 불러오는 중인가(ready 전 · 실패 아님).</summary>
+    public bool IsLoading => _job != null && !_ready && !_failed;
+
+    /// <summary>WebView2 기동(EnsureCoreWebView2) 끝 시각(UTC) — 미리 데우기 판정 · 전환 시간 로그. 아직이면 null.</summary>
+    public DateTime? CoreReadyAt { get; private set; }
+
+    /// <summary>지금 장면의 ready · rendered 받은 시각(UTC). 아직이면 null.</summary>
+    public DateTime? ReadyAt { get; private set; }
+    public DateTime? RenderedAt { get; private set; }
+
+    /// <summary>지금 장면이 <paramref name="job"/> 이고 rendered(오버레이 적용 + 한 프레임)까지 받았는가.</summary>
+    public bool IsRenderedFor(string job) => _rendered && IsReadyFor(job);
 
     /// <summary>지금 쓰는 방식 — "composition"(WPF 안, 오버레이가 3D 위에 보임) · "hwnd"(네이티브 창) · "none"(아직 안 만듦).</summary>
     public string HostMode => _el is WebView2CompositionControl ? "composition" : _el != null ? "hwnd" : "none";
@@ -36,7 +58,7 @@ public sealed class Map3DViewHost : Grid
     /// <summary>CompositionControl 을 쓸 수 없어 네이티브 창으로 바꿨다(사유) — 로그용.</summary>
     public event Action<string>? HostFallback;
 
-    /// <summary>3D → GIS 메시지(ready · camera · pick · overlay.resync). ready 는 이 호스트가 먼저 기록한 뒤 올린다.</summary>
+    /// <summary>3D → GIS 메시지(ready · rendered · camera · pick · overlay.resync). ready · rendered 는 이 호스트가 먼저 기록한 뒤 올린다.</summary>
     public event Action<Map3DMessage>? MessageReceived;
 
     /// <summary>WebView2 초기화 또는 탐색 실패(사유 문구).</summary>
@@ -55,27 +77,52 @@ public sealed class Map3DViewHost : Grid
         Park();
         _job = job;
         _url = url;
-        _ready = false;
+        _ready = _rendered = _failed = false;
+        ReadyAt = RenderedAt = null;
         try
         {
-            await _web!.EnsureCoreWebView2Async();
-            if (!_coreHooked)
-            {
-                _web.CoreWebView2.WebMessageReceived += (_, e) => OnWebMessage(e.WebMessageAsJson);
-                _web.CoreWebView2.NavigationCompleted += (_, e) =>
-                {
-                    if (!e.IsSuccess) LoadFailed?.Invoke($"3D 화면을 열지 못했습니다({e.WebErrorStatus})");
-                };
-                _coreHooked = true;
-            }
+            await EnsureCoreAsync();
         }
         catch (Exception ex)
         {
+            if (_job == job) _failed = true;
             LoadFailed?.Invoke($"3D 화면(WebView2)을 준비하지 못했습니다: {ex.Message}");
             return;
         }
-        if (_job != job) return;   // 기다리는 사이 다른 장면 요청이 왔다
+        if (_job != job || _web?.CoreWebView2 == null) return;   // 기다리는 사이 다른 장면 요청이 왔다
         _web.CoreWebView2.Navigate(url);
+    }
+
+    /// <summary>
+    /// 미리 데우기 — WebView2 를 만들고 EnsureCoreWebView2 까지만 해 둔다(1×1 대기, 탐색 없음). 첫 3D 진입의 WebView2 기동 시간을 없앤다.
+    /// 실패는 LoadFailed 로 알리고 삼킨다(진입 때 다시 시도).
+    /// </summary>
+    public async Task PrewarmAsync()
+    {
+        EnsureWebView();
+        try { await EnsureCoreAsync(); }
+        catch (Exception ex) { LoadFailed?.Invoke($"3D 화면(WebView2)을 미리 준비하지 못했습니다: {ex.Message}"); }
+    }
+
+    /// <summary>WebView2 기동은 한 번만(미리 데우기 · 장면 열기가 같은 Task 를 기다린다). 끝나면 메시지 · 탐색 이벤트를 1회 붙인다.</summary>
+    private async Task EnsureCoreAsync()
+    {
+        var web = _web!;
+        try { await (_coreTask ??= web.EnsureCoreWebView2Async()); }
+        catch { if (ReferenceEquals(web, _web)) _coreTask = null; throw; }
+        if (!ReferenceEquals(web, _web)) return;   // 기다리는 사이 네이티브 창 방식으로 바뀌었다
+        CoreReadyAt ??= DateTime.UtcNow;
+        if (_coreHooked) return;
+        web.CoreWebView2.WebMessageReceived += (_, e) => OnWebMessage(e.WebMessageAsJson);
+        web.CoreWebView2.NavigationStarting += (_, e) => _navigationId = e.NavigationId;
+        web.CoreWebView2.NavigationCompleted += (_, e) =>
+        {
+            // 새 장면으로 바꿔 탐색하면 앞 탐색이 취소로 끝난다 — 지금 탐색의 실패만 알린다
+            if (e.IsSuccess || e.NavigationId != _navigationId) return;
+            _failed = true;
+            LoadFailed?.Invoke($"3D 화면을 열지 못했습니다({e.WebErrorStatus})");
+        };
+        _coreHooked = true;
     }
 
     /// <summary>지도 칸 전체로 펼치고 포커스를 준다.</summary>
@@ -136,6 +183,7 @@ public sealed class Map3DViewHost : Grid
         }
         System.Windows.Automation.AutomationProperties.SetAutomationId(_el, "GMaps.Map3D.View");
         Children.Add(_el);
+        Park();   // 만들자마자 1×1 대기(미리 데우기 중 지도를 덮지 않게)
     }
 
     /// <summary>CompositionControl 실행에 필요한 Windows SDK 투영이 있는가 — 없으면 Loaded 순간 처리되지 않은 예외로 앱이 죽는다(2026-10-17 실기).</summary>
@@ -162,7 +210,7 @@ public sealed class Map3DViewHost : Grid
         var old = _el;
         Children.Remove(old);
         (old as IDisposable)?.Dispose();
-        _web = null; _el = null; _coreHooked = false; _ready = false; IsRevealed = false;
+        _web = null; _el = null; _coreHooked = false; _coreTask = null; _ready = false; IsRevealed = false;
         UseComposition = false;
         HostFallback?.Invoke(reason);
         if (_job is { } job && _url is { } url) _ = LoadAsync(job, url);
@@ -172,7 +220,8 @@ public sealed class Map3DViewHost : Grid
     {
         var msg = Map3DMath.ParseMessage(json);
         if (msg == null) return;
-        if (msg.Type == "ready") _ready = true;
+        if (msg.Type == "ready") { _ready = true; ReadyAt = DateTime.UtcNow; }
+        if (msg.Type == "rendered") { _rendered = true; RenderedAt = DateTime.UtcNow; }
         MessageReceived?.Invoke(msg);
     }
 }
