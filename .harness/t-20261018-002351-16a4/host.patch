@@ -1,8 +1,8 @@
 diff --git a/Dotnet.Monitoring.Solution/Help/HostHelp.cs b/Dotnet.Monitoring.Solution/Help/HostHelp.cs
-index 5783e3c4..9fb665e3 100644
+index 5783e3c4..6e13f78e 100644
 --- a/Dotnet.Monitoring.Solution/Help/HostHelp.cs
 +++ b/Dotnet.Monitoring.Solution/Help/HostHelp.cs
-@@ -50,17 +50,21 @@ public static class HostHelp
+@@ -50,23 +50,28 @@ public static class HostHelp
          HelpEntry.Create(SettingsMap, "지도 설정",
                  "지도 선택 · 기본맵 폴더는 바꾸면 프로그램을 다시 시작해야 반영됩니다.",
                  "기본맵 폴더의 [찾아보기] 는 폴더만 고릅니다 — 저장은 아래 [저장] 을 누르세요.",
@@ -27,8 +27,16 @@ index 5783e3c4..9fb665e3 100644
                  "**미리 준비하는 줌**부터 3D 화면을 미리 불러 둬 3D 로 바뀔 때 빨리 뜹니다. 2D 로 돌아가는 줌보다 크게 둘 수 없습니다.",
                  "**안내 표시 시간** — 3D 로 바뀔 때 안내를 적어도 이만큼(초) 보입니다. 0 이면 준비되는 대로 바로 바뀝니다.")
              .With("영역",
+                 "**영역 표시 줌** 이상에서 2D 지도에 3D 영역 테두리와 배지가 보입니다.",
+                 "**영역 최대 크기** — 3D 로 만들 영역 한 변의 최대 길이(m)입니다. 3D 서버가 받는 크기보다 크게 두면 만들기가 실패할 수 있습니다.",
+-                "**기본 만들기 방식** — 영역에 오버레이 이미지가 있을 때 처음 골라져 있는 방식입니다(지도에서 고르면 그 값으로 바뀝니다).")
++                "**기본 만들기 방식** — 영역에 오버레이 이미지가 있을 때 처음 골라져 있는 방식입니다(지도에서 고르면 그 값으로 바뀝니다).",
++                "**오버레이를 사진으로(건물 유지)** — 올린 사진이 지도 사진보다 좋을 때. 건물은 지도 자료로 세웁니다. **오버레이로 가리기(보안)** — 보안상 가린 구역. 그 범위의 실제 건물 · 사진을 지웁니다. **+ 건물 찾기** — 가리기에 더해 그림에서 건물 모양을 찾아 세웁니다(정확도 낮음).")
+             .With("연결",
+                 "**3D 서버 주소** — 3D 지도를 만들고 보여 주는 서버입니다(예: http://127.0.0.1:8765).",
+                 "**WPF 안에서 그리기** — 켜 두면 3D 위에도 상세 창 · 카메라 상자가 보입니다. 끄면 더 빠르지만 그 창들이 3D 에 가려집니다. 바꾸면 프로그램을 다시 시작해야 반영됩니다."),
 diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
-index ee271f66..56bbd3b9 100644
+index ee271f66..9e0d58cd 100644
 --- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
 +++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
 @@ -60,7 +60,7 @@ internal static class SettingsCatalog
@@ -107,6 +115,18 @@ index ee271f66..56bbd3b9 100644
                  Number("map3d.ExitZoom", "2D 로 돌아가는 줌", "Map3D.ExitZoom",
                         () => vm().ExitZoom, v => vm().ExitZoom = AsDouble(v), Map3DZoomRange).InGroup(Map3DSwitchGroup),
                  Number("map3d.PreloadZoom", "미리 준비하는 줌", "Map3D.PreloadZoom",
+@@ -378,8 +392,9 @@ internal static class SettingsCatalog
+     internal static readonly IReadOnlyList<SettingsChoice> Map3DOverlayModes = new[]
+     {
+         new SettingsChoice("위성 타일만", "tiles"),
+-        new SettingsChoice("오버레이 이미지 포함", "composite"),
+-        new SettingsChoice("오버레이 이미지 포함 + 건물 추출", "extract"),
++        new SettingsChoice("오버레이를 사진으로(건물 유지)", "photo"),
++        new SettingsChoice("오버레이로 가리기(보안)", "mask"),
++        new SettingsChoice("오버레이로 가리기 + 건물 찾기", "extract"),
+     };
+     #endregion
+ 
 diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs
 index 290f8e2e..ee0dc6f1 100644
 --- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs
@@ -127,7 +147,7 @@ index 290f8e2e..ee0dc6f1 100644
      /// </summary>
      public static string? Map3DZoomOrder(object? enterZoom, object? exitZoom, object? preloadZoom)
 diff --git a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
-index 49f08b4e..a5810dd0 100644
+index 49f08b4e..51fbc4fa 100644
 --- a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
 +++ b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
 @@ -9,6 +9,7 @@ namespace Dotnet.Monitoring.Solution.Tests.SetupPanels;
@@ -156,7 +176,23 @@ index 49f08b4e..a5810dd0 100644
                      "영역 표시 줌", "영역 최대 크기", "기본 만들기 방식", "3D 서버 주소", "WPF 안에서 그리기" },
              section.Fields.Select(f => f.Label).ToArray());
          CollectionAssert.AreEqual(new[] { "전환", "영역", "연결" }, section.Fields.Select(f => f.Group).Distinct().ToArray());
-@@ -129,17 +130,16 @@ public class Map3DSettingsSectionTests
+@@ -95,11 +96,13 @@ public class Map3DSettingsSectionTests
+     }
+ 
+     [TestMethod]
+-    public void should_offer_three_bake_modes_when_overlay_mode_field_opened()
++    public void should_offer_four_bake_modes_when_overlay_mode_field_opened()
+     {
+         var form = Form();
+         var mode = Field(form, "map3d.OverlayMode");
+-        CollectionAssert.AreEqual(new[] { "tiles", "composite", "extract" }, mode.Options.Select(o => o.Value).ToArray());
++        CollectionAssert.AreEqual(new[] { "tiles", "photo", "mask", "extract" }, mode.Options.Select(o => o.Value).ToArray());
++        CollectionAssert.AreEqual(new[] { "위성 타일만", "오버레이를 사진으로(건물 유지)", "오버레이로 가리기(보안)", "오버레이로 가리기 + 건물 찾기" },
++                                  mode.Options.Select(o => o.Display).ToArray(), "지도 만들기 패널과 같은 말");
+         Assert.AreEqual("위성 타일만", mode.SelectedChoice?.Display);
+     }
+ 
+@@ -129,17 +132,16 @@ public class Map3DSettingsSectionTests
      }
  
      [TestMethod]
@@ -180,7 +216,7 @@ index 49f08b4e..a5810dd0 100644
          Assert.IsFalse(form.HasError);
      }
  
-@@ -147,7 +147,7 @@ public class Map3DSettingsSectionTests
+@@ -147,7 +149,7 @@ public class Map3DSettingsSectionTests
      public void should_clear_order_error_when_draft_is_reverted()
      {
          var form = Form();
@@ -189,7 +225,7 @@ index 49f08b4e..a5810dd0 100644
          Assert.IsTrue(form.HasError);
  
          form.Revert();
-@@ -159,7 +159,7 @@ public class Map3DSettingsSectionTests
+@@ -159,7 +161,7 @@ public class Map3DSettingsSectionTests
      // ── 칸 하나의 범위 ──
  
      [DataTestMethod]
@@ -198,7 +234,16 @@ index 49f08b4e..a5810dd0 100644
      [DataRow("map3d.AreaShowZoom", "9.5")]
      [DataRow("map3d.MaxAreaSideM", "100")]
      [DataRow("map3d.MaxAreaSideM", "6000")]
-@@ -211,7 +211,7 @@ public class Map3DSettingsSectionTests
+@@ -183,7 +185,7 @@ public class Map3DSettingsSectionTests
+         Field(form, "map3d.ServerUrl").Text = "http://10.0.0.5:8765";
+         Field(form, "map3d.IsEnabled").BoolValue = false;
+         Field(form, "map3d.UseCompositionHost").BoolValue = false;
+-        Field(form, "map3d.OverlayMode").SelectedChoice = Field(form, "map3d.OverlayMode").Options[2];
++        Field(form, "map3d.OverlayMode").SelectedChoice = Field(form, "map3d.OverlayMode").Options[3];
+ 
+         Assert.AreEqual(4, form.Save());
+         Assert.AreEqual("http://10.0.0.5:8765", _port.ServerUrl);
+@@ -211,7 +213,7 @@ public class Map3DSettingsSectionTests
  
      [DataTestMethod]
      [DataRow("바로 반영")]
@@ -207,7 +252,7 @@ index 49f08b4e..a5810dd0 100644
      [DataRow("영역 최대 크기")]
      [DataRow("다시 시작해야 반영")]
      public void should_explain_section_in_question_mark_when_help_key_resolved(string phrase)
-@@ -219,4 +219,99 @@ public class Map3DSettingsSectionTests
+@@ -219,4 +221,99 @@ public class Map3DSettingsSectionTests
          Assert.IsTrue(HelpCatalog.TryGet(HostHelp.SettingsMap3D, out var entry));
          StringAssert.Contains(entry.ToPlainText(), phrase);
      }

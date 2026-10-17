@@ -11,6 +11,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
    Note         : ★ 규약(GIS ↔ map-3d, 2026-10-17): POST /api/jobs 본문에 overlay_mode("tiles" | "composite" | "extract") ·
                     overlays([{id,title,image_path,bounds{left,top,right,bottom},rotation,opacity,mask}]) 를 더한다.
                     tiles 면 overlays 는 보내지 않고 본문을 예전 그대로(bbox 만) 둔다 — 옛 서버와도 맞는다.
+                  ★ 2026-10-18(실기: 오버레이로 만들면 건물이 하나도 안 서고 그림만 깔림 — 모든 이미지를 mask=true 로 보내
+                    map-3d 가 그 범위의 실제 건물을 지웠다): GIS 만들기 방식은 넷 — tiles · photo(사진으로, 건물 유지 · 기본) ·
+                    mask(가리기, 보안) · extract(가리기 + 건물 찾기). 서버로는 overlay_mode(ServerOverlayMode) + 이미지마다 mask(MaskFor)로 바꿔 보낸다.
+                    옛 설정값 "composite"(그때는 늘 가림)는 mask 로 읽는다.
                   ★ 서버는 PNG/JPG · 50 MB 이하만 받는다 — 그 밖(TIF 등)은 GIS 가 PNG/JPG 로 바꾼 캐시 파일을 보낸다(NeedsConversion).
                   WPF 무의존 — tests/GMaps.Ui.Tests 가 실코드를 링크해 시험한다.
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
@@ -23,24 +27,38 @@ public sealed record Map3DBakeOverlay(
 
 public static class Map3DBake
 {
-    /// <summary>위성 타일만 — 오버레이 이미지는 3D 화면에서 덮기만 한다(기본).</summary>
+    /// <summary>위성 타일만 — 오버레이 이미지는 3D 화면에서 덮기만 한다.</summary>
     public const string ModeTiles = "tiles";
-    /// <summary>오버레이 이미지를 지형 텍스처에 합성.</summary>
+    /// <summary>서버 overlay_mode "composite"(이미지를 지형 텍스처에 합성) — GIS 방식으로는 옛 설정값(= <see cref="ModeMask"/>).</summary>
     public const string ModeComposite = "composite";
-    /// <summary>합성 + 이미지에서 건물 윤곽을 찾아 3D 건물로.</summary>
+    /// <summary>가리기 + 이미지에서 건물 윤곽을 찾아 3D 건물로(서버 overlay_mode 도 "extract").</summary>
     public const string ModeExtract = "extract";
+    /// <summary>오버레이를 사진으로(건물 유지, 기본) — composite + mask=false: 실제 건물은 세우고 지면 · 지붕 그림만 오버레이 사진.</summary>
+    public const string ModePhoto = "photo";
+    /// <summary>오버레이로 가리기(보안) — composite + mask=true: 그 범위의 실제 건물 · 사진을 지운다.</summary>
+    public const string ModeMask = "mask";
 
     /// <summary>서버가 받는 이미지 크기 상한(50 MB — 1000 단위로 작게 잡는다).</summary>
     public const long MaxImageBytes = 50_000_000;
 
     private const double MetersPerDegree = 111_320d;
 
-    /// <summary>알 수 없는 값 · 빈 값은 tiles.</summary>
+    /// <summary>GIS 만들기 방식 — tiles · photo · mask · extract. 옛 값 "composite" 는 mask, 알 수 없는 값 · 빈 값은 tiles.</summary>
     public static string NormalizeMode(string? mode)
     {
         string m = mode?.Trim().ToLowerInvariant() ?? "";
-        return m is ModeComposite or ModeExtract ? m : ModeTiles;
+        return m == ModeComposite ? ModeMask : m is ModePhoto or ModeMask or ModeExtract ? m : ModeTiles;
     }
+
+    /// <summary>서버 overlay_mode — tiles → "tiles", photo · mask → "composite", extract → "extract".</summary>
+    public static string ServerOverlayMode(string? mode) => NormalizeMode(mode) switch
+    {
+        ModePhoto or ModeMask => ModeComposite,
+        var m => m,
+    };
+
+    /// <summary>이미지마다 보낼 mask — 가리기 방식(mask · extract)만 true. photo 는 false(실제 건물 · 사진을 지우지 않는다).</summary>
+    public static bool MaskFor(string? mode) => NormalizeMode(mode) is ModeMask or ModeExtract;
 
     /// <summary>방식 고르기(라디오)를 보일지 — 영역과 겹치는 오버레이 이미지가 하나라도 있을 때만. 패널 자체는 줌을 고르게 늘 띄운다(2026-10-18).</summary>
     public static bool ShouldAsk(int overlayCount) => overlayCount > 0;
@@ -83,7 +101,8 @@ public static class Map3DBake
     }
 
     /// <summary>
-    /// 굽기 요청 본문(POST /api/jobs). tiles 면 {"bbox":[...]} 그대로, 아니면 overlay_mode · overlays 를 더한다.
+    /// 굽기 요청 본문(POST /api/jobs). tiles 면 {"bbox":[...]} 그대로, 아니면 overlay_mode(<see cref="ServerOverlayMode"/>) · overlays 를 더한다.
+    /// 이미지의 mask 는 방식이 가리기일 때만 그 이미지 값을 따르고, photo 면 늘 false(<see cref="MaskFor"/>).
     /// 회전은 [0, 360), 투명도는 0~1 로 자른다.
     /// </summary>
     public static JObject BuildBody(double[] bbox, string? mode, IEnumerable<Map3DBakeOverlay>? overlays)
@@ -99,7 +118,8 @@ public static class Map3DBake
         if (enterZoom is double z && double.IsFinite(z)) body["enter_zoom"] = z;
         string m = NormalizeMode(mode);
         if (m == ModeTiles) return body;
-        body["overlay_mode"] = m;
+        body["overlay_mode"] = ServerOverlayMode(m);
+        bool mask = MaskFor(m);
         body["overlays"] = new JArray((overlays ?? Enumerable.Empty<Map3DBakeOverlay>()).Select(o =>
         {
             double r = (double.IsFinite(o.Rotation) ? o.Rotation : 0d) % 360d;
@@ -111,7 +131,7 @@ public static class Map3DBake
                 ["bounds"] = new JObject { ["left"] = o.Left, ["top"] = o.Top, ["right"] = o.Right, ["bottom"] = o.Bottom },
                 ["rotation"] = r < 0 ? r + 360d : r,
                 ["opacity"] = Math.Clamp(double.IsFinite(o.Opacity) ? o.Opacity : 1d, 0d, 1d),
-                ["mask"] = o.Mask,
+                ["mask"] = mask && o.Mask,
             };
         }));
         return body;

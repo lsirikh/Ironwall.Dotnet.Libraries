@@ -48,3 +48,21 @@
   그래서 Map3DSettingsSectionTests 의 기대값을 바꿨다: 칸 10개 → 9개(3D 로 바뀌는 줌 빠짐), map3d.EnterZoom 칸을 쓰던 세 시험은 ExitZoom · PreloadZoom 으로, "?" 문구 한 줄("3D 로 바뀌는 줌보다 작아야" → "3D 최소 줌보다 작아야").
 - why: 「3D 지도」 절에서 그 칸이 빠졌으므로 막대 · "?" 가 없는 칸 이름을 말하면 사용자가 찾지 못한다.
 - effect: host.patch 안. 지도 절 새 칸 시험 8개를 같은 파일에 더했다.
+
+## 9. 만들기 방식 넷(추가 요구) — mask 값을 어디서 정할까
+- options: (a) 굽기 본문(Map3DBake.BuildBody)이 방식으로 정한다 (b) 화면(VM)이 이미지를 모을 때 방식에 맞춰 Map3DBakeOverlay.Mask 를 채운다
+- chosen: (a) — 이미지 mask = MaskFor(방식) && 그 이미지의 Mask. photo 면 늘 false, mask · extract 면 이미지 값(지금은 모두 true). overlay_mode 는 ServerOverlayMode(photo · mask → "composite").
+- why: 방식 → 본문 변환이 순수 함수 한 곳에 모여 시험으로 못 박히고, 이미지를 모으는 시점(방식 고르기 전)과 무관하다.
+- effect: Map3DBakeOverlay.Mask 는 "가리기 방식일 때 이 이미지를 가림에 쓰는가"의 뜻이 된다. 서버 규약이 바뀌면 Map3DBake.ServerOverlayMode · MaskFor 만 고치면 된다.
+
+## 10. 알 수 없는 설정값의 방식
+- options: 새 기본(photo)으로 / 예전처럼 tiles 로
+- chosen: 새 설정(키 없음)은 photo, 알 수 없는 글자는 예전처럼 tiles. 옛 "composite" 는 목표대로 mask.
+- why: 기본값은 목표대로 바꾸되, 망가진 값에 대해서는 이미지를 보내지 않는 가장 보수적인 쪽을 유지(기존 시험 그대로).
+- effect: Map3DBake.NormalizeMode · Map3DModel.Normalize 의 마지막 분기만 바꾸면 된다.
+
+## 11. 라디오 · 도움말 이름
+- options: 옛 AutomationId · HelpKey(Composite) 재사용 / 새 이름(Photo · Mask)
+- chosen: 새 이름 GMaps.Map3D.BakeOptions.Photo · .Mask, Map.Map3D.BakePhoto · BakeMask(옛 BakeComposite 도움말은 지웠다 — 쓰는 곳 없음). VM 의 공개 속성 IsMap3DBakeComposite 는 IsMap3DBakeMask 의 옛 이름으로 남겼다(공개 형식 더하기만).
+- why: 옛 "그림 합성"은 늘 가렸으므로 뜻이 바뀐 칸에 같은 이름을 두면 자동화 · 문서가 엉뚱한 칸을 가리킨다. 메인 앱 · 시험에서 옛 이름을 쓰는 곳은 없다(검색 확인).
+- effect: ④ 의 "?" 첫 줄은 화면에 번호가 없어 "③ +" 대신 "가리기 + 그림에서 건물 모양을 찾아 세운다(정확도 낮음)" 로 적었다.

@@ -14,10 +14,14 @@
 - [x] 시험: tests/GMaps.Ui.Tests/Map3DAreaZoomTests.cs — GMaps.Ui.Tests 1147 통과
 - [x] 메인 앱(복사본에서 빌드 · 시험): SettingsCatalog.MapSection 칸 · Map3DSection 칸 빼기 · 검증 문구 · HostHelp · Map3DSettingsSectionTests → `.harness/t-20261018-002351-16a4/host.patch`
       메인 앱 시험(Window/Startup/Headed 제외) 817 통과 · 0 실패. 원본 사본에 `git apply` → 작업본과 바이트 동일 확인.
-- [x] 정리: 복사본 · 정션(claude-skill-harness-h3d) 지움
+- [x] 추가 요구(실기: 오버레이로 만들면 건물이 안 섬): 만들기 방식 넷 — tiles · photo(새 기본, composite + mask=false) · mask(composite + mask=true) · extract.
+      Map3DBake.NormalizeMode(옛 composite → mask) · ServerOverlayMode · MaskFor · BuildBody, Map3DModel 기본 photo, 패널 라디오 넷 + "?" 셋, 메인 앱 「기본 만들기 방식」 선택지 넷(host.patch 갱신).
+      GMaps.Ui.Tests 1158 통과 · 메인 앱 시험 817 통과 · host.patch 원본 적용 검증.
+- [x] 정리: 복사본 · 정션(claude-skill-harness-h3d) 지움(두 번 — 추가 요구 때 다시 만들었다가 지움)
 - [x] 검증: dotnet test Ironwall.Dotnet.Libraries.sln — 시험 어셈블리 10개 모두 통과(실패 0)
 
 ## 발견
+- 하네스 첫 검사에서 CameraPopup.Tests `EventWindowTileStreamTests.should_close_with_timer_reason_when_timer_elapses_in_host`(900~3000 ms 예산, 실측 4283 ms)가 실패 — 이번 변경과 무관한 시간 예산 시험(기계가 바쁠 때). 바로 앞 실행에서는 통과했다.
 - 복사본에서 메인 앱 시험을 돌리려면 Dotnet.Monitoring.Solution.sln + Installer\ 도 있어야 한다(InstallerSource.FindRepoRoot) — 없으면 설치 · 옛 서버 시험 22개가 실패한다.
 - worktree 안 하위 폴더에서 `git apply` 하면 저장소 기준 경로라 조용히 아무것도 안 한다 → GIT_CEILING_DIRECTORIES 로 저장소 밖처럼 돌려 확인했다.
 - map-3d 가 enter_zoom 을 아직 기록하지 않으면(별도 작업) 새로 만든 영역도 목록을 다시 받은 뒤엔 세팅값을 쓴다 — 목표대로 GIS 는 보내기만 한다.

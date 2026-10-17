@@ -12,7 +12,8 @@ using System.Windows.Media.Imaging;
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
    Purpose      : 지도 3D 굽기 방식 고르기(오버레이 이미지 포함 여부) — 영역 그리기 · 배지 「다시 만들기」 직후, 굽기 시작 전.
-                  "3D 만들기 — ○ 위성 타일만 ○ 오버레이 이미지 포함(그림 합성) ○ 오버레이 이미지 포함 + 건물 추출" + [만들기] [취소]
+                  "3D 만들기 — ○ 위성 타일만 ○ 오버레이를 사진으로(건물 유지, 기본) ○ 오버레이로 가리기(보안) ○ 오버레이로 가리기 + 건물 찾기"
+                  + [만들기] [취소](2026-10-18 방식 넷 — 요청 본문 · mask 는 Map3DBake.ServerOverlayMode · MaskFor)
                   (MapView.xaml "GMaps.Map3D.BakeOptions"). 기본은 마지막 고른 값(appsettings Map3D.OverlayMode).
    Note         : ★ 영역과 겹치는(회전 포함) 보이는 오버레이 이미지가 하나도 없으면 방식은 묻지 않고(라디오 숨김) tiles 로 굽는다.
                   ★ 영역마다 3D 줌(2026-10-18): 패널은 늘 띄워 "3D 로 바뀌는 줌"(15~19, 0.5 단위, 기본 = 세팅의 3D 최소 줌)을 고른다 —
@@ -55,7 +56,12 @@ public partial class MapViewModel
     public double Map3DBakeEnterZoom { get => _map3DBakeEnterZoom; set { _map3DBakeEnterZoom = Map3DGuide.EnterZoomChoiceFor(value); NotifyOfPropertyChange(); } }
 
     public bool IsMap3DBakeTiles { get => _map3DBakeMode == Map3DBake.ModeTiles; set { if (value) SetMap3DBakeMode(Map3DBake.ModeTiles); } }
-    public bool IsMap3DBakeComposite { get => _map3DBakeMode == Map3DBake.ModeComposite; set { if (value) SetMap3DBakeMode(Map3DBake.ModeComposite); } }
+    /// <summary>오버레이를 사진으로(건물 유지).</summary>
+    public bool IsMap3DBakePhoto { get => _map3DBakeMode == Map3DBake.ModePhoto; set { if (value) SetMap3DBakeMode(Map3DBake.ModePhoto); } }
+    /// <summary>오버레이로 가리기(보안).</summary>
+    public bool IsMap3DBakeMask { get => _map3DBakeMode == Map3DBake.ModeMask; set { if (value) SetMap3DBakeMode(Map3DBake.ModeMask); } }
+    /// <summary>옛 이름 — 예전 "그림 합성"은 늘 가렸으므로 <see cref="IsMap3DBakeMask"/> 와 같다.</summary>
+    public bool IsMap3DBakeComposite { get => IsMap3DBakeMask; set => IsMap3DBakeMask = value; }
     public bool IsMap3DBakeExtract { get => _map3DBakeMode == Map3DBake.ModeExtract; set { if (value) SetMap3DBakeMode(Map3DBake.ModeExtract); } }
 
     private RelayCommand? _confirmMap3DBakeOptionsCommand;
@@ -74,6 +80,8 @@ public partial class MapViewModel
     {
         _map3DBakeMode = Map3DBake.NormalizeMode(mode);
         NotifyOfPropertyChange(nameof(IsMap3DBakeTiles));
+        NotifyOfPropertyChange(nameof(IsMap3DBakePhoto));
+        NotifyOfPropertyChange(nameof(IsMap3DBakeMask));
         NotifyOfPropertyChange(nameof(IsMap3DBakeComposite));
         NotifyOfPropertyChange(nameof(IsMap3DBakeExtract));
     }
