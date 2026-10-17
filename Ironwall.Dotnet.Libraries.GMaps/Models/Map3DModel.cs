@@ -5,6 +5,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Models;
 /****************************************************************************
    Purpose      : 지도 3D 바꿔 끼우기(map-3d POC) 설정 — AppSettings.Map3D.
                   3D 게이트 켜기(기본 켜짐) + map-3d 서버 주소(기본 http://127.0.0.1:8765).
+                  전환 줌 · 영역 표시 줌 · 영역 최대 크기 · 안내 시간(2026-10-17, 메인 앱 설정 「3D 지도」 절에서 고친다).
                   로드: MapSettingsHelper.LoadMap3D(키 부재 = 기본값). MapTiltModel 과 같은 방식(기본값 + Normalize).
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
  ****************************************************************************/
@@ -26,9 +27,43 @@ public class Map3DModel
     /// <summary>오버레이 이미지 기본 굽기 방식(마지막 고른 값) — "tiles"(기본, 위성 타일만) | "composite"(그림 합성) | "extract"(합성 + 건물 추출).</summary>
     public string OverlayMode { get; set; } = "tiles";
 
-    /// <summary>주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 굽기 방식이 셋 중 하나가 아니면 tiles. 주소가 바뀌었으면 true.</summary>
+    // ── 전환 · 영역 값(설정 화면 「3D 지도」, 기본값 = 2026-10-17 까지의 고정값) ──
+
+    public const double MinZoom = 10d, MaxZoom = 20.5d;
+    public const double MinAreaSideM = 200d, MaxAreaSideLimitM = 5000d;
+    public const double MaxGuideSeconds = 3d;
+
+    /// <summary>2D → 3D 로 바뀌는 실효줌.</summary>
+    public double EnterZoom { get; set; } = 17.0;
+    /// <summary>3D → 2D 로 돌아가는 줌(EnterZoom 보다 작아야 한다 — 그 사이가 히스테리시스).</summary>
+    public double ExitZoom { get; set; } = 16.5;
+    /// <summary>영역 안이면 3D 장면을 미리 불러오기 시작하는 실효줌(ExitZoom 이하).</summary>
+    public double PreloadZoom { get; set; } = 15.0;
+    /// <summary>2D 지도에 3D 영역 테두리 · 배지를 그리는 최소 실효줌.</summary>
+    public double AreaShowZoom { get; set; } = 13.0;
+    /// <summary>3D 로 만들 수 있는 영역 한 변 최대(m).</summary>
+    public double MaxAreaSideM { get; set; } = 2000d;
+    /// <summary>2D → 3D 전환 안내 최소 표시 시간(초).</summary>
+    public double GuideMinSeconds { get; set; } = 0.6;
+
+    /// <summary>
+    /// 주소가 http/https 절대 주소가 아니면 기본값으로 되돌리고, 끝 '/' 를 뗀다. 굽기 방식이 셋 중 하나가 아니면 tiles.
+    /// 줌은 10~20.5 · 영역 200~5000 m · 안내 0~3 s 로 자르고(수가 아니면 기본값), 이탈 줌 &lt; 진입 줌(아니면 진입 − 0.5) · 미리 준비 ≤ 이탈.
+    /// 주소가 바뀌었으면 true(다른 값 고침은 반환값에 넣지 않는다).
+    /// </summary>
     public bool Normalize()
     {
+        var def = new Map3DModel();
+        EnterZoom = Clamp(EnterZoom, MinZoom, MaxZoom, def.EnterZoom);
+        ExitZoom = Clamp(ExitZoom, MinZoom, MaxZoom, def.ExitZoom);
+        PreloadZoom = Clamp(PreloadZoom, MinZoom, MaxZoom, def.PreloadZoom);
+        AreaShowZoom = Clamp(AreaShowZoom, MinZoom, MaxZoom, def.AreaShowZoom);
+        MaxAreaSideM = Clamp(MaxAreaSideM, MinAreaSideM, MaxAreaSideLimitM, def.MaxAreaSideM);
+        GuideMinSeconds = Clamp(GuideMinSeconds, 0d, MaxGuideSeconds, def.GuideMinSeconds);
+        if (ExitZoom >= EnterZoom) ExitZoom = EnterZoom - 0.5;
+        if (ExitZoom < MinZoom) { ExitZoom = MinZoom; EnterZoom = MinZoom + 0.5; }
+        if (PreloadZoom > ExitZoom) PreloadZoom = ExitZoom;
+
         string mode = OverlayMode?.Trim().ToLowerInvariant() ?? "";
         OverlayMode = mode is "composite" or "extract" ? mode : "tiles";
         string before = ServerUrl;
@@ -40,6 +75,11 @@ public class Map3DModel
         return !string.Equals(before, ServerUrl, StringComparison.Ordinal);
     }
 
+    private static double Clamp(double value, double min, double max, double fallback)
+        => double.IsFinite(value) ? Math.Clamp(value, min, max) : fallback;
+
     public override string ToString()
-        => string.Format(CultureInfo.InvariantCulture, "Map3D[enabled={0}, server={1}, composition={2}, overlay={3}]", IsEnabled, ServerUrl, UseCompositionHost, OverlayMode);
+        => string.Format(CultureInfo.InvariantCulture,
+            "Map3D[enabled={0}, server={1}, composition={2}, overlay={3}, enter={4}, exit={5}, preload={6}, area={7}, maxSide={8}, guide={9}]",
+            IsEnabled, ServerUrl, UseCompositionHost, OverlayMode, EnterZoom, ExitZoom, PreloadZoom, AreaShowZoom, MaxAreaSideM, GuideMinSeconds);
 }

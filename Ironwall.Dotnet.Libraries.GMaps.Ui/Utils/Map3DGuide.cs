@@ -48,6 +48,13 @@ public static class Map3DGuide
         _ => "3D 화면을 여는 중…",
     };
 
+    /// <summary>안내 패널 단계 글 — "login" 글의 이탈 줌을 설정(Map3DModel.ExitZoom)에서 받는다.</summary>
+    public static string StageText(string? stage, double exitZoom)
+        => stage == "login" ? $"지금 3D 지도를 보고 있습니다 (줌 {Zoom(exitZoom)} 밑 · ESC = 2D)" : StageText(stage);
+
+    /// <summary>줌 글 — 17 · 16.5.</summary>
+    public static string Zoom(double zoom) => zoom.ToString("0.##", CultureInfo.InvariantCulture);
+
     /// <summary>글 뒤에 " n %"(percent 가 없으면 글 그대로).</summary>
     public static string WithPercent(string text, double? percent)
         => percent is double p && double.IsFinite(p) ? $"{text} {Math.Clamp(p, 0, 100).ToString("0", CultureInfo.InvariantCulture)} %" : text;
@@ -118,7 +125,16 @@ public static class Map3DGuide
     }
 
     /// <summary>한 변이라도 2 km 를 넘는가.</summary>
-    public static bool IsAreaTooLarge(double widthM, double heightM) => widthM > MaxAreaSideM || heightM > MaxAreaSideM;
+    public static bool IsAreaTooLarge(double widthM, double heightM) => IsAreaTooLarge(widthM, heightM, MaxAreaSideM);
+
+    /// <summary>한 변이라도 설정의 최대 크기(Map3DModel.MaxAreaSideM)를 넘는가.</summary>
+    public static bool IsAreaTooLarge(double widthM, double heightM, double maxSideM) => widthM > maxSideM || heightM > maxSideM;
+
+    /// <summary>최대 크기 글 — 2000 → "2 km", 1500 → "1.5 km", 800 → "800 m".</summary>
+    public static string LimitText(double maxSideM)
+        => maxSideM >= 1000d
+            ? (maxSideM / 1000d).ToString("0.##", CultureInfo.InvariantCulture) + " km"
+            : maxSideM.ToString("0", CultureInfo.InvariantCulture) + " m";
 
     /// <summary>길이 글 — 1 km 이상 "1.25 km", 밑으로 "850 m".</summary>
     public static string FormatLength(double meters)
@@ -130,16 +146,22 @@ public static class Map3DGuide
     public static string FormatAreaSize(double widthM, double heightM) => $"{FormatLength(widthM)} × {FormatLength(heightM)}";
 
     /// <summary>그리는 중 크기 표시 — (글, 경고). 2 km 를 넘으면 글 뒤에 " — 2 km 초과" 와 경고.</summary>
-    public static (string Text, bool IsWarning) AreaDrawLabel(IReadOnlyList<double> bbox)
+    public static (string Text, bool IsWarning) AreaDrawLabel(IReadOnlyList<double> bbox) => AreaDrawLabel(bbox, MaxAreaSideM);
+
+    /// <summary>그리는 중 크기 표시 — 최대 크기를 설정에서 받는다.</summary>
+    public static (string Text, bool IsWarning) AreaDrawLabel(IReadOnlyList<double> bbox, double maxSideM)
     {
         var (w, h) = AreaSizeMeters(bbox);
-        bool warn = IsAreaTooLarge(w, h);
-        return (FormatAreaSize(w, h) + (warn ? " — 2 km 초과" : ""), warn);
+        bool warn = IsAreaTooLarge(w, h, maxSideM);
+        return (FormatAreaSize(w, h) + (warn ? $" — {LimitText(maxSideM)} 초과" : ""), warn);
     }
 
     /// <summary>놓았을 때 너무 크면 배너에 띄우는 이유.</summary>
-    public static string AreaTooLargeText(double widthM, double heightM)
-        => $"영역이 너무 큽니다({FormatAreaSize(widthM, heightM)}) — 한 변 2 km 이하로 다시 그리세요 (ESC = 취소)";
+    public static string AreaTooLargeText(double widthM, double heightM) => AreaTooLargeText(widthM, heightM, MaxAreaSideM);
+
+    /// <summary>놓았을 때 너무 크면 배너에 띄우는 이유 — 최대 크기를 설정에서 받는다.</summary>
+    public static string AreaTooLargeText(double widthM, double heightM, double maxSideM)
+        => $"영역이 너무 큽니다({FormatAreaSize(widthM, heightM)}) — 한 변 {LimitText(maxSideM)} 이하로 다시 그리세요 (ESC = 취소)";
 
     // ── ③ 영역 표시 ──
 
@@ -151,11 +173,24 @@ public static class Map3DGuide
     public const string ChipText = "3D 가능 — 줌 17 이상";
 
     /// <summary>영역 테두리 · 배지를 보일까(실효줌 ≥ 13). NaN 은 false.</summary>
-    public static bool ShouldShowAreaOutlines(double effectiveZoom) => !double.IsNaN(effectiveZoom) && effectiveZoom >= AreaOutlineMinZoom;
+    public static bool ShouldShowAreaOutlines(double effectiveZoom) => ShouldShowAreaOutlines(effectiveZoom, AreaOutlineMinZoom);
+
+    /// <summary>영역 테두리 · 배지를 보일까 — 최소 줌을 설정(Map3DModel.AreaShowZoom)에서 받는다.</summary>
+    public static bool ShouldShowAreaOutlines(double effectiveZoom, double minZoom) => !double.IsNaN(effectiveZoom) && effectiveZoom >= minZoom;
 
     /// <summary>"3D 가능 — 줌 17 이상" 칩 — 3D 가 꺼져 있고 화면 가운데가 3D 영역 안이며 실효줌 &lt; 17.</summary>
     public static bool ShouldShowChip(double effectiveZoom, bool centerInsideArea, bool is3DOff)
-        => is3DOff && centerInsideArea && double.IsFinite(effectiveZoom) && effectiveZoom < Map3DMath.EnterZoom;
+        => ShouldShowChip(effectiveZoom, centerInsideArea, is3DOff, Map3DMath.EnterZoom);
+
+    /// <summary>"3D 가능" 칩 판정 — 진입 줌을 설정에서 받는다.</summary>
+    public static bool ShouldShowChip(double effectiveZoom, bool centerInsideArea, bool is3DOff, double enterZoom)
+        => is3DOff && centerInsideArea && double.IsFinite(effectiveZoom) && effectiveZoom < enterZoom;
+
+    /// <summary>칩 글 — 진입 줌을 설정에서 받는다("3D 가능 — 줌 17 이상").</summary>
+    public static string ChipTextFor(double enterZoom) => $"3D 가능 — 줌 {Zoom(enterZoom)} 이상";
+
+    /// <summary>「이 영역 3D 로 보기」가 옮겨 갈 실효줌 — 17.5, 진입 줌이 그보다 높으면 진입 줌.</summary>
+    public static double AreaViewZoomFor(double enterZoom) => Math.Max(AreaViewZoom, enterZoom);
 
     /// <summary>bbox 가운데(위도, 경도).</summary>
     public static (double Lat, double Lon) AreaCenter(IReadOnlyList<double> bbox)

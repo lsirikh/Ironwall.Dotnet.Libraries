@@ -58,21 +58,30 @@ public static class Map3DMath
     /// 3D 게이트 판정. 장면이 없으면 항상 false. 직전에 3D(또는 3D 준비 중)였으면 <see cref="ExitZoom"/> 이상 유지,
     /// 아니면 <see cref="EnterZoom"/> 이상에서 진입. NaN 은 false.
     /// </summary>
-    public static bool Decide(double zoom, bool wasActive, bool hasScene)
+    public static bool Decide(double zoom, bool wasActive, bool hasScene) => Decide(zoom, wasActive, hasScene, EnterZoom, ExitZoom);
+
+    /// <summary>게이트 판정 — 진입 · 이탈 줌을 설정(Map3DModel.EnterZoom · ExitZoom)에서 받는다.</summary>
+    public static bool Decide(double zoom, bool wasActive, bool hasScene, double enterZoom, double exitZoom)
     {
         if (!hasScene || double.IsNaN(zoom)) return false;
-        return zoom >= (wasActive ? ExitZoom : EnterZoom);
+        return zoom >= (wasActive ? exitZoom : enterZoom);
     }
 
     /// <summary>3D 가 보고한 줌으로 2D 로 돌아가야 하는가(&lt; 16.5).</summary>
-    public static bool ShouldLeave3D(double reportedZoom) => reportedZoom < ExitZoom;
+    public static bool ShouldLeave3D(double reportedZoom) => ShouldLeave3D(reportedZoom, ExitZoom);
+
+    /// <summary>3D 가 보고한 줌으로 2D 로 돌아가야 하는가(&lt; 설정의 이탈 줌).</summary>
+    public static bool ShouldLeave3D(double reportedZoom, double exitZoom) => reportedZoom < exitZoom;
 
     /// <summary>
     /// 3D 표시 중 2D 이동(이벤트 시 지도 이동 · 지도에서 보기)이 끝난 자리에서 3D 를 유지하는가 —
     /// 지금 장면(구운 영역) 안이고 실효줌 ≥ 16.5. 아니면 2D 로 돌아온다. NaN 은 false.
     /// </summary>
-    public static bool ShouldStay3DAfterMove(double effectiveZoom, bool insideScene)
-        => insideScene && !double.IsNaN(effectiveZoom) && effectiveZoom >= ExitZoom;
+    public static bool ShouldStay3DAfterMove(double effectiveZoom, bool insideScene) => ShouldStay3DAfterMove(effectiveZoom, insideScene, ExitZoom);
+
+    /// <summary>2D 이동 뒤 3D 유지 판정 — 이탈 줌을 설정에서 받는다.</summary>
+    public static bool ShouldStay3DAfterMove(double effectiveZoom, bool insideScene, double exitZoom)
+        => insideScene && !double.IsNaN(effectiveZoom) && effectiveZoom >= exitZoom;
 
     /// <summary>
     /// 2D 에서 장면을 1×1 대기 상태로 미리 열까 — 지도 가운데가 구운 장면 안이고 실효줌 ≥ 15, 호스트가 그 장면을 아직 열지 않았고
@@ -80,8 +89,12 @@ public static class Map3DMath
     /// blocked = 3D 설정 꺼짐 · 3D 표시 · 로딩 중 · 굽는 중 · 입력 모드 중. NaN 은 false.
     /// </summary>
     public static bool ShouldPreload(double effectiveZoom, string? sceneAtCenter, string? hostJob, bool hostLoading, bool blocked)
+        => ShouldPreload(effectiveZoom, sceneAtCenter, hostJob, hostLoading, blocked, PreloadZoom);
+
+    /// <summary>미리 불러오기 판정 — 미리 준비하는 줌을 설정에서 받는다.</summary>
+    public static bool ShouldPreload(double effectiveZoom, string? sceneAtCenter, string? hostJob, bool hostLoading, bool blocked, double preloadZoom)
         => !blocked && !hostLoading && sceneAtCenter != null && sceneAtCenter != hostJob
-           && !double.IsNaN(effectiveZoom) && effectiveZoom >= PreloadZoom;
+           && !double.IsNaN(effectiveZoom) && effectiveZoom >= preloadZoom;
 
     /// <summary>독점 입력 모드(편집 · 선 그리기 · 측정 · 심볼 배치 · 조준 · 홈/앵커 배치) 중에는 3D 에 들어가지 않는다 — 막으면 true.</summary>
     public static bool IsBlockedByInputMode(bool isEditMode, bool isExclusiveInputMode) => isEditMode || isExclusiveInputMode;
