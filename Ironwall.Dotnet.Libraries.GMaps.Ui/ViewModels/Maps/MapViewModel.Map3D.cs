@@ -125,10 +125,13 @@ public partial class MapViewModel
     /// <summary>3D 가 준비됐다 — 안내가 최소 시간(0.6 s)만큼 보였으면 바로 펼치고, 아니면 막대를 채운 채 남은 시간 뒤 펼친다.</summary>
     private void RevealAfterGuide()
     {
-        if (Map3DGuide.Remaining(DateTime.UtcNow - _map3DBusyShownAt, Map3DGuide.MinEnterShow) <= TimeSpan.Zero) { Reveal3D(); return; }
+        if (Map3DGuide.Remaining(DateTime.UtcNow - _map3DBusyShownAt, Map3DEnterShow) <= TimeSpan.Zero) { Reveal3D(); return; }
         SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("ready"));
-        RunMap3DGuideTimer(Map3DGuideMode.RevealWhenDue, Map3DGuide.MinEnterShow, timedBar: false);
+        RunMap3DGuideTimer(Map3DGuideMode.RevealWhenDue, Map3DEnterShow, timedBar: false);
     }
+
+    /// <summary>2D → 3D 안내 최소 표시 시간 — 설정(GuideMinSeconds, 기본 0.6 s).</summary>
+    private TimeSpan Map3DEnterShow => TimeSpan.FromSeconds(_map3DSettings.GuideMinSeconds);
 
     /// <summary>
     /// ready 뒤 — 3D 가 오버레이를 적용하고 한 프레임 그렸다는 rendered 를 받았으면 펼친다. 1.5 s 안에 안 오면 경고를 남기고 그냥 펼친다.
@@ -154,7 +157,7 @@ public partial class MapViewModel
             if (!Map3DGuide.ShouldGuideAfterLogin(_map3DRevealedBehindLogin, _map3DState == Map3DState.Shown)) return;
             _map3DRevealedBehindLogin = false;
             _log?.Info("[Map3D] 로그인 직후 3D 안내");
-            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("login"));
+            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("login", _map3DSettings.ExitZoom));
             RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.AfterLoginShow, timedBar: false);
         });
     }
@@ -204,10 +207,20 @@ public partial class MapViewModel
     private void LoadMap3DFromSettings()
     {
         if (MainMap == null) return;
+        string? oldServer = _map3DClient == null ? null : _map3DSettings.ServerUrl;
         _map3DSettings = MapSettingsHelper.LoadMap3D(_log);
-        _map3DClient?.Dispose();
-        _map3DClient = new Map3DClient(_map3DSettings.ServerUrl);
-        Map3DHost.UseComposition = _map3DSettings.UseCompositionHost;
+        NotifyOfPropertyChange(nameof(Map3DChipText));
+        if (oldServer != _map3DSettings.ServerUrl)
+        {
+            _map3DClient?.Dispose();
+            _map3DClient = new Map3DClient(_map3DSettings.ServerUrl);
+            if (oldServer != null) { _map3DScenes.Clear(); _map3DLastLookupCenter = null; }   // 다른 서버 — 옛 장면 캐시를 버린다
+        }
+        Map3DHost.UseComposition = _map3DSettings.UseCompositionHost;   // 3D 화면을 처음 만들 때만 본다(이미 만들었으면 다음 실행부터)
+
+        // 설정 화면 「3D 지도」 저장 → 다시 불러와 바로 반영(MapSettingsHelper.Map3DSaved)
+        MapSettingsHelper.Map3DSaved -= OnMap3DSettingsSaved;
+        MapSettingsHelper.Map3DSaved += OnMap3DSettingsSaved;
 
         MainMap.OnPositionChanged -= OnMap3DPositionChanged;
         MainMap.OnPositionChanged += OnMap3DPositionChanged;
@@ -238,6 +251,22 @@ public partial class MapViewModel
             _log?.Info($"[Map3D] WebView2 미리 데우기 끝 {(readyAt - startedAt).TotalSeconds:0.00}s");
     }
 
+    /// <summary>AppSettings.Map3D 가 저장됐다(배경 스레드 가능) — 다시 불러온다. 3D 를 끄고 저장했으면 보던 3D 를 접는다.</summary>
+    private void OnMap3DSettingsSaved()
+    {
+        _ = OnUiAsync(() =>
+        {
+            try
+            {
+                LoadMap3DFromSettings();
+                if (_map3DSettings.IsEnabled) return;
+                if (_map3DState == Map3DState.Shown) Leave3D(_map3DLastCamera, "settings-off");
+                else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
+            }
+            catch (Exception ex) { _log?.Error($"[Map3D] 설정 다시 불러오기 실패(격리): {ex.Message}"); }
+        });
+    }
+
     private void OnMap3DPositionChanged(PointLatLng _) => QueueMap3DGate();
     private void OnMap3DZoomChanged() => QueueMap3DGate();
     private void OnMap3DDigitalZoomChanged(int _) => QueueMap3DGate();
@@ -251,7 +280,7 @@ public partial class MapViewModel
         EnterAnchorDrawMode();   // 러버밴드 · 십자 커서 · ESC 후킹 · 포커스
         _isMap3DDrawMode = true;
         // 그리는 중 마퀴 옆 크기 표시 — 한 변 2 km 를 넘으면 경고색(R6)
-        MainMap.AnchorDrawLabel = (nw, se) => Map3DGuide.AreaDrawLabel(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng));
+        MainMap.AnchorDrawLabel = (nw, se) => Map3DGuide.AreaDrawLabel(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng), _map3DSettings.MaxAreaSideM);
         SetAimStatus("지도에서 드래그해 3D 로 만들 영역을 그리세요 (Enter = 지금 화면 · ESC = 취소)");
     }
 
@@ -268,11 +297,11 @@ public partial class MapViewModel
     private void TakeMap3DArea(double[] bbox)
     {
         var (w, h) = Map3DGuide.AreaSizeMeters(bbox);
-        if (Map3DGuide.IsAreaTooLarge(w, h))
+        if (Map3DGuide.IsAreaTooLarge(w, h, _map3DSettings.MaxAreaSideM))
         {
             _log?.Info($"[Map3D] 영역이 너무 큼 {Map3DGuide.FormatAreaSize(w, h)} → 다시 그리기");
             EnterMap3DDrawMode();
-            SetAimStatus(Map3DGuide.AreaTooLargeText(w, h));
+            SetAimStatus(Map3DGuide.AreaTooLargeText(w, h, _map3DSettings.MaxAreaSideM));
             return;
         }
         RequestMap3DBake(bbox);   // 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식 고르기(MapViewModel.Map3DBakeOptions)
@@ -384,10 +413,11 @@ public partial class MapViewModel
         double zoom = MainMap.EffectiveZoom;
         var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
         // 굽는 동안은 3D 로 들어가지 않는다 — 영역을 그리고 나면 곧바로 옛 3D 로 들어가 굽기 진행 패널이 가려졌다(2026-10-17 실기 S1)
-        bool active = !_isMap3DBaking && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null);
+        double enter = _map3DSettings.EnterZoom, exit = _map3DSettings.ExitZoom;
+        bool active = !_isMap3DBaking && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null, enter, exit);
 
-        if (!Map3DMath.Decide(zoom, false, scene != null)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
-        if (scene == null && zoom >= Map3DMath.ExitZoom) QueueMap3DSceneLookup(center);
+        if (!Map3DMath.Decide(zoom, false, scene != null, enter, exit)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
+        if (scene == null && zoom >= exit) QueueMap3DSceneLookup(center);
 
         if (active && _map3DState == Map3DState.Off && !_map3DEntrySuppressed) Begin3D(scene!);
         else if (!active && _map3DState == Map3DState.Pending)
@@ -396,7 +426,8 @@ public partial class MapViewModel
             CancelMap3DPending();
         }
         else if (_map3DState == Map3DState.Off
-                 && Map3DMath.ShouldPreload(zoom, scene?.Id, Map3DHost.Job, Map3DHost.IsLoading, _isMap3DBaking || IsMap3DBlockedByInputMode()))
+                 && Map3DMath.ShouldPreload(zoom, scene?.Id, Map3DHost.Job, Map3DHost.IsLoading, _isMap3DBaking || IsMap3DBlockedByInputMode(),
+                                            _map3DSettings.PreloadZoom))
         {
             // 줌 17 진입 전에(줌 15 · 영역 안) 장면을 1×1 로 미리 열어 둔다 — 진입은 펼치기만. 벗어나도 연 장면은 그대로 둔다.
             string job = scene!.Id;
@@ -458,7 +489,7 @@ public partial class MapViewModel
         {
             _map3DLastLookupCenter = null;   // 서버가 다시 켜지면 같은 자리에서도 다시 묻는다
             _log?.Warning($"[Map3D] 장면 조회 — 서버 닿지 않음: {ex.Message}");
-            if (MainMap.EffectiveZoom >= Map3DMath.EnterZoom) SetAimStatus(Map3DUnavailableText, autoHide: true);
+            if (MainMap.EffectiveZoom >= _map3DSettings.EnterZoom) SetAimStatus(Map3DUnavailableText, autoHide: true);
         }
         catch (Exception ex) { _log?.Warning($"[Map3D] 장면 조회 실패: {ex.Message}"); }
     }
@@ -486,7 +517,13 @@ public partial class MapViewModel
         // 안내 패널은 매번 — 이미 그려 둔 화면이어도 최소 0.4 s 동안 막대를 채운 뒤 펼친다(R5). 복귀 안내 타이머가 돌고 있으면 먼저 멈춘다.
         StopMap3DGuideTimer();
         SetMap3DBusy(Map3DGuide.EnterTitle, reuse ? 0 : null, Map3DGuide.StageText(reuse ? "reuse" : null));
-        if (reuse) { RunMap3DGuideTimer(Map3DGuideMode.RevealWhenDue, Map3DGuide.MinReuseShow, timedBar: true); return; }
+        if (reuse)
+        {
+            // 만들어 둔 화면은 0.4 s — 설정의 안내 시간이 그보다 짧으면 그 시간
+            var reuseShow = Map3DEnterShow < Map3DGuide.MinReuseShow ? Map3DEnterShow : Map3DGuide.MinReuseShow;
+            RunMap3DGuideTimer(Map3DGuideMode.RevealWhenDue, reuseShow, timedBar: true);
+            return;
+        }
         if (ready)
         {
             // ready 는 왔고 rendered 를 기다리는 중(미리 불러오기 직후)
@@ -584,7 +621,7 @@ public partial class MapViewModel
         }
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
-        if (Map3DMath.ShouldLeave3D(cam.Zoom)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
+        if (Map3DMath.ShouldLeave3D(cam.Zoom, _map3DSettings.ExitZoom)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
         // 3D 카메라(위치 · 줌 · 방위)에 맞춰 오버레이가 3D 상태를 보이게 하고, 2D 로 돌아갈 때도 끊기지 않게 한다(2026-10-17 실기: 나침반이 0° 에 멈춰 있었다).
         if (Map3DHost.HostMode == "composition") Apply3DCameraTo2D(cam);
@@ -640,7 +677,7 @@ public partial class MapViewModel
         var center = MainMap.Position;
         var scene = _map3DScenes.Find(sc => sc.Id == _map3DJob);
         bool inside = scene != null && Map3DMath.BboxContains(scene.Bbox, center.Lng, center.Lat);
-        if (!Map3DMath.ShouldStay3DAfterMove(MainMap.EffectiveZoom, inside))
+        if (!Map3DMath.ShouldStay3DAfterMove(MainMap.EffectiveZoom, inside, _map3DSettings.ExitZoom))
         {
             Leave3D(null, cause);
             return;

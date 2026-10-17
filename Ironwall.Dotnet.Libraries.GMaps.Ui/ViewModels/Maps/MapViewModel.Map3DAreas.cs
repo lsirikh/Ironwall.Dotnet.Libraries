@@ -36,7 +36,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     /// <summary>줌 컨트롤 옆 "3D 가능 — 줌 17 이상" 칩.</summary>
     public bool IsMap3DChipVisible { get => _isMap3DChipVisible; private set { if (_isMap3DChipVisible == value) return; _isMap3DChipVisible = value; NotifyOfPropertyChange(); } }
 
-    public string Map3DChipText => Map3DGuide.ChipText;
+    public string Map3DChipText => Map3DGuide.ChipTextFor(_map3DSettings.EnterZoom);
 
     // ── 목록 ──
 
@@ -92,12 +92,12 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     {
         if (MainMap == null) return;
         double zoom = MainMap.EffectiveZoom;
-        bool show = _map3DSettings.IsEnabled && Map3DGuide.ShouldShowAreaOutlines(zoom);
+        bool show = _map3DSettings.IsEnabled && Map3DGuide.ShouldShowAreaOutlines(zoom, _map3DSettings.AreaShowZoom);
         foreach (var marker in _map3DAreaMarkers.Values) marker.Refresh(MainMap, show);
 
         var center = MainMap.Position;
         bool inside = _map3DScenes.Exists(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
-        IsMap3DChipVisible = _map3DSettings.IsEnabled && Map3DGuide.ShouldShowChip(zoom, inside, _map3DState == Map3DState.Off);
+        IsMap3DChipVisible = _map3DSettings.IsEnabled && Map3DGuide.ShouldShowChip(zoom, inside, _map3DState == Map3DState.Off, _map3DSettings.EnterZoom);
     }
 
     // ── 동작 ──
@@ -112,8 +112,9 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         var (lat, lon) = Map3DGuide.AreaCenter(item.Bbox);
         _map3DEntrySuppressed = false;
         MainMap.Position = new PointLatLng(lat, lon);
-        MainMap.SetEffectiveZoom(Map3DGuide.AreaViewZoom);
-        _log?.Info($"[Map3D] 영역 보기 id={item.Id} → ({lat:F6},{lon:F6}) zoom={Map3DGuide.AreaViewZoom}");
+        double viewZoom = Map3DGuide.AreaViewZoomFor(_map3DSettings.EnterZoom);   // 진입 줌을 높였으면 그 줌까지
+        MainMap.SetEffectiveZoom(viewZoom);
+        _log?.Info($"[Map3D] 영역 보기 id={item.Id} → ({lat:F6},{lon:F6}) zoom={viewZoom}");
         if (IsMap3DBlockedByInputMode())
             SetAimStatus("편집 · 그리기 중에는 3D 로 들어가지 않습니다 — 모드를 끝내면 3D 로 바뀝니다", autoHide: true);
         QueueMap3DGate();

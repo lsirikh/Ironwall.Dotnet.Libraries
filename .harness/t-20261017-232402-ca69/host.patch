@@ -1,0 +1,616 @@
+diff --git a/Dotnet.Monitoring.Solution/Bootstrapper.cs b/Dotnet.Monitoring.Solution/Bootstrapper.cs
+index 451b2099..46101db2 100644
+--- a/Dotnet.Monitoring.Solution/Bootstrapper.cs
++++ b/Dotnet.Monitoring.Solution/Bootstrapper.cs
+@@ -560,6 +560,7 @@ internal class Bootstrapper : ParentBootstrapper<ShellViewModel>
+             builder.RegisterType<GatewayIntegrationSetupViewModel>().SingleInstance();
+             builder.RegisterType<WebServerSetupViewModel>().SingleInstance();
+             builder.RegisterType<WatchdogSetupViewModel>().SingleInstance();
++            builder.RegisterType<Map3DSettingsViewModel>().SingleInstance();   // 설정 창 「3D 지도」 절(AppSettings.Map3D)
+ 
+             //DialogViewModel Part (계정 다이얼로그 Register/ResetPass/Editor/Delete는 AccountUiModule이 등록)
+             builder.RegisterType<CameraPropertyDialogViewModel>().SingleInstance();
+diff --git a/Dotnet.Monitoring.Solution/Help/HostHelp.cs b/Dotnet.Monitoring.Solution/Help/HostHelp.cs
+index 8c14960e..5783e3c4 100644
+--- a/Dotnet.Monitoring.Solution/Help/HostHelp.cs
++++ b/Dotnet.Monitoring.Solution/Help/HostHelp.cs
+@@ -20,6 +20,7 @@ public static class HostHelp
+     public const string SettingsNats = "Host.Settings.Nats";
+     public const string SettingsMap = "Host.Settings.Map";
+     public const string SettingsMapZoom = "Host.Settings.MapZoom";
++    public const string SettingsMap3D = "Host.Settings.Map3D";
+     public const string SettingsSensorModels = "Host.Settings.SensorModels";
+     public const string SettingsGateway = "Host.Settings.Gateway";
+     public const string SettingsWeb = "Host.Settings.Web";
+@@ -55,6 +56,21 @@ public static class HostHelp
+                 "표를 고친 뒤 [줌 범위 적용] 을 누르면 바로 저장됩니다(아래 [저장] 과 별개입니다).",
+                 "적용한 범위는 지도를 바꾸거나 프로그램을 다시 시작하면 반영됩니다."),
+ 
++        HelpEntry.Create(SettingsMap3D, "3D 지도",
++                "3D 영역 안에서 지도를 **3D 로 바뀌는 줌** 이상으로 확대하면 3D 지도로 바뀌고, **2D 로 돌아가는 줌** 밑으로 줄이면 2D 지도로 돌아옵니다.",
++                "[저장] 하면 지도에 바로 반영됩니다.")
++            .With("전환",
++                "**2D 로 돌아가는 줌**은 3D 로 바뀌는 줌보다 작아야 합니다 — 두 줌 사이에서는 보던 지도를 그대로 둬 경계에서 깜빡이지 않습니다.",
++                "**미리 준비하는 줌**부터 3D 화면을 미리 불러 둬 3D 로 바뀔 때 빨리 뜹니다. 2D 로 돌아가는 줌보다 크게 둘 수 없습니다.",
++                "**안내 표시 시간** — 3D 로 바뀔 때 안내를 적어도 이만큼(초) 보입니다. 0 이면 준비되는 대로 바로 바뀝니다.")
++            .With("영역",
++                "**영역 표시 줌** 이상에서 2D 지도에 3D 영역 테두리와 배지가 보입니다.",
++                "**영역 최대 크기** — 3D 로 만들 영역 한 변의 최대 길이(m)입니다. 3D 서버가 받는 크기보다 크게 두면 만들기가 실패할 수 있습니다.",
++                "**기본 만들기 방식** — 영역에 오버레이 이미지가 있을 때 처음 골라져 있는 방식입니다(지도에서 고르면 그 값으로 바뀝니다).")
++            .With("연결",
++                "**3D 서버 주소** — 3D 지도를 만들고 보여 주는 서버입니다(예: http://127.0.0.1:8765).",
++                "**WPF 안에서 그리기** — 켜 두면 3D 위에도 상세 창 · 카메라 상자가 보입니다. 끄면 더 빠르지만 그 창들이 3D 에 가려집니다. 바꾸면 프로그램을 다시 시작해야 반영됩니다."),
++
+         HelpEntry.Create(SettingsSensorModels, "센서 모델",
+                 "[센서 모델 열기] 를 누르면 센서 모델 창이 열립니다 — 모델 · 설치 위치 프리셋 · 속성 프리셋을 그 창에서 고칩니다.",
+                 "그 창의 저장은 누르는 즉시 적용됩니다(아래 [저장] 과 별개입니다). 저장소가 GOP API 이면 읽기 전용입니다."),
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/SettingsPorts.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/SettingsPorts.cs
+index b9218f29..53ba7027 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/SettingsPorts.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/SettingsPorts.cs
+@@ -110,6 +110,28 @@ internal interface IMapSettingsPort
+     IEnumerable<string> MapNameChoices { get; }
+ }
+ 
++/// <summary>
++/// 3D 지도 창구(AppSettings.Map3D) — 멤버 이름은 라이브러리 <c>Map3DModel</c> 속성 이름 그대로다.
++/// setter 는 라이브러리 <c>MapSettingsHelper.SaveMap3DAsync</c> 로 저장하고, 지도는 저장 알림을 받아 다시 불러온다(바로 반영).
++/// </summary>
++internal interface IMap3DSettingsPort
++{
++    bool IsEnabled { get; set; }
++    double EnterZoom { get; set; }
++    double ExitZoom { get; set; }
++    double PreloadZoom { get; set; }
++    double GuideMinSeconds { get; set; }
++    double AreaShowZoom { get; set; }
++    int MaxAreaSideM { get; set; }
++    /// <summary>"tiles" | "composite" | "extract".</summary>
++    string OverlayMode { get; set; }
++    string ServerUrl { get; set; }
++    bool UseCompositionHost { get; set; }
++
++    /// <summary>절에 들어갈 때 설정 파일에서 다시 읽는다(지도가 굽기 방식을 바꿔 저장했을 수 있다).</summary>
++    void Reload();
++}
++
+ /// <summary>3rd Party(게이트웨이) 창구 — 칸으로 쪼개지 않고 기존 화면을 통째로 얹는다.</summary>
+ internal interface IGatewaySettingsPort
+ {
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Map3DSettingsViewModel.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Map3DSettingsViewModel.cs
+new file mode 100644
+index 00000000..26b07992
+--- /dev/null
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Map3DSettingsViewModel.cs
+@@ -0,0 +1,60 @@
++﻿using Ironwall.Dotnet.Libraries.Base.Services;
++using Ironwall.Dotnet.Libraries.GMaps.Models;
++using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
++using System;
++using System.Threading.Tasks;
++
++namespace Dotnet.Monitoring.Solution.ViewModels.Panels.SetupPanels;
++/****************************************************************************
++   Purpose      : 설정 창 「3D 지도」 절 창구 — AppSettings.Map3D(라이브러리 Map3DModel)를 읽고 쓴다.
++   Note         : 칸마다의 setter 는 모델 한 벌을 고친 뒤 MapSettingsHelper.SaveMap3DAsync 로 절을 통째로 저장한다
++                  (파일 잠금으로 차례대로 쓰고, 쓸 때의 모델 전체가 들어간다). 저장이 끝나면 지도가 Map3DSaved 를 받아 다시 불러온다.
++                  줌 순서는 저장 전에 설정 창의 칸 사이 규칙(SettingsValidation.Map3DZoomOrder)이 막으므로 여기서 고치지 않는다.
++   Created On   : 2026-10-17 · Sensorway Co., Ltd.
++****************************************************************************/
++internal sealed class Map3DSettingsViewModel : IMap3DSettingsPort
++{
++    private readonly ILogService? _log;
++    private Map3DModel? _model;
++
++    public Map3DSettingsViewModel(ILogService log) => _log = log;
++
++    private Map3DModel Model => _model ??= MapSettingsHelper.LoadMap3D(_log);
++
++    public void Reload() => _model = MapSettingsHelper.LoadMap3D(_log);
++
++    public bool IsEnabled { get => Model.IsEnabled; set => Save(m => m.IsEnabled = value); }
++    public double EnterZoom { get => Model.EnterZoom; set => Save(m => m.EnterZoom = value); }
++    public double ExitZoom { get => Model.ExitZoom; set => Save(m => m.ExitZoom = value); }
++    public double PreloadZoom { get => Model.PreloadZoom; set => Save(m => m.PreloadZoom = value); }
++    public double GuideMinSeconds { get => Model.GuideMinSeconds; set => Save(m => m.GuideMinSeconds = value); }
++    public double AreaShowZoom { get => Model.AreaShowZoom; set => Save(m => m.AreaShowZoom = value); }
++    public int MaxAreaSideM { get => (int)Math.Round(Model.MaxAreaSideM); set => Save(m => m.MaxAreaSideM = value); }
++    public string OverlayMode { get => Model.OverlayMode; set => Save(m => m.OverlayMode = value); }
++
++    /// <summary>주소 — 끝 '/' 는 떼어 저장한다(지도가 쓰는 모양). 다듬은 값은 칸이 다시 읽어 맞춘다.</summary>
++    public string ServerUrl
++    {
++        get => Model.ServerUrl;
++        set
++        {
++            var probe = new Map3DModel { ServerUrl = value };
++            probe.Normalize();
++            Save(m => m.ServerUrl = probe.ServerUrl);
++        }
++    }
++
++    public bool UseCompositionHost { get => Model.UseCompositionHost; set => Save(m => m.UseCompositionHost = value); }
++
++    private void Save(Action<Map3DModel> change)
++    {
++        change(Model);
++        _ = SaveAsync(Model);
++    }
++
++    private async Task SaveAsync(Map3DModel model)
++    {
++        try { await MapSettingsHelper.SaveMap3DAsync(model, _log); }
++        catch (Exception ex) { _log?.Error($"[Map3D] 설정 저장 실패: {ex.Message}"); }
++    }
++}
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
+index 7dbfb836..ee271f66 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
+@@ -47,6 +47,7 @@ internal static class SettingsCatalog
+         var sound = Port<SoundSetupViewModel, ISoundSettingsPort>(resolve);
+         var nats = Port<NatsSetupViewModel, INatsSettingsPort>(resolve);
+         var map = Port<MapSetupViewModel, IMapSettingsPort>(resolve);
++        var map3d = Port<Map3DSettingsViewModel, IMap3DSettingsPort>(resolve);
+         var gateway = Port<GatewayIntegrationSetupViewModel, IGatewaySettingsPort>(resolve);
+         var web = Port<WebServerSetupViewModel, IWebServerSettingsPort>(resolve);
+         var watchdog = Port<WatchdogSetupViewModel, IWatchdogSettingsPort>(resolve);
+@@ -62,6 +63,8 @@ internal static class SettingsCatalog
+                 (MapEventFlyToModel)resolve(typeof(MapEventFlyToModel)))),
+             // 센서 모델은 지도 위 펜스 · 센서 배치의 프리셋이라 지도 절 바로 뒤, 장비 연동(외부 연동) 앞에 둔다.
+             SensorModelsSection(() => (SensorModelsSettingsBlockViewModel)resolve(typeof(SensorModelsSettingsBlockViewModel))),
++            // 3D 지도(AppSettings.Map3D)도 지도 묶음 — 센서 모델 뒤, 외부 연동 앞.
++            Map3DSection(map3d),
+             GatewaySection(gateway, activate),
+             WebServerSection(web, activate, () => (IWebAppsSettingsPort)web()),
+             WatchdogSection(watchdog, activate),
+@@ -322,6 +325,64 @@ internal static class SettingsCatalog
+     internal const string HomeMissingNote = "홈 좌표가 아직 없습니다 — 지도에서 홈 위치를 먼저 지정하세요";
+     #endregion
+ 
++    #region - 5-0. 3D 지도 -
++    /// <summary>
++    /// 3D 지도(AppSettings.Map3D) — 소제목 전환 · 영역 · 연결. 줌 범위 · 크기 · 시간은 라이브러리 <c>Map3DModel.Normalize</c> 와 같은 범위로 막고,
++    /// 줌 순서(2D 로 돌아가는 줌 &lt; 3D 로 바뀌는 줌 · 미리 준비하는 줌 ≤ 2D 로 돌아가는 줌)는 칸 사이 규칙으로 저장을 막는다.
++    /// 저장하면 지도가 다시 불러와 바로 반영한다. 설명은 절 "?"(<see cref="HostHelp.SettingsMap3D"/>).
++    /// </summary>
++    internal static SettingsSectionDescriptor Map3DSection(Func<IMap3DSettingsPort> vm)
++        => new(Map3DKey, "3D 지도", "CubeOutline")
++        {
++            RailLabel = "3D 지도",
++            Subtitle = "전환 줌 · 3D 영역 · 3D 서버",
++            HelpKey = HostHelp.SettingsMap3D,
++            Enter = () => { vm().Reload(); return Task.CompletedTask; },
++            Check = draft => SettingsValidation.Map3DZoomOrder(draft("map3d.EnterZoom"), draft("map3d.ExitZoom"), draft("map3d.PreloadZoom")),
++            Fields = new[]
++            {
++                Bool("map3d.IsEnabled", "사용", "Map3D.IsEnabled",
++                     () => vm().IsEnabled, v => vm().IsEnabled = AsBool(v)).InGroup(Map3DSwitchGroup),
++                Number("map3d.EnterZoom", "3D 로 바뀌는 줌", "Map3D.EnterZoom",
++                       () => vm().EnterZoom, v => vm().EnterZoom = AsDouble(v), Map3DZoomRange).InGroup(Map3DSwitchGroup),
++                Number("map3d.ExitZoom", "2D 로 돌아가는 줌", "Map3D.ExitZoom",
++                       () => vm().ExitZoom, v => vm().ExitZoom = AsDouble(v), Map3DZoomRange).InGroup(Map3DSwitchGroup),
++                Number("map3d.PreloadZoom", "미리 준비하는 줌", "Map3D.PreloadZoom",
++                       () => vm().PreloadZoom, v => vm().PreloadZoom = AsDouble(v), Map3DZoomRange).InGroup(Map3DSwitchGroup),
++                Number("map3d.GuideMinSeconds", "안내 표시 시간", "Map3D.GuideMinSeconds",
++                       () => vm().GuideMinSeconds, v => vm().GuideMinSeconds = AsDouble(v),
++                       SettingsValidation.DecimalRange(0, 3), "단위: 초").InGroup(Map3DSwitchGroup),
++                Number("map3d.AreaShowZoom", "영역 표시 줌", "Map3D.AreaShowZoom",
++                       () => vm().AreaShowZoom, v => vm().AreaShowZoom = AsDouble(v), Map3DZoomRange).InGroup(Map3DAreaGroup),
++                Int("map3d.MaxAreaSideM", "영역 최대 크기", "Map3D.MaxAreaSideM",
++                    () => vm().MaxAreaSideM, v => vm().MaxAreaSideM = AsInt(v),
++                    SettingsValidation.IntegerRange(200, 5000, "m"), "m").InGroup(Map3DAreaGroup),
++                Choice("map3d.OverlayMode", "기본 만들기 방식", "Map3D.OverlayMode",
++                       () => vm().OverlayMode, v => vm().OverlayMode = AsText(v), () => Map3DOverlayModes).InGroup(Map3DAreaGroup),
++                Text("map3d.ServerUrl", "3D 서버 주소", "Map3D.ServerUrl",
++                     () => vm().ServerUrl, v => vm().ServerUrl = AsText(v), SettingsValidation.HttpUrl).InGroup(Map3DLinkGroup),
++                Bool("map3d.UseCompositionHost", "WPF 안에서 그리기", "Map3D.UseCompositionHost",
++                     () => vm().UseCompositionHost, v => vm().UseCompositionHost = AsBool(v)).InGroup(Map3DLinkGroup),
++            },
++        };
++
++    internal const string Map3DKey = "map3d";
++    internal const string Map3DSwitchGroup = "전환";
++    internal const string Map3DAreaGroup = "영역";
++    internal const string Map3DLinkGroup = "연결";
++
++    /// <summary>3D 지도 줌 범위 — 라이브러리 Map3DModel.MinZoom ~ MaxZoom.</summary>
++    private static readonly Func<object?, string?> Map3DZoomRange = SettingsValidation.DecimalRange(Map3DModel.MinZoom, Map3DModel.MaxZoom);
++
++    /// <summary>기본 만들기 방식 — 보이는 글은 지도의 만들기 패널과 같은 말, 저장 값은 Map3DModel.OverlayMode.</summary>
++    internal static readonly IReadOnlyList<SettingsChoice> Map3DOverlayModes = new[]
++    {
++        new SettingsChoice("위성 타일만", "tiles"),
++        new SettingsChoice("오버레이 이미지 포함", "composite"),
++        new SettingsChoice("오버레이 이미지 포함 + 건물 추출", "extract"),
++    };
++    #endregion
++
+     #region - 5-1. 센서 모델 -
+     /// <summary>
+     /// 센서 모델(설치 위치 · 속성 프리셋, sensor-mount-preset §10 호스트 배선). 칸은 없고 라이브러리 블록 하나만 얹는다 —
+@@ -515,6 +576,11 @@ internal static class SettingsCatalog
+                  : $"단위: {unit}",
+         };
+ 
++    private static SettingsFieldDescriptor Number(string key, string label, string api,
++                                                  Func<object?> read, Action<object?> write,
++                                                  Func<object?, string?>? rule = null, string note = "")
++        => new(key, label, SettingsFieldKind.Decimal, read, write) { ApiName = api, Rule = rule, Note = note };
++
+     private static SettingsFieldDescriptor Bool(string key, string label, string api,
+                                                 Func<object?> read, Action<object?> write, string note = "")
+         => new(key, label, SettingsFieldKind.Boolean, read, write) { ApiName = api, Note = note };
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionDescriptor.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionDescriptor.cs
+index b5d0678c..6f9016c6 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionDescriptor.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionDescriptor.cs
+@@ -63,6 +63,12 @@ public sealed class SettingsSectionDescriptor
+ 
+     public IReadOnlyList<SettingsFieldDescriptor> Fields { get; init; } = Array.Empty<SettingsFieldDescriptor>();
+ 
++    /// <summary>
++    /// 칸 사이 규칙(3D 지도의 줌 순서처럼 한 칸만 봐서는 모르는 것) — 칸 키로 지금 초안 값을 읽는 함수를 받아,
++    /// 어기면 사람이 읽을 이유 · 통과하면 <c>null</c>. 어기면 [저장]이 꺼지고 막대가 이유를 말한다. 비우면 검사하지 않는다.
++    /// </summary>
++    public Func<Func<string, object?>, string?>? Check { get; init; }
++
+     /// <summary>
+     /// 절에 들어올 때 해야 하는 일 — 오늘의 <c>OnActiveTab</c> 과 같은 뷰모델 활성화.
+     /// 끝난 뒤에 칸 값을 다시 읽는다.
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionViewModel.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionViewModel.cs
+index 4fbf173e..1437cc60 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionViewModel.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsSectionViewModel.cs
+@@ -96,7 +96,18 @@ public sealed class SettingsSectionViewModel : SettingsObservable
+     /// <summary>이 절에 걸린 미적용 변경 수 — 레일 배지가 이걸 보인다.</summary>
+     public int DirtyCount => Fields.Count(f => f.IsTouched) + BlockDirtyCount;
+ 
+-    public bool HasError => Fields.Any(f => f.HasError) || (_draftBlock?.HasError ?? false);
++    public bool HasError => Fields.Any(f => f.HasError) || (_draftBlock?.HasError ?? false) || CheckError.Length > 0;
++
++    /// <summary>칸 사이 규칙(<see cref="SettingsSectionDescriptor.Check"/>)을 어긴 이유 — 지금 초안 값으로 매번 본다. 통과면 빈 글자.</summary>
++    public string CheckError
++    {
++        get
++        {
++            if (_descriptor.Check is null) return string.Empty;
++            try { return _descriptor.Check(key => Fields.FirstOrDefault(f => f.Key == key)?.Current) ?? string.Empty; }
++            catch { return string.Empty; }
++        }
++    }
+ 
+     /// <summary>
+     /// 얹힌 화면이 쥔 미저장 항목 수(SET-049). 들어간 적 없는 절은 묻지 않는다 — 원래 뷰모델을 괜히 해석하지 않도록.
+@@ -222,7 +233,7 @@ public sealed class SettingsSectionViewModel : SettingsObservable
+         catch { /* 다시 읽기 실패는 초안을 지우지 않는다 */ }
+     }
+ 
+-    public void NotifyDirtyChanged() => Raise(nameof(DirtyCount), nameof(HasError));
++    public void NotifyDirtyChanged() => Raise(nameof(DirtyCount), nameof(HasError), nameof(CheckError));
+ 
+     private static object? Resolve(Func<object?>? source)
+     {
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsFormController.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsFormController.cs
+index f15b22ff..61fff76f 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsFormController.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsFormController.cs
+@@ -100,6 +100,10 @@ public sealed class SettingsFormController : SettingsObservable
+     /// <summary>어긴 칸이 있을 때 막대가 늘 보여 주는 이유 — [저장]이 꺼진 까닭을 사람이 알아야 한다.</summary>
+     public const string ErrorNotice = "입력을 고쳐야 저장할 수 있습니다";
+ 
++    /// <summary>[저장]이 꺼진 이유 — 칸 사이 규칙을 어긴 절이 있으면 그 이유(3D 지도 줌 순서), 아니면 <see cref="ErrorNotice"/>.</summary>
++    private string ErrorText
++        => _sections.Select(s => s.CheckError).FirstOrDefault(e => e.Length > 0) is { } check ? $"{ErrorNotice} — {check}" : ErrorNotice;
++
+     /// <summary>
+     /// 막대 문구. 방금 막은 이유 &gt; 어긴 칸 안내 &gt; 커널 상태기계(창마다 다른 문구를 새로 만들지 않는다).
+     /// </summary>
+@@ -108,7 +112,7 @@ public sealed class SettingsFormController : SettingsObservable
+          // 방금 저장에서 안 들어간 칸이 있으면 그것부터 말한다 —
+          // 실패한 칸은 더러운 채로 남아 있어서 그냥 두면 "변경 N건 미적용" 로 덮여 사유가 사라진다.
+          : _lastFailures.Count > 0 ? _lastMessage
+-         : HasError ? ErrorNotice
++         : HasError ? ErrorText
+          // #47 — 저장할 칸이 없는 절에서 "변경 없음" 만 두면 꺼진 [저장]이 왜 있는지 모른다. 까닭을 붙인다.
+          : DirtyCount == 0 && string.IsNullOrEmpty(_lastMessage) && _activeSection is { IsViewOnly: true } view ? view.ViewOnlyNote
+          : ConsoleDetailStateMachine.FooterText(State, DirtyCount, _lastMessage);
+@@ -190,7 +194,7 @@ public sealed class SettingsFormController : SettingsObservable
+     {
+         if (!CanApply)
+         {
+-            if (HasError) _notice = ErrorNotice;
++            if (HasError) _notice = ErrorText;
+             Raise(nameof(FooterText));
+             return 0;
+         }
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs
+index 9d78299f..290f8e2e 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsValidation.cs
+@@ -94,6 +94,30 @@ public static class SettingsValidation
+         return string.IsNullOrWhiteSpace(text) ? WhitespaceMessage : null;
+     }
+ 
++    public const string Map3DExitOrderMessage = "2D 로 돌아가는 줌은 3D 로 바뀌는 줌보다 작아야 합니다";
++    public const string Map3DPreloadOrderMessage = "미리 준비하는 줌은 2D 로 돌아가는 줌보다 클 수 없습니다";
++    public const string HttpUrlMessage = "http:// 또는 https:// 로 시작하는 주소를 입력하세요";
++
++    /// <summary>
++    /// 3D 지도 줌 순서(칸 사이 규칙) — 2D 로 돌아가는 줌 &lt; 3D 로 바뀌는 줌, 미리 준비하는 줌 ≤ 2D 로 돌아가는 줌.
++    /// 숫자가 아닌 칸은 그 칸의 규칙이 알리므로 여기서는 넘어간다.
++    /// </summary>
++    public static string? Map3DZoomOrder(object? enterZoom, object? exitZoom, object? preloadZoom)
++    {
++        if (!TryNumber(enterZoom, out var enter) || !TryNumber(exitZoom, out var exit)) return null;
++        if (exit >= enter) return Map3DExitOrderMessage;
++        return TryNumber(preloadZoom, out var preload) && preload > exit ? Map3DPreloadOrderMessage : null;
++    }
++
++    /// <summary>http/https 절대 주소(3D 서버) — 비우는 것도 막는다.</summary>
++    public static string? HttpUrl(object? value)
++    {
++        var text = AsText(value)?.Trim();
++        if (string.IsNullOrEmpty(text)) return EmptyMessage;
++        return Uri.TryCreate(text, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
++            ? null : HttpUrlMessage;
++    }
++
+     internal static bool TryInteger(object? value, out int number)
+     {
+         switch (value)
+diff --git a/Dotnet.Monitoring.Solution.Tests/SetupPanels/SettingsConsoleScenarioTests.cs b/Dotnet.Monitoring.Solution.Tests/SetupPanels/SettingsConsoleScenarioTests.cs
+index db8c6263..3becdf33 100644
+--- a/Dotnet.Monitoring.Solution.Tests/SetupPanels/SettingsConsoleScenarioTests.cs
++++ b/Dotnet.Monitoring.Solution.Tests/SetupPanels/SettingsConsoleScenarioTests.cs
+@@ -16,10 +16,10 @@ public class SettingsConsoleScenarioTests
+     private static readonly string[] RailKeys = { "events", "sound", "nats", "map", "gateway", "web", "watchdog", "about" };
+ 
+     /// <summary>
+-    /// Build() 의 레일 — 위 8절에 "센서 모델"(sensor-mount-preset §10 호스트 배선)이 지도 절 바로 뒤에 붙는다.
+-    /// 센서 모델 절은 라이브러리 블록 하나라 가짜 창구 묶음(<see cref="AllSections"/>)에는 넣지 않는다 — 그 절은 SensorModelsRailScenarioTests 가 본다.
++    /// Build() 의 레일 — 위 8절에 "센서 모델"(sensor-mount-preset §10 호스트 배선)이 지도 절 바로 뒤, "3D 지도"(AppSettings.Map3D)가 그 뒤에 붙는다.
++    /// 두 절은 가짜 창구 묶음(<see cref="AllSections"/>)에는 넣지 않는다 — SensorModelsRailScenarioTests · Map3DSettingsSectionTests 가 본다.
+     /// </summary>
+-    private static readonly string[] BuiltRailKeys = { "events", "sound", "nats", "map", "sensorModels", "gateway", "web", "watchdog", "about" };
++    private static readonly string[] BuiltRailKeys = { "events", "sound", "nats", "map", "sensorModels", "map3d", "gateway", "web", "watchdog", "about" };
+ 
+     private WriteLog _log = null!;
+ 
+@@ -63,7 +63,7 @@ public class SettingsConsoleScenarioTests
+     {
+         // 앱이 쓰는 Build() 의 순서 = 레일 순서. 뷰모델은 들어갈 때만 해석된다(여기서 해석되면 시험이 실패한다).
+         var built = SettingsCatalog.Build(_ => throw new AssertFailedException("절 뷰모델은 들어갈 때만 해석된다"), NoActivate);
+-        CollectionAssert.AreEqual(BuiltRailKeys, built.Select(s => s.Key).ToArray(), "Build() 레일 9개 · 순서(redis 없음 · 센서 모델은 지도 뒤)");
++        CollectionAssert.AreEqual(BuiltRailKeys, built.Select(s => s.Key).ToArray(), "Build() 레일 10개 · 순서(redis 없음 · 센서 모델 · 3D 지도는 지도 뒤)");
+ 
+         var form = Form(AllSections());
+ 
+diff --git a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
+new file mode 100644
+index 00000000..49f08b4e
+--- /dev/null
++++ b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
+@@ -0,0 +1,222 @@
++﻿using Dotnet.Monitoring.Solution.Help;
++using Dotnet.Monitoring.Solution.ViewModels.Panels.SetupPanels;
++using Dotnet.Monitoring.Solution.ViewModels.Panels.SetupPanels.Console;
++using Ironwall.Dotnet.Libraries.Utils.Consoles;
++using MaterialDesignThemes.Wpf;
++using System.Runtime.CompilerServices;
++
++namespace Dotnet.Monitoring.Solution.Tests.SetupPanels;
++
++/****************************************************************************
++   Purpose      : 설정 창 「3D 지도」 절(AppSettings.Map3D) — 칸 · 소제목 · 범위 검증 · 줌 순서(칸 사이 규칙) · "?" 도움말. 창 없이.
++                  진짜 창구(Map3DSettingsViewModel)는 setter 가 설정 파일 쓰기라 가짜 창구를 끼운다.
++   Created On   : 2026-10-17 · Sensorway Co., Ltd.
++****************************************************************************/
++[TestClass]
++public class Map3DSettingsSectionTests
++{
++    /// <summary>라이브러리 Map3DModel 기본값과 같은 가짜 창구 — 쓴 칸을 순서대로 적는다.</summary>
++    private sealed class FakeMap3DPort : IMap3DSettingsPort
++    {
++        public List<string> Writes { get; } = new();
++        public int Reloads { get; private set; }
++
++        private bool _enabled = true, _composition = true;
++        private double _enter = 17, _exit = 16.5, _preload = 15, _guide = 0.6, _area = 13;
++        private int _maxSide = 2000;
++        private string _mode = "tiles", _url = "http://127.0.0.1:8765";
++
++        public bool IsEnabled { get => _enabled; set { _enabled = value; Writes.Add(nameof(IsEnabled)); } }
++        public double EnterZoom { get => _enter; set { _enter = value; Writes.Add(nameof(EnterZoom)); } }
++        public double ExitZoom { get => _exit; set { _exit = value; Writes.Add(nameof(ExitZoom)); } }
++        public double PreloadZoom { get => _preload; set { _preload = value; Writes.Add(nameof(PreloadZoom)); } }
++        public double GuideMinSeconds { get => _guide; set { _guide = value; Writes.Add(nameof(GuideMinSeconds)); } }
++        public double AreaShowZoom { get => _area; set { _area = value; Writes.Add(nameof(AreaShowZoom)); } }
++        public int MaxAreaSideM { get => _maxSide; set { _maxSide = value; Writes.Add(nameof(MaxAreaSideM)); } }
++        public string OverlayMode { get => _mode; set { _mode = value; Writes.Add(nameof(OverlayMode)); } }
++        public string ServerUrl { get => _url; set { _url = value; Writes.Add(nameof(ServerUrl)); } }
++        public bool UseCompositionHost { get => _composition; set { _composition = value; Writes.Add(nameof(UseCompositionHost)); } }
++        public void Reload() => Reloads++;
++    }
++
++    private FakeMap3DPort _port = null!;
++
++    [TestInitialize]
++    public void Setup()
++    {
++        _port = new FakeMap3DPort();
++        RuntimeHelpers.RunModuleConstructor(typeof(HostHelp).Module.ModuleHandle);
++    }
++
++    private SettingsFormController Form()
++    {
++        var form = new SettingsFormController(new[] { SettingsCatalog.Map3DSection(() => _port) });
++        form.SelectFirst();
++        HeadlessAwait(form.EnterAsync(form.ActiveSection));
++        return form;
++    }
++
++    private static void HeadlessAwait(Task task) => task.GetAwaiter().GetResult();
++
++    private static SettingsFieldViewModel Field(SettingsFormController form, string key)
++        => form.Sections.SelectMany(s => s.Fields).First(f => f.Key == key);
++
++    // ── 절 모양 ──
++
++    [TestMethod]
++    public void should_list_ten_fields_under_three_groups_when_map3d_section_built()
++    {
++        var section = SettingsCatalog.Map3DSection(() => _port);
++
++        Assert.AreEqual("map3d", section.Key);
++        Assert.AreEqual("3D 지도", section.RailText);
++        Assert.AreEqual(HostHelp.SettingsMap3D, section.HelpKey);
++        Assert.AreEqual(string.Empty, section.Banner, "설명은 \"?\" 로 — 화면에 긴 글 금지");
++        CollectionAssert.AreEqual(
++            new[] { "사용", "3D 로 바뀌는 줌", "2D 로 돌아가는 줌", "미리 준비하는 줌", "안내 표시 시간",
++                    "영역 표시 줌", "영역 최대 크기", "기본 만들기 방식", "3D 서버 주소", "WPF 안에서 그리기" },
++            section.Fields.Select(f => f.Label).ToArray());
++        CollectionAssert.AreEqual(new[] { "전환", "영역", "연결" }, section.Fields.Select(f => f.Group).Distinct().ToArray());
++        Assert.IsTrue(section.Fields.All(f => f.ApiName.StartsWith("Map3D.", StringComparison.Ordinal)), "실제 키 = AppSettings.Map3D.*");
++    }
++
++    [TestMethod]
++    public void should_resolve_rail_icon_when_icon_name_is_a_real_pack_icon()
++    {
++        var section = SettingsCatalog.Map3DSection(() => _port);
++        Assert.IsTrue(Enum.TryParse<PackIconKind>(section.IconKind, ignoreCase: false, out _), $"PackIconKind 에 없는 이름 '{section.IconKind}'");
++    }
++
++    [TestMethod]
++    public void should_reload_port_when_section_entered()
++    {
++        Form();
++        Assert.AreEqual(1, _port.Reloads, "절에 들어갈 때 설정 파일을 다시 읽는다");
++    }
++
++    [TestMethod]
++    public void should_offer_three_bake_modes_when_overlay_mode_field_opened()
++    {
++        var form = Form();
++        var mode = Field(form, "map3d.OverlayMode");
++        CollectionAssert.AreEqual(new[] { "tiles", "composite", "extract" }, mode.Options.Select(o => o.Value).ToArray());
++        Assert.AreEqual("위성 타일만", mode.SelectedChoice?.Display);
++    }
++
++    // ── 줌 순서(칸 사이 규칙) ──
++
++    [TestMethod]
++    public void should_block_save_and_tell_reason_when_exit_zoom_is_not_below_enter_zoom()
++    {
++        var form = Form();
++        Field(form, "map3d.ExitZoom").Text = "17";
++
++        Assert.IsTrue(form.HasError);
++        Assert.IsFalse(form.CanApply, "줌 순서를 어기면 [저장] 꺼짐");
++        StringAssert.Contains(form.FooterText, SettingsValidation.Map3DExitOrderMessage);
++        Assert.AreEqual(0, form.Save());
++        Assert.AreEqual(0, _port.Writes.Count, "아무것도 쓰지 않는다");
++    }
++
++    [TestMethod]
++    public void should_block_save_when_preload_zoom_is_above_exit_zoom()
++    {
++        var form = Form();
++        Field(form, "map3d.PreloadZoom").Text = "16.6";
++
++        Assert.IsFalse(form.CanApply);
++        StringAssert.Contains(form.FooterText, SettingsValidation.Map3DPreloadOrderMessage);
++    }
++
++    [TestMethod]
++    public void should_save_in_order_when_all_zooms_raised_together()
++    {
++        var form = Form();
++        Field(form, "map3d.EnterZoom").Text = "19";
++        Field(form, "map3d.ExitZoom").Text = "18.5";
++        Field(form, "map3d.PreloadZoom").Text = "18";
++
++        Assert.IsTrue(form.CanApply);
++        Assert.AreEqual(3, form.Save());
++        CollectionAssert.AreEqual(new[] { "EnterZoom", "ExitZoom", "PreloadZoom" }, _port.Writes);
++        Assert.AreEqual((19d, 18.5d, 18d), (_port.EnterZoom, _port.ExitZoom, _port.PreloadZoom));
++        Assert.IsFalse(form.HasError);
++    }
++
++    [TestMethod]
++    public void should_clear_order_error_when_draft_is_reverted()
++    {
++        var form = Form();
++        Field(form, "map3d.EnterZoom").Text = "16";
++        Assert.IsTrue(form.HasError);
++
++        form.Revert();
++
++        Assert.IsFalse(form.HasError);
++        Assert.AreEqual(string.Empty, form.Sections[0].CheckError);
++    }
++
++    // ── 칸 하나의 범위 ──
++
++    [DataTestMethod]
++    [DataRow("map3d.EnterZoom", "21")]
++    [DataRow("map3d.AreaShowZoom", "9.5")]
++    [DataRow("map3d.MaxAreaSideM", "100")]
++    [DataRow("map3d.MaxAreaSideM", "6000")]
++    [DataRow("map3d.GuideMinSeconds", "3.5")]
++    [DataRow("map3d.ServerUrl", "ftp://10.0.0.5")]
++    [DataRow("map3d.ServerUrl", "")]
++    public void should_mark_field_error_when_value_out_of_range(string key, string text)
++    {
++        var form = Form();
++        var field = Field(form, key);
++        field.Text = text;
++
++        Assert.IsTrue(field.HasError, $"{key} = '{text}'");
++        Assert.IsFalse(form.CanApply);
++    }
++
++    [TestMethod]
++    public void should_write_server_url_and_switches_when_changed()
++    {
++        var form = Form();
++        Field(form, "map3d.ServerUrl").Text = "http://10.0.0.5:8765";
++        Field(form, "map3d.IsEnabled").BoolValue = false;
++        Field(form, "map3d.UseCompositionHost").BoolValue = false;
++        Field(form, "map3d.OverlayMode").SelectedChoice = Field(form, "map3d.OverlayMode").Options[2];
++
++        Assert.AreEqual(4, form.Save());
++        Assert.AreEqual("http://10.0.0.5:8765", _port.ServerUrl);
++        Assert.IsFalse(_port.IsEnabled);
++        Assert.IsFalse(_port.UseCompositionHost);
++        Assert.AreEqual("extract", _port.OverlayMode);
++    }
++
++    // ── 순수 규칙 ──
++
++    [DataTestMethod]
++    [DataRow(17d, 16.5d, 15d, null)]
++    [DataRow(17d, 16.5d, 16.5d, null)]
++    [DataRow(17d, 17d, 15d, SettingsValidation.Map3DExitOrderMessage)]
++    [DataRow(17d, 18d, 15d, SettingsValidation.Map3DExitOrderMessage)]
++    [DataRow(17d, 16.5d, 16.6d, SettingsValidation.Map3DPreloadOrderMessage)]
++    public void should_check_zoom_order_when_zooms_given(double enter, double exit, double preload, string? expected)
++        => Assert.AreEqual(expected, SettingsValidation.Map3DZoomOrder(enter, exit, preload));
++
++    [TestMethod]
++    public void should_leave_non_numbers_to_field_rules_when_zoom_order_checked()
++        => Assert.IsNull(SettingsValidation.Map3DZoomOrder("abc", 16.5, 15));
++
++    // ── "?" 도움말 ──
++
++    [DataTestMethod]
++    [DataRow("바로 반영")]
++    [DataRow("3D 로 바뀌는 줌보다 작아야")]
++    [DataRow("영역 최대 크기")]
++    [DataRow("다시 시작해야 반영")]
++    public void should_explain_section_in_question_mark_when_help_key_resolved(string phrase)
++    {
++        Assert.IsTrue(HelpCatalog.TryGet(HostHelp.SettingsMap3D, out var entry));
++        StringAssert.Contains(entry.ToPlainText(), phrase);
++    }
++}
