@@ -156,6 +156,7 @@ public static class MapSettingsHelper
             {
                 model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
                 model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
+                model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
             }
             if (model.Normalize()) log?.Warning($"[Map3D] ServerUrl 이 올바르지 않아 고쳐 씀 → {model.ServerUrl}");
             log?.Info($"[Map3D] 로드(appsettings.Map3D): {model}");

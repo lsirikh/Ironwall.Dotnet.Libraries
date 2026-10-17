@@ -80,6 +80,7 @@ public partial class MapViewModel
         _map3DSettings = MapSettingsHelper.LoadMap3D(_log);
         _map3DClient?.Dispose();
         _map3DClient = new Map3DClient(_map3DSettings.ServerUrl);
+        Map3DHost.UseComposition = _map3DSettings.UseCompositionHost;
 
         MainMap.OnPositionChanged -= OnMap3DPositionChanged;
         MainMap.OnPositionChanged += OnMap3DPositionChanged;
