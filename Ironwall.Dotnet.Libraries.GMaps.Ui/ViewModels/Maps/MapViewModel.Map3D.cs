@@ -284,6 +284,7 @@ public partial class MapViewModel
                 await Task.Delay(1000);
                 job = await _map3DClient.GetJobAsync(job.Id);
             }
+            _isMap3DBaking = false;   // 아래 QueueMap3DGate 가 새 영역으로 들어갈 수 있게(finally 보다 먼저)
             if (job.IsError)
             {
                 SetAimStatus($"3D 만들기 실패: {job.Message ?? "알 수 없는 오류"}", autoHide: true);
@@ -340,7 +341,8 @@ public partial class MapViewModel
         var center = MainMap.Position;
         double zoom = MainMap.EffectiveZoom;
         var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
-        bool active = !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null);
+        // 굽는 동안은 3D 로 들어가지 않는다 — 영역을 그리고 나면 곧바로 옛 3D 로 들어가 굽기 진행 패널이 가려졌다(2026-10-17 실기 S1)
+        bool active = !_isMap3DBaking && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null);
 
         if (!Map3DMath.Decide(zoom, false, scene != null)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
         if (scene == null && zoom >= Map3DMath.ExitZoom) QueueMap3DSceneLookup(center);
