@@ -22,6 +22,8 @@
 
 ## 발견
 - 하네스 첫 검사에서 CameraPopup.Tests `EventWindowTileStreamTests.should_close_with_timer_reason_when_timer_elapses_in_host`(900~3000 ms 예산, 실측 4283 ms)가 실패 — 이번 변경과 무관한 시간 예산 시험(기계가 바쁠 때). 바로 앞 실행에서는 통과했다.
+  둘째 검사에서는 다른 시간 예산 시험 `EventWindowManagerTests.should_return_within_budget_and_not_throw_when_supervisor_is_unavailable`(50 ms, 실측 755 ms)이 실패.
+  이 작업은 CameraPopup 코드를 하나도 고치지 않았고(git diff 434af21a 확인), 그 시험 묶음만 따로 두 번 돌리면 334/334 통과 — 솔루션 전체를 병렬로 돌릴 때의 부하 탓이다.
 - 복사본에서 메인 앱 시험을 돌리려면 Dotnet.Monitoring.Solution.sln + Installer\ 도 있어야 한다(InstallerSource.FindRepoRoot) — 없으면 설치 · 옛 서버 시험 22개가 실패한다.
 - worktree 안 하위 폴더에서 `git apply` 하면 저장소 기준 경로라 조용히 아무것도 안 한다 → GIT_CEILING_DIRECTORIES 로 저장소 밖처럼 돌려 확인했다.
 - map-3d 가 enter_zoom 을 아직 기록하지 않으면(별도 작업) 새로 만든 영역도 목록을 다시 받은 뒤엔 세팅값을 쓴다 — 목표대로 GIS 는 보내기만 한다.
