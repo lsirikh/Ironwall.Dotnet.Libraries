@@ -27,6 +27,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                   ★ 서버에 닿지 않으면 "3D 서버(map-3d)가 꺼져 있습니다" 배너만 띄우고 아무것도 바꾸지 않는다.
                   ★ 2차(2026-10-17): 편집 · 독점 입력 모드(ExclusiveInputModeGate) 중에는 3D 에 들어가지 않고, 3D 중 그 모드에 들어가면 먼저 2D 로 돌아온다.
                     3D 가 보이는 동안 마커를 오버레이 다리(Map3DOverlayBridge)로 보내고, 3D 의 pick 을 지도 마커 클릭 경로로 넘긴다.
+                  ★ 3차(2026-10-17, R5): 전환 안내 패널 — 들어갈 때마다 "3D 지도로 전환합니다" + 막대(만들어 둔 화면이어도 최소 0.6 s 뒤 펼침),
+                    나올 때 "2D 지도로 돌아갑니다" 0.5 s, 로그인 화면 뒤에서 펼쳤으면 로그인 직후 한 번(판정 = Map3DGuide 순수 함수).
+                    영역 표시 · 관리 · 칩은 MapViewModel.Map3DAreas.cs.
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
@@ -49,15 +52,91 @@ public partial class MapViewModel
     public string Map3DBusyText { get => _map3DBusyText; private set { _map3DBusyText = value; NotifyOfPropertyChange(); } }
     public double Map3DBusyPercent { get => _map3DBusyPercent; private set { _map3DBusyPercent = value; NotifyOfPropertyChange(); } }
     public bool Map3DBusyIndeterminate { get => _map3DBusyIndeterminate; private set { _map3DBusyIndeterminate = value; NotifyOfPropertyChange(); } }
+    private string _map3DBusyDetail = "";
+    /// <summary>진행 패널 둘째 줄(단계 · %). 비면 줄을 접는다.</summary>
+    public string Map3DBusyDetail { get => _map3DBusyDetail; private set { _map3DBusyDetail = value; NotifyOfPropertyChange(); } }
 
-    /// <summary>진행 패널 — text 가 null 이면 닫는다. percent 가 null 이면 끝을 모르는 진행(원이 돈다).</summary>
-    private void SetMap3DBusy(string? text, double? percent = null)
+    /// <summary>진행 패널 — text(제목)가 null 이면 닫는다. percent 가 null 이면 끝을 모르는 진행(막대가 흐른다).
+    /// 제목이 바뀌거나 새로 열 때만 표시 시작 시각을 다시 잡는다(최소 표시 시간 기준).</summary>
+    private void SetMap3DBusy(string? text, double? percent = null, string detail = "")
     {
-        if (text == null) { IsMap3DBusy = false; return; }
+        _map3DBusyForBake = false;
+        if (text == null) { StopMap3DGuideTimer(); IsMap3DBusy = false; return; }
+        if (!IsMap3DBusy || text != Map3DBusyText) _map3DBusyShownAt = DateTime.UtcNow;
         Map3DBusyText = text;
+        Map3DBusyDetail = detail;
         Map3DBusyIndeterminate = percent == null;
         Map3DBusyPercent = percent ?? 0;
         IsMap3DBusy = true;
+    }
+
+    // ── 전환 안내(R5) — 최소 표시 시간을 채운 뒤 3D 를 펼치거나(RevealWhenDue) 패널을 닫는다(HideWhenDue) ──
+    private enum Map3DGuideMode { None, RevealWhenDue, HideWhenDue }
+    private Map3DGuideMode _map3DGuideMode;
+    private DateTime _map3DBusyShownAt;
+    private TimeSpan _map3DGuideMin;
+    /// <summary>막대를 시간으로 채운다(만들어 둔 3D 화면 펼치기).</summary>
+    private bool _map3DGuideTimedBar;
+    private DispatcherTimer? _map3DGuideTimer;
+    /// <summary>지금 패널이 굽기 진행 표시인가(굽기가 끝나면 그 패널만 닫는다).</summary>
+    private bool _map3DBusyForBake;
+    /// <summary>로그인 화면 뒤에서 3D 를 펼쳤다 — 로그인 직후 한 번 안내한다.</summary>
+    private bool _map3DRevealedBehindLogin;
+    private bool _map3DLoginSubscribed;
+
+    private void RunMap3DGuideTimer(Map3DGuideMode mode, TimeSpan minimum, bool timedBar)
+    {
+        _map3DGuideMode = mode;
+        _map3DGuideMin = minimum;
+        _map3DGuideTimedBar = timedBar;
+        if (_map3DGuideTimer == null)
+        {
+            _map3DGuideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            _map3DGuideTimer.Tick += (_, __) =>
+            {
+                try { OnMap3DGuideTick(); }
+                catch (Exception ex) { StopMap3DGuideTimer(); _log?.Error($"[Map3D] 안내 처리 실패(격리): {ex.Message}"); }
+            };
+        }
+        _map3DGuideTimer.Start();
+    }
+
+    private void StopMap3DGuideTimer()
+    {
+        _map3DGuideTimer?.Stop();
+        _map3DGuideMode = Map3DGuideMode.None;
+    }
+
+    private void OnMap3DGuideTick()
+    {
+        var elapsed = DateTime.UtcNow - _map3DBusyShownAt;
+        if (_map3DGuideTimedBar) Map3DBusyPercent = Map3DGuide.TimedPercent(elapsed, _map3DGuideMin);
+        if (Map3DGuide.Remaining(elapsed, _map3DGuideMin) > TimeSpan.Zero) return;
+        var mode = _map3DGuideMode;
+        StopMap3DGuideTimer();
+        if (mode == Map3DGuideMode.RevealWhenDue) { if (_map3DState == Map3DState.Pending) Reveal3D(); }
+        else SetMap3DBusy(null);
+    }
+
+    /// <summary>3D 가 준비됐다 — 안내가 최소 시간(0.6 s)만큼 보였으면 바로 펼치고, 아니면 막대를 채운 채 남은 시간 뒤 펼친다.</summary>
+    private void RevealAfterGuide()
+    {
+        if (Map3DGuide.Remaining(DateTime.UtcNow - _map3DBusyShownAt, Map3DGuide.MinEnterShow) <= TimeSpan.Zero) { Reveal3D(); return; }
+        SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("ready"));
+        RunMap3DGuideTimer(Map3DGuideMode.RevealWhenDue, Map3DGuide.MinEnterShow, timedBar: false);
+    }
+
+    /// <summary>로그인 성공(배경 스레드 가능) — 로그인 화면 뒤에서 3D 로 들어갔고 지금도 3D 면 한 번 안내한다.</summary>
+    private void OnMap3DLoginSucceeded()
+    {
+        _ = OnUiAsync(() =>
+        {
+            if (!Map3DGuide.ShouldGuideAfterLogin(_map3DRevealedBehindLogin, _map3DState == Map3DState.Shown)) return;
+            _map3DRevealedBehindLogin = false;
+            _log?.Info("[Map3D] 로그인 직후 3D 안내");
+            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("login"));
+            RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.AfterLoginShow, timedBar: false);
+        });
     }
     private string? _map3DJob;
     private bool _isMap3DDrawMode;
@@ -109,7 +188,13 @@ public partial class MapViewModel
         MainMap.OnMapZoomChanged += OnMap3DZoomChanged;
         MainMap.DigitalZoomLevelChanged -= OnMap3DDigitalZoomChanged;
         MainMap.DigitalZoomLevelChanged += OnMap3DDigitalZoomChanged;
+        if (!_map3DLoginSubscribed && ResolveSessionLifecycle() is { } session)
+        {
+            session.LoginSucceeded += OnMap3DLoginSucceeded;   // 로그인 화면 뒤에서 들어간 3D 를 로그인 직후 안내(R5)
+            _map3DLoginSubscribed = true;
+        }
         QueueMap3DGate();
+        if (_map3DSettings.IsEnabled) _ = RefreshMap3DAreasAsync();   // 2D 지도 3D 영역 표시(R4)
     }
 
     private void OnMap3DPositionChanged(PointLatLng _) => QueueMap3DGate();
@@ -123,7 +208,9 @@ public partial class MapViewModel
         if (MainMap == null) return;
         EnterAnchorDrawMode();   // 러버밴드 · 십자 커서 · ESC 후킹 · 포커스
         _isMap3DDrawMode = true;
-        SetAimStatus("지도에서 드래그해 3D 로 만들 영역을 그리세요 — (Enter = 지금 화면 전체 · ESC = 취소)");
+        // 그리는 중 마퀴 옆 크기 표시 — 한 변 2 km 를 넘으면 경고색(R6)
+        MainMap.AnchorDrawLabel = (nw, se) => Map3DGuide.AreaDrawLabel(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng));
+        SetAimStatus("지도에서 드래그해 3D 로 만들 영역을 그리세요 (Enter = 지금 화면 · ESC = 취소)");
     }
 
     /// <summary>앵커 그리기 완료가 3D 그리기였으면 굽기로 넘긴다(OnAnchorAreaDrawn 서두에서 호출).</summary>
@@ -131,8 +218,22 @@ public partial class MapViewModel
     {
         if (!_isMap3DDrawMode) return false;
         ExitAnchorDrawMode();
-        _ = BakeMap3DAsync(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng));
+        TakeMap3DArea(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng));
         return true;
+    }
+
+    /// <summary>그린 영역(또는 Enter = 지금 화면) — 한 변 2 km 를 넘으면 이유를 알리고 다시 그리기 모드로, 아니면 굽는다.</summary>
+    private void TakeMap3DArea(double[] bbox)
+    {
+        var (w, h) = Map3DGuide.AreaSizeMeters(bbox);
+        if (Map3DGuide.IsAreaTooLarge(w, h))
+        {
+            _log?.Info($"[Map3D] 영역이 너무 큼 {Map3DGuide.FormatAreaSize(w, h)} → 다시 그리기");
+            EnterMap3DDrawMode();
+            SetAimStatus(Map3DGuide.AreaTooLargeText(w, h));
+            return;
+        }
+        _ = BakeMap3DAsync(bbox);
     }
 
     /// <summary>창 PreviewKeyDown(OnMapPreviewKeyDownForAim) 서두 — 3D 그리기 중 Enter = 지금 화면 전체, 3D 화면 중 ESC = 2D 복귀.</summary>
@@ -147,7 +248,7 @@ public partial class MapViewModel
             double cLat = v.Lat - v.HeightLat / 2.0, cLng = v.Lng + v.WidthLng / 2.0;
             double hLat = v.HeightLat / 2.0 / s, hLng = v.WidthLng / 2.0 / s;
             ExitAnchorDrawMode();
-            _ = BakeMap3DAsync(Map3DMath.BuildBbox(cLat + hLat, cLng - hLng, cLat - hLat, cLng + hLng));
+            TakeMap3DArea(Map3DMath.BuildBbox(cLat + hLat, cLng - hLng, cLat - hLat, cLng + hLng));
             e.Handled = true;
             return true;
         }
@@ -175,7 +276,11 @@ public partial class MapViewModel
             while (!job.IsDone && !job.IsError)
             {
                 SetAimStatus($"3D 만드는 중… {job.Progress:P0}{(string.IsNullOrEmpty(job.Message) ? "" : $" — {job.Message}")}");
-                SetMap3DBusy(string.IsNullOrEmpty(job.Message) ? "3D 를 만드는 중…" : $"3D 를 만드는 중… {job.Message}", job.Progress * 100);
+                if (_map3DState == Map3DState.Off && _map3DGuideMode == Map3DGuideMode.None)   // 전환 안내를 덮지 않는다
+                {
+                    SetMap3DBusy(Map3DGuide.WithPercent("3D 를 만드는 중…", job.Progress * 100), job.Progress * 100, job.Message ?? "");
+                    _map3DBusyForBake = true;
+                }
                 await Task.Delay(1000);
                 job = await _map3DClient.GetJobAsync(job.Id);
             }
@@ -189,6 +294,7 @@ public partial class MapViewModel
             _map3DEntrySuppressed = false;
             SetAimStatus("3D 준비됨 — 줌 17 이상에서 3D", autoHide: true);
             QueueMap3DGate();
+            _ = RefreshMap3DAreasAsync();   // 새 영역 테두리 · 배지(만든 날짜 · 건물 수는 서버 목록에서)
         }
         catch (Map3DServerUnavailableException ex)
         {
@@ -206,7 +312,7 @@ public partial class MapViewModel
         }
         finally
         {
-            if (_map3DState != Map3DState.Pending) SetMap3DBusy(null);
+            if (_map3DBusyForBake) SetMap3DBusy(null);   // 굽기 패널만 닫는다(전환 안내는 그대로)
             _isMap3DBaking = false;
             DrawMap3DAreaCommand.RaiseCanExecuteChanged();
         }
@@ -223,6 +329,8 @@ public partial class MapViewModel
             _map3DGateQueued = false;
             try { EvaluateMap3DGate(); }
             catch (Exception ex) { _log?.Error($"[Map3D] 게이트 판정 실패(격리): {ex.Message}"); }
+            try { UpdateMap3DAreaDisplay(); }   // 영역 테두리 크기 · 줌 13 표시 · "3D 가능" 칩(MapViewModel.Map3DAreas)
+            catch (Exception ex) { _log?.Error($"[Map3D] 영역 표시 갱신 실패(격리): {ex.Message}"); }
         }));
     }
 
@@ -274,6 +382,7 @@ public partial class MapViewModel
             _map3DScenes.Add(scene);
             _log?.Info($"[Map3D] 장면 찾음 id={scene.Id}");
             QueueMap3DGate();
+            if (!_map3DAreaMarkers.ContainsKey(scene.Id)) _ = RefreshMap3DAreasAsync();   // 서버가 늦게 켜졌거나 다른 곳에서 만든 영역 — 영역 표시도 맞춘다
         }
         catch (OperationCanceledException) { }
         catch (Map3DServerUnavailableException ex)
@@ -296,10 +405,13 @@ public partial class MapViewModel
     {
         if (MainMap == null || IsMap3DBlockedByInputMode()) return;
         _map3DState = Map3DState.Pending;
-        SetMap3DBusy("3D 로 전환하는 중…");
         _map3DJob = scene.Id;
-        _log?.Info($"[Map3D] 진입 시작 job={scene.Id} zoom={MainMap.EffectiveZoom:F1}");
-        if (Map3DHost.IsReadyFor(scene.Id)) { Reveal3D(); return; }
+        bool reuse = Map3DHost.IsReadyFor(scene.Id);
+        _log?.Info($"[Map3D] 진입 시작 job={scene.Id} zoom={MainMap.EffectiveZoom:F1} reuse={reuse}");
+        // 안내 패널은 매번 — 만들어 둔 화면이어도 최소 0.6 s 동안 막대를 채운 뒤 펼친다(R5). 복귀 안내 타이머가 돌고 있으면 먼저 멈춘다.
+        StopMap3DGuideTimer();
+        SetMap3DBusy(Map3DGuide.EnterTitle, reuse ? 0 : null, Map3DGuide.StageText(reuse ? "reuse" : null));
+        if (reuse) { RunMap3DGuideTimer(Map3DGuideMode.RevealWhenDue, Map3DGuide.MinEnterShow, timedBar: true); return; }
         // 위에서 내려다본 같은 축척으로 연다(animate=0) — 펼칠 때(Reveal3D) 기울기 애니메이션을 보낸다.
         bool remote = IsRemoteSession();
         if (remote) _log?.Info("[Map3D] 원격 세션 — 3D 저사양(low=1)");
@@ -311,6 +423,7 @@ public partial class MapViewModel
         if (MainMap == null) return;
         _map3DState = Map3DState.Shown;
         SetMap3DBusy(null);
+        _map3DRevealedBehindLogin = Map3DGuide.IsBehindLogin(ResolveTokenStorage()?.IsAuthenticated);   // 로그인 뒤 한 번 안내(R5)
         _map3DLastCamera = null;
         Map3DOverlay.Start(MainMap);                                                     // 오버레이 전체 스냅샷(ready 직후 · 재사용 펼침)
         Map3DHost.PostCamera(Current2DCamera(0d), animate: false);                    // 지금 2D 와 같은 자리 · 축척(로딩 중 움직였을 수 있다)
@@ -324,7 +437,11 @@ public partial class MapViewModel
     private void Leave3D(Map3DCamera? cam, string cause)
     {
         if (MainMap == null) return;
-        _map3DState = Map3DState.Off; SetMap3DBusy(null);
+        _map3DState = Map3DState.Off;
+        _map3DRevealedBehindLogin = false;
+        // 짧은 복귀 안내(R5) — 패널은 2D 위에 0.5 s
+        SetMap3DBusy(Map3DGuide.LeaveTitle, 100);
+        RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.LeaveShow, timedBar: false);
         _map3DOverlay?.Stop();
         Map3DHost.Park();
         MainMap.IsHitTestVisible = true;
@@ -345,14 +462,14 @@ public partial class MapViewModel
     {
         if (msg.Type == "progress")
         {
-            if (_map3DState == Map3DState.Pending)
-                SetMap3DBusy(msg.Reason switch { "model" => "3D 장면을 받는 중…", "scene" => "3D 장면 정보를 읽는 중…", _ => "3D 화면을 여는 중…" }, msg.Progress);
+            if (_map3DState == Map3DState.Pending && _map3DGuideMode == Map3DGuideMode.None)
+                SetMap3DBusy(Map3DGuide.EnterTitle, msg.Progress, Map3DGuide.WithPercent(Map3DGuide.StageText(msg.Reason), msg.Progress));
             return;
         }
         if (msg.Type == "ready")
         {
             _log?.Info($"[Map3D] ready job={msg.Job}");
-            if (_map3DState == Map3DState.Pending && (msg.Job == null || msg.Job == _map3DJob)) Reveal3D();
+            if (_map3DState == Map3DState.Pending && (msg.Job == null || msg.Job == _map3DJob)) RevealAfterGuide();
             return;
         }
         if (msg.Type == "overlay.resync")
@@ -459,7 +576,7 @@ public partial class MapViewModel
         if (_map3DState != Map3DState.Shown) return;
         // WPF 안에서 그리는 방식이면 상세 창(지도 옆 패널)은 3D 위에 그대로 보인다 — 2D 로 돌아갈 필요가 없다.
         // 카드 · 카메라 상자는 2D 심볼 화면 위치에 붙어 있어 3D 에서는 자리가 맞지 않으므로 계속 2D 로 돌아온다.
-        if (cause == "symbol-detail" && Map3DHost.HostMode == "composition") return;
+        if (!Map3DGuide.ShouldLeave3DForPanel(cause, Map3DHost.HostMode)) return;
         _map3DEntrySuppressed = true;
         Leave3D(_map3DLastCamera, cause);
     }

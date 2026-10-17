@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
@@ -20,6 +21,8 @@ public sealed class RubberBandAdorner : Adorner
     private static readonly Pen _pen = FrozenDashPen(Color.FromArgb(210, 0, 170, 255), 1.5d);
 
     private Rect? _rect;
+    private string? _label;
+    private bool _warn;
 
     public RubberBandAdorner(UIElement map) : base(map)
     {
@@ -27,13 +30,34 @@ public sealed class RubberBandAdorner : Adorner
     }
 
     /// <summary>마퀴 사각형 갱신(컨트롤 로컬 좌표). null=숨김.</summary>
-    public void Update(Rect? rect) { _rect = rect; InvalidateVisual(); }
+    public void Update(Rect? rect) => Update(rect, null, false);
+
+    /// <summary>마퀴 사각형 + 오른쪽 아래 크기 글(3D 영역 그리기). warn = 경고색(StatusWarningBrush — 2 km 초과).</summary>
+    public void Update(Rect? rect, string? label, bool warn) { _rect = rect; _label = label; _warn = warn; InvalidateVisual(); }
 
     protected override void OnRender(DrawingContext dc)
     {
-        if (_rect is Rect r && r.Width > 0 && r.Height > 0)
+        if (_rect is not Rect r || r.Width <= 0 || r.Height <= 0) return;
+        if (string.IsNullOrEmpty(_label))
+        {
             dc.DrawRectangle(_fill, _pen, r);
+            return;
+        }
+
+        // 크기 글 — 토큰을 그릴 때마다 다시 읽는다(라이트/다크). 경고면 테두리도 같은 경고색.
+        var accent = Token(_warn ? "StatusWarningBrush" : "PrimaryBrush") ?? _pen.Brush;
+        var pen = _warn ? new Pen(accent, 2d) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) } : _pen;
+        dc.DrawRectangle(_fill, pen, r);
+
+        var text = new FormattedText(_label, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(SystemFonts.MessageFontFamily, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            12d, accent, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var box = new Rect(Math.Max(r.Left, r.Right - text.Width - 12d), r.Bottom + 4d, text.Width + 12d, text.Height + 6d);
+        dc.DrawRoundedRectangle(Token("SurfaceBrush") ?? Brushes.Black, new Pen(accent, 1d), box, 3d, 3d);
+        dc.DrawText(text, new Point(box.Left + 6d, box.Top + 3d));
     }
+
+    private Brush? Token(string key) => (AdornedElement as FrameworkElement)?.TryFindResource(key) as Brush;
 
     private static Brush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
     private static Pen FrozenDashPen(Color c, double t)
