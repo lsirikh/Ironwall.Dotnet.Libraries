@@ -265,6 +265,29 @@
 					Command="{Binding OpenMapSetupCommand}"
 					Header="지도 줌 범위 설정…"
 					Icon="{md:PackIcon Kind=MagnifyPlusOutline}" />
+				<!--  3D 영역 목록(지도 3D 시나리오 S3) — 영역마다 배지 우클릭과 같은 동작(3D 로 보기 · 다시 만들기 · 지우기).  -->
+				<MenuItem
+					AutomationProperties.AutomationId="GMaps.Map3D.AreaList"
+					Header="3D 영역 목록"
+					Icon="{md:PackIcon Kind=CubeOutline}"
+					IsEnabled="{Binding HasMap3DAreas}"
+					ItemsSource="{Binding Map3DAreas}">
+					<MenuItem.ItemContainerStyle>
+						<Style BasedOn="{StaticResource MaterialDesignMenuItem}" TargetType="MenuItem">
+							<Setter Property="Header" Value="{Binding Title}" />
+							<Setter Property="ToolTip" Value="{Binding ToolTip}" />
+							<Setter Property="ItemsSource" Value="{Binding Actions}" />
+							<Setter Property="ItemContainerStyle">
+								<Setter.Value>
+									<Style BasedOn="{StaticResource MaterialDesignMenuItem}" TargetType="MenuItem">
+										<Setter Property="Header" Value="{Binding Header}" />
+										<Setter Property="Command" Value="{Binding Command}" />
+									</Style>
+								</Setter.Value>
+							</Setter>
+						</Style>
+					</MenuItem.ItemContainerStyle>
+				</MenuItem>
 				<Separator />
 				<MenuItem
 					Command="{Binding ExitApplicationCommand}"
@@ -1306,8 +1329,27 @@
 							FontSize="13"
 							FontWeight="SemiBold"
 							Foreground="{DynamicResource TextPrimaryBrush}"
+							AutomationProperties.AutomationId="GMaps.Map3D.Progress.Title"
 							Text="{Binding Map3DBusyText}" />
 					</StackPanel>
+					<!--  둘째 줄 = 단계 · %(R5 전환 안내 — "3D 장면을 받는 중… 42 %" 등). 비면 접는다.  -->
+					<TextBlock
+						Margin="0,6,0,0"
+						HorizontalAlignment="Center"
+						AutomationProperties.AutomationId="GMaps.Map3D.Progress.Detail"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding Map3DBusyDetail}">
+						<TextBlock.Style>
+							<Style TargetType="TextBlock">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding Map3DBusyDetail}" Value="">
+										<Setter Property="Visibility" Value="Collapsed" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
 					<ProgressBar
 						Height="4"
 						Margin="0,10,0,0"
@@ -1609,6 +1651,39 @@
 				Zoom="{Binding MainMap.Zoom, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 				ZoomInCommand="{Binding ZoomInCommand}"
 				ZoomOutCommand="{Binding ZoomOutCommand}" />
+
+			<!--  "3D 가능 — 줌 17 이상" 칩(지도 3D 시나리오 S2) — 줌 컨트롤(폭 250, 오른쪽 여백 300) 바로 왼쪽.
+			      화면 가운데가 3D 영역 안이고 줌 < 17 일 때만. 입력은 막지 않는다. 토큰만(라이트/다크).  -->
+			<Border
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Margin="0,0,558,9"
+				Padding="8,3"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Bottom"
+				Background="{DynamicResource SurfaceBrush}"
+				BorderBrush="{DynamicResource PrimaryBrush}"
+				BorderThickness="1"
+				CornerRadius="10"
+				IsHitTestVisible="False"
+				Visibility="{Binding IsMap3DChipVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel Orientation="Horizontal">
+					<md:PackIcon
+						Width="14"
+						Height="14"
+						Margin="0,0,4,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource PrimaryBrush}"
+						Kind="CubeOutline" />
+					<TextBlock
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="GMaps.Map3D.Chip"
+						FontSize="12"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="{Binding Map3DChipText}" />
+				</StackPanel>
+			</Border>
 
 			<!--  카메라 영상 팝업 제어 허브(CameraPopup_ControlHub) — 기존 카운터 위젯 교체.
 			      드래그 이동 + 위치 기억 위해 PropertyPanelCanvas 안(Canvas.Left/Top)에 배치 → 아래 PropertyPanelCanvas 내부 참조.  -->

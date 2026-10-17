@@ -33,3 +33,7 @@ public class CallCloseAllCameraPopupsProcessMessageModel : IMessageModel { }
 /// 팝업 인프라가 이 메시지를 재발행 → <c>MapViewModel.HandleAsync</c> 가 대기 대상(_pendingPresetDelete)을
 /// ONVIF RemovePreset 후 목록 재조회. raw MessageBox 금지 — 표준 EventAggregator 확인 패턴.</summary>
 public class CallDeletePresetProcessMessageModel : IMessageModel { }
+
+/// <summary>3D 영역(구운 장면) 지우기 확인 콜백(지도 3D 시나리오 S3). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
+/// 대기 대상(_pendingMap3DAreaDelete)을 map-3d 서버에서 지운다(DELETE /api/jobs/{id}). raw MessageBox 금지 — 표준 EventAggregator 확인 패턴.</summary>
+public class CallDeleteMap3DAreaProcessMessageModel : IMessageModel { }

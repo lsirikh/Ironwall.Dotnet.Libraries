@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -27,6 +29,9 @@ public sealed record Map3DJob(string Id, string Status, double Progress, string?
 
 /// <summary>구운 장면. Id 는 3D 화면 주소의 job 값으로 쓴다. Bbox = [minLon, minLat, maxLon, maxLat].</summary>
 public sealed record Map3DScene(string Id, double[] Bbox);
+
+/// <summary>구운 장면 목록 항목(GET /api/jobs 의 scenes) — 2D 지도 3D 영역 표시용. 모르는 값은 null.</summary>
+public sealed record Map3DSceneInfo(string Id, string? Name, double[] Bbox, DateTime? Created, int? Buildings, string? Kind);
 
 /// <summary>서버에 닿지 않음(연결 거부 · 시간 초과).</summary>
 public sealed class Map3DServerUnavailableException : Exception
@@ -84,6 +89,57 @@ public sealed class Map3DClient : IDisposable
         if (string.IsNullOrEmpty(id) || bbox == null || bbox.Length != 4)
             throw new Map3DRequestException(HttpStatusCode.OK, "장면 응답 형식이 올바르지 않습니다");
         return new Map3DScene(id, bbox);
+    }
+
+    /// <summary>구운 장면 목록(GET /api/jobs 의 scenes).</summary>
+    public async Task<IReadOnlyList<Map3DSceneInfo>> ListScenesAsync(CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, Map3DMath.JobsUrl(_server)), allowNotFound: false, ct).ConfigureAwait(false);
+        return ParseScenes(json!);
+    }
+
+    /// <summary>굽은 장면 지우기(DELETE /api/jobs/{id}) — 지웠으면 true, 이미 없으면(404) false. 지울 수 없는 장면(예: 견본 405)은 Map3DRequestException.</summary>
+    public async Task<bool> DeleteSceneAsync(string id, CancellationToken ct = default)
+        => await SendAsync(new HttpRequestMessage(HttpMethod.Delete, Map3DMath.JobUrl(_server, id)), allowNotFound: true, ct).ConfigureAwait(false) != null;
+
+    /// <summary>
+    /// GET /api/jobs 응답의 scenes 해석 — {"scenes":[...]} 또는 배열 그대로. id 나 bbox(수 4개)가 없는 항목은 건너뛴다.
+    /// created = ISO 문자열 또는 유닉스 초, 건물 수 = counts.buildings.
+    /// </summary>
+    internal static IReadOnlyList<Map3DSceneInfo> ParseScenes(string json)
+    {
+        // 날짜는 문자열 그대로 받아(DateParseHandling.None) 시간대 없는 값을 지역 시각으로 읽는다
+        using var reader = new JsonTextReader(new System.IO.StringReader(json)) { DateParseHandling = DateParseHandling.None };
+        var root = JToken.ReadFrom(reader);
+        var array = root as JArray ?? (root as JObject)?["scenes"] as JArray;
+        var list = new List<Map3DSceneInfo>();
+        if (array == null) return list;
+        foreach (var o in array.OfType<JObject>())
+        {
+            string? id = o["id"]?.Type == JTokenType.String ? o.Value<string>("id") : null;
+            var bboxToken = o["bbox"] as JArray;
+            if (string.IsNullOrEmpty(id) || bboxToken == null || bboxToken.Count != 4
+                || bboxToken.Any(t => t.Type is not (JTokenType.Float or JTokenType.Integer))) continue;
+            var counts = o["counts"] as JObject;
+            list.Add(new Map3DSceneInfo(
+                id,
+                o["name"]?.Type == JTokenType.String ? o.Value<string>("name") : null,
+                bboxToken.Select(t => t.Value<double>()).ToArray(),
+                ParseCreated(o["created"]),
+                counts?["buildings"]?.Type == JTokenType.Integer ? counts.Value<int>("buildings") : null,
+                o["kind"]?.Type == JTokenType.String ? o.Value<string>("kind") : null));
+        }
+        return list;
+    }
+
+    private static DateTime? ParseCreated(JToken? t)
+    {
+        if (t == null) return null;
+        if (t.Type is JTokenType.Integer or JTokenType.Float)
+            return DateTimeOffset.FromUnixTimeMilliseconds((long)(t.Value<double>() * 1000d)).LocalDateTime;
+        if (t.Type == JTokenType.String && DateTimeOffset.TryParse(t.Value<string>(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var d))
+            return d.LocalDateTime;
+        return null;
     }
 
     /// <summary>보내고 본문을 돌려준다. 404 + allowNotFound → null. 그 밖의 실패 → Map3DRequestException(detail).

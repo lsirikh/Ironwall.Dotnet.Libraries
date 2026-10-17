@@ -1007,6 +1007,8 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     public bool IsAnchorDrawMode { get; set; }
     /// <summary>앵커 영역 드래그 완료 — (NW, SE) 지리좌표 통지. VM이 구역 입력을 채운다.</summary>
     public event System.Action<PointLatLng, PointLatLng>? AnchorAreaDrawn;
+    /// <summary>앵커 영역 그리기 중 마퀴 옆 글(NW, SE → 글 · 경고) — 3D 영역 그리기의 크기 표시 · 2 km 경고. null 이면 글 없음.</summary>
+    public System.Func<PointLatLng, PointLatLng, (string Text, bool IsWarning)>? AnchorDrawLabel { get; set; }
     private static readonly Pen _rubberPen = CreateDashedPen(Color.FromArgb(210, 0, 170, 255), 1.5d);
     private static readonly Brush _rubberFill = CreateFrozenBrush(Color.FromArgb(40, 0, 170, 255));
     private static Brush CreateFrozenBrush(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
@@ -1305,18 +1307,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
                     if (ar.Width >= 4 && ar.Height >= 4)   // 최소 드래그(오클릭 방지)
                     {
                         IsAnchorDrawMode = false;                                    // 유효 드래그 → 모드 종료
-                        // [Rotation R-28] 회전 시 화면 좌상≠지리 북서 — 4모서리를 전부 변환해 min/max로
-                        // 정규화(HeightLat 음수·뒤틀린 저장 방지). 비회전에선 종전 2코너와 동일 결과.
-                        var g1 = FromLocalToLatLng((int)ar.Left, (int)ar.Top);
-                        var g2 = FromLocalToLatLng((int)ar.Right, (int)ar.Top);
-                        var g3 = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);
-                        var g4 = FromLocalToLatLng((int)ar.Left, (int)ar.Bottom);
-                        double north = Math.Max(Math.Max(g1.Lat, g2.Lat), Math.Max(g3.Lat, g4.Lat));
-                        double south = Math.Min(Math.Min(g1.Lat, g2.Lat), Math.Min(g3.Lat, g4.Lat));
-                        double west = Math.Min(Math.Min(g1.Lng, g2.Lng), Math.Min(g3.Lng, g4.Lng));
-                        double east = Math.Max(Math.Max(g1.Lng, g2.Lng), Math.Max(g3.Lng, g4.Lng));
-                        var nw = new PointLatLng(north, west);                       // 정규화 북서
-                        var se = new PointLatLng(south, east);                       // 정규화 남동
+                        var (nw, se) = RubberRectToGeo(ar);                          // 정규화 북서 · 남동(R-28)
                         AnchorAreaDrawn?.Invoke(nw, se);                             // VM이 채우고 ExitAnchorDrawMode(커서 복원)
                     }
                     // 너무 작은 드래그(오클릭)면 모드 유지 → 재시도 또는 ESC 취소
@@ -2817,8 +2808,31 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     /// <summary>러버밴드 마퀴 사각형 갱신(드래그 중).</summary>
     private void UpdateRubberBand()
     {
-        if (_rubberBandAdorner != null && _rubberStart.HasValue && _rubberCurrent.HasValue)
-            _rubberBandAdorner.Update(new Rect(_rubberStart.Value, _rubberCurrent.Value));
+        if (_rubberBandAdorner == null || !_rubberStart.HasValue || !_rubberCurrent.HasValue) return;
+        var rect = new Rect(_rubberStart.Value, _rubberCurrent.Value);
+        if (_rubberForAnchor && AnchorDrawLabel is { } labelOf && rect.Width >= 1 && rect.Height >= 1)
+        {
+            var (nw, se) = RubberRectToGeo(rect);
+            var (text, warn) = labelOf(nw, se);
+            _rubberBandAdorner.Update(rect, text, warn);
+            return;
+        }
+        _rubberBandAdorner.Update(rect);
+    }
+
+    /// <summary>[Rotation R-28] 화면 사각형 → 정규화 NW/SE — 회전 시 화면 좌상≠지리 북서라 4모서리를 전부 변환해 min/max 로
+    /// 정규화(HeightLat 음수·뒤틀린 저장 방지). 비회전에선 2코너와 같은 결과.</summary>
+    private (PointLatLng Nw, PointLatLng Se) RubberRectToGeo(Rect ar)
+    {
+        var g1 = FromLocalToLatLng((int)ar.Left, (int)ar.Top);
+        var g2 = FromLocalToLatLng((int)ar.Right, (int)ar.Top);
+        var g3 = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);
+        var g4 = FromLocalToLatLng((int)ar.Left, (int)ar.Bottom);
+        double north = Math.Max(Math.Max(g1.Lat, g2.Lat), Math.Max(g3.Lat, g4.Lat));
+        double south = Math.Min(Math.Min(g1.Lat, g2.Lat), Math.Min(g3.Lat, g4.Lat));
+        double west = Math.Min(Math.Min(g1.Lng, g2.Lng), Math.Min(g3.Lng, g4.Lng));
+        double east = Math.Max(Math.Max(g1.Lng, g2.Lng), Math.Max(g3.Lng, g4.Lng));
+        return (new PointLatLng(north, west), new PointLatLng(south, east));
     }
 
     /// <summary>러버밴드 마퀴 어도너 제거(종료/취소).</summary>
