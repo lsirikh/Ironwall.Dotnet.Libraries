@@ -2790,8 +2790,13 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             // 드래그 종료 위치(팝업 좌상단, 화면 outer) → inner 역보정 → 위경도 앵커 갱신 + DB 저장(다중 클라 공유)
-            var ip = MainMap.OuterToInner(new Point(vm.CanvasLeft, vm.CanvasTop));
-            var geo = MainMap.FromLocalToLatLng((int)ip.X, (int)ip.Y);
+            PointLatLng geo;
+            if (Map3DDraggedAnchor(vm) is { } geo3D) geo = geo3D;   // 3D 에서 끌었다 — 3D 오프셋을 2D 로 되돌린 앵커(MapViewModel.Map3DWindows)
+            else
+            {
+                var ip = MainMap.OuterToInner(new Point(vm.CanvasLeft, vm.CanvasTop));
+                geo = MainMap.FromLocalToLatLng((int)ip.X, (int)ip.Y);
+            }
             vm.AnchorGeo = geo;
             StartOrResetAutoCloseTimer(vm);   // 드래그 = 상호작용 → 카운트 리셋
             await CameraPopupPositionStore.SavePositionAsync(vm.CameraId, geo);
@@ -2931,10 +2936,11 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
-    /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음).</summary>
+    /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음). 3D 표시 중이면 3D 마커 화면 자리 기준.</summary>
     private void RefreshCameraPopupPositions()
     {
         if (MainMap == null || _cameraPopups == null || _cameraPopups.Count == 0) return;
+        if (TryPlaceCameraPopupsIn3D()) return;   // WPF 안 3D 가 펼쳐진 동안은 3D 마커 화면 자리 기준(MapViewModel.Map3DWindows)
         foreach (var vm in _cameraPopups.ToList())   // 순회 중 Close(Remove) 재진입 방어
         {
             // 카메라 심볼 화면점(연결선 끝점1) 갱신 — 팬/줌 추종 + 디지털줌 outer 보정(InnerToOuter는 scale=1이면 항등)

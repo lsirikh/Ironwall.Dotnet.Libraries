@@ -24,7 +24,7 @@ public readonly record struct Map3DCamera(double Lon, double Lat, double Zoom, d
 /// <summary>3D 영역 하나의 게이트 줌 — 3D 로 바뀌는 줌 · 2D 로 돌아가는 줌 · 미리 준비하는 줌(<see cref="Map3DMath.AreaGate"/>).</summary>
 public readonly record struct Map3DZoomGate(double Enter, double Exit, double Preload);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "progress". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
@@ -34,6 +34,9 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>rendered 일 때 3D 가 그린 오버레이 항목 수(모르면 null).</summary>
     public int? Items { get; init; }
+
+    /// <summary>overlay.screen 일 때 지켜보는 항목의 화면 좌표(바뀐 것만, <see cref="Map3DScreen"/>).</summary>
+    public IReadOnlyList<Map3DScreenPoint>? Screens { get; init; }
 }
 
 /// <summary>
@@ -222,6 +225,7 @@ public static class Map3DMath
                 return new Map3DMessage(type, null, o["job"]?.ToString(), null)
                     { Items = o["items"]?.Type == JTokenType.Integer ? o.Value<int>("items") : null };
             if (type == "overlay.resync") return new Map3DMessage(type, null, null, null);
+            if (type == "overlay.screen") return new Map3DMessage(type, null, null, null) { Screens = Map3DScreen.ParseScreens(o) };
             if (type == "pick") return ParsePick(o);
             if (type == "progress")
             {
