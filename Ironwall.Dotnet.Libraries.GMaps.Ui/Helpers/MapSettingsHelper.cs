@@ -157,6 +157,7 @@ public static class MapSettingsHelper
                 model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
                 model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
                 model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
+                model.OverlayMode = t["OverlayMode"]?.ToString() ?? model.OverlayMode;
             }
             if (model.Normalize()) log?.Warning($"[Map3D] ServerUrl 이 올바르지 않아 고쳐 씀 → {model.ServerUrl}");
             log?.Info($"[Map3D] 로드(appsettings.Map3D): {model}");
@@ -167,6 +168,12 @@ public static class MapSettingsHelper
             model = new Map3DModel();
         }
         return model;
+    }
+
+    /// <summary>지도 3D 설정 저장(AppSettings.Map3D — 절을 통째로 바꾸므로 읽은 모델 전체를 싣는다). 굽기 방식 고르기 뒤 호출.</summary>
+    public static async Task SaveMap3DAsync(Map3DModel model, ILogService? log = default)
+    {
+        await SaveSettingAsync("Map3D", model, log);
     }
 
     /// <summary>

@@ -50,6 +50,33 @@ internal static class Map3DImageCache
         return encoded;
     }
 
+    /// <summary>
+    /// 굽기 요청용 PNG/JPG 파일 경로 — 서버가 그대로 받지 못하는 원본(TIF · 50 MB 초과)을 캐시 파일로 바꿔 둔다(Map3DBake.NeedsConversion).
+    /// 원본 파일을 아는 그림은 GetOrEncode 와 같은 파일을 쓴다. 쓰지 못하면 null(경고만).
+    /// </summary>
+    public static string? GetOrEncodeFile(BitmapSource source, string directory, ILogService? log = null)
+    {
+        var (bytes, mime) = GetOrEncode(source, directory, log);
+        string key = SourceFile(source) is { } file
+            ? Map3DOverlay.ImageCacheKey(file.FullName, file.Length, file.LastWriteTimeUtc)
+            : Map3DOverlay.HashKey(bytes);
+        string path = Path.Combine(directory, key + Extension(mime));
+        if (File.Exists(path)) return path;
+        try
+        {
+            Directory.CreateDirectory(directory);
+            string temp = $"{path}.{Guid.NewGuid():N}.tmp";
+            File.WriteAllBytes(temp, bytes);
+            File.Move(temp, path, overwrite: true);
+            return path;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            log?.Warning($"[Map3D] 굽기용 이미지 파일 쓰기 실패(이 이미지는 빼고 굽는다): {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>긴 변 2048 px 이하로 줄이고, 투명 픽셀이 없으면 JPEG(품질 85) · 있으면 PNG 로 인코딩한다.</summary>
     public static (byte[] Bytes, string Mime) Encode(BitmapSource source)
     {

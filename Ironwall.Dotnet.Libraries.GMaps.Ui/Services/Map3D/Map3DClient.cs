@@ -61,9 +61,13 @@ public sealed class Map3DClient : IDisposable
     }
 
     /// <summary>굽기 시작(POST /api/jobs) → 202 작업.</summary>
-    public async Task<Map3DJob> StartBakeAsync(double[] bbox, CancellationToken ct = default)
+    public Task<Map3DJob> StartBakeAsync(double[] bbox, CancellationToken ct = default)
+        => StartBakeAsync(bbox, Map3DBake.ModeTiles, null, ct);
+
+    /// <summary>굽기 시작 — 오버레이 이미지 포함 방식(overlay_mode) · 영역과 겹치는 이미지(overlays) 함께. 본문 = Map3DBake.BuildBody.</summary>
+    public async Task<Map3DJob> StartBakeAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, CancellationToken ct = default)
     {
-        var body = new JObject { ["bbox"] = new JArray(bbox.Cast<object>().ToArray()) }.ToString(Formatting.None);
+        var body = Map3DBake.BuildBody(bbox, overlayMode, overlays).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, Map3DMath.JobsUrl(_server))
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),

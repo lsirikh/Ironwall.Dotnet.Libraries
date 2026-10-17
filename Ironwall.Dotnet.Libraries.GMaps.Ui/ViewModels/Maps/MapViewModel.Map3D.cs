@@ -247,6 +247,7 @@ public partial class MapViewModel
     private void EnterMap3DDrawMode()
     {
         if (MainMap == null) return;
+        CloseMap3DBakeOptions();   // 열려 있던 굽기 방식 패널은 새 영역 그리기로 대신한다
         EnterAnchorDrawMode();   // 러버밴드 · 십자 커서 · ESC 후킹 · 포커스
         _isMap3DDrawMode = true;
         // 그리는 중 마퀴 옆 크기 표시 — 한 변 2 km 를 넘으면 경고색(R6)
@@ -274,7 +275,7 @@ public partial class MapViewModel
             SetAimStatus(Map3DGuide.AreaTooLargeText(w, h));
             return;
         }
-        _ = BakeMap3DAsync(bbox);
+        RequestMap3DBake(bbox);   // 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식 고르기(MapViewModel.Map3DBakeOptions)
     }
 
     /// <summary>창 PreviewKeyDown(OnMapPreviewKeyDownForAim) 서두 — 3D 그리기 중 Enter = 지금 화면 전체, 3D 화면 중 ESC = 2D 복귀.</summary>
@@ -305,15 +306,15 @@ public partial class MapViewModel
 
     // ── 굽기 ──
 
-    private async Task BakeMap3DAsync(double[] bbox)
+    private async Task BakeMap3DAsync(double[] bbox, string overlayMode = Map3DBake.ModeTiles, IReadOnlyList<Map3DBakeOverlay>? overlays = null)
     {
         if (_map3DClient == null || _isMap3DBaking) return;
         _isMap3DBaking = true;
         DrawMap3DAreaCommand.RaiseCanExecuteChanged();
         try
         {
-            _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}]");
-            var job = await _map3DClient.StartBakeAsync(bbox);
+            _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] overlay={overlayMode} images={overlays?.Count ?? 0}");
+            var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays);
             while (!job.IsDone && !job.IsError)
             {
                 SetAimStatus($"3D 만드는 중… {job.Progress:P0}{(string.IsNullOrEmpty(job.Message) ? "" : $" — {job.Message}")}");

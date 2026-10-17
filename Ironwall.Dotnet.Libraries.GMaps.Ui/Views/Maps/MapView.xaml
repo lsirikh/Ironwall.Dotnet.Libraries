@@ -1361,6 +1361,102 @@
 				</StackPanel>
 			</Border>
 
+			<!--  3D 굽기 방식 고르기 — 영역을 그린 뒤(또는 배지 「다시 만들기」) 영역과 겹치는 오버레이 이미지가 있을 때만 뜬다.
+			      기본 = 마지막 고른 값(appsettings Map3D.OverlayMode). 각 방식 설명은 "?" 말풍선. 지도 HUD 와 같은 MapFloatingPanelStyle · 토큰.  -->
+			<Border
+				Panel.ZIndex="170"
+				MinWidth="300"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions"
+				Style="{StaticResource MapFloatingPanelStyle}"
+				Visibility="{Binding IsMap3DBakeOptionsOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel Margin="8,6">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Kind="CubeOutline" />
+						<TextBlock
+							Margin="8,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="13"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="3D 만들기" />
+					</StackPanel>
+					<TextBlock
+						Margin="0,4,0,8"
+						AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Summary"
+						FontSize="11"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding Map3DBakeOptionsSummary}" />
+					<StackPanel Margin="0,2" Orientation="Horizontal">
+						<RadioButton
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Tiles"
+							Content="위성 타일만"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="Map3DBakeMode"
+							IsChecked="{Binding IsMap3DBakeTiles}" />
+						<help:HelpTip
+							Margin="6,0,0,0"
+							HelpKey="Map.Map3D.BakeTiles"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
+					</StackPanel>
+					<StackPanel Margin="0,2" Orientation="Horizontal">
+						<RadioButton
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Composite"
+							Content="오버레이 이미지 포함(그림 합성)"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="Map3DBakeMode"
+							IsChecked="{Binding IsMap3DBakeComposite}" />
+						<help:HelpTip
+							Margin="6,0,0,0"
+							HelpKey="Map.Map3D.BakeComposite"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
+					</StackPanel>
+					<StackPanel Margin="0,2" Orientation="Horizontal">
+						<RadioButton
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Extract"
+							Content="오버레이 이미지 포함 + 건물 추출"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							GroupName="Map3DBakeMode"
+							IsChecked="{Binding IsMap3DBakeExtract}" />
+						<help:HelpTip
+							Margin="6,0,0,0"
+							HelpKey="Map.Map3D.BakeExtract"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
+					</StackPanel>
+					<StackPanel
+						Margin="0,10,0,0"
+						HorizontalAlignment="Right"
+						Orientation="Horizontal">
+						<Button
+							Height="28"
+							Padding="12,0"
+							AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Create"
+							Command="{Binding ConfirmMap3DBakeOptionsCommand}"
+							BorderBrush="{DynamicResource PrimaryBrush}"
+							Content="만들기"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Style="{StaticResource MaterialDesignOutlinedButton}" />
+						<Button
+							Height="28"
+							Margin="6,0,0,0"
+							Padding="12,0"
+							AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Cancel"
+							Command="{Binding CancelMap3DBakeOptionsCommand}"
+							Content="취소"
+							Style="{StaticResource MaterialDesignOutlinedButton}" />
+					</StackPanel>
+				</StackPanel>
+			</Border>
+
 			<!--  스케일바 + 기울임 배지(map-tilt-25d FR-09 · G6 세로 축척 이탈 표시: 수평 축척은 유지, 세로는 cosφ 배 — φ>0.1° 만 표시).
 			      배지는 색이 아니라 형태(1px 스트로크 필 + 아이콘)로 구분, 토큰은 DynamicResource(라이트/다크 재해석).  -->
 			<StackPanel
