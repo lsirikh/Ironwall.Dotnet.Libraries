@@ -468,6 +468,20 @@ public partial class MapViewModel
     {
         if (MainMap == null || _map3DState != Map3DState.Shown) return;
         Point? at = pick.ScreenX is double x && pick.ScreenY is double y ? Map3DHost.TranslatePoint(new Point(x, y), MainMap) : null;
+        if (pick.Kind == Utils.Map3DOverlay.KindTrack)
+        {
+            // 2D 추적 마커는 클릭 동작이 없다(호버 툴팁만) — 기록만 남긴다
+            _log?.Info($"[Map3D] pick {pick.Action} kind=track id={pick.TrackId} → 동작 없음(2D 와 같음)");
+            return;
+        }
+        if (pick.Kind == Utils.Map3DOverlay.KindImage && pick.Id is int imageId && imageId < 0)
+        {
+            // 지도 CustomImages(TIF 등) — 다리가 붙인 음수 id. 2D 도 클릭만 받는다(OnImageClicked → 선택)
+            var image = _map3DOverlay?.FindCustomImage(imageId);
+            _log?.Info($"[Map3D] pick {pick.Action} kind=image id={imageId} → {(image != null ? "오버레이 이미지" : "없음")}");
+            if (image != null && pick.Action == "click") OnMapImageClicked(image);
+            return;
+        }
         var marker = pick.Kind is { } kind && pick.Id is int id
             ? MainMap.Markers.FirstOrDefault(m => Map3DOverlayBridge.KindOf(m) == kind && ((IEditableMarker)m).Id == id)
             : null;

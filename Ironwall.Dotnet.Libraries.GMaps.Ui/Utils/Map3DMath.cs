@@ -29,8 +29,16 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
     public double? Progress { get; init; }
 }
 
-/// <summary>3D 클릭 — Action = "click" | "dblclick" | "context". Kind · Id 가 없으면 빈 곳. 화면 좌표는 3D 화면 기준 DIP(없으면 null).</summary>
-public sealed record Map3DPick(string Action, string? Kind, int? Id, double? ScreenX, double? ScreenY);
+/// <summary>
+/// 3D 클릭 — Action = "click" | "dblclick" | "context". Kind · Id 가 없으면 빈 곳. 화면 좌표는 3D 화면 기준 DIP(없으면 null).
+/// Kind = "pids" · "symbol" · "geometric" · "military" · "infra" · "pidsGroup" · "line" · "polygon" · "image" · "track".
+/// 추적(track)은 id 가 문자열이라 <see cref="TrackId"/> 에 담고 Id 는 null 이다.
+/// </summary>
+public sealed record Map3DPick(string Action, string? Kind, int? Id, double? ScreenX, double? ScreenY)
+{
+    /// <summary>kind = "track" 일 때 추적 id(track.upsert 의 id).</summary>
+    public string? TrackId { get; init; }
+}
 
 public static class Map3DMath
 {
@@ -177,15 +185,27 @@ public static class Map3DMath
         catch (JsonException) { return null; }
     }
 
-    /// <summary>pick 해석 — action 이 click · dblclick · context 가 아니면 null. kind 와 id 는 둘 다 있을 때만 쓴다(하나라도 없으면 빈 곳).</summary>
+    /// <summary>
+    /// pick 해석 — action 이 click · dblclick · context 가 아니면 null. kind 와 id 는 둘 다 있을 때만 쓴다(하나라도 없으면 빈 곳).
+    /// kind = "track" 은 id 가 문자열(정수여도 문자열로)이라 <see cref="Map3DPick.TrackId"/> 로 넘긴다.
+    /// </summary>
     private static Map3DMessage? ParsePick(JObject o)
     {
         string? action = o["action"]?.Type == JTokenType.String ? o.Value<string>("action") : null;
         if (action is not ("click" or "dblclick" or "context")) return null;
         string? kind = o["kind"]?.Type == JTokenType.String ? o.Value<string>("kind") : null;
+        var screen = o["screen"] as JObject;
+        if (kind == "track")
+        {
+            string? trackId = o["id"]?.Type is JTokenType.String or JTokenType.Integer ? o["id"]!.ToString() : null;
+            return new Map3DMessage("pick", null, null, null)
+            {
+                Pick = new Map3DPick(action, string.IsNullOrEmpty(trackId) ? null : kind, null, Finite(screen?["x"]), Finite(screen?["y"]))
+                    { TrackId = string.IsNullOrEmpty(trackId) ? null : trackId },
+            };
+        }
         int? id = o["id"]?.Type == JTokenType.Integer ? o.Value<int>("id") : null;
         if (string.IsNullOrEmpty(kind) || id == null) { kind = null; id = null; }
-        var screen = o["screen"] as JObject;
         return new Map3DMessage("pick", null, null, null)
         {
             Pick = new Map3DPick(action, kind, id, Finite(screen?["x"]), Finite(screen?["y"])),
