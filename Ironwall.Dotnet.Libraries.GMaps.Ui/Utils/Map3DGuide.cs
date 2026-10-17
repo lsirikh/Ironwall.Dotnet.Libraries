@@ -10,8 +10,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
                   ② 영역 크기 · 2 km 판정 · 크기 글(R6)
                   ③ 영역 테두리 표시 줌 · "3D 가능" 칩 · 영역 가운데 · 툴팁 글(R4)
                   ④ 창을 열 때 2D 로 돌아올지(R7)
+                  ⑤ 펼침 시점(rendered · 1.5 s 시간 초과) · 진입 한 번의 전환 시간 로그 줄
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
 ****************************************************************************/
+
+/// <summary>3D 펼침 판정 — 기다림 · rendered 받음 · rendered 기다림 시간 초과.</summary>
+public enum Map3DRevealDecision { Wait, Rendered, TimedOut }
+
 public static class Map3DGuide
 {
     // ── ① 전환 안내 ──
@@ -22,6 +27,10 @@ public static class Map3DGuide
     public const string LeaveTitle = "2D 지도로 돌아갑니다";
     /// <summary>2D → 3D 안내 최소 표시 시간(이미 만든 3D 화면을 다시 펼칠 때도 이만큼은 보인다).</summary>
     public static readonly TimeSpan MinEnterShow = TimeSpan.FromSeconds(0.6);
+    /// <summary>미리 불러와 이미 그려진(rendered) 3D 화면을 펼칠 때의 최소 안내 시간.</summary>
+    public static readonly TimeSpan MinReuseShow = TimeSpan.FromSeconds(0.4);
+    /// <summary>ready 뒤 rendered 를 기다리는 최대 시간 — 넘으면 그냥 펼친다.</summary>
+    public static readonly TimeSpan RenderedTimeout = TimeSpan.FromSeconds(1.5);
     /// <summary>3D → 2D 안내 표시 시간(짧게).</summary>
     public static readonly TimeSpan LeaveShow = TimeSpan.FromSeconds(0.5);
     /// <summary>로그인 화면 뒤에서 3D 로 들어간 뒤, 로그인 직후 한 번 보이는 안내 시간.</summary>
@@ -34,6 +43,7 @@ public static class Map3DGuide
         "scene" => "3D 장면 정보를 읽는 중…",
         "model" => "3D 장면을 받는 중…",
         "ready" => "3D 화면 준비됨",
+        "rendering" => "3D 화면을 그리는 중…",
         "login" => "지금 3D 지도를 보고 있습니다 (줌 16.5 밑 · ESC = 2D)",
         _ => "3D 화면을 여는 중…",
     };
@@ -49,6 +59,40 @@ public static class Map3DGuide
     /// <summary>시간으로 채우는 막대(만들어 둔 화면 펼치기) — 0~100. 최소 시간이 0 이하면 100.</summary>
     public static double TimedPercent(TimeSpan elapsed, TimeSpan minimum)
         => minimum <= TimeSpan.Zero ? 100d : Math.Clamp(elapsed.TotalMilliseconds / minimum.TotalMilliseconds * 100d, 0d, 100d);
+
+    /// <summary>
+    /// 펼칠 때인가 — ready 전이면 기다림, rendered(오버레이 적용 + 한 프레임)를 받았으면 펼침,
+    /// ready 뒤 <see cref="RenderedTimeout"/> 가 지나도 안 왔으면 시간 초과로 펼침(페이지가 rendered 를 모르는 판).
+    /// </summary>
+    public static Map3DRevealDecision DecideReveal(bool ready, bool rendered, TimeSpan sinceReady)
+        => !ready ? Map3DRevealDecision.Wait
+           : rendered ? Map3DRevealDecision.Rendered
+           : sinceReady >= RenderedTimeout ? Map3DRevealDecision.TimedOut
+           : Map3DRevealDecision.Wait;
+
+    /// <summary>
+    /// 진입 한 번의 전환 시간 로그 줄 — 진입(enterAt)부터 각 표시 시각까지 차례로 나눈 구간(초). 진입 전에 끝난 단계
+    /// (미리 데우기 · 미리 불러오기)는 0, 표시 시각이 없으면 "-"(그 구간은 다음 구간에 들어간다).
+    /// </summary>
+    public static string TransitionTimingText(DateTime enterAt, DateTime? webViewAt, DateTime? pageAt, DateTime? snapshotAt,
+                                              DateTime? renderedAt, DateTime revealAt, bool prewarmed, bool preloaded)
+    {
+        var prev = enterAt;
+        string Segment(DateTime? mark)
+        {
+            if (mark is not DateTime m) return "-";
+            var at = m < enterAt ? enterAt : m;
+            var span = at > prev ? at - prev : TimeSpan.Zero;
+            if (at > prev) prev = at;
+            return Seconds(span);
+        }
+        string webview = Segment(webViewAt), page = Segment(pageAt), snapshot = Segment(snapshotAt), rendered = Segment(renderedAt), reveal = Segment(revealAt);
+        string total = Seconds(revealAt > enterAt ? revealAt - enterAt : TimeSpan.Zero);
+        return $"[Map3D] 전환 시간 total={total} webview={webview} page={page} snapshot={snapshot} rendered={rendered} reveal={reveal} "
+               + $"(prewarmed={(prewarmed ? "true" : "false")}, preloaded={(preloaded ? "true" : "false")})";
+    }
+
+    private static string Seconds(TimeSpan span) => span.TotalSeconds.ToString("0.00", CultureInfo.InvariantCulture) + "s";
 
     /// <summary>로그인 화면 뒤인가 — 토큰 저장소가 "로그인 안 됨"이라고 할 때만 true(저장소가 없으면 = 로그인 게이트 없음 = false).</summary>
     public static bool IsBehindLogin(bool? isAuthenticated) => isAuthenticated == false;
