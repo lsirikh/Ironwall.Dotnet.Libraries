@@ -42,7 +42,7 @@ public static class Map3DBake
         return m is ModeComposite or ModeExtract ? m : ModeTiles;
     }
 
-    /// <summary>선택 패널을 띄울지 — 영역과 겹치는 오버레이 이미지가 하나라도 있을 때만.</summary>
+    /// <summary>방식 고르기(라디오)를 보일지 — 영역과 겹치는 오버레이 이미지가 하나라도 있을 때만. 패널 자체는 줌을 고르게 늘 띄운다(2026-10-18).</summary>
     public static bool ShouldAsk(int overlayCount) => overlayCount > 0;
 
     /// <summary>패널을 띄우지 않을 때 쓰는 모드 · 띄울 때 처음 골라 둘 모드 — 겹치는 이미지가 없으면 tiles, 있으면 마지막 고른 값.</summary>
@@ -87,8 +87,16 @@ public static class Map3DBake
     /// 회전은 [0, 360), 투명도는 0~1 로 자른다.
     /// </summary>
     public static JObject BuildBody(double[] bbox, string? mode, IEnumerable<Map3DBakeOverlay>? overlays)
+        => BuildBody(bbox, mode, overlays, null);
+
+    /// <summary>
+    /// 굽기 요청 본문 — 그 영역의 3D 로 바뀌는 줌(enter_zoom, 2026-10-18)을 함께 보낸다. map-3d 가 scene.json 에 그대로 기록하고
+    /// 장면 목록(GET /api/jobs)으로 돌려준다. 옛 서버는 모르는 키를 무시한다. 줌이 없거나 수가 아니면 넣지 않는다.
+    /// </summary>
+    public static JObject BuildBody(double[] bbox, string? mode, IEnumerable<Map3DBakeOverlay>? overlays, double? enterZoom)
     {
         var body = new JObject { ["bbox"] = new JArray(bbox.Cast<object>().ToArray()) };
+        if (enterZoom is double z && double.IsFinite(z)) body["enter_zoom"] = z;
         string m = NormalizeMode(mode);
         if (m == ModeTiles) return body;
         body["overlay_mode"] = m;

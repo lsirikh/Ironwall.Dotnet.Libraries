@@ -28,10 +28,18 @@ public sealed record Map3DJob(string Id, string Status, double Progress, string?
 }
 
 /// <summary>구운 장면. Id 는 3D 화면 주소의 job 값으로 쓴다. Bbox = [minLon, minLat, maxLon, maxLat].</summary>
-public sealed record Map3DScene(string Id, double[] Bbox);
+public sealed record Map3DScene(string Id, double[] Bbox)
+{
+    /// <summary>그 영역의 3D 로 바뀌는 줌(scene.json enter_zoom) — 없으면 null(세팅값을 쓴다).</summary>
+    public double? EnterZoom { get; init; }
+}
 
 /// <summary>구운 장면 목록 항목(GET /api/jobs 의 scenes) — 2D 지도 3D 영역 표시용. 모르는 값은 null.</summary>
-public sealed record Map3DSceneInfo(string Id, string? Name, double[] Bbox, DateTime? Created, int? Buildings, string? Kind);
+public sealed record Map3DSceneInfo(string Id, string? Name, double[] Bbox, DateTime? Created, int? Buildings, string? Kind)
+{
+    /// <summary>그 영역의 3D 로 바뀌는 줌(scene.json enter_zoom) — 없으면 null(세팅값을 쓴다).</summary>
+    public double? EnterZoom { get; init; }
+}
 
 /// <summary>서버에 닿지 않음(연결 거부 · 시간 초과).</summary>
 public sealed class Map3DServerUnavailableException : Exception
@@ -65,9 +73,14 @@ public sealed class Map3DClient : IDisposable
         => StartBakeAsync(bbox, Map3DBake.ModeTiles, null, ct);
 
     /// <summary>굽기 시작 — 오버레이 이미지 포함 방식(overlay_mode) · 영역과 겹치는 이미지(overlays) 함께. 본문 = Map3DBake.BuildBody.</summary>
-    public async Task<Map3DJob> StartBakeAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, CancellationToken ct = default)
+    public Task<Map3DJob> StartBakeAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, CancellationToken ct = default)
+        => StartBakeAsync(bbox, overlayMode, overlays, null, ct);
+
+    /// <summary>굽기 시작 — 그 영역의 3D 로 바뀌는 줌(enter_zoom)도 함께 보낸다(map-3d 가 scene.json 에 기록).</summary>
+    public async Task<Map3DJob> StartBakeAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double? enterZoom,
+                                               CancellationToken ct = default)
     {
-        var body = Map3DBake.BuildBody(bbox, overlayMode, overlays).ToString(Formatting.None);
+        var body = Map3DBake.BuildBody(bbox, overlayMode, overlays, enterZoom).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, Map3DMath.JobsUrl(_server))
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -92,7 +105,7 @@ public sealed class Map3DClient : IDisposable
         string? id = o["id"]?.ToString();
         if (string.IsNullOrEmpty(id) || bbox == null || bbox.Length != 4)
             throw new Map3DRequestException(HttpStatusCode.OK, "장면 응답 형식이 올바르지 않습니다");
-        return new Map3DScene(id, bbox);
+        return new Map3DScene(id, bbox) { EnterZoom = ReadZoom(o["enter_zoom"]) };
     }
 
     /// <summary>구운 장면 목록(GET /api/jobs 의 scenes).</summary>
@@ -105,6 +118,24 @@ public sealed class Map3DClient : IDisposable
     /// <summary>굽은 장면 지우기(DELETE /api/jobs/{id}) — 지웠으면 true, 이미 없으면(404) false. 지울 수 없는 장면(예: 견본 405)은 Map3DRequestException.</summary>
     public async Task<bool> DeleteSceneAsync(string id, CancellationToken ct = default)
         => await SendAsync(new HttpRequestMessage(HttpMethod.Delete, Map3DMath.JobUrl(_server, id)), allowNotFound: true, ct).ConfigureAwait(false) != null;
+
+    /// <summary>
+    /// 영역의 3D 로 바뀌는 줌 바꾸기(PATCH /api/jobs/{id} {"enter_zoom":f}) — 다시 굽지 않는다.
+    /// 서버가 저장했으면 true, 그 기능을 모르면(404 · 405) false — 호출자가 GIS 로컬 설정(Map3DAreaZoomStore)에 저장한다.
+    /// 그 밖의 거절은 Map3DRequestException, 닿지 않으면 Map3DServerUnavailableException.
+    /// </summary>
+    public async Task<bool> UpdateSceneEnterZoomAsync(string id, double enterZoom, CancellationToken ct = default)
+    {
+        var body = new JObject { ["enter_zoom"] = enterZoom }.ToString(Formatting.None);
+        try
+        {
+            return await SendAsync(new HttpRequestMessage(new HttpMethod("PATCH"), Map3DMath.JobUrl(_server, id))
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            }, allowNotFound: true, ct).ConfigureAwait(false) != null;
+        }
+        catch (Map3DRequestException ex) when (ex.StatusCode == HttpStatusCode.MethodNotAllowed) { return false; }
+    }
 
     /// <summary>
     /// GET /api/jobs 응답의 scenes 해석 — {"scenes":[...]} 또는 배열 그대로. id 나 bbox(수 4개)가 없는 항목은 건너뛴다.
@@ -131,10 +162,15 @@ public sealed class Map3DClient : IDisposable
                 bboxToken.Select(t => t.Value<double>()).ToArray(),
                 ParseCreated(o["created"]),
                 counts?["buildings"]?.Type == JTokenType.Integer ? counts.Value<int>("buildings") : null,
-                o["kind"]?.Type == JTokenType.String ? o.Value<string>("kind") : null));
+                o["kind"]?.Type == JTokenType.String ? o.Value<string>("kind") : null)
+                { EnterZoom = ReadZoom(o["enter_zoom"]) });
         }
         return list;
     }
+
+    /// <summary>enter_zoom — 유한한 수만(그 밖은 null = 세팅값).</summary>
+    private static double? ReadZoom(JToken? t)
+        => t?.Type is JTokenType.Float or JTokenType.Integer && double.IsFinite(t.Value<double>()) ? t.Value<double>() : null;
 
     private static DateTime? ParseCreated(JToken? t)
     {
