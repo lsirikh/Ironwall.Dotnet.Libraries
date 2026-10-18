@@ -1,7 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 
@@ -22,9 +21,7 @@ public class MapAnchorPanelControl : Control
     public MapAnchorPanelControl()
     {
         Width = 320;
-        MouseLeftButtonDown += OnMouseLeftButtonDown;
-        MouseMove += OnMouseMove;
-        MouseLeftButtonUp += OnMouseLeftButtonUp;
+        Helpers.OverlayHeaderDrag.Attach(this, 36);   // 헤더 영역(Y<=36)만 드래그(본문 폼은 통과)
     }
 
     #region - Dependency Properties -
@@ -47,51 +44,5 @@ public class MapAnchorPanelControl : Control
     public static readonly DependencyProperty CloseCommandProperty =
         DependencyProperty.Register(nameof(CloseCommand), typeof(ICommand),
             typeof(MapAnchorPanelControl), new PropertyMetadata(null));
-    #endregion
-
-    #region - Header Drag (헤더 영역 Y<=36 만, LayerPanelControl 답습) -
-    private bool _isDragging;
-    private Point _lastMousePosition;
-
-    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.GetPosition(this).Y > 36) return;                 // 헤더 영역만 드래그(본문 폼은 통과)
-        var cp = FindParent<ContentPresenter>(this);
-        if (cp?.Parent is not Canvas canvas) return;
-        _isDragging = true;
-        _lastMousePosition = e.GetPosition(canvas);
-        CaptureMouse();
-        e.Handled = true;
-    }
-
-    private void OnMouseMove(object sender, MouseEventArgs e)
-    {
-        if (!_isDragging) return;
-        var cp = FindParent<ContentPresenter>(this);
-        if (cp?.Parent is not Canvas canvas) return;
-        var cur = e.GetPosition(canvas);
-        double left = Canvas.GetLeft(cp); if (double.IsNaN(left)) left = 0;
-        double top = Canvas.GetTop(cp); if (double.IsNaN(top)) top = 0;
-        // 머리(36)가 지도 안에 남도록 자른다(AUX-D7 · MAP-191)
-        var (newLeft, newTop) = Helpers.OverlayHeaderClamp.Clamp(left + cur.X - _lastMousePosition.X, top + cur.Y - _lastMousePosition.Y, this, canvas, 36);
-        Canvas.SetLeft(cp, newLeft);
-        Canvas.SetTop(cp, newTop);
-        _lastMousePosition = cur;
-    }
-
-    private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        if (!_isDragging) return;
-        _isDragging = false;
-        ReleaseMouseCapture();
-    }
-
-    private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
-    {
-        var parent = VisualTreeHelper.GetParent(child);
-        while (parent != null && parent is not T)
-            parent = VisualTreeHelper.GetParent(parent);
-        return parent as T;
-    }
     #endregion
 }

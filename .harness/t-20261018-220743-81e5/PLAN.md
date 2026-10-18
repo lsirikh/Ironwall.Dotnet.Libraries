@@ -33,7 +33,8 @@
 - [x] 판 컨트롤 · 스타일 · VM · MapView 배선 · 「회전」 단추 · 도움말
 - [x] 시나리오 시험(tests/GMaps.MapEdit.Tests/GroupRotationPanelScenarioTests.cs 10건, 창 없음) + 기존 손잡이 시험 1건을 새 규칙(놓음 ≠ 저장)에 맞춤
 - [x] 판 포커스 중 키 가드(DECISIONS #7)
-- [ ] dotnet test Ironwall.Dotnet.Libraries.sln · GMaps.Ui.Tests · GMaps.MapEdit.Tests · MapsHelp 키 시험 — 결과는 아래 「검증」
+- [x] 머리 띠 끌기 중복 제거 — 공용 `Helpers/OverlayHeaderDrag.cs` 로 빼고 사이트 고정 창도 같은 것을 쓰게 함(DECISIONS #9)
+- [x] 검증: dotnet test Ironwall.Dotnet.Libraries.sln 전부 통과 · GMaps.Ui.Tests 1373 · GMaps.MapEdit.Tests 75 · MapsHelpTests(키 · 문구) 30 통과
 
 ## 발견
 - 창이 없으면 `VisualTreeHelper.HitTest` 가 돌지 않는다 → 어도너 `HitTestCore` 를 직접 불러 확인
@@ -41,4 +42,5 @@
 - 커스텀 Control 은 UIA peer 가 없어 `OnCreateAutomationPeer` 를 둬야 `Map.GroupRotation.Panel` 이 트리에 나온다
 
 ## 남은 것 / 실기 미확인
+- 판 안 포커스 키 가드(DECISIONS #7)는 창 없는 시험으로 키보드 포커스를 만들 수 없어 시험 없음
 - 실제 마우스로 손잡이 · 중심 십자 끌기, 판 머리 띠 끌기, 막대 조작, 라이트/다크 실제 그림, 지도 회전(뷰 회전) 상태의 중심 손잡이 자리 — 코디네이터 실기

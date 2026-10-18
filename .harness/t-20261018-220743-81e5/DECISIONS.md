@@ -47,3 +47,9 @@
 - chosen: 편집 도구줄 「선택」 묶음(선택 해제 · 삭제 옆), 2개 이상 고르면 켜짐(`StartGroupRotationCommand` CanExecute)
 - why: 선택 개수 칩은 지금 없고(선택 수는 잠깐 뜨는 안내 띠뿐) 새 칩은 범위 밖. 선택 관련 명령이 모인 곳
 - effect: `MapView.xaml` `Map.GroupRotation.Start`
+
+## 9. 머리 띠 끌기 코드
+- options: 사이트 고정 창 코드를 판에 복사 / 공용 도우미로 빼서 둘이 같이 쓰기
+- chosen: `Helpers/OverlayHeaderDrag.Attach(panel, 머리 높이)` 로 빼고 `MapAnchorPanelControl`(36) · `GroupRotationPanelControl`(38) 둘 다 이것을 쓴다(사이트 고정 창 동작은 같고, 캡처를 잃으면 끌기 상태를 푸는 처리만 더해짐)
+- why: 하네스 품질 검사(중복 코드)
+- effect: 다른 겹창(SymbolDetail · LayerPanel 등)의 같은 복사본은 이번 범위 밖이라 그대로 — 옮기려면 각 생성자에서 Attach 한 줄로
