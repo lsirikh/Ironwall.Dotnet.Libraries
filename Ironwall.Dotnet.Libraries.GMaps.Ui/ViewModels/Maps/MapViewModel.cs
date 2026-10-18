@@ -578,6 +578,7 @@ public partial class MapViewModel : BasePanelViewModel,
             _groupSelection.GroupVisibilityRequested += OnGroupVisibilityRequested;
             _groupSelection.GroupZOrderRequested += OnGroupZOrderRequested;
             _groupSelection.GroupRotateCompleted += OnGroupRotateCompleted;   // 묶음 회전 확정 → 영속 + Undo 1단위
+            _groupSelection.RotationChanged += OnGroupRotationChanged;        // 회전 세션 → 컨트롤러 판(MapViewModel.GroupRotation)
 
             // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
             _labelService = new LabelAdornerService(MainMap, _log);
@@ -664,6 +665,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 _groupSelection.GroupVisibilityRequested -= OnGroupVisibilityRequested;
                 _groupSelection.GroupZOrderRequested -= OnGroupZOrderRequested;
                 _groupSelection.GroupRotateCompleted -= OnGroupRotateCompleted;
+                _groupSelection.RotationChanged -= OnGroupRotationChanged;
                 _groupSelection.Dispose();
                 _groupSelection = null;
             }
@@ -1445,6 +1447,8 @@ public partial class MapViewModel : BasePanelViewModel,
 
         if (sel.IsRotating)
         {
+            // 「지도에서 고르기」 중 Esc = 고르기만 그만(회전은 그대로)
+            if (key == System.Windows.Input.Key.Escape && sel.IsPickingPivot) { e.Handled = true; sel.SetPivotPicking(false); return true; }
             if (key == System.Windows.Input.Key.Escape) { e.Handled = true; sel.EndRotation(commit: false); SetAimStatus("회전 취소", true); return true; }
             if (key == System.Windows.Input.Key.Enter) { e.Handled = true; sel.EndRotation(commit: true); return true; }
         }

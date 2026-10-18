@@ -41,13 +41,23 @@ public sealed class GroupRotationSession
         var anchors = _originals.SelectMany(o => o.LinePoints is { Count: > 0 } pts ? pts : new List<PointLatLng> { o.Position })
             .Select(p => (p.Lat, p.Lng));
         var c = GroupRotationMath.BoundsCenter(anchors);
-        Pivot = c.HasValue ? new PointLatLng(c.Value.lat, c.Value.lng) : PointLatLng.Empty;
+        DefaultPivot = c.HasValue ? new PointLatLng(c.Value.lat, c.Value.lng) : PointLatLng.Empty;
+        Pivot = DefaultPivot;
     }
 
     /// <summary>회전 대상(잠금 제외) 원본 목록.</summary>
     public IReadOnlyList<Original> Originals => _originals;
-    /// <summary>회전 중심(위경도).</summary>
-    public PointLatLng Pivot { get; }
+    /// <summary>회전 중심(위경도) — 기본은 <see cref="DefaultPivot"/>, 컨트롤러 판 · 중심 십자 끌기로 바꾼다.</summary>
+    public PointLatLng Pivot { get; private set; }
+    /// <summary>기본 회전 중심 = 원본의 경계 상자 중심(「가운데로」가 돌아가는 자리).</summary>
+    public PointLatLng DefaultPivot { get; }
+
+    /// <summary>중심을 바꾸고 지금 각도로 원본에서 다시 돌린다(미리보기 — 저장 없음).</summary>
+    public void SetPivot(PointLatLng pivot)
+    {
+        Pivot = pivot;
+        Preview(Angle);
+    }
     /// <summary>현재 미리보기 회전량(도, 시계 방향 +, (-180,180]).</summary>
     public double Angle { get; private set; }
     public bool IsEmpty => _originals.Count == 0;
@@ -56,7 +66,9 @@ public sealed class GroupRotationSession
     public void Preview(double degrees)
     {
         Angle = GroupRotationMath.WrapSigned(degrees);
-        foreach (var o in _originals) ApplyTo(o, Angle);
+        foreach (var o in _originals)
+            if (Angle == 0) Restore(o);   // 0° = 원본 그대로(메르카토르 왕복 오차로 저장 없이 미세하게 어긋나지 않게)
+            else ApplyTo(o, Angle);
     }
 
     /// <summary>원위치(회전 0) — ESC 취소.</summary>

@@ -223,7 +223,7 @@ public class GroupRotationScenarioTests
     });
 
     [Fact]
-    public void should_start_only_past_dead_zone_and_save_on_release_when_handle_is_dragged() => Scenario.StaAsync(async () =>
+    public void should_start_only_past_dead_zone_and_save_only_after_confirm_when_handle_is_dragged() => Scenario.StaAsync(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSymbolSaves(rig);
@@ -251,7 +251,15 @@ public class GroupRotationScenarioTests
         Assert.InRange(a.Bearing, 89.0, 91.0);
         Assert.Empty(saves);
 
-        Scenario.Call(adorner, "FinishRotationDrag", true);   // 놓음 = 확정
+        // 놓음 = 그 각에서 멈춤(컨트롤러 판, 2026-10-18 — 확정은 판 [확정] · Enter)
+        Scenario.Call(adorner, "FinishRotationDrag", true);
+        await Task.Delay(30);
+        Assert.True(g.IsRotating);
+        Assert.True(rig.Vm.IsGroupRotationPanelOpen);
+        Assert.Empty(saves);
+        Assert.False(Scenario.GetField<bool>(adorner, "_rotPressed"));
+
+        rig.Vm.ConfirmGroupRotationCommand.Execute(null);
         await Task.Delay(60);
         Assert.False(g.IsRotating);
         Assert.Equal(new[] { 2141, 2142 }, saves.Distinct().OrderBy(x => x));

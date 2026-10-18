@@ -1184,6 +1184,14 @@
 							ToolTip="선택 항목 삭제">
 							<md:PackIcon Kind="Delete" />
 						</Button>
+						<!--  묶음 회전 — 2개 이상 고르면 켜진다. 누르면 회전 판(Map.GroupRotation.Panel)이 뜬다.  -->
+						<Button
+							AutomationProperties.AutomationId="Map.GroupRotation.Start"
+							Command="{Binding StartGroupRotationCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="고른 것 함께 돌리기 (] · [)">
+							<md:PackIcon Kind="RotateRight" />
+						</Button>
 						<Button
 							Command="{Binding UndoCommand}"
 							IsEnabled="{Binding CanUndo}"
@@ -1948,6 +1956,15 @@
 					Panel.ZIndex="40"
 					Content="{Binding MapRoiPanel}"
 					Visibility="{Binding IsMapRoiPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  묶음 회전 컨트롤러 판(2026-10-18) — 회전 세션이 열려 있는 동안만. OverlayWindow 패턴(사이트 고정 창과 같은 크롬 · 머리 띠 끌기).
+				      속성창(300,100 · 폭 약 300) 오른쪽에 처음 자리 — 묶음 · 속성창을 덜 가린다.  -->
+				<ContentPresenter
+					Canvas.Left="620"
+					Canvas.Top="100"
+					Panel.ZIndex="125"
+					Content="{Binding GroupRotationPanel}"
+					Visibility="{Binding IsGroupRotationPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  사이트 고정(맵 앵커) 설정 패널 (증분6, FR-B3) — OverlayWindow 패턴(Control+ControlTemplate, 헤더 드래그)  -->
 				<ContentPresenter
