@@ -577,6 +577,7 @@ public partial class MapViewModel : BasePanelViewModel,
             _groupSelection.GroupLockRequested += OnGroupLockRequested;
             _groupSelection.GroupVisibilityRequested += OnGroupVisibilityRequested;
             _groupSelection.GroupZOrderRequested += OnGroupZOrderRequested;
+            _groupSelection.GroupRotateCompleted += OnGroupRotateCompleted;   // 묶음 회전 확정 → 영속 + Undo 1단위
 
             // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
             _labelService = new LabelAdornerService(MainMap, _log);
@@ -662,6 +663,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 _groupSelection.GroupLockRequested -= OnGroupLockRequested;
                 _groupSelection.GroupVisibilityRequested -= OnGroupVisibilityRequested;
                 _groupSelection.GroupZOrderRequested -= OnGroupZOrderRequested;
+                _groupSelection.GroupRotateCompleted -= OnGroupRotateCompleted;
                 _groupSelection.Dispose();
                 _groupSelection = null;
             }
@@ -1243,6 +1245,9 @@ public partial class MapViewModel : BasePanelViewModel,
         //   윈도우 터널이라 포커스와 무관하게 여기가 가장 먼저 도달한다(그룹 후킹은 초기화 시 구독).
         if (TryRouteDrawingKey(e)) return;
 
+        // 묶음 회전 키(]/[ · Enter · Esc) — 열린 회전이 있으면 다른 키보다 먼저(ESC 가 선택 해제로 새지 않게).
+        if (TryRouteGroupRotationKey(e)) return;
+
         // Delete = 선택 심볼/이미지 삭제(단일·그룹) — 단일 진입점 ExecuteDeleteSelected(확인팝업 경유)로 통일.
         //   그룹 선택 시 내부에서 ExecuteGroupDelete로 위임. 단일 Delete 키 경로는 원래 부재(어도너 스텁=no-op)였어 신규 배선(FR-05).
         if (e.Key == System.Windows.Input.Key.Delete
@@ -1259,6 +1264,7 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             if (e.Key == System.Windows.Input.Key.C) { e.Handled = true; CopySelectionToBuffer(); return; }
             if (e.Key == System.Windows.Input.Key.V) { e.Handled = true; PasteFromBufferAsync(); return; }
+            if (e.Key == System.Windows.Input.Key.A) { e.Handled = true; SelectAllForGroup(); return; }
         }
 
         // 방향키 이동 — 스냅 ON=격자 한 칸, 스냅 OFF=1px(Shift+방향키=5px). 선택된 심볼/이미지 대상.
@@ -1397,6 +1403,86 @@ public partial class MapViewModel : BasePanelViewModel,
                     _editRecorder?.RecordPositionChange(mv.marker, mv.before);
         _groupSelection.RefreshAdorner();
         SetAimStatus(skipped > 0 ? $"{moved}개 이동 저장(잠금 {skipped}개 제외)" : $"{moved}개 이동 저장", true);
+    }
+
+    /// <summary>묶음 회전 확정 → Undo 1단위(동기 기록) 후 멤버별 DB 영속(그룹 이동과 같은 저장 경로). 권한 없으면 원위치.</summary>
+    private async void OnGroupRotateCompleted(System.Collections.Generic.IReadOnlyList<GroupRotationSession.Original> changed, double angle)
+    {
+        if (changed == null || changed.Count == 0) return;
+        if (!CanEditMap())
+        {
+            foreach (var o in changed) GroupRotationSession.Restore(o);
+            _groupSelection?.RefreshAdorner();
+            ShowNoMapEditPermissionInfo();
+            return;
+        }
+        using (_editRecorder?.BeginBatch($"그룹 회전 {changed.Count}개"))
+        {
+            foreach (var o in changed)
+            {
+                if (o.LinePoints != null) _editRecorder?.RecordLineGeometry(o.Marker, o.LinePoints, o.Position);
+                else _editRecorder?.RecordTransform(new MarkerEditCompletedEventArgs(o.Marker, o.Position, o.Marker.Width, o.Marker.Height, o.Bearing));
+            }
+        }
+        _groupSelection?.RefreshAdorner();
+        int saved = 0;
+        foreach (var o in changed)
+        {
+            if (o.Marker.IsDisposed) continue;
+            try { await DbUpdateProcess(o.Marker); saved++; } catch (Exception ex) { _log?.Error($"그룹 회전 영속 실패: {ex.Message}"); }
+        }
+        SetAimStatus($"{saved}개 회전 {Helpers.GroupRotationMath.FormatAngle(angle)} 저장", true);
+    }
+
+    /// <summary>묶음 회전 키보드 폴백(드래그 우선 규칙 ①). ] / [ = ±1°(Shift ±0.1°) 미리보기, Enter 확정, Esc 원위치.
+    /// 열린 회전 중 다른 키(조합키 단독 제외) = 다른 작업 → 먼저 확정하고 그 키는 원래 처리로. 반환 = 이 키를 소비했는가.</summary>
+    private bool TryRouteGroupRotationKey(System.Windows.Input.KeyEventArgs e)
+    {
+        var sel = _groupSelection;
+        if (sel == null) return false;
+        var key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
+        var mods = System.Windows.Input.Keyboard.Modifiers;
+
+        if (sel.IsRotating)
+        {
+            if (key == System.Windows.Input.Key.Escape) { e.Handled = true; sel.EndRotation(commit: false); SetAimStatus("회전 취소", true); return true; }
+            if (key == System.Windows.Input.Key.Enter) { e.Handled = true; sel.EndRotation(commit: true); return true; }
+        }
+
+        bool rotateKey = key is System.Windows.Input.Key.OemOpenBrackets or System.Windows.Input.Key.OemCloseBrackets
+            && (mods & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Alt)) == 0;
+        if (!rotateKey)
+        {
+            if (sel.IsRotating && key is not (System.Windows.Input.Key.LeftShift or System.Windows.Input.Key.RightShift
+                or System.Windows.Input.Key.LeftCtrl or System.Windows.Input.Key.RightCtrl
+                or System.Windows.Input.Key.LeftAlt or System.Windows.Input.Key.RightAlt))
+                sel.EndRotation(commit: true);
+            return false;
+        }
+
+        if (!IsEditModeEnabled || !sel.HasSelection) return false;
+        e.Handled = true;
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return true; }
+        double step = (mods & System.Windows.Input.ModifierKeys.Shift) != 0
+            ? Helpers.GroupRotationMath.FineKeyStepDegrees : Helpers.GroupRotationMath.KeyStepDegrees;
+        if (key == System.Windows.Input.Key.OemOpenBrackets) step = -step;
+        if (sel.RotateBy(step) && sel.Rotation != null)
+            SetAimStatus($"회전 {Helpers.GroupRotationMath.FormatAngle(sel.Rotation.Angle)} · Enter 확정 · Esc 취소", false);
+        return true;
+    }
+
+    /// <summary>Ctrl+A = 지금 보이는 편집 대상 전부를 그룹 선택(러버밴드와 같은 대상 규칙 — 잠금 · 오버레이 이미지 제외).</summary>
+    private void SelectAllForGroup()
+    {
+        if (MainMap?.Markers == null) return;
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
+        var ids = new System.Collections.Generic.HashSet<(bool isImage, int id)>(
+            MainMap.Markers.OfType<IEditableMarker>()
+                .Where(m => m != null && !m.IsDisposed && !m.IsLocked && m.Id > 0 && m is not GMapSymbols.GMapImageMarker
+                    && m.IsLayerEnabled && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap.EffectiveZoom, m.Zoom))
+                .Select(m => (false, m.Id)));
+        ApplyGroupSelectionByIds(ids);
+        SetAimStatus(ids.Count > 0 ? $"{ids.Count}개 선택" : "고를 항목이 없습니다.", autoHide: true);
     }
 
     private async void OnGroupDeleteRequested() => await ExecuteGroupDelete();
