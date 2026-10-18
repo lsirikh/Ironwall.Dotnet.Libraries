@@ -21,6 +21,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
                   이동=선택 심볼 아무거나 좌드래그(핸들 없음, 커서=SizeAll), 우클릭=그룹 공통 메뉴
                   (삭제/잠금/해제/표시/숨김/맨위로/맨아래로). LineDrawingAdorner 패턴.
                   회전=묶음 위쪽 회전 손잡이(Thumb 자식) 캡처 드래그 → 서비스가 GroupRotationSession 으로 미리보기 · 확정(2026-10-18).
+                  회전 세션 중엔 중심 십자 손잡이(Thumb, Map.GroupRotation.CenterHandle)를 끌어 중심을 옮기고,
+                  「지도에서 고르기」 중엔 지도 전체 눌림을 받아 그 자리를 중심으로 알린다(컨트롤러 판, 2026-10-18).
    Note         : AdornerManager 미사용(GroupSelectionService 소유). HitTestCore=선택 마커 영역만
                   (그 외 클릭스루, 불변식#3). 좌표=inner공간(e.GetPosition(_map), InnerToOuter 금지 불변식#10).
                   Dispose서 OnMapZoomChanged/OnMapDrag 구독해제(누수 방지).
@@ -70,6 +72,24 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     /// <summary>그룹 이동 드래그가 막 시작됨 — 열린 키보드 회전을 먼저 확정하게(Undo 단위 섞임 방지).</summary>
     public event System.Action? MoveDragStarting;
 
+    // ── 회전 중심 십자 손잡이(회전 세션 중에만 보임 · 끌어서 중심 옮기기) + 「지도에서 고르기」 ──
+    private readonly Thumb _pivotHandle;
+    private const double PivotHandleSize = 18d;
+    private bool _pivPressed;
+    private bool _pivDragging;
+    private Point _pivPressPoint;
+    private Vector _pivGrabOffset;     // 누른 점 → 중심 화면 자리(손잡이 가장자리를 잡아도 중심이 튀지 않게)
+    private bool _pickingPivot;
+
+    /// <summary>중심 십자 끌기가 데드존을 넘어 시작됨.</summary>
+    public event System.Action? PivotDragStarted;
+    /// <summary>중심 십자 끌기 중 새 중심(위경도).</summary>
+    public event System.Action<PointLatLng>? PivotDragDelta;
+    /// <summary>중심 십자 끌기 끝(true=놓음, false=캡처 잃음 → 끌기 전 중심으로).</summary>
+    public event System.Action<bool>? PivotDragFinished;
+    /// <summary>「지도에서 고르기」 중 지도 클릭 — 그 자리(위경도).</summary>
+    public event System.Action<PointLatLng>? PivotPicked;
+
     public GroupSelectionAdorner(GMapCustomControl map, ILogService? log = null) : base(map)
     {
         _map = map ?? throw new ArgumentNullException(nameof(map));
@@ -81,7 +101,8 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         _boxPen.Freeze();
 
         _rotateHandle = CreateRotateHandle();
-        _children = new VisualCollection(this) { _rotateHandle };
+        _pivotHandle = CreatePivotHandle();
+        _children = new VisualCollection(this) { _rotateHandle };   // 중심 손잡이는 회전 세션 동안만 자식(SetRotationState)
 
         _map.OnMapZoomChanged += OnMapChanged;   // geo-앵커 재렌더(줌 생존)
         _map.OnMapDrag += OnMapChanged;
@@ -147,6 +168,27 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         return thumb;
     }
 
+    /// <summary>회전 중심 손잡이 — 속 빈 원(가운데 "+" 는 OnRender 가 그림). 속은 투명 채움(누르기 받음), 색은 테마 토큰 동적 참조.</summary>
+    private static Thumb CreatePivotHandle()
+    {
+        var ring = new FrameworkElementFactory(typeof(System.Windows.Shapes.Ellipse));
+        ring.SetValue(System.Windows.Shapes.Shape.StrokeThicknessProperty, 1.5d);
+        ring.SetValue(System.Windows.Shapes.Shape.FillProperty, Brushes.Transparent);
+        ring.SetValue(System.Windows.Shapes.Shape.StrokeProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        var thumb = new Thumb
+        {
+            Width = PivotHandleSize,
+            Height = PivotHandleSize,
+            Cursor = Cursors.SizeAll,
+            Visibility = Visibility.Collapsed,
+            Template = new ControlTemplate(typeof(Thumb)) { VisualTree = ring },
+        };
+        thumb.SetResourceReference(Control.BorderBrushProperty, "PrimaryBrush");
+        AutomationProperties.SetAutomationId(thumb, "Map.GroupRotation.CenterHandle");
+        AutomationProperties.SetName(thumb, "회전 중심");
+        return thumb;
+    }
+
     protected override int VisualChildrenCount => _children.Count;
     protected override Visual GetVisualChild(int index) => _children[index];
 
@@ -156,13 +198,27 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         _rotateHandle.Visibility = c.HasValue ? Visibility.Visible : Visibility.Collapsed;
         var p = c ?? new Point();
         _rotateHandle.Arrange(new Rect(p.X - RotateHandleSize / 2d, p.Y - RotateHandleSize / 2d, RotateHandleSize, RotateHandleSize));
+
+        var pc = PivotScreen();
+        _pivotHandle.Visibility = pc.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        var q = pc ?? new Point();
+        _pivotHandle.Arrange(new Rect(q.X - PivotHandleSize / 2d, q.Y - PivotHandleSize / 2d, PivotHandleSize, PivotHandleSize));
         return finalSize;
     }
 
     protected override Size MeasureOverride(Size constraint)
     {
         _rotateHandle.Measure(new Size(RotateHandleSize, RotateHandleSize));
+        _pivotHandle.Measure(new Size(PivotHandleSize, PivotHandleSize));
         return base.MeasureOverride(constraint);
+    }
+
+    /// <summary>회전 중심의 화면 자리 — 세션이 없으면 null.</summary>
+    private Point? PivotScreen()
+    {
+        if (_rotationPivot is not PointLatLng pivot) return null;
+        try { var g = _map.FromLatLngToLocal(pivot); return new Point(g.X, g.Y); }
+        catch { return null; }
     }
 
     /// <summary>회전 대상(잠금 제외) 화면 사각형 합집합 — 없으면 null.</summary>
@@ -207,20 +263,84 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
             _rotHandleRestGeo = _map.FromLocalToLatLng((int)Math.Round(rest.X), (int)Math.Round(rest.Y));   // 세션 시작 자리 고정
         _rotationPivot = pivot;
         _rotationAngle = pivot.HasValue ? angle : 0d;
+        bool showPivot = pivot.HasValue;
+        if (showPivot && !_children.Contains(_pivotHandle)) _children.Add(_pivotHandle);
+        else if (!showPivot && _children.Contains(_pivotHandle)) _children.Remove(_pivotHandle);
+        InvalidateMeasure();
         Refresh();
+    }
+
+    /// <summary>「지도에서 고르기」 켜기/끄기 — 켜면 지도 전체 눌림을 받아 그 자리를 중심으로 알린다(십자 커서).</summary>
+    internal void SetPivotPicking(bool on)
+    {
+        _pickingPivot = on;
+        Cursor = on ? Cursors.Cross : Cursors.SizeAll;
     }
 
     /// <summary>회전 드래그 강제 종료(ESC 취소 등) — 이벤트 없이 플래그 · 캡처만 정리.</summary>
     internal void AbortRotationDrag()
     {
-        if (!_rotPressed) return;
+        if (!_rotPressed && !_pivPressed) return;
         _rotPressed = false;
         _rotDragging = false;
+        _pivPressed = false;
+        _pivDragging = false;
         if (IsMouseCaptured) ReleaseMouseCapture();
+    }
+
+    private bool IsIn(DependencyObject d, Visual target)
+    {
+        for (DependencyObject? cur = d; cur != null; cur = VisualTreeHelper.GetParent(cur))
+            if (ReferenceEquals(cur, target)) return true;
+        return false;
+    }
+
+    /// <summary>중심 십자 끌기 이동 — 데드존(8 DIU) 통과 뒤 시작, 새 중심 = 누른 자리 오프셋을 뺀 커서 자리.</summary>
+    private void ProcessPivotMove(Point cur)
+    {
+        if (!_pivDragging)
+        {
+            if (!CameraPopupHubMath.IsDrag(cur.X - _pivPressPoint.X, cur.Y - _pivPressPoint.Y)) return;
+            _pivDragging = true;
+            PivotDragStarted?.Invoke();
+        }
+        var p = cur + _pivGrabOffset;
+        PivotDragDelta?.Invoke(_map.FromLocalToLatLng((int)Math.Round(p.X), (int)Math.Round(p.Y)));
+    }
+
+    /// <summary>중심 십자 끌기 단일 종료점(Up · LostMouseCapture 공용).</summary>
+    private void FinishPivotDrag(bool commit)
+    {
+        if (!_pivPressed) return;
+        bool wasDragging = _pivDragging;
+        _pivPressed = false;
+        _pivDragging = false;
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        if (wasDragging) PivotDragFinished?.Invoke(commit);
     }
 
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
+        // 「지도에서 고르기」 — 다음 좌클릭 자리를 중심으로(이동 · 팬 · 선택 바꾸기로 새지 않게 여기서 소비).
+        if (_pickingPivot && e.ChangedButton == MouseButton.Left)
+        {
+            var at = e.GetPosition(_map);
+            e.Handled = true;
+            PivotPicked?.Invoke(_map.FromLocalToLatLng((int)Math.Round(at.X), (int)Math.Round(at.Y)));
+            return;
+        }
+        // 중심 십자 눌림 — 회전 손잡이와 같은 선점 · 캡처 규칙
+        if (e.ChangedButton == MouseButton.Left && !_pivPressed && !_rotPressed && _rotationPivot.HasValue
+            && e.OriginalSource is DependencyObject psrc && IsIn(psrc, _pivotHandle) && PivotScreen() is Point pc)
+        {
+            _pivPressed = true;
+            _pivDragging = false;
+            _pivPressPoint = e.GetPosition(_map);
+            _pivGrabOffset = pc - _pivPressPoint;
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
         // 손잡이 눌림은 터널에서 선점 — Thumb 자체 캡처 · 아래 그룹 이동 · 지도 팬과 겹치지 않게(drag-first-ux Must Always).
         if (e.ChangedButton == MouseButton.Left && !_rotPressed && !ExclusiveInputModeGate.IsActive(_map)
             && e.OriginalSource is DependencyObject src && IsInRotateHandle(src))
@@ -399,6 +519,9 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         // C12: 독점 입력 모드(라인드로잉·배치·조준·측정 등) 중엔 선택 마커 영역도 투과 — 눌림이 맵의 base-전 분기로 내려가야 한다(D-19 동일 계열).
         if (ExclusiveInputModeGate.IsActive(_map)) return null!;
 
+        // 「지도에서 고르기」 중엔 지도 전체 눌림을 받는다(OnPreviewMouseDown 이 그 자리를 중심으로).
+        if (_pickingPivot) return new PointHitTestResult(this, hitTestParameters.HitPoint);
+
         // Ctrl/Shift = 멀티셀렉션 토글·러버밴드(그룹 '이동' 아님) → adorner 투과시켜 아래 마커 Shape/GMapCustomControl이
         //   클릭을 받아 MarkerToggleRequested가 발화되게 함. (미투과 시 그룹 내 마커 위 Ctrl+클릭을 adorner가 e.Handled로
         //   삼켜 '제외'가 영구 불가 — 추가만 되고 제외/모든 시나리오 실패의 실제 원인)
@@ -428,9 +551,10 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        if (_rotPressed)
+        if (_rotPressed || _pivPressed)
         {
-            ProcessRotationMove(e.GetPosition(_map));
+            if (_rotPressed) ProcessRotationMove(e.GetPosition(_map));
+            else ProcessPivotMove(e.GetPosition(_map));
             e.Handled = true;
             base.OnMouseMove(e);
             return;
@@ -470,9 +594,10 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
-        if (_rotPressed)
+        if (_rotPressed || _pivPressed)
         {
-            FinishRotationDrag(commit: true);   // 놓음 = 확정(되돌리기는 Undo)
+            if (_rotPressed) FinishRotationDrag(commit: true);   // 놓음 = 그 각에서 멈춤(저장은 컨트롤러 판 확정 · Enter)
+            else FinishPivotDrag(commit: true);                  // 놓음 = 그 자리를 중심으로
             e.Handled = true;
             base.OnMouseLeftButtonUp(e);
             return;
@@ -490,6 +615,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         if (_rotPressed) FinishRotationDrag(commit: false);   // 캡처 잃음(창 전환 등) = 취소 · 원위치
+        if (_pivPressed) FinishPivotDrag(commit: false);      // 캡처 잃음 = 끌기 전 중심으로
         if (_dragging) { _dragging = false; GroupMoveCompleted?.Invoke(BuildMoveList()); }
         base.OnLostMouseCapture(e);
     }
@@ -511,5 +637,9 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         RotationDragDelta = null;
         RotationDragFinished = null;
         MoveDragStarting = null;
+        PivotDragStarted = null;
+        PivotDragDelta = null;
+        PivotDragFinished = null;
+        PivotPicked = null;
     }
 }

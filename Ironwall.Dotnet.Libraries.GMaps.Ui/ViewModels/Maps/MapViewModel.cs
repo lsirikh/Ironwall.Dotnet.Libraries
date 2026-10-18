@@ -578,6 +578,7 @@ public partial class MapViewModel : BasePanelViewModel,
             _groupSelection.GroupVisibilityRequested += OnGroupVisibilityRequested;
             _groupSelection.GroupZOrderRequested += OnGroupZOrderRequested;
             _groupSelection.GroupRotateCompleted += OnGroupRotateCompleted;   // 묶음 회전 확정 → 영속 + Undo 1단위
+            _groupSelection.RotationChanged += OnGroupRotationChanged;        // 회전 세션 → 컨트롤러 판(MapViewModel.GroupRotation)
 
             // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
             _labelService = new LabelAdornerService(MainMap, _log);
@@ -664,6 +665,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 _groupSelection.GroupVisibilityRequested -= OnGroupVisibilityRequested;
                 _groupSelection.GroupZOrderRequested -= OnGroupZOrderRequested;
                 _groupSelection.GroupRotateCompleted -= OnGroupRotateCompleted;
+                _groupSelection.RotationChanged -= OnGroupRotationChanged;
                 _groupSelection.Dispose();
                 _groupSelection = null;
             }
@@ -1241,6 +1243,10 @@ public partial class MapViewModel : BasePanelViewModel,
             || focused is System.Windows.Controls.ComboBox
             || focused is System.Windows.Controls.PasswordBox) return;
 
+        // 묶음 회전 판 안(단추 · 막대)에 포커스면 키는 판 것 — 막대 ←/→ 가 묶음 이동 · "다른 키 = 확정" 으로 새지 않게. Esc 만 회전 취소로 보낸다.
+        if (focused is System.Windows.DependencyObject fd && _groupRotationPanel != null && _groupRotationPanel.IsAncestorOf(fd)
+            && e.Key != System.Windows.Input.Key.Escape) return;
+
         // [C10] 드로잉 중에는 Ctrl+Z = 마지막 점 제거, Delete/방향키/Redo = 무시 — 전역 Undo·선택 삭제·격자 이동보다 먼저 판정.
         //   윈도우 터널이라 포커스와 무관하게 여기가 가장 먼저 도달한다(그룹 후킹은 초기화 시 구독).
         if (TryRouteDrawingKey(e)) return;
@@ -1445,6 +1451,8 @@ public partial class MapViewModel : BasePanelViewModel,
 
         if (sel.IsRotating)
         {
+            // 「지도에서 고르기」 중 Esc = 고르기만 그만(회전은 그대로)
+            if (key == System.Windows.Input.Key.Escape && sel.IsPickingPivot) { e.Handled = true; sel.SetPivotPicking(false); return true; }
             if (key == System.Windows.Input.Key.Escape) { e.Handled = true; sel.EndRotation(commit: false); SetAimStatus("회전 취소", true); return true; }
             if (key == System.Windows.Input.Key.Enter) { e.Handled = true; sel.EndRotation(commit: true); return true; }
         }
