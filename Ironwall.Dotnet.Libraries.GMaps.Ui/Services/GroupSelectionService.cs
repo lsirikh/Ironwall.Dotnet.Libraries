@@ -44,6 +44,54 @@ public sealed class GroupSelectionService : IDisposable
     public event System.Action<bool>? GroupVisibilityRequested;
     /// <summary>그룹 Z순서 요청(true=맨위로) — VM 처리(BatchUpdateZOrderAsync).</summary>
     public event System.Action<bool>? GroupZOrderRequested;
+    /// <summary>묶음 회전 확정 — 바뀐 멤버의 회전 전 상태 목록 + 회전량(도). VM 이 멤버별 DB 영속 + Undo 1단위.</summary>
+    public event System.Action<IReadOnlyList<GroupRotationSession.Original>, double>? GroupRotateCompleted;
+
+    private GroupRotationSession? _rotation;
+    /// <summary>열린 회전 세션(드래그 중이거나 키보드로 돌리고 아직 확정 전) — 없으면 null.</summary>
+    public GroupRotationSession? Rotation => _rotation;
+    public bool IsRotating => _rotation != null;
+
+    /// <summary>회전 세션 열기(이미 열렸으면 그대로). 2개 미만이거나 전원 잠금이면 false.</summary>
+    public bool BeginRotation()
+    {
+        if (_rotation != null) return true;
+        if (_selection.Count < 2) return false;
+        var s = new GroupRotationSession(_selection);
+        if (s.IsEmpty) return false;
+        _rotation = s;
+        _adorner?.SetRotationState(s.Pivot, 0d);
+        return true;
+    }
+
+    /// <summary>회전량 미리보기(원본 기준 절대 각도).</summary>
+    public void PreviewRotation(double degrees)
+    {
+        if (_rotation == null) return;
+        _rotation.Preview(degrees);
+        _adorner?.SetRotationState(_rotation.Pivot, _rotation.Angle);
+    }
+
+    /// <summary>키보드 한 칸 — 세션이 없으면 열고 현재 회전량에 더한다. 반환 = 회전했는가.</summary>
+    public bool RotateBy(double step)
+    {
+        if (!BeginRotation()) return false;
+        PreviewRotation(_rotation!.Angle + step);
+        return true;
+    }
+
+    /// <summary>회전 세션 끝 — commit=true 면 확정(GroupRotateCompleted), false 면 원위치(저장 없음).</summary>
+    public void EndRotation(bool commit)
+    {
+        var s = _rotation;
+        if (s == null) return;
+        _rotation = null;
+        _adorner?.AbortRotationDrag();
+        if (!commit) s.Cancel();
+        var changed = commit ? s.Commit() : Array.Empty<GroupRotationSession.Original>();
+        _adorner?.SetRotationState(null, 0d);
+        if (changed.Count > 0) GroupRotateCompleted?.Invoke(changed, s.Angle);
+    }
 
     /// <summary>러버밴드 결과 설정 — 이전 그룹 clear 후 새 집합에 adorner 부착·IsSelected 표시. 빈 목록=clear.</summary>
     public void SetSelection(IReadOnlyList<IEditableMarker>? markers)
@@ -70,6 +118,10 @@ public sealed class GroupSelectionService : IDisposable
         _adorner.GroupLockRequested += OnAdornerLockRequested;
         _adorner.GroupVisibilityRequested += OnAdornerVisibilityRequested;
         _adorner.GroupZOrderRequested += OnAdornerZOrderRequested;
+        _adorner.RotationDragStarted += OnAdornerRotationDragStarted;
+        _adorner.RotationDragDelta += PreviewRotation;
+        _adorner.RotationDragFinished += EndRotation;
+        _adorner.MoveDragStarting += OnAdornerMoveDragStarting;
         _adorner.SetMarkers(_selection);
         _layer.Add(_adorner);
         _log?.Info($"그룹 선택 {_selection.Count}개");
@@ -80,6 +132,8 @@ public sealed class GroupSelectionService : IDisposable
     private void OnAdornerLockRequested(bool locked) => GroupLockRequested?.Invoke(locked);
     private void OnAdornerVisibilityRequested(bool show) => GroupVisibilityRequested?.Invoke(show);
     private void OnAdornerZOrderRequested(bool toFront) => GroupZOrderRequested?.Invoke(toFront);
+    private void OnAdornerRotationDragStarted() => BeginRotation();
+    private void OnAdornerMoveDragStarting() => EndRotation(commit: true);
 
     /// <summary>선택집합에서 일부 제거(그룹 삭제 후) 후 adorner 갱신. 남은 게 없으면 Clear.</summary>
     public void RemoveAndRefresh(IEnumerable<IEditableMarker> removed)
@@ -99,6 +153,7 @@ public sealed class GroupSelectionService : IDisposable
     /// <summary>그룹 해제 — adorner 제거·Dispose, IsSelected 해제.</summary>
     public void Clear()
     {
+        EndRotation(commit: true);   // 열린 회전은 선택이 바뀌기 전에 확정(선택 바꾸기 = 다른 작업으로 넘어감)
         if (_adorner != null)
         {
             _adorner.GroupMoveCompleted -= OnAdornerMoveCompleted;
@@ -106,6 +161,10 @@ public sealed class GroupSelectionService : IDisposable
             _adorner.GroupLockRequested -= OnAdornerLockRequested;
             _adorner.GroupVisibilityRequested -= OnAdornerVisibilityRequested;
             _adorner.GroupZOrderRequested -= OnAdornerZOrderRequested;
+            _adorner.RotationDragStarted -= OnAdornerRotationDragStarted;
+            _adorner.RotationDragDelta -= PreviewRotation;
+            _adorner.RotationDragFinished -= EndRotation;
+            _adorner.MoveDragStarting -= OnAdornerMoveDragStarting;
             try { _layer?.Remove(_adorner); } catch { /* 레이어 정리 중 */ }
             _adorner.Dispose();
             _adorner = null;

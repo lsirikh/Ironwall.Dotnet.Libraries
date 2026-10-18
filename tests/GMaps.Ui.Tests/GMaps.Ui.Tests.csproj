@@ -51,6 +51,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\AnchorViewportClamp.cs" />
     <!-- 디지털줌 드래그 서브픽셀 보간(심볼 이동 뻑뻑함 방지) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\SubPixelGeo.cs" />
+    <!-- 선택 묶음 회전 순수 수학(메르카토르 왕복 · 중심 · 회전 · 방향 감기 · 드래그 각 · Shift 스냅) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\GroupRotationMath.cs" />
     <!-- 드로잉 키 라우팅 순수 판정(C8 ESC 취소·C9 포커스 무관 터널·C10 Ctrl+Z/Delete/방향키 선점) — 실코드 링크(WPF 어댑터 .Wpf.cs 는 미링크) -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\DrawingKeyRouter.cs" />
     <!-- C12 독점 입력 모드 어도너 투과 게이트(라벨·편집핸들·그룹선택 공용, D-19 동일 목록+측정) — 실코드 링크 -->

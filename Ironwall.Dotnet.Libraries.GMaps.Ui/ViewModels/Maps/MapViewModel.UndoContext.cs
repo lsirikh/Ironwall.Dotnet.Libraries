@@ -48,12 +48,14 @@ public partial class MapViewModel : IUndoApplyContext
         if (_undoService == null) return;
         UndoCommand = new AsyncRelayCommand(async () =>
         {
+            _groupSelection?.EndRotation(commit: true);   // 열린 묶음 회전은 먼저 확정 → 이번 되돌리기가 그 회전을 되돌린다
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.UndoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
         }, () => CanUndo);
         RedoCommand = new AsyncRelayCommand(async () =>
         {
+            _groupSelection?.EndRotation(commit: true);   // 열린 묶음 회전 먼저 확정(Undo 단위 섞임 방지)
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.RedoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
