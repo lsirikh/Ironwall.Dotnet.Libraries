@@ -14,7 +14,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
                   ★ 2026-10-18(실기: 오버레이로 만들면 건물이 하나도 안 서고 그림만 깔림 — 모든 이미지를 mask=true 로 보내
                     map-3d 가 그 범위의 실제 건물을 지웠다): GIS 만들기 방식은 넷 — tiles · photo(사진으로, 건물 유지 · 기본) ·
                     mask(가리기, 보안) · extract(가리기 + 건물 찾기). 서버로는 overlay_mode(ServerOverlayMode) + 이미지마다 mask(MaskFor)로 바꿔 보낸다.
-                    옛 설정값 "composite"(그때는 늘 가림)는 mask 로 읽는다.
+                    옛 설정값 "composite" 는 photo 로 읽는다 — 그 값을 고른 사용자는 "오버레이 포함"(사진)을 원했고, mask 로 읽으면
+                    다시 만들어도 실제 건물이 지워진다(2026-10-18 실기: 저장값 composite → 가리기로 되살아남).
                   ★ 서버는 PNG/JPG · 50 MB 이하만 받는다 — 그 밖(TIF 등)은 GIS 가 PNG/JPG 로 바꾼 캐시 파일을 보낸다(NeedsConversion).
                   WPF 무의존 — tests/GMaps.Ui.Tests 가 실코드를 링크해 시험한다.
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
@@ -29,7 +30,7 @@ public static class Map3DBake
 {
     /// <summary>위성 타일만 — 오버레이 이미지는 3D 화면에서 덮기만 한다.</summary>
     public const string ModeTiles = "tiles";
-    /// <summary>서버 overlay_mode "composite"(이미지를 지형 텍스처에 합성) — GIS 방식으로는 옛 설정값(= <see cref="ModeMask"/>).</summary>
+    /// <summary>서버 overlay_mode "composite"(이미지를 지형 텍스처에 합성) — GIS 방식으로는 옛 설정값(= <see cref="ModePhoto"/>).</summary>
     public const string ModeComposite = "composite";
     /// <summary>가리기 + 이미지에서 건물 윤곽을 찾아 3D 건물로(서버 overlay_mode 도 "extract").</summary>
     public const string ModeExtract = "extract";
@@ -43,11 +44,11 @@ public static class Map3DBake
 
     private const double MetersPerDegree = 111_320d;
 
-    /// <summary>GIS 만들기 방식 — tiles · photo · mask · extract. 옛 값 "composite" 는 mask, 알 수 없는 값 · 빈 값은 tiles.</summary>
+    /// <summary>GIS 만들기 방식 — tiles · photo · mask · extract. 옛 값 "composite" 는 photo, 알 수 없는 값 · 빈 값은 tiles.</summary>
     public static string NormalizeMode(string? mode)
     {
         string m = mode?.Trim().ToLowerInvariant() ?? "";
-        return m == ModeComposite ? ModeMask : m is ModePhoto or ModeMask or ModeExtract ? m : ModeTiles;
+        return m == ModeComposite ? ModePhoto : m is ModePhoto or ModeMask or ModeExtract ? m : ModeTiles;
     }
 
     /// <summary>서버 overlay_mode — tiles → "tiles", photo · mask → "composite", extract → "extract".</summary>

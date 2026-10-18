@@ -62,7 +62,7 @@ public class Map3DBakeTests
     [InlineData(null, "tiles")]
     [InlineData("", "tiles")]
     [InlineData("TILES", "tiles")]
-    [InlineData(" Composite ", "mask")]   // 옛 값(그때는 늘 가림) → mask(2026-10-18)
+    [InlineData(" Composite ", "photo")]   // 옛 값("오버레이 포함") → photo(2026-10-18 — mask 로 읽으면 다시 만들어도 건물이 지워짐)
     [InlineData("Photo", "photo")]
     [InlineData("mask", "mask")]
     [InlineData("extract", "extract")]
@@ -81,7 +81,7 @@ public class Map3DBakeTests
     public void should_preselect_last_mode_when_overlay_images_are_in_area()
     {
         Assert.True(Map3DBake.ShouldAsk(2));
-        Assert.Equal("mask", Map3DBake.DefaultMode("composite", 2));
+        Assert.Equal("photo", Map3DBake.DefaultMode("composite", 2));
         Assert.Equal("photo", Map3DBake.DefaultMode("photo", 2));
         Assert.Equal("tiles", Map3DBake.DefaultMode("bogus", 1));
     }
@@ -124,7 +124,7 @@ public class Map3DBakeTests
         Assert.Equal(37.504, o["bounds"]!.Value<double>("bottom"));
         Assert.Equal(15d, o.Value<double>("rotation"));
         Assert.Equal(0.8, o.Value<double>("opacity"));
-        Assert.True(o.Value<bool>("mask"));
+        Assert.Equal(Map3DBake.MaskFor(mode), o.Value<bool>("mask"));   // composite(옛 값) = photo → false, extract → true
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public class Map3DBakeTests
     [Theory]
     [InlineData(null, "tiles")]
     [InlineData("Extract", "extract")]
-    [InlineData("composite", "mask")]
+    [InlineData("composite", "photo")]
     [InlineData("photo", "photo")]
     [InlineData("whatever", "tiles")]
     public void should_normalize_saved_overlay_mode_when_settings_load(string? saved, string expected)
@@ -195,7 +195,7 @@ public class Map3DBakeTests
     [InlineData("photo", "composite", false)]
     [InlineData("mask", "composite", true)]
     [InlineData("extract", "extract", true)]
-    [InlineData("composite", "composite", true)]   // 옛 설정값 = 가리기
+    [InlineData("composite", "composite", false)]   // 옛 설정값 = 사진으로(건물 유지)
     public void should_map_gis_mode_to_server_mode_and_mask_when_baking(string mode, string serverMode, bool mask)
     {
         Assert.Equal(serverMode, Map3DBake.ServerOverlayMode(mode));

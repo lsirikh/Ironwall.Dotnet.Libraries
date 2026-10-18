@@ -24,7 +24,8 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d"
 	help:HelpTip.HandlesF1="True"
-	AutomationProperties.AutomationId="GMaps.Map.Root">
+	AutomationProperties.AutomationId="GMaps.Map.Root"
+	AutomationProperties.ItemStatus="{Binding Map3DStatusText}">
 	<!--  전역 단축키 — 상단 메뉴 명령을 맵 포커스 상태에서 동작(메뉴 스코프가 아닌 루트 스코프).
 	      기존 코드 단축키(Ctrl+Shift+R 회전토글·Ctrl+R 회전리셋·Ctrl+←/→ 미세회전·Ctrl+A 전체선택)와 비충돌.  -->
 	<UserControl.InputBindings>

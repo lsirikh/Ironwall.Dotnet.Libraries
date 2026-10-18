@@ -53,6 +53,8 @@ public partial class MapViewModel
     private string _map3DBusyText = "";
     private double _map3DBusyPercent;
     private bool _map3DBusyIndeterminate = true;
+    /// <summary>UIA 계측용 지금 화면 — "3D"(3D 표시 중) · "2D". 지도 루트의 ItemStatus 로 내보낸다(컴포지션 WebView2 는 UIA 트리에 없다).</summary>
+    public string Map3DStatusText => _map3DState == Map3DState.Shown ? "3D" : "2D";
     public bool IsMap3DBusy { get => _isMap3DBusy; private set { _isMap3DBusy = value; NotifyOfPropertyChange(); } }
     public string Map3DBusyText { get => _map3DBusyText; private set { _map3DBusyText = value; NotifyOfPropertyChange(); } }
     public double Map3DBusyPercent { get => _map3DBusyPercent; private set { _map3DBusyPercent = value; NotifyOfPropertyChange(); } }
@@ -464,7 +466,7 @@ public partial class MapViewModel
     /// <summary>로딩 중(Pending) 진입 취소 — 패널을 닫고 1×1 로 접는다(불러오던 장면은 그대로 둬 다음 진입에 쓴다).</summary>
     private void CancelMap3DPending()
     {
-        _map3DState = Map3DState.Off; SetMap3DBusy(null);
+        _map3DState = Map3DState.Off; NotifyOfPropertyChange(nameof(Map3DStatusText)); SetMap3DBusy(null);
         Map3DHost.Park();
         _map3DOverlay?.Pause();
     }
@@ -564,6 +566,7 @@ public partial class MapViewModel
     {
         if (MainMap == null) return;
         _map3DState = Map3DState.Shown;
+        NotifyOfPropertyChange(nameof(Map3DStatusText));
         SetMap3DBusy(null);
         _map3DRevealedBehindLogin = Map3DGuide.IsBehindLogin(ResolveTokenStorage()?.IsAuthenticated);   // 로그인 뒤 한 번 안내(R5)
         _map3DLastCamera = null;
@@ -583,6 +586,7 @@ public partial class MapViewModel
     {
         if (MainMap == null) return;
         _map3DState = Map3DState.Off;
+        NotifyOfPropertyChange(nameof(Map3DStatusText));
         _map3DRevealedBehindLogin = false;
         // 짧은 복귀 안내(R5) — 패널은 2D 위에 0.5 s
         SetMap3DBusy(Map3DGuide.LeaveTitle, 100);
