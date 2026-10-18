@@ -12,7 +12,8 @@ using System.Windows.Media.Imaging;
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
    Purpose      : 지도 3D 굽기 방식 고르기(오버레이 이미지 포함 여부) — 영역 그리기 · 배지 「다시 만들기」 직후, 굽기 시작 전.
-                  "3D 만들기 — ○ 위성 타일만 ○ 오버레이를 사진으로(건물 유지, 기본) ○ 오버레이로 가리기(보안) ○ 오버레이로 가리기 + 건물 찾기"
+                  "3D 만들기 — ○ 오버레이 영역은 이미지에서 건물 찾기(기본) ○ 오버레이를 바닥 사진으로만(지도 건물 유지)
+                  ○ 오버레이로 가리기(보안 · 건물 없음) ○ 위성 타일만(오버레이 안 넣음)"
                   + [만들기] [취소](2026-10-18 방식 넷 — 요청 본문 · mask 는 Map3DBake.ServerOverlayMode · MaskFor)
                   (MapView.xaml "GMaps.Map3D.BakeOptions"). 기본은 마지막 고른 값(appsettings Map3D.OverlayMode).
    Note         : ★ 영역과 겹치는(회전 포함) 보이는 오버레이 이미지가 하나도 없으면 방식은 묻지 않고(라디오 숨김) tiles 로 굽는다.
