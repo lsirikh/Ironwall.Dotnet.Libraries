@@ -40,7 +40,16 @@ public class Map3DModel
     public const double MinAreaSideM = 200d, MaxAreaSideLimitM = 5000d;
     public const double MaxGuideSeconds = 3d;
 
-    /// <summary>2D → 3D 로 바뀌는 실효줌.</summary>
+    /// <summary>3D 들어가는 방식 — 자동(줌): 3D 영역 안에서 <see cref="EnterZoom"/> 이상이면 3D 로.</summary>
+    public const string EntryAuto = "auto";
+    /// <summary>3D 들어가는 방식 — 수동(단추): 줌으로는 들어가지 않고 「3D 로 보기」 · 「이 영역 3D 로 보기」로만.</summary>
+    public const string EntryManual = "manual";
+
+    /// <summary>3D 들어가는 방식(2026-10-19) — <see cref="EntryAuto"/>(기본, 옛 설정 파일에 없으면 이것) | <see cref="EntryManual"/>.
+    /// 나가기는 방식과 상관없이 「나가기」 단추 · ESC 로만.</summary>
+    public string EntryMode { get; set; } = EntryAuto;
+
+    /// <summary>2D → 3D 로 바뀌는 실효줌(자동(줌)일 때만 진입에 쓴다).</summary>
     public double EnterZoom { get; set; } = 17.0;
     /// <summary>3D → 2D 로 돌아가는 줌(EnterZoom 보다 작아야 한다 — 그 사이가 히스테리시스).</summary>
     public double ExitZoom { get; set; } = 16.5;
@@ -71,6 +80,7 @@ public class Map3DModel
         if (ExitZoom < MinZoom) { ExitZoom = MinZoom; EnterZoom = MinZoom + 0.5; }
         if (PreloadZoom > ExitZoom) PreloadZoom = ExitZoom;
 
+        EntryMode = string.Equals(EntryMode?.Trim(), EntryManual, StringComparison.OrdinalIgnoreCase) ? EntryManual : EntryAuto;
         string mode = OverlayMode?.Trim().ToLowerInvariant() ?? "";
         OverlayMode = mode == "composite" ? "extract" : mode is "photo" or "mask" or "extract" ? mode : "tiles";
         string before = ServerUrl;
@@ -87,6 +97,6 @@ public class Map3DModel
 
     public override string ToString()
         => string.Format(CultureInfo.InvariantCulture,
-            "Map3D[enabled={0}, server={1}, composition={2}, hwndWhenRemote={10}, overlay={3}, enter={4}, exit={5}, preload={6}, area={7}, maxSide={8}, guide={9}]",
-            IsEnabled, ServerUrl, UseCompositionHost, OverlayMode, EnterZoom, ExitZoom, PreloadZoom, AreaShowZoom, MaxAreaSideM, GuideMinSeconds, HwndWhenRemote);
+            "Map3D[enabled={0}, server={1}, composition={2}, hwndWhenRemote={10}, overlay={3}, entry={11}, enter={4}, exit={5}, preload={6}, area={7}, maxSide={8}, guide={9}]",
+            IsEnabled, ServerUrl, UseCompositionHost, OverlayMode, EnterZoom, ExitZoom, PreloadZoom, AreaShowZoom, MaxAreaSideM, GuideMinSeconds, HwndWhenRemote, EntryMode);
 }

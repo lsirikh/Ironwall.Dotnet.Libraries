@@ -39,6 +39,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                     영역 전체가 들어오는 시점으로 열고(3D 의 home 메시지) 줌으로는 나가지 않으며, 나가면 들어오기 전 2D 자리로 돌아간다.
                   ★ 7차(2026-10-18): 6차 규칙을 모든 진입으로 — 줌 게이트로 들어와도 영역 전체 시점으로 열고, 3D 에서는 줌으로 나가지 않으며
                     (나가기 · ESC 만), 나가면 들어오기 직전 2D 자리(_map3DReturn). 상태는 SetMap3DState 하나로 바꿔 "3D" 표시와 「나가기」 보임이 늘 같다.
+                  ★ 8차(2026-10-19, 들어가는 방식): 설정 Map3D.EntryMode — 자동(줌, 기본)은 지금처럼 줌 게이트, 수동(단추)은 줌으로 들어가지 않는다.
+                    어느 방식이든 화면 가운데가 3D 영역 안이면 왼쪽 위 「3D 로 보기」 단추 · 「이 영역 3D 로 보기」로 바로 들어간다(EnterMap3DDirect).
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
@@ -74,11 +76,24 @@ public partial class MapViewModel
         NotifyOfPropertyChange(nameof(Map3DStatusText));
         NotifyOfPropertyChange(nameof(IsMap3DShown));
         NotifyOfPropertyChange(nameof(IsMap3DZoomControlVisible));
+        NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible));
     }
 
     private RelayCommand? _exitMap3DCommand;
     /// <summary>「나가기」 — ESC 와 같은 경로(ExitMap3D)로 2D 에 돌아온다.</summary>
     public RelayCommand ExitMap3DCommand => _exitMap3DCommand ??= new RelayCommand(_ => ExitMap3D("exit-button"));
+
+    /// <summary>화면 가운데가 들어 있는 만들어 둔 3D 영역(없으면 null) — 게이트 큐의 UpdateMap3DAreaDisplay 가 맞춘다.</summary>
+    private Map3DScene? _map3DCenterScene;
+    /// <summary>지도 위 「3D 로 보기」 단추(MapView.xaml "Map.Map3D.EnterButton") — 2D 이고 화면 가운데가 3D 영역 안일 때(Map3DMath.IsEnterButtonVisible).</summary>
+    public bool IsMap3DEnterButtonVisible => Map3DMath.IsEnterButtonVisible(_map3DSettings.IsEnabled, _map3DState == Map3DState.Off, _map3DCenterScene != null);
+
+    private RelayCommand? _enterMap3DCommand;
+    /// <summary>「3D 로 보기」 — 화면 가운데 3D 영역으로 줌과 상관없이 바로 들어간다(EnterMap3DDirect).</summary>
+    public RelayCommand EnterMap3DCommand => _enterMap3DCommand ??= new RelayCommand(_ =>
+    {
+        if (_map3DCenterScene is { } scene) EnterMap3DDirect(scene, "enter-button");
+    });
     public bool IsMap3DBusy { get => _isMap3DBusy; private set { _isMap3DBusy = value; NotifyOfPropertyChange(); } }
     public string Map3DBusyText { get => _map3DBusyText; private set { _map3DBusyText = value; NotifyOfPropertyChange(); } }
     public double Map3DBusyPercent { get => _map3DBusyPercent; private set { _map3DBusyPercent = value; NotifyOfPropertyChange(); } }
@@ -251,6 +266,7 @@ public partial class MapViewModel
         string? oldServer = _map3DClient == null ? null : _map3DSettings.ServerUrl;
         _map3DSettings = MapSettingsHelper.LoadMap3D(_log);
         NotifyOfPropertyChange(nameof(Map3DChipText));
+        NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible));   // 3D 끄기 · 켜기
         if (oldServer != _map3DSettings.ServerUrl)
         {
             _map3DClient?.Dispose();
@@ -387,6 +403,29 @@ public partial class MapViewModel
         Leave3D(Map3DExitCamera, cause);
     }
 
+    /// <summary>
+    /// 줌 게이트에 기대지 않고 그 영역 3D 로 바로 들어간다(「3D 로 보기」 단추 · 「이 영역 3D 로 보기」, 들어가는 방식과 상관없이).
+    /// 돌아올 자리를 지금 2D 로 잡고(이미 잡아 뒀으면 그대로) 준비를 시작한다 — 준비 중에는 게이트가 줌으로 취소하지 않는다.
+    /// 편집 · 그리기 중이면 들어가지 않고 알린다.
+    /// </summary>
+    private void EnterMap3DDirect(Map3DScene scene, string cause)
+    {
+        if (MainMap == null || !_map3DSettings.IsEnabled || _map3DState != Map3DState.Off) return;
+        // 만드는 중 · 이벤트 지도 이동 중에는 게이트가 곧바로 취소한다 — 안내가 깜빡이지 않게 처음부터 들어가지 않는다
+        if (_isMap3DBaking) { SetAimStatus("3D 를 만드는 중입니다 — 다 만든 뒤 다시 누르세요", autoHide: true); return; }
+        if (_flyAnimation != null) return;
+        if (IsMap3DBlockedByInputMode())
+        {
+            SetAimStatus("편집 · 그리기 중에는 3D 로 들어가지 않습니다 — 모드를 끝낸 뒤 다시 누르세요", autoHide: true);
+            return;
+        }
+        _map3DReturn ??= Current2DCamera(0d);
+        _map3DAreaViewJob = scene.Id;
+        _map3DEntrySuppressed = false;
+        _log?.Info($"[Map3D] 바로 들어가기({cause}) job={scene.Id} mode={_map3DSettings.EntryMode}");
+        Begin3D(scene);
+    }
+
     // ── 굽기 ──
 
     /// <param name="enterZoom">그 영역의 3D 로 바뀌는 줌(만들기 패널에서 고른 값) — 굽기 요청 enter_zoom.</param>
@@ -419,7 +458,9 @@ public partial class MapViewModel
             _map3DScenes.RemoveAll(sc => sc.Id == job.Id);
             _map3DScenes.Add(new Map3DScene(job.Id, bbox) { EnterZoom = enterZoom });
             _map3DEntrySuppressed = false;
-            SetAimStatus($"3D 준비됨 — 줌 {Map3DGuide.Zoom(Map3DAreaEnterZoom(job.Id, enterZoom))} 이상에서 3D", autoHide: true);
+            SetAimStatus(Map3DMath.IsZoomEntry(_map3DSettings.EntryMode)
+                ? $"3D 준비됨 — 줌 {Map3DGuide.Zoom(Map3DAreaEnterZoom(job.Id, enterZoom))} 이상에서 3D"
+                : "3D 준비됨 — 지도 왼쪽 위 「3D 로 보기」로 들어갑니다", autoHide: true);
             QueueMap3DGate();
             _ = RefreshMap3DAreasAsync();   // 새 영역 테두리 · 배지(만든 날짜 · 건물 수는 서버 목록에서)
         }
@@ -488,7 +529,11 @@ public partial class MapViewModel
         // 굽는 동안은 3D 로 들어가지 않는다 — 영역을 그리고 나면 곧바로 옛 3D 로 들어가 굽기 진행 패널이 가려졌다(2026-10-17 실기 S1)
         var gate = Map3DGateFor(scene);   // 그 영역의 진입 · 이탈 · 미리 준비 줌(영역마다 3D 줌)
         // 이벤트 2D 비행 중에는 출발 자리에서 3D 로 다시 들어가지 않는다 — 끝난 자리에서 판정한다(마지막 프레임의 위치 변경이 게이트를 다시 부른다)
-        bool active = !_isMap3DBaking && _flyAnimation == null && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null, gate.Enter, gate.Exit);
+        // 수동(단추)이면 줌으로는 들어가지 않는다 — 단추 · 「이 영역 3D 로 보기」로 직접 들어가는 중이면 줌과 상관없이 유지(EnterMap3DDirect)
+        bool pending = _map3DState == Map3DState.Pending;
+        bool direct = pending && _map3DAreaViewJob != null && _map3DAreaViewJob == _map3DJob && scene?.Id == _map3DJob;
+        bool active = !_isMap3DBaking && _flyAnimation == null && !IsMap3DBlockedByInputMode()
+                      && Map3DMath.DecideEntry(zoom, pending, scene != null, gate.Enter, gate.Exit, Map3DMath.IsZoomEntry(_map3DSettings.EntryMode), direct);
 
         if (!Map3DMath.Decide(zoom, false, scene != null, gate.Enter, gate.Exit)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
         // 목록에 없는 장면은 가장 낮게 고를 수 있는 영역 줌의 이탈 줌부터 묻는다

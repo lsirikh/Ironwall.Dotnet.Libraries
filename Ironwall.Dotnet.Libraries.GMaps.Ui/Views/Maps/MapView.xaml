@@ -1559,6 +1559,42 @@
 				HorizontalAlignment="Left"
 				VerticalAlignment="Top"
 				Orientation="Horizontal">
+				<!--  「3D 로 보기」 — 2D 에서 화면 가운데가 만들어 둔 3D 영역 안일 때만(IsMap3DEnterButtonVisible), 「나가기」와 같은 자리 · 같은 디자인.
+				      줌과 상관없이 바로 들어간다(EnterMap3DCommand → EnterMap3DDirect, 수동(단추) 방식의 들어가는 길). 설명은 "?" 말풍선.  -->
+				<Border
+					Margin="0,0,8,0"
+					Padding="4"
+					VerticalAlignment="Top"
+					AutomationProperties.AutomationId="GMaps.Map3D.Enter"
+					Style="{StaticResource MapFloatingPanelStyle}"
+					Visibility="{Binding IsMap3DEnterButtonVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<StackPanel Orientation="Horizontal">
+						<Button
+							AutomationProperties.AutomationId="Map.Map3D.EnterButton"
+							AutomationProperties.Name="3D 로 보기"
+							Command="{Binding EnterMap3DCommand}"
+							Style="{StaticResource PanelPrimaryButtonStyle}"
+							ToolTip="이 자리를 3D 지도로 봅니다">
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="16"
+									Height="16"
+									VerticalAlignment="Center"
+									Kind="CubeOutline" />
+								<TextBlock
+									Margin="6,0,0,0"
+									VerticalAlignment="Center"
+									FontWeight="SemiBold"
+									Text="3D 로 보기" />
+							</StackPanel>
+						</Button>
+						<help:HelpTip
+							Margin="6,0,2,0"
+							VerticalAlignment="Center"
+							HelpKey="Map.Map3D.Enter"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
+					</StackPanel>
+				</Border>
 				<Border
 					Margin="0,0,8,0"
 					Padding="4"

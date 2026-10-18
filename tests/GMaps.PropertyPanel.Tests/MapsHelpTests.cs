@@ -76,6 +76,12 @@ public class MapsHelpTests
     [InlineData("Map.Tracking.Settings", "[저장]")]
     [InlineData("Map.Playback.Window", "31일")]
     [InlineData("Map.Playback.Window", "[불러오기]")]
+    [InlineData("Map.Map3D.Enter", "줌과 상관없이")]
+    [InlineData("Map.Map3D.Enter", "수동(단추)")]
+    [InlineData("Map.Map3D.Enter", "이 영역 3D 로 보기")]
+    [InlineData("Map.Map3D.Enter", "[나가기]")]
+    [InlineData("Map.Map3D.EnterZoom", "자동(줌)일 때")]
+    [InlineData("Map.Map3D.EnterZoom", "3D 로 들어가는 줌")]
     public void should_keep_the_moved_explanation_in_the_callout_body_when_it_left_the_screen(string key, string phrase)
     {
         RuntimeHelpers.RunModuleConstructor(typeof(MapsHelp).Module.ModuleHandle);
