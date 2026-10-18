@@ -147,6 +147,14 @@ public sealed class Map3DViewHost : Grid
             _failed = true;
             LoadFailed?.Invoke($"3D 화면을 열지 못했습니다({e.WebErrorStatus})");
         };
+        // 페이지(렌더 프로세스)가 죽으면 3D 가 멈춘 채 "3D"(「나가기」)로 남는다 — 실패로 알려 2D 로 돌아가게 하고, 다음 진입은 다시 연다
+        web.CoreWebView2.ProcessFailed += (_, e) =>
+        {
+            if (e.ProcessFailedKind != Microsoft.Web.WebView2.Core.CoreWebView2ProcessFailedKind.RenderProcessExited) return;
+            _ready = _rendered = false;
+            _failed = true;
+            LoadFailed?.Invoke($"3D 화면이 멈췄습니다({e.ProcessFailedKind} · {e.Reason})");
+        };
         _coreHooked = true;
     }
 

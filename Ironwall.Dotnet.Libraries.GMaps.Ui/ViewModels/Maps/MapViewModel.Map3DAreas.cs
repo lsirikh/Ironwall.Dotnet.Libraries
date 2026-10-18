@@ -116,12 +116,12 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     private void ViewMap3DArea(Map3DAreaItem item)
     {
         if (MainMap == null) return;
-        // 이미 「영역 보기」 중이면 처음 들어오기 전 자리를 그대로 둔다(3D 를 따라 움직인 2D 자리가 아니라)
-        var before = IsMap3DAreaView ? _map3DAreaViewReturn : null;
+        // 이미 3D 중이면 처음 들어오기 전 자리를 그대로 둔다(3D 를 따라 움직인 2D 자리가 아니라)
+        var before = _map3DState == Map3DState.Shown ? _map3DReturn : null;
         if (_map3DState == Map3DState.Shown) Leave3D(null, "area-view");
         else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
 
-        _map3DAreaViewReturn = before ?? Current2DCamera(0d);
+        _map3DReturn = before ?? Current2DCamera(0d);
         _map3DAreaViewJob = item.Id;
         var (lat, lon) = Map3DGuide.AreaCenter(item.Bbox);
         _map3DEntrySuppressed = false;
@@ -200,7 +200,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             if (item == null || _map3DClient == null) return;
             if (_map3DJob == item.Id)
             {
-                if (_map3DState == Map3DState.Shown) Leave3D(_map3DLastCamera, "area-delete");
+                if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, "area-delete");
                 else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
             }
             bool removed = await _map3DClient.DeleteSceneAsync(item.Id, cancellationToken);

@@ -1,0 +1,129 @@
+--- a/map3d/static/overlay-store.js
++++ b/map3d/static/overlay-store.js
+@@ -46,6 +46,14 @@
+   return !(Number.isFinite(item.minZoom) && Number.isFinite(zoom) && zoom < item.minZoom - 0.25);
+ }
+ 
++// 3D 보임(2026-10-18) — 3D 에는 줌 개념이 없다(영역 전체 시점은 줌 13 근처라 minZoom 이 전부 숨겼다).
++//   body = 모형 · 상태 점 · 아이콘 · 선 · 펜스 · 도형 · 이미지: 숨김(visible=false)만 따른다.
++//   label = 글자 이름표: 겹침을 줄이려 2D 와 같은 최소 표시 줌 규칙(isShown).
++export function shown3D(item, zoom) {
++  const body = !!item && item.visible !== false;
++  return { body, label: body && isShown(item, zoom) };
++}
++
+ function merge(dst, src) {
+   for (const [k, v] of Object.entries(src)) {
+     if (v && typeof v === "object" && !Array.isArray(v) && dst[k] && typeof dst[k] === "object" && !Array.isArray(dst[k])) merge(dst[k], v);
+--- a/map3d/static/overlay3d.js
++++ b/map3d/static/overlay3d.js
+@@ -2,7 +2,7 @@
+ //   선 · 다각형(지형을 따라, 실선 · 점선 · 점 무늬 · 화살표 · 채움) · 철망 벽 · 오버레이 이미지(보안 가림 = 덮기 / 지형에 깔기) · 추적 타겟.
+ //   표식 · 라벨 · 아이콘은 화면에서 크기가 일정하고 건물에 가려지지 않는다(상황 파악 우선). 고르기는 userData.overlay = {kind, id}.
+ import * as THREE from "three";
+-import { OverlayStore, TrackStore, colorOf, statusOf, isShown, densify, isBakedImage } from "./overlay-store.js";
++import { OverlayStore, TrackStore, colorOf, statusOf, shown3D, densify, isBakedImage } from "./overlay-store.js";
+ import { enuOf } from "./camsync.js";
+ import { loadHousing, instantiate, POLE_MOUNTED } from "./housing.js";
+ import {
+@@ -178,7 +178,11 @@
+ 
+   refreshVisibility(zoom) {
+     this.zoom = zoom;
+-    for (const [k, n] of this.nodes) n.group.visible = isShown(this.store.items.get(k), zoom);
++    for (const [k, n] of this.nodes) {
++      const v = shown3D(this.store.items.get(k), zoom);   // 몸체는 줌과 상관없이 · 이름표만 줌 규칙
++      n.group.visible = v.body;
++      if (n.label) n.label.visible = v.label;
++    }
+   }
+ 
+   // 탐지 중인 표식이 보이는가 — 그리기 빈도 판단용(깜빡임은 계속 다시 그려야 한다)
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -126,7 +126,7 @@
+ $("expo").addEventListener("input", () => { renderer.toneMappingExposure = +$("expo").value / 100; });
+ 
+ // 처음 시점 = 영역 전체가 화면에 다 들어오는 비스듬한 시점(camsync.fitAreaView — 화면 비율 · 시야각으로 거리, 여백 조금).
+-//   GIS 「이 영역 3D 로 보기」는 {type:"home"} 으로 부른다 — 화면이 아직 접혀 있으면(비율 · 줌을 셀 수 없다) 펼친 뒤(resize) 한다.
++//   GIS 는 3D 로 들어올 때마다(줌 게이트 · 「이 영역 3D 로 보기」) {type:"home"} 으로 부른다 — 화면이 아직 접혀 있으면(비율 · 줌을 셀 수 없다) 펼친 뒤(resize) 한다.
+ const HOME_PITCH = 60;
+ let homePending = null;
+ function homeView(opts = {}) {
+@@ -205,7 +205,7 @@
+   const s = new THREE.Vector3(); bounds.getSize(s);
+   size = Math.max(s.x, s.z, 50);
+   camera.far = size * 20; camera.updateProjectionMatrix();
+-  controls.maxDistance = size * (embed ? 10 : 4);   // 끼워 넣기는 GIS 가 줌을 내려 2D 로 돌아갈 만큼 멀어질 수 있어야 한다
++  controls.maxDistance = size * (embed ? 10 : 4);   // 끼워 넣기는 영역 전체 시점(좁고 긴 화면)보다 더 물러날 수 있게 넉넉히 — 줌으로 2D 로 나가지는 않는다
+   gtao.updateGtaoMaterial({ radius: Math.max(2, size / 250), distanceExponent: 1.5, thickness: Math.max(2, size / 300), scale: 1.0 });
+   if (scene.fog || first) scene.fog = makeFog();
+   indexGround();
+@@ -591,13 +591,14 @@
+   camera.aspect = w / h; camera.updateProjectionMatrix();
+   renderer.setSize(w, h); composer.setSize(w, h); gtao.setSize(w, h);
+   if (homePending && h >= MIN_CAMERA_HEIGHT_PX) homeView(homePending);
++  refreshOverlayZoom();
+   invalidate();
+ });
+ 
+ // ------------------------------------------------------------ GIS 연동(끼워 넣기)
+ // 받는 것  {type:"camera", lon, lat, zoom, bearing, pitch, animate?}  — 2D 지도 상태(Web Mercator 줌, DIP 기준)
+ // 보내는 것 {type:"ready", job, bbox, origin} · {type:"camera", reason:"user"|"live", lon, lat, zoom, bearing, pitch}
+-//   WebView2 면 chrome.webview, 아니면 부모 창(iframe 시험)으로 보낸다. GIS 는 보고된 zoom 으로 2D 복귀를 판정한다.
++//   WebView2 면 chrome.webview, 아니면 부모 창(iframe 시험)으로 보낸다. GIS 는 보고된 카메라로 2D 를 따라 맞춘다(줌으로 2D 로 나가지는 않는다 — 나가기 단추 · ESC).
+ const hostBridge = window.chrome && window.chrome.webview;
+ // 접힌(1×1) · 펼치는 중인 화면에서는 카메라를 보내지 않는다 — 줌은 화면 높이로 셈하므로(mapFromCamera) 높이 30 px 이면
+ // 실제보다 약 5 낮게 나와 GIS 가 곧바로 2D 로 돌아갔다(2026-10-18 실기: 다시 펼친 직후 줌 13 으로 튐).
+@@ -672,10 +673,8 @@
+   const pivot = hit ? hit.point : controls.target.clone();
+   let next = zoomAboutPoint(camera.position, controls.target, pivot, steps);
+   const d = Math.hypot(next.position.x - next.target.x, next.position.y - next.target.y, next.position.z - next.target.z);
+-  if (d < controls.minDistance || d > controls.maxDistance) {
+-    if (steps > 0 || !embed) return;      // 더 못 다가감 / 끼워 넣기가 아니면 더 못 물러남
+-    next = zoomAboutPoint(camera.position, controls.target, controls.target.clone(), steps);   // 물러날 땐 가운데 기준으로 — GIS 가 2D 로 받는다
+-  }
++  // 더 못 다가감 / 더 못 물러남 — GIS 는 줌으로 2D 로 나가지 않으므로(나가기 단추 · ESC 로만) 끼워 넣기도 최대 거리에서 멈춘다
++  if (d < controls.minDistance || d > controls.maxDistance) return;
+   applying = true;
+   camera.position.set(next.position.x, next.position.y, next.position.z);
+   controls.target.set(next.target.x, next.target.y, next.target.z);
+@@ -714,7 +713,8 @@
+   const ov = moved ? null : overlayAt(ev);
+   if (ov) postPick("context", ov, ev);
+ });
+-function refreshOverlayZoom() { if (overlay && sceneInfo) overlay.refreshVisibility(currentMapView().zoom); }
++// 접힌(1×1) 화면에서는 줌을 다시 셈하지 않는다 — 줌은 화면 높이로 셈해 엉뚱한 값(23 등)이 나온다. 펼치면(resize) 다시 셈한다.
++function refreshOverlayZoom() { if (overlay && sceneInfo && host.clientHeight >= MIN_CAMERA_HEIGHT_PX) overlay.refreshVisibility(currentMapView().zoom); }
+ 
+ // 오버레이 메시지가 장면을 다 불러오기 전에 오면 모아 뒀다가 오버레이를 만든 뒤 차례대로 적용한다
+ //   (아이콘 · 이미지 자료는 같은 key 를 한 번만 보내므로 버리면 다시 오지 않는다).
+--- a/tests/overlay_check.mjs
++++ b/tests/overlay_check.mjs
+@@ -1,5 +1,5 @@
+ // overlay-store.js 시험 — 스냅샷 · 변경분 · rev 빈칸 · 상태색 · 줌 표시 · 선 촘촘히(pytest 가 node 로 부른다).
+-import { OverlayStore, statusOf, colorOf, isShown, densify, STATUS_COLORS, bakedImageIds, isBakedImage } from "../map3d/static/overlay-store.js";
++import { OverlayStore, statusOf, colorOf, isShown, shown3D, densify, STATUS_COLORS, bakedImageIds, isBakedImage } from "../map3d/static/overlay-store.js";
+ import { enuOf } from "../map3d/static/camsync.js";
+ 
+ const fails = [];
+@@ -39,6 +39,19 @@
+ ok(!isShown({ ...cam, minZoom: 18 }, 17.5) && isShown({ ...cam, minZoom: 18 }, 17.8), "minZoom with 0.25 slack");
+ ok(isShown({ ...cam, minZoom: undefined }, 10), "no minZoom");
+ 
++// 3D 보임 — 영역 전체 시점(줌 13)에서도 몸체(모형 · 점 · 선 · 펜스)는 보이고, 이름표만 minZoom 규칙
++let v3 = shown3D(cam, 13.1);
++ok(v3.body && !v3.label, "3D: body shown below minZoom, label hidden");
++v3 = shown3D(fence, 13.1);
++ok(v3.body && !v3.label, "3D: fence shown below minZoom");
++v3 = shown3D(cam, 17.7);
++ok(v3.body && v3.label, "3D: label shown at/above minZoom");
++v3 = shown3D({ ...cam, visible: false }, 18);
++ok(!v3.body && !v3.label, "3D: visible=false hides body and label");
++v3 = shown3D(cam, null);
++ok(v3.body && v3.label, "3D: unknown zoom (collapsed page) shows all");
++ok(!shown3D(undefined, 13).body, "3D: missing item hidden");
++
+ const origin = { lon: 127.108, lat: 37.367 };
+ const d = densify(origin, fence.pts, false, 2, enuOf);
+ const len = Math.hypot(d.at(-1).x - d[0].x, d.at(-1).z - d[0].z);

@@ -1362,50 +1362,6 @@
 				</StackPanel>
 			</Border>
 
-			<!--  3D 「나가기」 — 3D 가 보이는 동안 지도 오른쪽 위. ESC 와 같은 경로(ExitMap3DCommand → ExitMap3D)로 2D 에 돌아온다.
-			      「이 영역 3D 로 보기」로 들어온 3D 는 줌으로 나가지 않으므로 이 단추 · ESC 로만 나간다. 설명은 "?" 말풍선.
-			      WPF 안에서 그리는 3D(기본) 위에 보인다 — 네이티브 창 3D 로 바뀐 경우엔 그 창에 가려 ESC 만 남는다. 지도 HUD 와 같은 MapFloatingPanelStyle · 토큰.  -->
-			<Border
-				Margin="0,12,12,0"
-				Padding="4"
-				HorizontalAlignment="Right"
-				VerticalAlignment="Top"
-				Panel.ZIndex="160"
-				AutomationProperties.AutomationId="GMaps.Map3D.Exit"
-				Style="{StaticResource MapFloatingPanelStyle}"
-				Visibility="{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}">
-				<StackPanel Orientation="Horizontal">
-					<Button
-						Height="28"
-						Padding="10,0"
-						AutomationProperties.AutomationId="GMaps.Map3D.ExitButton"
-						AutomationProperties.Name="나가기"
-						BorderBrush="{DynamicResource PrimaryBrush}"
-						Command="{Binding ExitMap3DCommand}"
-						Foreground="{DynamicResource PrimaryBrush}"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
-						ToolTip="2D 지도로 돌아갑니다 (Esc)">
-						<StackPanel Orientation="Horizontal">
-							<md:PackIcon
-								Width="16"
-								Height="16"
-								VerticalAlignment="Center"
-								Kind="ExitToApp" />
-							<TextBlock
-								Margin="6,0,0,0"
-								VerticalAlignment="Center"
-								FontWeight="SemiBold"
-								Text="나가기" />
-						</StackPanel>
-					</Button>
-					<help:HelpTip
-						Margin="6,0,2,0"
-						VerticalAlignment="Center"
-						HelpKey="Map.Map3D.Exit"
-						Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
-				</StackPanel>
-			</Border>
-
 			<!--  3D 만들기 — 영역을 그린 뒤(Enter = 지금 화면 · 배지 「다시 만들기」 포함) 늘 뜬다: 3D 로 바뀌는 줌(15~19, 기본 = 세팅의 3D 최소 줌) +
 			      영역과 겹치는 오버레이 이미지가 있을 때만 만들기 방식 넷(위성 타일만 · 사진으로 · 가리기 · 가리기 + 건물 찾기, 기본 = 마지막 고른 값, appsettings Map3D.OverlayMode).
 			      배지 「3D 줌 바꾸기…」도 이 패널(제목 「3D 줌 바꾸기」 · 줌만 · [바꾸기]). 설명은 "?" 말풍선. 지도 HUD 와 같은 MapFloatingPanelStyle · 토큰.  -->
@@ -1583,12 +1539,67 @@
 				</Border>
 			</StackPanel>
 
-			<!--  좌표 표시  -->
-			<ctrl:MapCoordinateControl
+			<!--  왼쪽 위 줄 — [3D 나가기] + 좌표 표시. 좌측 메뉴(50) 오른쪽 · 바람 위젯(좌표 아래 도킹) 위라 겹치지 않는다.
+			      「나가기」는 3D 가 보이는 동안만(IsMap3DShown = Map3DStatusText "3D" 에서 파생) 좌표 칩 왼쪽에 붙는다.
+			      ESC 와 같은 경로(ExitMap3DCommand → ExitMap3D)로 들어오기 직전 2D 자리에 돌아온다 — 3D 는 줌으로 나가지 않는다. 설명은 "?" 말풍선.
+			      WPF 안에서 그리는 3D(기본) 위에 보인다 — 네이티브 창 3D 로 바뀐 경우엔 그 창에 가려 ESC 만 남는다.
+			      디자인 = 지도 HUD 와 같은 MapFloatingPanelStyle + 패널 주 단추(PanelPrimaryButtonStyle) + 키 힌트 칩(Esc), 토큰만(라이트/다크).  -->
+			<StackPanel
 				Grid.Row="2"
 				Grid.ColumnSpan="2"
 				Margin="50,5,5,5"
 				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Orientation="Horizontal">
+				<Border
+					Margin="0,0,8,0"
+					Padding="4"
+					VerticalAlignment="Top"
+					AutomationProperties.AutomationId="GMaps.Map3D.Exit"
+					Style="{StaticResource MapFloatingPanelStyle}"
+					Visibility="{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<StackPanel Orientation="Horizontal">
+						<Button
+							AutomationProperties.AutomationId="GMaps.Map3D.ExitButton"
+							AutomationProperties.Name="나가기"
+							Command="{Binding ExitMap3DCommand}"
+							Style="{StaticResource PanelPrimaryButtonStyle}"
+							ToolTip="2D 지도로 돌아갑니다 (Esc)">
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="16"
+									Height="16"
+									VerticalAlignment="Center"
+									Kind="ArrowLeft" />
+								<TextBlock
+									Margin="6,0,0,0"
+									VerticalAlignment="Center"
+									FontWeight="SemiBold"
+									Text="나가기" />
+								<Border
+									Margin="8,0,0,0"
+									Padding="4,0"
+									VerticalAlignment="Center"
+									BorderBrush="{DynamicResource OnPrimaryFixedBrush}"
+									BorderThickness="1"
+									CornerRadius="3"
+									Opacity="0.85">
+									<TextBlock
+										FontFamily="Consolas"
+										FontSize="10"
+										Text="Esc" />
+								</Border>
+							</StackPanel>
+						</Button>
+						<help:HelpTip
+							Margin="6,0,2,0"
+							VerticalAlignment="Center"
+							HelpKey="Map.Map3D.Exit"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
+					</StackPanel>
+				</Border>
+			<!--  좌표 표시  -->
+			<ctrl:MapCoordinateControl
 				VerticalAlignment="Top"
 				IsShowMGRS="{Binding IsShowMGRS}"
 				IsShowUTM="{Binding IsShowUTM}"
@@ -1597,6 +1608,7 @@
 				Longitude="{Binding CurrentCoordinatePosition.Longitude}"
 				MGRS="{Binding CurrentMGRS}"
 				UTM="{Binding CurrentUTM}" />
+			</StackPanel>
 
 			<!--  화면 정중앙 십자가(비상호작용 시각 기준) — IsCenterCrosshairVisible 토글. AdornerDecorator 형제라 디지털줌 RenderTransform 영향 없이 항상 화면 중앙.
 			      z-순서: 맵/심볼/오버레이이미지(GMapControl, ZIndex 0) 위 · OverlayWindow 패널(PropertyPanelCanvas, ZIndex 200) 아래 → ZIndex 150.  -->
