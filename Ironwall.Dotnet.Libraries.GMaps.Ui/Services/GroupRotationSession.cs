@@ -12,6 +12,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
                   Preview(각)=원본에서 매번 다시 계산(누적 오차 없음) → Commit(변경 목록) / Cancel(원위치).
    Note         : 잠금·dispose 멤버는 제외(그룹 이동 FR-MS-08 과 같은 규칙). 선/구역(ILineEditableMarker)=꼭짓점 전부 +
                   Position 회전(방향 각 불변), 그 외(심볼·장비·이미지)=Position 회전 + Bearing 에 같은 각 더함.
+                  장비(IPidsEditableMarker)는 감시 방향(DetectionBearing — 시야 부채꼴 · 3D 카메라 머리, 지도 기준 각)도
+                  같은 각 더함(2026-10-19 — 빠뜨리면 아이콘만 돌고 시야는 옛 방향에 남는다). BaseBearing 은 Bearing 기준 상대각이라 그대로.
                   중심 = 원본 위치 + 선 꼭짓점의 메르카토르 경계 상자 중심(GroupRotationMath.BoundsCenter).
    Created On   : 2026-10-18 · Sensorway Co., Ltd.
 ****************************************************************************/
@@ -20,13 +22,15 @@ public sealed class GroupRotationSession
     /// <summary>멤버 1개의 회전 전 상태.</summary>
     public sealed class Original
     {
-        public Original(IEditableMarker marker, PointLatLng position, double bearing, List<PointLatLng>? linePoints)
-        { Marker = marker; Position = position; Bearing = bearing; LinePoints = linePoints; }
+        public Original(IEditableMarker marker, PointLatLng position, double bearing, List<PointLatLng>? linePoints, double? detectionBearing = null)
+        { Marker = marker; Position = position; Bearing = bearing; LinePoints = linePoints; DetectionBearing = detectionBearing; }
         public IEditableMarker Marker { get; }
         public PointLatLng Position { get; }
         public double Bearing { get; }
         /// <summary>선/구역이면 회전 전 꼭짓점, 그 외 null.</summary>
         public List<PointLatLng>? LinePoints { get; }
+        /// <summary>장비(점 마커)면 회전 전 감시 방향, 그 외 null.</summary>
+        public double? DetectionBearing { get; }
     }
 
     private readonly List<Original> _originals;
@@ -35,7 +39,8 @@ public sealed class GroupRotationSession
     {
         _originals = (markers ?? Enumerable.Empty<IEditableMarker>())
             .Where(m => m != null && !m.IsDisposed && !m.IsLocked)
-            .Select(m => new Original(m, m.Position, m.Bearing, (m as ILineEditableMarker)?.RuntimePoints))
+            .Select(m => new Original(m, m.Position, m.Bearing, (m as ILineEditableMarker)?.RuntimePoints,
+                m is IPidsEditableMarker p && m is not ILineEditableMarker ? p.DetectionBearing : null))
             .ToList();
 
         var anchors = _originals.SelectMany(o => o.LinePoints is { Count: > 0 } pts ? pts : new List<PointLatLng> { o.Position })
@@ -93,6 +98,7 @@ public sealed class GroupRotationSession
         {
             m.UpdateLocation(pos);
             m.UpdateRotation(GroupRotationMath.AddBearing(o.Bearing, degrees));
+            if (o.DetectionBearing is double db && m is IPidsEditableMarker p) p.DetectionBearing = GroupRotationMath.AddBearing(db, degrees);
         }
     }
 
@@ -107,6 +113,7 @@ public sealed class GroupRotationSession
         {
             m.UpdateLocation(o.Position);
             m.UpdateRotation(o.Bearing);
+            if (o.DetectionBearing is double db && m is IPidsEditableMarker p) p.DetectionBearing = db;
         }
     }
 

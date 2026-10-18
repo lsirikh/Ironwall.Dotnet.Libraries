@@ -1428,6 +1428,8 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 if (o.LinePoints != null) _editRecorder?.RecordLineGeometry(o.Marker, o.LinePoints, o.Position);
                 else _editRecorder?.RecordTransform(new MarkerEditCompletedEventArgs(o.Marker, o.Position, o.Marker.Width, o.Marker.Height, o.Bearing));
+                if (o.DetectionBearing is double db && o.Marker is IPidsEditableMarker p)
+                    _editRecorder?.RecordPropertyChange(o.Marker, nameof(IPidsEditableMarker.DetectionBearing), db, p.DetectionBearing);
             }
         }
         _groupSelection?.RefreshAdorner();

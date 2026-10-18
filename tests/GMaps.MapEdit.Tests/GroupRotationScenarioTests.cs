@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
@@ -384,5 +385,60 @@ public class GroupRotationScenarioTests
         Assert.NotNull(Adorner(rig));
         Assert.DoesNotContain(locked, rig.Vm.SelectedMarkers);
         Assert.DoesNotContain(hidden, rig.Vm.SelectedMarkers);
+    });
+
+    [Fact]
+    public void should_turn_device_view_direction_with_group_and_undo_it_when_rotation_confirmed() => Scenario.StaAsync(async () =>
+    {
+        // 2026-10-19 실사용 결함: 장비는 위치 · 아이콘만 돌고 감시 방향(시야 부채꼴 · 3D 카메라 머리)은 옛 방향에 남았다.
+        var rig = WiredMapRig.Create();
+        var saved = new List<(int id, double detection)>();
+        rig.Db.Setup(d => d.UpdatePidsSymbolAsync(It.IsAny<IPidsSymbolModel>(), It.IsAny<CancellationToken>()))
+              .Callback<IPidsSymbolModel, CancellationToken>((x, _) => saved.Add((x.Id, x.DetectionBearing)))
+              .ReturnsAsync((IPidsSymbolModel?)null);
+        var center = rig.Map.FromLatLngToLocal(rig.Map.Position);
+        GMapPidsMarker Device(int id, int dx, EnumDeviceType type, double bearing, double detection)
+        {
+            var geo = rig.Map.FromLocalToLatLng((int)center.X + dx, (int)center.Y);
+            var m = new GMapPidsMarker(Mock.Of<ILogService>(), new PidsSymbolModel
+            {
+                Id = id, Title = $"장비-{id}", DeviceType = type, Latitude = geo.Lat, Longitude = geo.Lng,
+                Bearing = bearing, DetectionBearing = detection, BaseBearing = 45,
+            });
+            rig.Map.Markers.Add(m);
+            return m;
+        }
+        var cam = Device(2201, -100, EnumDeviceType.IpCamera, bearing: 0, detection: 30);
+        var box = Device(2202, 100, EnumDeviceType.Controller, bearing: 10, detection: 350);
+        Scenario.Layout(rig.Deco, 1200, 800);
+        Group(rig).SetSelection(new IEditableMarker[] { cam, box });
+
+        for (int i = 0; i < 20; i++) Key(rig, System.Windows.Input.Key.OemCloseBrackets);   // +20°
+        Assert.Equal(50, cam.DetectionBearing, 9);
+        Assert.Equal(10, box.DetectionBearing, 9);    // 350 + 20 → 10 (360° 감기)
+        Assert.Equal(45, cam.BaseBearing, 9);          // 몸체 보정각은 Bearing 기준 상대각 — 그대로
+
+        Key(rig, System.Windows.Input.Key.Escape);   // 취소 = 감시 방향도 원위치
+        await Task.Delay(30);
+        Assert.Equal(30, cam.DetectionBearing, 9);
+        Assert.Equal(350, box.DetectionBearing, 9);
+        Assert.Empty(saved);
+
+        for (int i = 0; i < 20; i++) Key(rig, System.Windows.Input.Key.OemCloseBrackets);
+        Key(rig, System.Windows.Input.Key.Enter);
+        await Task.Delay(60);
+        Assert.Contains((2201, 50.0), saved);
+        Assert.Contains((2202, 10.0), saved);
+        Assert.Equal(20, cam.Bearing, 9);
+        Assert.Equal("그룹 회전 2개", rig.Undo.NextUndoDescription);
+
+        Assert.True(await rig.Undo.UndoAsync());   // Ctrl+Z 한 번 = 위치 · 아이콘 · 감시 방향 모두 원래대로
+        await Task.Delay(30);
+        Assert.Equal(30, cam.DetectionBearing, 9);
+        Assert.Equal(350, box.DetectionBearing, 9);
+        Assert.Equal(0, cam.Bearing, 9);
+        Assert.Equal(10, box.Bearing, 9);
+        Assert.False(rig.Undo.CanUndo);
+        Assert.Empty(rig.Errors);
     });
 }
