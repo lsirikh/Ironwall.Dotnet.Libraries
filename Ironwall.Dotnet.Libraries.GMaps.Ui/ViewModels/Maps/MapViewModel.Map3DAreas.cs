@@ -109,13 +109,20 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
 
     // ── 동작 ──
 
-    /// <summary>「이 영역 3D 로 보기」 — 영역 가운데 · 줌 17.5 로 옮기면 게이트가 3D 로 들어간다(안내 패널과 함께).</summary>
+    /// <summary>
+    /// 「이 영역 3D 로 보기」 — 영역 가운데 · 줌 17.5 로 옮기면 게이트가 3D 로 들어간다(안내 패널과 함께).
+    /// 이렇게 들어간 3D 는 영역 전체가 들어오는 시점으로 열고, 줌으로 나가지 않으며, 나가면 지금(들어오기 전) 2D 자리로 돌아간다.
+    /// </summary>
     private void ViewMap3DArea(Map3DAreaItem item)
     {
         if (MainMap == null) return;
+        // 이미 「영역 보기」 중이면 처음 들어오기 전 자리를 그대로 둔다(3D 를 따라 움직인 2D 자리가 아니라)
+        var before = IsMap3DAreaView ? _map3DAreaViewReturn : null;
         if (_map3DState == Map3DState.Shown) Leave3D(null, "area-view");
         else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
 
+        _map3DAreaViewReturn = before ?? Current2DCamera(0d);
+        _map3DAreaViewJob = item.Id;
         var (lat, lon) = Map3DGuide.AreaCenter(item.Bbox);
         _map3DEntrySuppressed = false;
         MainMap.Position = new PointLatLng(lat, lon);
