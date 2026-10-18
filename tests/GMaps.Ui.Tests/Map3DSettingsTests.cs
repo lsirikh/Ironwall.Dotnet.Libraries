@@ -146,7 +146,7 @@ public class Map3DSettingsTests
     /// <summary>LoadMap3D 가 읽는 키 — 저장되는 키 이름과 같아야 한다(속성 이름이 바뀌면 이 시험이 깨진다).</summary>
     private static readonly string[] LoadedKeys =
     {
-        "IsEnabled", "ServerUrl", "UseCompositionHost", "OverlayMode",
+        "IsEnabled", "ServerUrl", "UseCompositionHost", "HwndWhenRemote", "OverlayMode",
         "EnterZoom", "ExitZoom", "PreloadZoom", "AreaShowZoom", "MaxAreaSideM", "GuideMinSeconds",
     };
 
@@ -155,7 +155,7 @@ public class Map3DSettingsTests
     {
         var model = new Map3DModel
         {
-            IsEnabled = false, ServerUrl = "http://10.0.0.5:9000", UseCompositionHost = false, OverlayMode = "extract",
+            IsEnabled = false, ServerUrl = "http://10.0.0.5:9000", UseCompositionHost = false, HwndWhenRemote = false, OverlayMode = "extract",
             EnterZoom = 18.5, ExitZoom = 18, PreloadZoom = 16, AreaShowZoom = 14, MaxAreaSideM = 3000, GuideMinSeconds = 1.5,
         };
         var token = JObject.Parse(JToken.FromObject(model).ToString());

@@ -200,6 +200,8 @@ public partial class MapViewModel
     private bool _map3DEnterPreloaded;
     /// <summary>지금 페이지에 ready 직후 전체 스냅샷을 다 보낸 시각(UTC).</summary>
     private DateTime? _map3DSnapshotAt;
+    /// <summary>3D 표시 중 WPF 프레임 간격 · 2D 따라가기(Apply3DCameraTo2D) 시간 — perf.stats 를 받을 때 로그 한 줄로 꺼낸다.</summary>
+    private readonly Map3DPerfSamples _map3DWpfFrames = new(), _map3DSync2D = new();
 
     private Map3DOverlayBridge Map3DOverlay => _map3DOverlay ??= new Map3DOverlayBridge(json => Map3DHost.PostJson(json), _log, ZoneDetectionSection);
 
@@ -234,7 +236,10 @@ public partial class MapViewModel
             _map3DClient = new Map3DClient(_map3DSettings.ServerUrl);
             if (oldServer != null) { _map3DScenes.Clear(); _map3DLastLookupCenter = null; }   // 다른 서버 — 옛 장면 캐시를 버린다
         }
-        Map3DHost.UseComposition = _map3DSettings.UseCompositionHost;   // 3D 화면을 처음 만들 때만 본다(이미 만들었으면 다음 실행부터)
+        // 3D 화면을 처음 만들 때만 본다(이미 만들었으면 다음 실행부터). 원격(RDP)이면 네이티브 창(HwndWhenRemote) — WPF 안 그리기는 원격에서 매 프레임 CPU 복사
+        bool remote = IsRemoteSession();
+        Map3DHost.UseComposition = Map3DPerf.UseComposition(_map3DSettings.UseCompositionHost, _map3DSettings.HwndWhenRemote, remote);
+        if (remote && _map3DSettings.UseCompositionHost && !Map3DHost.UseComposition) _log?.Info("[Map3D] 원격 세션 — 3D 를 네이티브 창으로(HwndWhenRemote)");
 
         // 설정 화면 「3D 지도」 저장 → 다시 불러와 바로 반영(MapSettingsHelper.Map3DSaved)
         MapSettingsHelper.Map3DSaved -= OnMap3DSettingsSaved;
@@ -607,6 +612,9 @@ public partial class MapViewModel
         MainMap.IsHitTestVisible = false;                                               // 3D 가 보이는 동안 2D 입력 막음
         EnsureAimEscWindowHook();
         BeginMap3DWindows();                                                            // 카메라 상자 · 조립 카드가 3D 마커 자리를 따라간다(MapViewModel.Map3DWindows)
+        _map3DWpfFrames.Reset(); _map3DSync2D.Reset();                                  // 계측 — 3D 의 perf.stats 가 올 때 WPF 프레임 간격과 함께 한 줄([Map3D][perf])
+        System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
+        System.Windows.Media.CompositionTarget.Rendering += OnMap3DWpfFrame;
         _log?.Info($"[Map3D] 3D 표시 job={_map3DJob} host={Map3DHost.HostMode}");
         _log?.Info(Map3DGuide.TransitionTimingText(_map3DEnterAt, Map3DHost.CoreReadyAt, Map3DHost.ReadyAt, _map3DSnapshotAt,
                                                    Map3DHost.RenderedAt, DateTime.UtcNow, _map3DEnterPrewarmed, _map3DEnterPreloaded));
@@ -624,6 +632,7 @@ public partial class MapViewModel
         SetMap3DBusy(Map3DGuide.LeaveTitle, 100);
         RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.LeaveShow, timedBar: false);
         _map3DOverlay?.Pause();   // 페이지는 1×1 로 살아 있다 — 다시 펼칠 때 바뀐 것만 보낸다
+        System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
         Map3DHost.Park();
         MainMap.IsHitTestVisible = true;
         if (cam is { } c) Apply3DCameraTo2D(c);
@@ -682,6 +691,14 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 창 자리 처리 실패(격리): {ex.Message}"); }
             return;
         }
+        if (msg.Type == "perf.stats")
+        {
+            // 3D 프레임 단계 요약(몇 초마다) + GIS 쪽 WPF 프레임 간격 · 2D 따라가기 시간 — 병목 판정은 .harness PLAN 의 표
+            if (msg.PerfLines is { } lines)
+                _log?.Info(Map3DPerf.LogLine(lines, Map3DHost.HostMode, Map3DHost.ActualWidth, Map3DHost.ActualHeight, IsRemoteSession(),
+                                             System.Windows.Media.RenderCapability.Tier >> 16, _map3DWpfFrames.Take(), _map3DSync2D.Take()));
+            return;
+        }
         if (msg.Pick is { } pick)
         {
             try { OnMap3DPick(pick); }
@@ -694,7 +711,18 @@ public partial class MapViewModel
         if (Map3DMath.ShouldLeave3D(cam.Zoom, Map3DCurrentGate.Exit, IsMap3DAreaView)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }   // 「영역 보기」는 줌으로 나가지 않는다
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
         // 3D 카메라(위치 · 줌 · 방위)에 맞춰 오버레이가 3D 상태를 보이게 하고, 2D 로 돌아갈 때도 끊기지 않게 한다(2026-10-17 실기: 나침반이 0° 에 멈춰 있었다).
-        if (Map3DHost.HostMode == "composition") Apply3DCameraTo2D(cam);
+        if (Map3DHost.HostMode == "composition")
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            Apply3DCameraTo2D(cam);
+            _map3DSync2D.Add(System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
+        }
+    }
+
+    /// <summary>WPF 프레임 하나(3D 표시 중만 구독) — 간격을 모아 perf 로그 줄에 싣는다.</summary>
+    private void OnMap3DWpfFrame(object? sender, EventArgs e)
+    {
+        if (e is System.Windows.Media.RenderingEventArgs r) _map3DWpfFrames.AddFrame(r.RenderingTime);
     }
 
     private void OnMap3DLoadFailed(string reason)

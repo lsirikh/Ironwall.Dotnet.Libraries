@@ -24,6 +24,11 @@ public class Map3DModel
     /// 끄면 네이티브 창(WebView2) — 더 빠르지만 같은 자리의 WPF 를 덮는다(공역). RDP · 저사양에서 느리면 끈다.</summary>
     public bool UseCompositionHost { get; set; } = true;
 
+    /// <summary>원격 데스크톱(RDP) 세션이면 UseCompositionHost 와 상관없이 네이티브 창(2026-10-18 3D 느림 분석) —
+    /// RDP 의 WPF 는 소프트웨어로 그려 WPF 안 3D 는 매 프레임 화면을 CPU 로 옮겨 그린다. 대신 3D 위 WPF 창(카메라 상자 · 카드)이 덮인다(창을 열면 2D 로 돌아온다).
+    /// 기본 꺼짐 — 사용자 필수 요구 "3D 위에 오버레이 창이 2D 와 같이"(2026-10-18)를 원격에서도 지킨다. 느림 계측([Map3D][perf])으로 병목이 확인되면 켠다.</summary>
+    public bool HwndWhenRemote { get; set; } = false;
+
     /// <summary>오버레이 이미지 기본 만들기 방식(마지막 고른 값) — "extract"(기본, 오버레이 범위 안은 이미지 그림 + 이미지에서 찾은 건물,
     /// 범위 밖은 위성 타일 + 지도 건물 자료) | "photo"(오버레이를 바닥 사진으로만 · 지도 건물 유지) | "mask"(오버레이로 가리기, 보안) | "tiles"(위성 타일만).
     /// 옛 값 "composite" 는 extract 로 읽는다(2026-10-18 — 오버레이 범위는 이미지대로, 나머지는 타일대로).</summary>
@@ -82,6 +87,6 @@ public class Map3DModel
 
     public override string ToString()
         => string.Format(CultureInfo.InvariantCulture,
-            "Map3D[enabled={0}, server={1}, composition={2}, overlay={3}, enter={4}, exit={5}, preload={6}, area={7}, maxSide={8}, guide={9}]",
-            IsEnabled, ServerUrl, UseCompositionHost, OverlayMode, EnterZoom, ExitZoom, PreloadZoom, AreaShowZoom, MaxAreaSideM, GuideMinSeconds);
+            "Map3D[enabled={0}, server={1}, composition={2}, hwndWhenRemote={10}, overlay={3}, enter={4}, exit={5}, preload={6}, area={7}, maxSide={8}, guide={9}]",
+            IsEnabled, ServerUrl, UseCompositionHost, OverlayMode, EnterZoom, ExitZoom, PreloadZoom, AreaShowZoom, MaxAreaSideM, GuideMinSeconds, HwndWhenRemote);
 }
