@@ -49,6 +49,8 @@
 - map-3d 복제본 pytest 72 통과(새 시험 포함)
 - **실기 미확인** — 창 · WebView2 를 띄우는 확인은 하지 않았다(사용자 PC 사용 중 규칙).
 
+- 이어 하기(세션 Active 로 다시 붙은 뒤) 재검증: 솔루션 2888 통과 · 0 실패, GMaps.Ui.Tests 1181 통과, GMaps.Housing.Tests 359 통과 — 앞의 렌더 · 캡처 실패는 세션 끊김 탓이었음이 확인됐다.
+
 ## 발견
 - 메인 앱 대상은 net8.0-windows10.0.17763.0 → 3D 기본은 WPF 안 3D(composition). Map3D.cs 의 "composition 되돌림" 주석은 옛 대상(windows7.0) 시절 이야기다.
 - 조립 카드 어도너는 지도 AdornerDecorator 안이라 3D 호스트(ContentControl, 같은 ZIndex · 뒤 선언) 밑에 깔린다 → 3D 위 층이 필요했다.
