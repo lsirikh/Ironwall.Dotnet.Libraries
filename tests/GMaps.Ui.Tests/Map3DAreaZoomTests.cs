@@ -108,7 +108,7 @@ public class Map3DAreaZoomTests
 
         var composite = Map3DBake.BuildBody(bbox, Map3DBake.ModeComposite, Array.Empty<Map3DBakeOverlay>(), 18);
         Assert.Equal(18, composite["enter_zoom"]!.Value<double>());
-        Assert.Equal("composite", composite.Value<string>("overlay_mode"));
+        Assert.Equal("extract", composite.Value<string>("overlay_mode"));   // 옛 값 composite = extract(2026-10-18)
     }
 
     [Theory]

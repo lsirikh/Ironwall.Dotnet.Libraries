@@ -1,0 +1,69 @@
+diff --git a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
+index 9e0d58c..b3c822b 100644
+--- a/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
++++ b/Dotnet.Monitoring.Solution/ViewModels/Panels/SetupPanels/Console/SettingsCatalog.cs
+@@ -391,10 +391,10 @@ internal static class SettingsCatalog
+     /// <summary>기본 만들기 방식 — 보이는 글은 지도의 만들기 패널과 같은 말, 저장 값은 Map3DModel.OverlayMode.</summary>
+     internal static readonly IReadOnlyList<SettingsChoice> Map3DOverlayModes = new[]
+     {
+-        new SettingsChoice("위성 타일만", "tiles"),
+-        new SettingsChoice("오버레이를 사진으로(건물 유지)", "photo"),
+-        new SettingsChoice("오버레이로 가리기(보안)", "mask"),
+-        new SettingsChoice("오버레이로 가리기 + 건물 찾기", "extract"),
++        new SettingsChoice("오버레이 영역은 이미지에서 건물 찾기", "extract"),
++        new SettingsChoice("오버레이를 바닥 사진으로만(지도 건물 유지)", "photo"),
++        new SettingsChoice("오버레이로 가리기(보안 · 건물 없음)", "mask"),
++        new SettingsChoice("위성 타일만(오버레이 안 넣음)", "tiles"),
+     };
+     #endregion
+ 
+diff --git a/Dotnet.Monitoring.Solution/Help/HostHelp.cs b/Dotnet.Monitoring.Solution/Help/HostHelp.cs
+index 6e13f78..05fa88a 100644
+--- a/Dotnet.Monitoring.Solution/Help/HostHelp.cs
++++ b/Dotnet.Monitoring.Solution/Help/HostHelp.cs
+@@ -71,7 +71,7 @@ public static class HostHelp
+                 "**영역 표시 줌** 이상에서 2D 지도에 3D 영역 테두리와 배지가 보입니다.",
+                 "**영역 최대 크기** — 3D 로 만들 영역 한 변의 최대 길이(m)입니다. 3D 서버가 받는 크기보다 크게 두면 만들기가 실패할 수 있습니다.",
+                 "**기본 만들기 방식** — 영역에 오버레이 이미지가 있을 때 처음 골라져 있는 방식입니다(지도에서 고르면 그 값으로 바뀝니다).",
+-                "**오버레이를 사진으로(건물 유지)** — 올린 사진이 지도 사진보다 좋을 때. 건물은 지도 자료로 세웁니다. **오버레이로 가리기(보안)** — 보안상 가린 구역. 그 범위의 실제 건물 · 사진을 지웁니다. **+ 건물 찾기** — 가리기에 더해 그림에서 건물 모양을 찾아 세웁니다(정확도 낮음).")
++                "**오버레이 영역은 이미지에서 건물 찾기**(기본) — 오버레이 이미지 범위 안은 이미지 그림 + 이미지에서 찾은 건물(지도 건물 자료는 그 안에서 뺍니다), 범위 밖은 위성 타일 + 지도 건물 자료로 만듭니다. 사진에서 건물을 찾는 데 수십 초 걸릴 수 있고, 찾은 건물의 높이는 어림값입니다. **오버레이를 바닥 사진으로만(지도 건물 유지)** — 올린 사진이 지도 사진보다 좋을 때. 건물은 지도 자료로 세웁니다. **오버레이로 가리기(보안 · 건물 없음)** — 보안상 가린 구역. 그 범위의 실제 건물 · 사진을 지웁니다. **위성 타일만(오버레이 안 넣음)** — 오버레이 이미지는 3D 위에 덮어 보이기만 합니다.")
+             .With("연결",
+                 "**3D 서버 주소** — 3D 지도를 만들고 보여 주는 서버입니다(예: http://127.0.0.1:8765).",
+                 "**WPF 안에서 그리기** — 켜 두면 3D 위에도 상세 창 · 카메라 상자가 보입니다. 끄면 더 빠르지만 그 창들이 3D 에 가려집니다. 바꾸면 프로그램을 다시 시작해야 반영됩니다."),
+diff --git a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
+index 51fbc4f..a24dc11 100644
+--- a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
++++ b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
+@@ -25,7 +25,7 @@ public class Map3DSettingsSectionTests
+         private bool _enabled = true, _composition = true;
+         private double _enter = 17, _exit = 16.5, _preload = 15, _guide = 0.6, _area = 13;
+         private int _maxSide = 2000;
+-        private string _mode = "tiles", _url = "http://127.0.0.1:8765";
++        private string _mode = "extract", _url = "http://127.0.0.1:8765";
+ 
+         public bool IsEnabled { get => _enabled; set { _enabled = value; Writes.Add(nameof(IsEnabled)); } }
+         public double EnterZoom { get => _enter; set { _enter = value; Writes.Add(nameof(EnterZoom)); } }
+@@ -100,10 +100,10 @@ public class Map3DSettingsSectionTests
+     {
+         var form = Form();
+         var mode = Field(form, "map3d.OverlayMode");
+-        CollectionAssert.AreEqual(new[] { "tiles", "photo", "mask", "extract" }, mode.Options.Select(o => o.Value).ToArray());
+-        CollectionAssert.AreEqual(new[] { "위성 타일만", "오버레이를 사진으로(건물 유지)", "오버레이로 가리기(보안)", "오버레이로 가리기 + 건물 찾기" },
+-                                  mode.Options.Select(o => o.Display).ToArray(), "지도 만들기 패널과 같은 말");
+-        Assert.AreEqual("위성 타일만", mode.SelectedChoice?.Display);
++        CollectionAssert.AreEqual(new[] { "extract", "photo", "mask", "tiles" }, mode.Options.Select(o => o.Value).ToArray());
++        CollectionAssert.AreEqual(new[] { "오버레이 영역은 이미지에서 건물 찾기", "오버레이를 바닥 사진으로만(지도 건물 유지)", "오버레이로 가리기(보안 · 건물 없음)", "위성 타일만(오버레이 안 넣음)" },
++                                  mode.Options.Select(o => o.Display).ToArray(), "지도 만들기 패널과 같은 말 · 같은 순서");
++        Assert.AreEqual("오버레이 영역은 이미지에서 건물 찾기", mode.SelectedChoice?.Display, "라이브러리 기본값 = extract");
+     }
+ 
+     // ── 줌 순서(칸 사이 규칙) ──
+@@ -191,7 +191,7 @@ public class Map3DSettingsSectionTests
+         Assert.AreEqual("http://10.0.0.5:8765", _port.ServerUrl);
+         Assert.IsFalse(_port.IsEnabled);
+         Assert.IsFalse(_port.UseCompositionHost);
+-        Assert.AreEqual("extract", _port.OverlayMode);
++        Assert.AreEqual("tiles", _port.OverlayMode);   // Options[3] = 위성 타일만(기본 extract 에서 바꾼 값)
+     }
+ 
+     // ── 순수 규칙 ──

@@ -16,6 +16,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
                     mask(가리기, 보안) · extract(가리기 + 건물 찾기). 서버로는 overlay_mode(ServerOverlayMode) + 이미지마다 mask(MaskFor)로 바꿔 보낸다.
                     옛 설정값 "composite" 는 photo 로 읽는다 — 그 값을 고른 사용자는 "오버레이 포함"(사진)을 원했고, mask 로 읽으면
                     다시 만들어도 실제 건물이 지워진다(2026-10-18 실기: 저장값 composite → 가리기로 되살아남).
+                  ★ 2026-10-18(사용자 요청 "오버레이 영역은 오버레이 이미지대로, 나머지는 타일대로"): 기본 방식 = extract —
+                    이미지 범위 안은 이미지 그림 + 이미지에서 찾은 건물(지도 건물 자료는 그 안에서 뺀다), 범위 밖은 위성 타일 + 지도 건물 자료.
+                    옛 설정값 "composite" 와 비어 있는 마지막 값도 extract 로 읽는다(위 photo 읽기를 대신한다).
                   ★ 서버는 PNG/JPG · 50 MB 이하만 받는다 — 그 밖(TIF 등)은 GIS 가 PNG/JPG 로 바꾼 캐시 파일을 보낸다(NeedsConversion).
                   WPF 무의존 — tests/GMaps.Ui.Tests 가 실코드를 링크해 시험한다.
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
@@ -30,11 +33,11 @@ public static class Map3DBake
 {
     /// <summary>위성 타일만 — 오버레이 이미지는 3D 화면에서 덮기만 한다.</summary>
     public const string ModeTiles = "tiles";
-    /// <summary>서버 overlay_mode "composite"(이미지를 지형 텍스처에 합성) — GIS 방식으로는 옛 설정값(= <see cref="ModePhoto"/>).</summary>
+    /// <summary>서버 overlay_mode "composite"(이미지를 지형 텍스처에 합성) — GIS 방식으로는 옛 설정값(= <see cref="ModeExtract"/>).</summary>
     public const string ModeComposite = "composite";
-    /// <summary>가리기 + 이미지에서 건물 윤곽을 찾아 3D 건물로(서버 overlay_mode 도 "extract").</summary>
+    /// <summary>오버레이 영역은 이미지에서 건물 찾기(기본) — 이미지 범위 안은 이미지 그림 + 찾은 건물, 밖은 위성 타일 + 지도 건물(서버 overlay_mode 도 "extract", mask=true).</summary>
     public const string ModeExtract = "extract";
-    /// <summary>오버레이를 사진으로(건물 유지, 기본) — composite + mask=false: 실제 건물은 세우고 지면 · 지붕 그림만 오버레이 사진.</summary>
+    /// <summary>오버레이를 바닥 사진으로만(지도 건물 유지) — composite + mask=false: 실제 건물은 세우고 지면 · 지붕 그림만 오버레이 사진.</summary>
     public const string ModePhoto = "photo";
     /// <summary>오버레이로 가리기(보안) — composite + mask=true: 그 범위의 실제 건물 · 사진을 지운다.</summary>
     public const string ModeMask = "mask";
@@ -44,11 +47,11 @@ public static class Map3DBake
 
     private const double MetersPerDegree = 111_320d;
 
-    /// <summary>GIS 만들기 방식 — tiles · photo · mask · extract. 옛 값 "composite" 는 photo, 알 수 없는 값 · 빈 값은 tiles.</summary>
+    /// <summary>GIS 만들기 방식 — tiles · photo · mask · extract. 옛 값 "composite" 는 extract, 알 수 없는 값 · 빈 값은 tiles.</summary>
     public static string NormalizeMode(string? mode)
     {
         string m = mode?.Trim().ToLowerInvariant() ?? "";
-        return m == ModeComposite ? ModePhoto : m is ModePhoto or ModeMask or ModeExtract ? m : ModeTiles;
+        return m == ModeComposite ? ModeExtract : m is ModePhoto or ModeMask or ModeExtract ? m : ModeTiles;
     }
 
     /// <summary>서버 overlay_mode — tiles → "tiles", photo · mask → "composite", extract → "extract".</summary>
@@ -64,9 +67,9 @@ public static class Map3DBake
     /// <summary>방식 고르기(라디오)를 보일지 — 영역과 겹치는 오버레이 이미지가 하나라도 있을 때만. 패널 자체는 줌을 고르게 늘 띄운다(2026-10-18).</summary>
     public static bool ShouldAsk(int overlayCount) => overlayCount > 0;
 
-    /// <summary>패널을 띄우지 않을 때 쓰는 모드 · 띄울 때 처음 골라 둘 모드 — 겹치는 이미지가 없으면 tiles, 있으면 마지막 고른 값.</summary>
+    /// <summary>패널을 띄우지 않을 때 쓰는 모드 · 띄울 때 처음 골라 둘 모드 — 겹치는 이미지가 없으면 tiles, 있으면 마지막 고른 값(없으면 extract).</summary>
     public static string DefaultMode(string? lastMode, int overlayCount)
-        => ShouldAsk(overlayCount) ? NormalizeMode(lastMode) : ModeTiles;
+        => !ShouldAsk(overlayCount) ? ModeTiles : string.IsNullOrWhiteSpace(lastMode) ? ModeExtract : NormalizeMode(lastMode);
 
     /// <summary>
     /// 이미지(회전 포함 사각형)가 굽기 영역 bbox=[minLon, minLat, maxLon, maxLat] 와 겹치는가.

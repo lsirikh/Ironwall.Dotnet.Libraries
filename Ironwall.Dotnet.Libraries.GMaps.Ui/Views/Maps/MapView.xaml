@@ -1400,21 +1400,21 @@
 						<StackPanel Margin="0,2" Orientation="Horizontal">
 							<RadioButton
 								VerticalAlignment="Center"
-								AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Tiles"
-								Content="위성 타일만"
+								AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Extract"
+								Content="오버레이 영역은 이미지에서 건물 찾기"
 								Foreground="{DynamicResource TextPrimaryBrush}"
 								GroupName="Map3DBakeMode"
-								IsChecked="{Binding IsMap3DBakeTiles}" />
+								IsChecked="{Binding IsMap3DBakeExtract}" />
 							<help:HelpTip
 								Margin="6,0,0,0"
-								HelpKey="Map.Map3D.BakeTiles"
+								HelpKey="Map.Map3D.BakeExtract"
 								Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 						</StackPanel>
 						<StackPanel Margin="0,2" Orientation="Horizontal">
 							<RadioButton
 								VerticalAlignment="Center"
 								AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Photo"
-								Content="오버레이를 사진으로(건물 유지)"
+								Content="오버레이를 바닥 사진으로만(지도 건물 유지)"
 								Foreground="{DynamicResource TextPrimaryBrush}"
 								GroupName="Map3DBakeMode"
 								IsChecked="{Binding IsMap3DBakePhoto}" />
@@ -1427,7 +1427,7 @@
 							<RadioButton
 								VerticalAlignment="Center"
 								AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Mask"
-								Content="오버레이로 가리기(보안)"
+								Content="오버레이로 가리기(보안 · 건물 없음)"
 								Foreground="{DynamicResource TextPrimaryBrush}"
 								GroupName="Map3DBakeMode"
 								IsChecked="{Binding IsMap3DBakeMask}" />
@@ -1439,14 +1439,14 @@
 						<StackPanel Margin="0,2" Orientation="Horizontal">
 							<RadioButton
 								VerticalAlignment="Center"
-								AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Extract"
-								Content="오버레이로 가리기 + 건물 찾기"
+								AutomationProperties.AutomationId="GMaps.Map3D.BakeOptions.Tiles"
+								Content="위성 타일만(오버레이 안 넣음)"
 								Foreground="{DynamicResource TextPrimaryBrush}"
 								GroupName="Map3DBakeMode"
-								IsChecked="{Binding IsMap3DBakeExtract}" />
+								IsChecked="{Binding IsMap3DBakeTiles}" />
 							<help:HelpTip
 								Margin="6,0,0,0"
-								HelpKey="Map.Map3D.BakeExtract"
+								HelpKey="Map.Map3D.BakeTiles"
 								Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 						</StackPanel>
 					</StackPanel>
