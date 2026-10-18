@@ -97,6 +97,31 @@ public static class Map3DMath
         => areaView && beforeAreaView != null ? beforeAreaView : last3D;
 
     /// <summary>
+    /// 나가기 때 2D 에 맞출 카메라(2026-10-18 — 진입 방식과 상관없이) — 3D 로 들어오기 직전 2D 자리,
+    /// 없으면 3D 의 마지막 카메라(그것도 없으면 null = 2D 를 그대로 둔다).
+    /// </summary>
+    public static Map3DCamera? ExitCamera(Map3DCamera? before3D, Map3DCamera? last3D) => before3D ?? last3D;
+
+    /// <summary>
+    /// 3D 로 들어갈 때 시점 메시지 — 진입 방식(줌 게이트 · 「이 영역 3D 로 보기」)과 상관없이 영역 전체가 들어오는
+    /// 비스듬한 시점(home — 2D 방위 그대로 · 기울기 <see cref="DefaultPitchDeg"/> · 애니메이션).
+    /// </summary>
+    public static string EnterViewMessageJson(double map3DBearing) => HomeMessageJson(map3DBearing, DefaultPitchDeg, animate: true);
+
+    /// <summary>
+    /// 3D 표시 중 받은 카메라로 뒤의 2D 를 맞출까 — WPF 안 3D(composition)면 맞춘다(2D 오버레이 · 나침반이 3D 를 따라간다).
+    /// 줌으로 2D 로 나가지는 않는다(2026-10-18: 3D 에는 줌 개념이 없어 진입 방식과 상관없이 나가기 단추 · ESC 로만 나간다).
+    /// </summary>
+    public static bool ShouldSync2DToCamera(string hostMode, Map3DCamera camera)
+        => hostMode == "composition" && double.IsFinite(camera.Zoom);
+
+    /// <summary>지금 화면 표시 — "3D"(3D 가 펼쳐져 보이는 중) · "2D". UIA ItemStatus 와 「나가기」 단추 보임의 한 근원.</summary>
+    public static string StatusText(bool shown3D) => shown3D ? "3D" : "2D";
+
+    /// <summary>「나가기」 단추를 보이는가 — 지금 화면 표시(<see cref="StatusText"/>)가 "3D" 일 때만.</summary>
+    public static bool IsExitButtonVisible(string? statusText) => statusText == "3D";
+
+    /// <summary>
     /// 3D 표시 중 2D 이동(이벤트 시 지도 이동 · 지도에서 보기)이 끝난 자리에서 3D 를 유지하는가 —
     /// 지금 장면(구운 영역) 안이고 실효줌 ≥ 16.5. 아니면 2D 로 돌아온다. NaN 은 false.
     /// </summary>
