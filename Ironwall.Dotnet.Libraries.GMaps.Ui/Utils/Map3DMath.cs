@@ -81,6 +81,19 @@ public static class Map3DMath
     public static bool ShouldLeave3D(double reportedZoom, double exitZoom) => reportedZoom < exitZoom;
 
     /// <summary>
+    /// 줌으로 2D 로 돌아가야 하는가 — 「이 영역 3D 로 보기」로 들어온 3D(areaView)는 영역 전체를 보려고 멀리 빼면 이탈 줌보다 낮아지므로
+    /// 줌으로는 나가지 않는다(나가기 단추 · ESC 로만). 줌 게이트로 들어온 3D 는 &lt; 이탈 줌이면 돌아간다.
+    /// </summary>
+    public static bool ShouldLeave3D(double reportedZoom, double exitZoom, bool areaView) => !areaView && ShouldLeave3D(reportedZoom, exitZoom);
+
+    /// <summary>
+    /// 나가기(단추 · ESC) 때 2D 에 맞출 카메라 — 「영역 보기」로 들어왔으면 들어오기 전 2D 자리, 아니면 3D 의 마지막 카메라
+    /// (없으면 null = 2D 를 그대로 둔다).
+    /// </summary>
+    public static Map3DCamera? ExitCamera(bool areaView, Map3DCamera? beforeAreaView, Map3DCamera? last3D)
+        => areaView && beforeAreaView != null ? beforeAreaView : last3D;
+
+    /// <summary>
     /// 3D 표시 중 2D 이동(이벤트 시 지도 이동 · 지도에서 보기)이 끝난 자리에서 3D 를 유지하는가 —
     /// 지금 장면(구운 영역) 안이고 실효줌 ≥ 16.5. 아니면 2D 로 돌아온다. NaN 은 false.
     /// </summary>
@@ -204,6 +217,16 @@ public static class Map3DMath
             ["zoom"] = cam.Zoom,
             ["bearing"] = cam.Bearing,
             ["pitch"] = cam.Pitch,
+            ["animate"] = animate,
+        }.ToString(Formatting.None);
+
+    /// <summary>GIS → 3D 「영역 전체 보기」 메시지 — 3D 가 화면 비율 · 시야각으로 영역 전체가 들어오는 거리를 셈해 그 시점으로 간다(view.js homeView).</summary>
+    public static string HomeMessageJson(double bearing, double pitch, bool animate)
+        => new JObject
+        {
+            ["type"] = "home",
+            ["bearing"] = bearing,
+            ["pitch"] = pitch,
             ["animate"] = animate,
         }.ToString(Formatting.None);
 

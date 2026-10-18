@@ -35,6 +35,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                     이미 그려 둔 화면은 0.4 s ⑤ 진입마다 "[Map3D] 전환 시간 …" 한 줄 로그.
                   ★ 5차(2026-10-18, 영역마다 3D 줌): 게이트 · 미리 불러오기 · 2D 복귀 줌은 그 영역의 진입 줌(로컬 &gt; 서버 enter_zoom &gt; 세팅)으로
                     세운다(Map3DMath.AreaGate). 만들기 패널에서 고른 줌은 굽기 요청 enter_zoom 으로 보낸다.
+                  ★ 6차(2026-10-18, 나가기): 3D 가 보이는 동안 지도 위 「나가기」 단추(= ESC, ExitMap3D). 「이 영역 3D 로 보기」로 들어온 3D 는
+                    영역 전체가 들어오는 시점으로 열고(3D 의 home 메시지) 줌으로는 나가지 않으며, 나가면 들어오기 전 2D 자리로 돌아간다.
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
@@ -55,6 +57,12 @@ public partial class MapViewModel
     private bool _map3DBusyIndeterminate = true;
     /// <summary>UIA 계측용 지금 화면 — "3D"(3D 표시 중) · "2D". 지도 루트의 ItemStatus 로 내보낸다(컴포지션 WebView2 는 UIA 트리에 없다).</summary>
     public string Map3DStatusText => _map3DState == Map3DState.Shown ? "3D" : "2D";
+    /// <summary>3D 가 보이는 동안 — 지도 위 「나가기」 단추(MapView.xaml "GMaps.Map3D.ExitButton").</summary>
+    public bool IsMap3DShown => _map3DState == Map3DState.Shown;
+
+    private RelayCommand? _exitMap3DCommand;
+    /// <summary>「나가기」 — ESC 와 같은 경로(ExitMap3D)로 2D 에 돌아온다.</summary>
+    public RelayCommand ExitMap3DCommand => _exitMap3DCommand ??= new RelayCommand(_ => ExitMap3D("exit-button"));
     public bool IsMap3DBusy { get => _isMap3DBusy; private set { _isMap3DBusy = value; NotifyOfPropertyChange(); } }
     public string Map3DBusyText { get => _map3DBusyText; private set { _map3DBusyText = value; NotifyOfPropertyChange(); } }
     public double Map3DBusyPercent { get => _map3DBusyPercent; private set { _map3DBusyPercent = value; NotifyOfPropertyChange(); } }
@@ -171,6 +179,12 @@ public partial class MapViewModel
     private bool _map3DGateQueued;
     /// <summary>ESC · 로딩 실패 뒤 같은 줌에서 곧바로 다시 들어가지 않게 — 게이트가 한 번 꺼질(줌 &lt; 17 · 장면 밖) 때까지 진입 보류.</summary>
     private bool _map3DEntrySuppressed;
+    /// <summary>「이 영역 3D 로 보기」로 여는(또는 보는) 영역 id — 그 3D 는 줌으로 나가지 않고, 나가면 들어오기 전 2D 자리로 돌아간다. 줌 게이트 진입이면 null.</summary>
+    private string? _map3DAreaViewJob;
+    /// <summary>「영역 보기」 들어오기 전 2D 자리(위치 · 줌 · 방위).</summary>
+    private Map3DCamera? _map3DAreaViewReturn;
+    /// <summary>지금 3D 가 「영역 보기」로 들어온 것인가.</summary>
+    private bool IsMap3DAreaView => _map3DAreaViewJob != null && _map3DAreaViewJob == _map3DJob;
     private Map3DCamera? _map3DLastCamera;
     private readonly List<Map3DScene> _map3DScenes = new();
     private DispatcherTimer? _map3DLookupTimer;
@@ -329,12 +343,22 @@ public partial class MapViewModel
         }
         if (e.Key == System.Windows.Input.Key.Escape && _map3DState == Map3DState.Shown)
         {
-            _map3DEntrySuppressed = true;
-            Leave3D(_map3DLastCamera, "esc");
+            ExitMap3D("esc");
             e.Handled = true;
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// 사용자가 3D 를 나간다(ESC · 「나가기」 단추) — 같은 줌에서 곧바로 다시 들어가지 않게 진입을 보류하고 2D 로 돌아온다.
+    /// 「영역 보기」로 들어왔으면 들어오기 전 2D 자리, 아니면 3D 마지막 카메라를 2D 에(Map3DMath.ExitCamera).
+    /// </summary>
+    private void ExitMap3D(string cause)
+    {
+        if (_map3DState != Map3DState.Shown) return;
+        _map3DEntrySuppressed = true;
+        Leave3D(Map3DMath.ExitCamera(IsMap3DAreaView, _map3DAreaViewReturn, _map3DLastCamera), cause);
     }
 
     // ── 굽기 ──
@@ -468,6 +492,7 @@ public partial class MapViewModel
     private void CancelMap3DPending()
     {
         _map3DState = Map3DState.Off; NotifyOfPropertyChange(nameof(Map3DStatusText)); SetMap3DBusy(null);
+        _map3DAreaViewJob = null; _map3DAreaViewReturn = null;   // 「영역 보기」 진입도 함께 취소
         Map3DHost.Park();
         _map3DOverlay?.Pause();
     }
@@ -532,6 +557,7 @@ public partial class MapViewModel
     private void Begin3D(Map3DScene scene)
     {
         if (MainMap == null || IsMap3DBlockedByInputMode()) return;
+        if (_map3DAreaViewJob != scene.Id) { _map3DAreaViewJob = null; _map3DAreaViewReturn = null; }   // 다른 영역은 줌 게이트 진입
         _map3DState = Map3DState.Pending;
         _map3DJob = scene.Id;
         _map3DEnterAt = DateTime.UtcNow;
@@ -568,6 +594,7 @@ public partial class MapViewModel
         if (MainMap == null) return;
         _map3DState = Map3DState.Shown;
         NotifyOfPropertyChange(nameof(Map3DStatusText));
+        NotifyOfPropertyChange(nameof(IsMap3DShown));
         SetMap3DBusy(null);
         _map3DRevealedBehindLogin = Map3DGuide.IsBehindLogin(ResolveTokenStorage()?.IsAuthenticated);   // 로그인 뒤 한 번 안내(R5)
         _map3DLastCamera = null;
@@ -575,6 +602,8 @@ public partial class MapViewModel
         Map3DHost.PostCamera(Current2DCamera(0d), animate: false);                    // 지금 2D 와 같은 자리 · 축척(로딩 중 움직였을 수 있다)
         Map3DHost.Reveal();
         Map3DHost.PostCamera(Current2DCamera(Map3DMath.DefaultPitchDeg), animate: true); // 0.6 s 동안 눕힌다
+        // 「영역 보기」 — 영역 전체가 화면에 다 들어오는 비스듬한 시점으로(거리는 3D 가 화면 비율 · 시야각으로 셈한다). 옛 3D 서버는 모르는 메시지라 눕히기만 남는다.
+        if (IsMap3DAreaView) Map3DHost.PostJson(Map3DMath.HomeMessageJson(Map3DMath.ToMap3DBearing(MainMap.Bearing), Map3DMath.DefaultPitchDeg, animate: true));
         MainMap.IsHitTestVisible = false;                                               // 3D 가 보이는 동안 2D 입력 막음
         EnsureAimEscWindowHook();
         BeginMap3DWindows();                                                            // 카메라 상자 · 조립 카드가 3D 마커 자리를 따라간다(MapViewModel.Map3DWindows)
@@ -588,6 +617,8 @@ public partial class MapViewModel
         if (MainMap == null) return;
         _map3DState = Map3DState.Off;
         NotifyOfPropertyChange(nameof(Map3DStatusText));
+        NotifyOfPropertyChange(nameof(IsMap3DShown));
+        _map3DAreaViewJob = null; _map3DAreaViewReturn = null;   // 다음 진입은 다시 줌 게이트 또는 새 「영역 보기」
         _map3DRevealedBehindLogin = false;
         // 짧은 복귀 안내(R5) — 패널은 2D 위에 0.5 s
         SetMap3DBusy(Map3DGuide.LeaveTitle, 100);
@@ -660,7 +691,7 @@ public partial class MapViewModel
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
         NoteMap3DCameraForFlyTo(msg.Reason);   // 3D 조작 중이면 이벤트 이동이 양보한다(MapViewModel.EventFlyTo)
-        if (Map3DMath.ShouldLeave3D(cam.Zoom, Map3DCurrentGate.Exit)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
+        if (Map3DMath.ShouldLeave3D(cam.Zoom, Map3DCurrentGate.Exit, IsMap3DAreaView)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }   // 「영역 보기」는 줌으로 나가지 않는다
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
         // 3D 카메라(위치 · 줌 · 방위)에 맞춰 오버레이가 3D 상태를 보이게 하고, 2D 로 돌아갈 때도 끊기지 않게 한다(2026-10-17 실기: 나침반이 0° 에 멈춰 있었다).
         if (Map3DHost.HostMode == "composition") Apply3DCameraTo2D(cam);
