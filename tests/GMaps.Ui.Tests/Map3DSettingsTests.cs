@@ -146,7 +146,7 @@ public class Map3DSettingsTests
     /// <summary>LoadMap3D 가 읽는 키 — 저장되는 키 이름과 같아야 한다(속성 이름이 바뀌면 이 시험이 깨진다).</summary>
     private static readonly string[] LoadedKeys =
     {
-        "IsEnabled", "ServerUrl", "UseCompositionHost", "HwndWhenRemote", "OverlayMode",
+        "IsEnabled", "ServerUrl", "UseCompositionHost", "HwndWhenRemote", "OverlayMode", "EntryMode",
         "EnterZoom", "ExitZoom", "PreloadZoom", "AreaShowZoom", "MaxAreaSideM", "GuideMinSeconds",
     };
 

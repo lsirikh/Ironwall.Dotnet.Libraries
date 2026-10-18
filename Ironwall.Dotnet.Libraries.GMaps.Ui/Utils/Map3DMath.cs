@@ -130,6 +130,24 @@ public static class Map3DMath
     /// <summary>오른쪽 아래 줌 컨트롤을 보이는가 — 3D 에는 줌 개념이 없어 지금 화면 표시가 "3D" 가 아닐 때만(2026-10-18).</summary>
     public static bool IsZoomControlVisible(string? statusText) => statusText != "3D";
 
+    // ── 3D 들어가는 방식(2026-10-19 — 자동(줌) · 수동(단추)) ──
+
+    /// <summary>줌으로 3D 에 들어가는 방식인가 — 수동(<see cref="Map3DModel.EntryManual"/>)이 아니면 자동(줌, 기본).</summary>
+    public static bool IsZoomEntry(string? entryMode) => !string.Equals(entryMode?.Trim(), Map3DModel.EntryManual, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 지도 위 「3D 로 보기」 단추를 보이는가 — 3D 를 켰고, 2D(3D 준비 중도 아님)이며, 화면 가운데가 만들어 둔 3D 영역 안일 때만.
+    /// 들어가는 방식(자동 · 수동)과 상관없이 보인다(자동에서는 진입 줌 아래에서 바로 들어가기).
+    /// </summary>
+    public static bool IsEnterButtonVisible(bool enabled, bool is3DOff, bool centerInsideScene) => enabled && is3DOff && centerInsideScene;
+
+    /// <summary>
+    /// 3D 진입 판정(들어가는 방식 포함) — 장면이 없으면 false. 단추 · 「이 영역 3D 로 보기」로 직접 들어가는 중(directEntry, 준비 중)이면
+    /// 줌과 상관없이 유지하고, 아니면 자동(줌)일 때만 줌 게이트(<see cref="Decide(double, bool, bool, double, double)"/>)를 따른다. 수동이면 줌으로는 들어가지 않는다.
+    /// </summary>
+    public static bool DecideEntry(double zoom, bool wasActive, bool hasScene, double enterZoom, double exitZoom, bool zoomEntry, bool directEntry)
+        => hasScene && ((wasActive && directEntry) || (zoomEntry && Decide(zoom, wasActive, hasScene, enterZoom, exitZoom)));
+
     // ── 3D 좌표 칩 · 축척 막대(2026-10-18) ──
 
     /// <summary>

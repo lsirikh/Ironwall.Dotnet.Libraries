@@ -159,6 +159,7 @@ public static class MapSettingsHelper
                 model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
                 model.HwndWhenRemote = t["HwndWhenRemote"]?.ToObject<bool>() ?? model.HwndWhenRemote;
                 model.OverlayMode = t["OverlayMode"]?.ToString() ?? model.OverlayMode;
+                model.EntryMode = t["EntryMode"]?.ToString() ?? model.EntryMode;
                 model.EnterZoom = t["EnterZoom"]?.ToObject<double>() ?? model.EnterZoom;
                 model.ExitZoom = t["ExitZoom"]?.ToObject<double>() ?? model.ExitZoom;
                 model.PreloadZoom = t["PreloadZoom"]?.ToObject<double>() ?? model.PreloadZoom;

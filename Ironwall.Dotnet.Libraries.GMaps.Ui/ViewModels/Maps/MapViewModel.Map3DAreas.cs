@@ -104,13 +104,16 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
         double enter = Map3DGateFor(scene).Enter;   // 그 영역의 3D 줌
         if (_map3DChipEnterZoom != enter) { _map3DChipEnterZoom = enter; NotifyOfPropertyChange(nameof(Map3DChipText)); }
-        IsMap3DChipVisible = _map3DSettings.IsEnabled && Map3DGuide.ShouldShowChip(zoom, scene != null, _map3DState == Map3DState.Off, enter);
+        // "줌 17 이상" 칩은 자동(줌)일 때만 — 수동(단추)이면 왼쪽 위 「3D 로 보기」 단추가 대신한다
+        IsMap3DChipVisible = _map3DSettings.IsEnabled && Map3DMath.IsZoomEntry(_map3DSettings.EntryMode)
+                             && Map3DGuide.ShouldShowChip(zoom, scene != null, _map3DState == Map3DState.Off, enter);
+        if (_map3DCenterScene != scene) { _map3DCenterScene = scene; NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible)); }
     }
 
     // ── 동작 ──
 
     /// <summary>
-    /// 「이 영역 3D 로 보기」 — 영역 가운데 · 줌 17.5 로 옮기면 게이트가 3D 로 들어간다(안내 패널과 함께).
+    /// 「이 영역 3D 로 보기」 — 영역 가운데 · 줌 17.5 로 옮기고 줌 게이트와 상관없이 바로 3D 로 들어간다(안내 패널과 함께, 2026-10-19 수동(단추) 방식).
     /// 이렇게 들어간 3D 는 영역 전체가 들어오는 시점으로 열고, 줌으로 나가지 않으며, 나가면 지금(들어오기 전) 2D 자리로 돌아간다.
     /// </summary>
     private void ViewMap3DArea(Map3DAreaItem item)
@@ -129,8 +132,8 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         double viewZoom = Map3DGuide.AreaViewZoomFor(item.EnterZoom);   // 그 영역 진입 줌을 높였으면 그 줌까지
         MainMap.SetEffectiveZoom(viewZoom);
         _log?.Info($"[Map3D] 영역 보기 id={item.Id} → ({lat:F6},{lon:F6}) zoom={viewZoom}");
-        if (IsMap3DBlockedByInputMode())
-            SetAimStatus("편집 · 그리기 중에는 3D 로 들어가지 않습니다 — 모드를 끝내면 3D 로 바뀝니다", autoHide: true);
+        // 줌 게이트에 기대지 않고 바로 들어간다(수동(단추)이면 줌으로는 들어가지 않는다). 목록에 장면이 아직 없으면 게이트가 찾아 들어간다(자동).
+        if (_map3DScenes.Find(sc => sc.Id == item.Id) is { } scene) EnterMap3DDirect(scene, "area-view");
         QueueMap3DGate();
     }
 
