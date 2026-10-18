@@ -70,6 +70,31 @@ public sealed class Map3DViewHost : Grid
     /// <summary>펼쳐져 있는가.</summary>
     public bool IsRevealed { get; private set; }
 
+    private Canvas? _overlayLayer;
+    /// <summary>
+    /// 3D 화면 위 층(조립 카드 등 3D 마커 화면 자리에 붙는 창) — 좌표 = 이 호스트 좌표 = 3D 화면 CSS px × <see cref="ZoomFactor"/>.
+    /// 배경이 없어 창 밖 입력은 3D 로 간다. WPF 안 3D(composition)에서만 보인다(네이티브 창 3D 는 덮는다).
+    /// </summary>
+    public Canvas OverlayLayer
+    {
+        get
+        {
+            if (_overlayLayer != null) return _overlayLayer;
+            _overlayLayer = new Canvas { ClipToBounds = true };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(_overlayLayer, "GMaps.Map3D.OverlayLayer");
+            Children.Add(_overlayLayer);   // WebView2 는 늘 맨 아래에 끼운다(EnsureWebView)
+            return _overlayLayer;
+        }
+    }
+
+    /// <summary>WebView2 확대 배율(CSS px → DIP). 아직 만들지 않았으면 1.</summary>
+    public double ZoomFactor => _el switch
+    {
+        WebView2CompositionControl c => c.ZoomFactor,
+        WebView2 w => w.ZoomFactor,
+        _ => 1d,
+    };
+
     /// <summary>장면 주소를 연다(1×1 대기 상태로). ready 가 오면 MessageReceived("ready").</summary>
     public async Task LoadAsync(string job, string url)
     {
@@ -182,7 +207,7 @@ public sealed class Map3DViewHost : Grid
             _web = w; _el = w;
         }
         System.Windows.Automation.AutomationProperties.SetAutomationId(_el, "GMaps.Map3D.View");
-        Children.Add(_el);
+        Children.Insert(0, _el);   // 3D 위 층(OverlayLayer)보다 아래
         Park();   // 만들자마자 1×1 대기(미리 데우기 중 지도를 덮지 않게)
     }
 

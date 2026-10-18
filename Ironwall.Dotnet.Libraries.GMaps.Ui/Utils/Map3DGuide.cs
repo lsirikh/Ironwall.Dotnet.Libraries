@@ -9,7 +9,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
                   ① 전환 안내 패널 문구 · 최소 표시 시간 · 로그인 뒤 안내(R5)
                   ② 영역 크기 · 2 km 판정 · 크기 글(R6)
                   ③ 영역 테두리 표시 줌 · "3D 가능" 칩 · 영역 가운데 · 툴팁 글(R4)
-                  ④ 창을 열 때 2D 로 돌아올지(R7)
+                  ④ 창을 열 때 2D 로 돌아올지(R7 · 2026-10-18 WPF 안 3D 면 3D 유지)
                   ⑤ 펼침 시점(rendered · 1.5 s 시간 초과) · 진입 한 번의 전환 시간 로그 줄
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
 ****************************************************************************/
@@ -238,4 +238,12 @@ public static class Map3DGuide
     /// </summary>
     public static bool ShouldLeave3DForPanel(string cause, string hostMode)
         => !(cause == "symbol-detail" && hostMode == "composition");
+
+    /// <summary>
+    /// 3D 위에서 창(카메라 상자 · 조립 카드 · 상세 창)을 열 때 2D 로 돌아올까(2026-10-18 — 3D 화면 자리 따라가기).
+    /// WPF 안 3D(composition)면 창이 3D 위에 그대로 보이고, 카메라 상자 · 카드는 3D 가 알려 주는 마커 화면 자리(overlay.screen)를
+    /// 따라가므로 돌아오지 않는다. 네이티브 창 3D(hwnd)는 WPF 창을 덮으므로(공역) 늘 돌아온다.
+    /// <see cref="ShouldLeave3DForPanel"/> 은 화면 자리를 받기 전의 옛 규칙이다.
+    /// </summary>
+    public static bool ShouldLeave3DForWindow(string hostMode) => hostMode != "composition";
 }

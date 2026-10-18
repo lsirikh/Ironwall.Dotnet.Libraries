@@ -573,6 +573,7 @@ public partial class MapViewModel
         Map3DHost.PostCamera(Current2DCamera(Map3DMath.DefaultPitchDeg), animate: true); // 0.6 s 동안 눕힌다
         MainMap.IsHitTestVisible = false;                                               // 3D 가 보이는 동안 2D 입력 막음
         EnsureAimEscWindowHook();
+        BeginMap3DWindows();                                                            // 카메라 상자 · 조립 카드가 3D 마커 자리를 따라간다(MapViewModel.Map3DWindows)
         _log?.Info($"[Map3D] 3D 표시 job={_map3DJob} host={Map3DHost.HostMode}");
         _log?.Info(Map3DGuide.TransitionTimingText(_map3DEnterAt, Map3DHost.CoreReadyAt, Map3DHost.ReadyAt, _map3DSnapshotAt,
                                                    Map3DHost.RenderedAt, DateTime.UtcNow, _map3DEnterPrewarmed, _map3DEnterPreloaded));
@@ -590,6 +591,7 @@ public partial class MapViewModel
         Map3DHost.Park();
         MainMap.IsHitTestVisible = true;
         if (cam is { } c) Apply3DCameraTo2D(c);
+        EndMap3DWindows();   // 열린 창은 닫지 않고 같은 마커의 2D 자리로(MapViewModel.Map3DWindows)
         MainMap.Focus();
         _log?.Info($"[Map3D] 2D 복귀({cause}) zoom={MainMap.EffectiveZoom:F1} bearing={MainMap.Bearing:F1}");
         QueueMap3DGate();
@@ -636,6 +638,12 @@ public partial class MapViewModel
         {
             if (_map3DOverlay?.IsActive == true) _map3DOverlay.SendSnapshot();
             else _map3DOverlay?.Stop();   // 접혀 있으면 기록만 버린다 — 다음 펼침 때 전체 스냅샷
+            return;
+        }
+        if (msg.Type == "overlay.screen")
+        {
+            try { if (msg.Screens is { } screens) OnMap3DScreens(screens); }
+            catch (Exception ex) { _log?.Error($"[Map3D] 창 자리 처리 실패(격리): {ex.Message}"); }
             return;
         }
         if (msg.Pick is { } pick)
@@ -734,9 +742,9 @@ public partial class MapViewModel
     private void LeaveMap3DForPanel(string cause)
     {
         if (_map3DState != Map3DState.Shown) return;
-        // WPF 안에서 그리는 방식이면 상세 창(지도 옆 패널)은 3D 위에 그대로 보인다 — 2D 로 돌아갈 필요가 없다.
-        // 카드 · 카메라 상자는 2D 심볼 화면 위치에 붙어 있어 3D 에서는 자리가 맞지 않으므로 계속 2D 로 돌아온다.
-        if (!Map3DGuide.ShouldLeave3DForPanel(cause, Map3DHost.HostMode)) return;
+        // WPF 안에서 그리는 방식이면 창이 3D 위에 그대로 보인다 — 상세 창은 고정 자리, 카드 · 카메라 상자는 3D 가 알려 주는 마커 화면 자리를 따라간다(2026-10-18).
+        // 네이티브 창 3D 는 WPF 창을 덮으므로 2D 로 돌아온다.
+        if (!Map3DGuide.ShouldLeave3DForWindow(Map3DHost.HostMode)) return;
         _map3DEntrySuppressed = true;
         Leave3D(_map3DLastCamera, cause);
     }
@@ -781,10 +789,11 @@ public partial class MapViewModel
                 // 지도 위 누름 · 뗌이 없으므로 같은 자리로 바로 끝낸다(OnMapMarkerClicked 와 같은 조건)
                 if (_componentCard != null && !IsEditModeEnabled && !editable.IsLocked)
                 {
-                    if (Services.ComponentCardService.CanShow(editable)) LeaveMap3DForPanel("component-card");   // 카드는 2D 심볼 위 어도너
+                    if (Services.ComponentCardService.CanShow(editable)) LeaveMap3DForPanel("component-card");   // 네이티브 창 3D 만 2D 로 — WPF 안 3D 는 3D 위 층에 카드
 
                     _componentCard.OnMarkerPressed(editable, at ?? default);
                     _componentCard.OnReleased(at ?? default);
+                    SyncMap3DWatch();   // 3D 에 남았으면 열린 카드의 심볼 화면 자리를 받는다
                 }
                 break;
             case "dblclick":
