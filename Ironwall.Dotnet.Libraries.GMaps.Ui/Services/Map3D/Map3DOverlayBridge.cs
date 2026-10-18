@@ -60,6 +60,8 @@ internal sealed class Map3DOverlayBridge
 
     private readonly Action<string> _post;
     private readonly ILogService? _log;
+    /// <summary>구역 선 위 탐지 센서 구간(선 길이 비율) — 없으면 보내지 않는다(MapViewModel.EventFlyTo).</summary>
+    private readonly Func<GMapPidsGroupMarker, (double From, double To)?>? _zoneSection;
     private readonly Dictionary<string, JObject> _sent = new();
     private readonly HashSet<INotifyPropertyChanged> _subscribed = new();
     private readonly HashSet<INotifyPropertyChanged> _dirty = new();
@@ -78,10 +80,11 @@ internal sealed class Map3DOverlayBridge
     private long _rev;
     private int _nextCustomImageId = -1;
 
-    public Map3DOverlayBridge(Action<string> post, ILogService? log)
+    public Map3DOverlayBridge(Action<string> post, ILogService? log, Func<GMapPidsGroupMarker, (double From, double To)?>? zoneSection = null)
     {
         _post = post;
         _log = log;
+        _zoneSection = zoneSection;
     }
 
     /// <summary>구독 중인가(3D 표시 중).</summary>
@@ -424,7 +427,8 @@ internal sealed class Map3DOverlayBridge
             case GMapMarker marker:
             {
                 var dto = BuildDto(marker);
-                if (dto is Map3DOverlayLine line) return Map3DOverlay.ToJson(line);
+                if (dto is Map3DOverlayLine line)
+                    return Map3DOverlay.ToJson(marker is GMapPidsGroupMarker g && _zoneSection != null ? line with { ActiveSection = _zoneSection(g) } : line);
                 if (dto is not Map3DOverlayPoint point) return null;
                 var item = Map3DOverlay.ToJson(point);
                 return IconOf(marker, item) is { } icon ? Map3DOverlay.ToJson(point with { Icon = icon }) : item;

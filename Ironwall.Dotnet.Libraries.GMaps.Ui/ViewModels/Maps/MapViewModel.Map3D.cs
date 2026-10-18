@@ -187,7 +187,7 @@ public partial class MapViewModel
     /// <summary>지금 페이지에 ready 직후 전체 스냅샷을 다 보낸 시각(UTC).</summary>
     private DateTime? _map3DSnapshotAt;
 
-    private Map3DOverlayBridge Map3DOverlay => _map3DOverlay ??= new Map3DOverlayBridge(json => Map3DHost.PostJson(json), _log);
+    private Map3DOverlayBridge Map3DOverlay => _map3DOverlay ??= new Map3DOverlayBridge(json => Map3DHost.PostJson(json), _log, ZoneDetectionSection);
 
     /// <summary>지도 위 3D 화면 호스트(MapView.xaml 의 ContentControl). WebView2 는 처음 3D 에 들어갈 때 1회 만든다.</summary>
     public Map3DViewHost Map3DHost => _map3DHost ??= CreateMap3DHost();
@@ -440,7 +440,8 @@ public partial class MapViewModel
         var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
         // 굽는 동안은 3D 로 들어가지 않는다 — 영역을 그리고 나면 곧바로 옛 3D 로 들어가 굽기 진행 패널이 가려졌다(2026-10-17 실기 S1)
         var gate = Map3DGateFor(scene);   // 그 영역의 진입 · 이탈 · 미리 준비 줌(영역마다 3D 줌)
-        bool active = !_isMap3DBaking && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null, gate.Enter, gate.Exit);
+        // 이벤트 2D 비행 중에는 출발 자리에서 3D 로 다시 들어가지 않는다 — 끝난 자리에서 판정한다(마지막 프레임의 위치 변경이 게이트를 다시 부른다)
+        bool active = !_isMap3DBaking && _flyAnimation == null && !IsMap3DBlockedByInputMode() && Map3DMath.Decide(zoom, _map3DState == Map3DState.Pending, scene != null, gate.Enter, gate.Exit);
 
         if (!Map3DMath.Decide(zoom, false, scene != null, gate.Enter, gate.Exit)) _map3DEntrySuppressed = false;   // 한 번 꺼지면 보류 해제
         // 목록에 없는 장면은 가장 낮게 고를 수 있는 영역 줌의 이탈 줌부터 묻는다
@@ -658,6 +659,7 @@ public partial class MapViewModel
         }
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
+        NoteMap3DCameraForFlyTo(msg.Reason);   // 3D 조작 중이면 이벤트 이동이 양보한다(MapViewModel.EventFlyTo)
         if (Map3DMath.ShouldLeave3D(cam.Zoom, Map3DCurrentGate.Exit)) { Leave3D(cam, $"zoom {cam.Zoom:F2}"); return; }
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
         // 3D 카메라(위치 · 줌 · 방위)에 맞춰 오버레이가 3D 상태를 보이게 하고, 2D 로 돌아갈 때도 끊기지 않게 한다(2026-10-17 실기: 나침반이 0° 에 멈춰 있었다).
@@ -711,10 +713,7 @@ public partial class MapViewModel
     private void Sync3DAfter2DMove(string cause)
     {
         if (MainMap == null || _map3DState != Map3DState.Shown) return;
-        var center = MainMap.Position;
-        var scene = _map3DScenes.Find(sc => sc.Id == _map3DJob);
-        bool inside = scene != null && Map3DMath.BboxContains(scene.Bbox, center.Lng, center.Lat);
-        if (!Map3DMath.ShouldStay3DAfterMove(MainMap.EffectiveZoom, inside, Map3DGateFor(scene).Exit))
+        if (!Map3DStaysAt(MainMap.Position, MainMap.EffectiveZoom))
         {
             Leave3D(null, cause);
             return;
@@ -724,6 +723,14 @@ public partial class MapViewModel
         if (last is { } l) cam = cam with { Bearing = l.Bearing };   // 3D 에서 돌려 둔 방위 · 기울기는 그대로
         Map3DHost.PostCamera(cam, animate: true);
         _log?.Info($"[Map3D] 2D 이동({cause}) → 3D 카메라 zoom={cam.Zoom:F2}");
+    }
+
+    /// <summary>그 자리 · 실효줌에서 지금 3D 장면을 유지하는가(장면 안이고 줌 ≥ 그 장면의 이탈 줌).</summary>
+    private bool Map3DStaysAt(PointLatLng center, double effectiveZoom)
+    {
+        var scene = _map3DScenes.Find(sc => sc.Id == _map3DJob);
+        bool inside = scene != null && Map3DMath.BboxContains(scene.Bbox, center.Lng, center.Lat);
+        return Map3DMath.ShouldStay3DAfterMove(effectiveZoom, inside, Map3DGateFor(scene).Exit);
     }
 
     // ── 3D 클릭(3단계) ──

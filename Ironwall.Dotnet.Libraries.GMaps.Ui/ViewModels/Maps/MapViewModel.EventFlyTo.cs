@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using GMap.NET;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
@@ -8,6 +9,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Input;
@@ -68,7 +70,10 @@ public partial class MapViewModel
         OnUIThread(() => FlyToEventEntry(entry));
     }
 
-    /// <summary>그 장비의 심볼로 비행. 사용자가 지도를 만지는 중이면 양보(FR-05), 심볼이 없으면 아무것도 안 한다.</summary>
+    /// <summary>
+    /// 그 장비의 심볼로 비행 — 심볼이 없으면 소속 구역 선(탐지 센서 구간 가운데, 없으면 구역 전체)으로. 사용자가 지도(2D · 3D)를
+    /// 만지는 중이면 양보(FR-05). 3D 표시 중이고 목표에서 3D 를 유지하면 2D 비행 없이 바로 3D 카메라(뷰어가 부드럽게/바로를 판단).
+    /// </summary>
     private void FlyToEventEntry(EventEntry entry)
     {
         try
@@ -86,14 +91,34 @@ public partial class MapViewModel
                 return;
             }
 
-            var marker = MainMap.Markers.OfType<IPidsEditableMarker>()
-                .FirstOrDefault(m => (m.LinkedDevice?.Id ?? m.LinkedDeviceId) == entry.DeviceId && m.DeviceType == entry.DeviceType);
-            if (marker == null) return;
-
             Sync2DFrom3DCamera();   // 3D 표시 중이면 지금 보이는 3D 자리에서 출발(MapViewModel.Map3D)
-            var target = marker.Position;
             var currentZoom = MainMap.EffectiveZoom;
-            var targetZoom = MapFlyToMath.ResolveTargetZoom(_flyToSettings.MaxZoom, MainMap.MinZoom, MainMap.MaxZoom, currentZoom);
+            PointLatLng target;
+            double targetZoom;
+            string what;
+            var marker = FindDeviceMarker(entry.DeviceId, entry.DeviceType);
+            if (marker != null)
+            {
+                target = marker.Position;
+                targetZoom = MapFlyToMath.ResolveTargetZoom(_flyToSettings.MaxZoom, MainMap.MinZoom, MainMap.MaxZoom, currentZoom);
+                what = "심볼";
+            }
+            else
+            {
+                var device = DeviceProvider.FirstOrDefault(d => d.Id == entry.DeviceId && d.DeviceType == entry.DeviceType);
+                var groupIds = MapFlyToMath.ZoneGroupCandidates(entry.GroupIds, device?.DeviceGroups, entry.DeviceType == EnumDeviceType.Fence_Group, entry.DeviceId);
+                var zone = groupIds.Select(id => MainMap.Markers.OfType<GMapPidsGroupMarker>().FirstOrDefault(z => z.LinkedDeviceGroup == id)).FirstOrDefault(z => z != null);
+                var line = zone?.RuntimePoints.Select(p => (p.Lat, p.Lng)).ToList();
+                if (zone == null || MapFlyToMath.ResolveZoneTarget(line!, zone.IsClosedPath, ActiveZoneSensorPoints(zone.LinkedDeviceGroup)) is not { } zt)
+                {
+                    _log?.Info($"[EventFlyTo] 이동할 곳 없음 — 장비 심볼 · 구역 선이 지도에 없다({entry.EventType} 장비 {entry.DeviceId} {entry.DeviceType}, 그룹 [{string.Join(",", groupIds)}])");
+                    return;
+                }
+                target = new PointLatLng(zt.Lat, zt.Lng);
+                targetZoom = MapFlyToMath.ResolveZoneZoom(zt.IsSection, _flyToSettings.MaxZoom, MainMap.MinZoom, MainMap.MaxZoom, currentZoom,
+                                                          MapFlyToMath.FitZoom(line!, MainMap.ActualWidth, MainMap.ActualHeight));
+                what = $"구역 '{zone.Title}' {(zt.IsSection ? "탐지 구간" : "전체")}";
+            }
             var center = MainMap.Position;
             var duration = MapFlyToMath.PlanDurationMs(
                 _flyToSettings.DurationMs,
@@ -102,14 +127,39 @@ public partial class MapViewModel
                 zoomChanges: MapFlyToMath.SnapHalf(targetZoom) != MapFlyToMath.SnapHalf(currentZoom));
             if (duration is not int ms) return;
 
+            var path = MapFlyToMath.ChoosePath(_map3DState == Map3DState.Shown, Map3DStaysAt(target, targetZoom));
+            if (path == FlyToPath.ThreeD) ms = 0;   // 2D 는 목표로 바로 옮기고 3D 카메라만 animate(FlyTo 0 ms → Sync3DAfter2DMove)
+            else if (path == FlyToPath.Leave3DThenTwoD) Leave3D(null, "event-flyto");   // 2D 가 이미 3D 자리(Sync2DFrom3DCamera)
             FlyTo(target, targetZoom, ms);
-            _log?.Info($"[EventFlyTo] {entry.EventType} 장비 {entry.DeviceId} → 줌 {targetZoom:0.#} · {ms} ms");
+            _log?.Info($"[EventFlyTo] {entry.EventType} 장비 {entry.DeviceId} → {what} · 줌 {targetZoom:0.#} · {path} · {ms} ms");
         }
         catch (Exception ex)
         {
             _log?.Error($"[EventFlyTo] 이동 실패: {ex.Message}");
         }
     }
+
+    /// <summary>그 장비의 지도 심볼(없으면 null).</summary>
+    private IPidsEditableMarker? FindDeviceMarker(int deviceId, EnumDeviceType deviceType)
+        => MainMap?.Markers.OfType<IPidsEditableMarker>()
+            .FirstOrDefault(m => (m.LinkedDevice?.Id ?? m.LinkedDeviceId) == deviceId && m.DeviceType == deviceType);
+
+    /// <summary>구역 그룹에서 이벤트가 살아 있는 장비 자리 — 지도 심볼이 있으면 심볼, 없으면 장비 좌표(0,0 · 수 아님은 뺀다).</summary>
+    private IEnumerable<(double Lat, double Lng)> ActiveZoneSensorPoints(int groupId)
+    {
+        foreach (var d in DeviceProvider.Where(d => d.DeviceGroups?.Contains(groupId) == true).ToList())
+        {
+            if (!_eventQueueManager.HasEventsForDevice(d.Id, d.DeviceType)) continue;
+            if (FindDeviceMarker(d.Id, d.DeviceType) is { } m) yield return (m.Position.Lat, m.Position.Lng);
+            else if (double.IsFinite(d.Latitude) && double.IsFinite(d.Longitude) && (d.Latitude != 0 || d.Longitude != 0)) yield return (d.Latitude, d.Longitude);
+        }
+    }
+
+    /// <summary>3D 에 보낼 구역 선 위 탐지 센서 구간(선 길이 비율) — 모르면 null(Map3DOverlayBridge).</summary>
+    private (double From, double To)? ZoneDetectionSection(GMapPidsGroupMarker zone)
+        => zone.LinkedDeviceGroup > 0
+            ? MapFlyToMath.ZoneSection(zone.RuntimePoints.Select(p => (p.Lat, p.Lng)).ToList(), zone.IsClosedPath, ActiveZoneSensorPoints(zone.LinkedDeviceGroup))
+            : null;
 
     /// <summary>
     /// 공용 이동 — 목표 위치(와 줌)로 <paramref name="durationMs"/> 동안 부드럽게. 0 ms = 순간 이동.
@@ -195,6 +245,12 @@ public partial class MapViewModel
         MainMap.PreviewMouseDown += OnFlyUserInput;
         MainMap.PreviewMouseWheel += OnFlyUserInput;
         _flyInputHookedMap = MainMap;
+    }
+
+    /// <summary>3D 의 사용자 조작(camera reason "user" · "live") — 2D 조작과 같은 2 s 양보 규칙에 넣는다.</summary>
+    private void NoteMap3DCameraForFlyTo(string? reason)
+    {
+        if (MapFlyToMath.IsUserCameraReason(reason)) _flyLastUserInputTick = Environment.TickCount64;
     }
 
     private void OnFlyUserInput(object sender, MouseEventArgs e)
