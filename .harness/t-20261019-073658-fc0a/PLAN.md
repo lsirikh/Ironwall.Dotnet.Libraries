@@ -23,6 +23,18 @@
 - [x] 메인 앱(복사본에서) SettingsCatalog · SettingsPorts · Map3DSettingsViewModel · SettingsValidation · HostHelp · Map3DSettingsSectionTests → host.patch(`git apply --check` 통과)
 - [x] dotnet test Ironwall.Dotnet.Libraries.sln — 실패 0 · tests/GMaps.Ui.Tests 1401 통과
 
+## 추가 지시(2026-10-19 "시나리오 빡세게")
+- [x] tests/GMaps.MapEdit.Tests/Map3DEntryScenarioTests.cs — 실제 MapViewModel(WiredMapRig) 게이트 · 표시 · 단추 · 영역 메뉴 · 나가기 · ESC 경로, 284건
+  - 표: 방식 2 × 줌 8(진입 줌 −1/−0.01/0/+0.01/+0.5 · 미리 준비 줌 ±0.01) × 위치 4(안 · 밖 · 겹침 · 경계 위) × 장면 4(있음 · 없음 · 만드는 중 · 만들기 실패) = 256
+  - 흐름 · 막힘(편집/묶음 회전 · 영역 그리기 · 심볼 배치) · 단추 보임 회귀 · 반복 누름 · 안내 중 나가기/ESC · 준비 중 줌 변경 · 영역 밖 이동 · flyTo 중 · XAML 디자인/바인딩
+- [x] tests/GMaps.MapEdit.Tests/Map3DSettingsReadTests.cs — ReadMap3D 옛 파일 · 이상한 값 12종 · 왕복(16건)
+- [x] MapsHelpTests 에 Map.Map3D.Enter · EnterZoom 문구 6줄
+- [x] 메인 앱 Map3DSettingsSectionTests 에 칸 순서 · 수동 주석(저장 전/뒤) · 수동에서도 진입 줌 저장 · 되돌리기 · 줌 순서 경계 9 · "?" 에 모든 칸 설명 → 58건 통과(host.patch 다시 만듦)
+- [x] 시험이 찾은 결함: 만드는 중 · flyTo 중 단추 → 준비 시작 후 즉시 취소(안내 깜빡임) → EnterMap3DDirect 에서 처음부터 막음(DECISIONS 8)
+- [x] 수정 전 실패 증명: 게이트를 옛 `Map3DMath.Decide` 로, 만드는 중/flyTo 막음을 빼고 돌리면 284 중 16 실패 → 되돌리면 284 통과
+
+- [x] 다시 확인: sln 전체 통과(첫 회 CameraPopup.Tests 의 시간 예산 시험 1건이 부하로 실패 → 단독 · 재실행 통과, 3D 변경과 무관). tests/ 아래 GMaps.* 시험은 sln 밖이라 따로 돌림.
+
 ## 발견
 - 메인 앱 저장소는 이 세션에서 쓰기 거부 → 워크트리 안 복사본(라이브러리 참조를 이 워크트리로)에서 고쳐 시험하고 패치로 남김(DECISIONS 7). 복사본은 지움.
 - 복사본 시험에서 실패 7건은 복사 위치 탓(Installer 폴더 · 라이브러리 XAML 상대 경로 없음) — 3D 변경과 무관. Map3DSettingsSectionTests 전부 통과.

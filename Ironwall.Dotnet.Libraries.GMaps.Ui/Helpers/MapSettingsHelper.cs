@@ -147,26 +147,11 @@ public static class MapSettingsHelper
     /// </summary>
     public static Map3DModel LoadMap3D(ILogService? log = default)
     {
-        var model = new Map3DModel();
+        Map3DModel model;
         try
         {
             var fp = AppSettingsLocation.AppSettingsReadPath;
-            var t = File.Exists(fp) ? JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Map3D"] : null;
-            if (t != null)
-            {
-                model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
-                model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
-                model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
-                model.HwndWhenRemote = t["HwndWhenRemote"]?.ToObject<bool>() ?? model.HwndWhenRemote;
-                model.OverlayMode = t["OverlayMode"]?.ToString() ?? model.OverlayMode;
-                model.EntryMode = t["EntryMode"]?.ToString() ?? model.EntryMode;
-                model.EnterZoom = t["EnterZoom"]?.ToObject<double>() ?? model.EnterZoom;
-                model.ExitZoom = t["ExitZoom"]?.ToObject<double>() ?? model.ExitZoom;
-                model.PreloadZoom = t["PreloadZoom"]?.ToObject<double>() ?? model.PreloadZoom;
-                model.AreaShowZoom = t["AreaShowZoom"]?.ToObject<double>() ?? model.AreaShowZoom;
-                model.MaxAreaSideM = t["MaxAreaSideM"]?.ToObject<double>() ?? model.MaxAreaSideM;
-                model.GuideMinSeconds = t["GuideMinSeconds"]?.ToObject<double>() ?? model.GuideMinSeconds;
-            }
+            model = ReadMap3D(File.Exists(fp) ? JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Map3D"] : null);
             if (model.Normalize()) log?.Warning($"[Map3D] ServerUrl 이 올바르지 않아 고쳐 씀 → {model.ServerUrl}");
             log?.Info($"[Map3D] 로드(appsettings.Map3D): {model}");
         }
@@ -174,6 +159,28 @@ public static class MapSettingsHelper
         {
             log?.Warning($"[Map3D] 로드 실패, 기본값 사용: {ex.Message}");
             model = new Map3DModel();
+        }
+        return model;
+    }
+
+    /// <summary>AppSettings.Map3D 절(JSON)을 모델로 — 없는 키는 기본값(옛 파일에 EntryMode 가 없으면 auto). Normalize 는 부르는 쪽이 한다.</summary>
+    public static Map3DModel ReadMap3D(JToken? t)
+    {
+        var model = new Map3DModel();
+        if (t != null)
+        {
+            model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
+            model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
+            model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
+            model.HwndWhenRemote = t["HwndWhenRemote"]?.ToObject<bool>() ?? model.HwndWhenRemote;
+            model.OverlayMode = t["OverlayMode"]?.ToString() ?? model.OverlayMode;
+            model.EntryMode = t["EntryMode"]?.ToString() ?? model.EntryMode;
+            model.EnterZoom = t["EnterZoom"]?.ToObject<double>() ?? model.EnterZoom;
+            model.ExitZoom = t["ExitZoom"]?.ToObject<double>() ?? model.ExitZoom;
+            model.PreloadZoom = t["PreloadZoom"]?.ToObject<double>() ?? model.PreloadZoom;
+            model.AreaShowZoom = t["AreaShowZoom"]?.ToObject<double>() ?? model.AreaShowZoom;
+            model.MaxAreaSideM = t["MaxAreaSideM"]?.ToObject<double>() ?? model.MaxAreaSideM;
+            model.GuideMinSeconds = t["GuideMinSeconds"]?.ToObject<double>() ?? model.GuideMinSeconds;
         }
         return model;
     }

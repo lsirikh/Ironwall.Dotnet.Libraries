@@ -411,6 +411,9 @@ public partial class MapViewModel
     private void EnterMap3DDirect(Map3DScene scene, string cause)
     {
         if (MainMap == null || !_map3DSettings.IsEnabled || _map3DState != Map3DState.Off) return;
+        // 만드는 중 · 이벤트 지도 이동 중에는 게이트가 곧바로 취소한다 — 안내가 깜빡이지 않게 처음부터 들어가지 않는다
+        if (_isMap3DBaking) { SetAimStatus("3D 를 만드는 중입니다 — 다 만든 뒤 다시 누르세요", autoHide: true); return; }
+        if (_flyAnimation != null) return;
         if (IsMap3DBlockedByInputMode())
         {
             SetAimStatus("편집 · 그리기 중에는 3D 로 들어가지 않습니다 — 모드를 끝낸 뒤 다시 누르세요", autoHide: true);

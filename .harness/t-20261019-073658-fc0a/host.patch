@@ -248,7 +248,7 @@ index 623a8767..f74c179d 100644
                  "**오버레이 영역은 이미지에서 건물 찾기**(기본) — 오버레이 이미지 범위 안은 이미지 그림 + 이미지에서 찾은 건물(지도 건물 자료는 그 안에서 뺍니다), 범위 밖은 위성 타일 + 지도 건물 자료로 만듭니다. 사진에서 건물을 찾는 데 수십 초 걸릴 수 있고, 찾은 건물의 높이는 어림값입니다. **오버레이를 바닥 사진으로만(지도 건물 유지)** — 올린 사진이 지도 사진보다 좋을 때. 건물은 지도 자료로 세웁니다. **오버레이로 가리기(보안 · 건물 없음)** — 보안상 가린 구역. 그 범위의 실제 건물 · 사진을 지웁니다. **위성 타일만(오버레이 안 넣음)** — 오버레이 이미지는 3D 위에 덮어 보이기만 합니다.")
              .With("연결",
 diff --git a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
-index 0eb4a24d..7c36d7d8 100644
+index 0eb4a24d..5affb285 100644
 --- a/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
 +++ b/Dotnet.Monitoring.Solution.Tests/SetupPanels/Map3DSettingsSectionTests.cs
 @@ -9,7 +9,8 @@ namespace Dotnet.Monitoring.Solution.Tests.SetupPanels;
@@ -316,7 +316,7 @@ index 0eb4a24d..7c36d7d8 100644
      [TestMethod]
      public void should_resolve_rail_icon_when_icon_name_is_a_real_pack_icon()
      {
-@@ -106,42 +120,76 @@ public class Map3DSettingsSectionTests
+@@ -106,42 +120,153 @@ public class Map3DSettingsSectionTests
          Assert.AreEqual("오버레이 영역은 이미지에서 건물 찾기", mode.SelectedChoice?.Display, "라이브러리 기본값 = extract");
      }
  
@@ -350,6 +350,83 @@ index 0eb4a24d..7c36d7d8 100644
 +
 +        _port.EntryMode = "manual";
 +        Assert.AreEqual(SettingsCatalog.Map3DEnterZoomManualNote, Field(Form(), SettingsCatalog.Map3DEnterZoomKey).Note);
++    }
++
++    [TestMethod]
++    public void should_keep_fixed_field_order_when_map3d_section_built()
++        => CollectionAssert.AreEqual(
++            new[] { "map3d.IsEnabled", "map3d.EntryMode", "map3d.EnterZoom", "map3d.PreloadZoom", "map3d.GuideMinSeconds",
++                    "map3d.AreaShowZoom", "map3d.MaxAreaSideM", "map3d.OverlayMode", "map3d.ServerUrl", "map3d.UseCompositionHost" },
++            SettingsCatalog.Map3DSection(() => _port).Fields.Select(f => f.Key).ToArray());
++
++    [TestMethod]
++    public void should_show_manual_note_right_after_manual_saved_and_clear_it_after_auto_saved()
++    {
++        var form = Form();
++        var entry = Field(form, "map3d.EntryMode");
++        entry.SelectedChoice = entry.Options[1];
++        Assert.AreEqual(string.Empty, Field(form, SettingsCatalog.Map3DEnterZoomKey).Note, "저장 전(초안)에는 아직 저장된 방식 = 자동");
++        Assert.AreEqual(1, form.Save());
++        Assert.AreEqual(SettingsCatalog.Map3DEnterZoomManualNote, Field(form, SettingsCatalog.Map3DEnterZoomKey).Note, "수동 저장 뒤 — 지금은 쓰지 않음");
++
++        entry = Field(form, "map3d.EntryMode");
++        entry.SelectedChoice = entry.Options[0];
++        Assert.AreEqual(1, form.Save());
++        Assert.AreEqual(string.Empty, Field(form, SettingsCatalog.Map3DEnterZoomKey).Note);
++    }
++
++    [TestMethod]
++    public void should_still_let_enter_zoom_be_saved_when_manual()
++    {
++        _port.EntryMode = "manual";
++        _port.Writes.Clear();
++        var form = Form();
++        Field(form, SettingsCatalog.Map3DEnterZoomKey).Text = "18";
++        Assert.IsTrue(form.CanApply, "수동이어도 새 3D 영역의 기본 줌으로 쓰이므로 고칠 수 있다");
++        Assert.AreEqual(1, form.Save());
++        Assert.AreEqual(18d, _port.EnterZoom);
++    }
++
++    [TestMethod]
++    public void should_restore_entry_mode_when_draft_reverted()
++    {
++        var form = Form();
++        var entry = Field(form, "map3d.EntryMode");
++        entry.SelectedChoice = entry.Options[1];
++        Assert.IsTrue(form.CanApply);
++        form.Revert();
++        Assert.AreEqual("자동(줌)", Field(form, "map3d.EntryMode").SelectedChoice?.Display);
++        Assert.AreEqual(0, _port.Writes.Count);
++    }
++
++    // ── 줌 순서(칸 사이 규칙) — 경계 ──
++
++    [DataTestMethod]
++    [DataRow("17", "16.5", true)]
++    [DataRow("17", "16.51", false)]
++    [DataRow("17", "10", true)]
++    [DataRow("15.5", "15", true)]
++    [DataRow("15.49", "15", false)]
++    [DataRow("20.5", "20", true)]
++    [DataRow("20.5", "20.01", false)]
++    [DataRow("10.5", "10", true)]
++    [DataRow("10", "10", false)]
++    public void should_allow_or_block_save_at_preload_boundary_when_enter_and_preload_drafted(string enter, string preload, bool allowed)
++    {
++        var form = Form();
++        Field(form, SettingsCatalog.Map3DEnterZoomKey).Text = enter;
++        Field(form, "map3d.PreloadZoom").Text = preload;
++        Assert.AreEqual(allowed, form.CanApply, $"진입 {enter} · 미리 준비 {preload}");
++        if (!allowed) StringAssert.Contains(form.FooterText, SettingsValidation.Map3DPreloadOrderMessage);
++    }
++
++    [TestMethod]
++    public void should_explain_every_field_label_when_help_key_resolved()
++    {
++        Assert.IsTrue(HelpCatalog.TryGet(HostHelp.SettingsMap3D, out var entry));
++        var text = entry.ToPlainText();
++        foreach (var label in SettingsCatalog.Map3DSection(() => _port).Fields.Select(f => f.Label).Where(l => l != "사용"))
++            StringAssert.Contains(text, label, $"\"?\" 에 칸 '{label}' 설명이 없다");
 +    }
 +
      // ── 줌 순서(칸 사이 규칙) ──
@@ -405,7 +482,7 @@ index 0eb4a24d..7c36d7d8 100644
          Assert.IsFalse(form.HasError);
      }
  
-@@ -149,7 +197,7 @@ public class Map3DSettingsSectionTests
+@@ -149,7 +274,7 @@ public class Map3DSettingsSectionTests
      public void should_clear_order_error_when_draft_is_reverted()
      {
          var form = Form();
@@ -414,7 +491,7 @@ index 0eb4a24d..7c36d7d8 100644
          Assert.IsTrue(form.HasError);
  
          form.Revert();
-@@ -161,7 +209,8 @@ public class Map3DSettingsSectionTests
+@@ -161,7 +286,8 @@ public class Map3DSettingsSectionTests
      // ── 칸 하나의 범위 ──
  
      [DataTestMethod]
@@ -424,7 +501,7 @@ index 0eb4a24d..7c36d7d8 100644
      [DataRow("map3d.AreaShowZoom", "9.5")]
      [DataRow("map3d.MaxAreaSideM", "100")]
      [DataRow("map3d.MaxAreaSideM", "6000")]
-@@ -197,24 +246,33 @@ public class Map3DSettingsSectionTests
+@@ -197,24 +323,33 @@ public class Map3DSettingsSectionTests
      // ── 순수 규칙 ──
  
      [DataTestMethod]
@@ -468,7 +545,7 @@ index 0eb4a24d..7c36d7d8 100644
      [DataRow("다시 시작해야 반영")]
      public void should_explain_section_in_question_mark_when_help_key_resolved(string phrase)
      {
-@@ -222,98 +280,23 @@ public class Map3DSettingsSectionTests
+@@ -222,98 +357,23 @@ public class Map3DSettingsSectionTests
          StringAssert.Contains(entry.ToPlainText(), phrase);
      }
  
@@ -498,11 +575,11 @@ index 0eb4a24d..7c36d7d8 100644
 -            .Any(f => f.Key == SettingsCatalog.MapMap3DEnterZoomKey), "3D 창구가 없으면 칸도 없다");
 -    }
 -
-     [TestMethod]
+-    [TestMethod]
 -    public void should_not_offer_enter_zoom_in_map3d_section_when_moved_to_map_section()
 -        => Assert.IsFalse(SettingsCatalog.Map3DSection(() => _port).Fields.Any(f => f.ApiName == "Map3D.EnterZoom"), "중복 금지 — 지도 절에만");
 -
--    [TestMethod]
+     [TestMethod]
 -    public void should_reload_map3d_port_when_map_section_entered()
 +    public void should_not_mention_removed_exit_zoom_when_help_key_resolved()
      {
@@ -531,14 +608,14 @@ index 0eb4a24d..7c36d7d8 100644
 -    {
 -        var form = MapForm();
 -        Field(form, SettingsCatalog.MapMap3DEnterZoomKey).Text = text;
-+    // ── 지도 절(2026-10-19 — 3D 줌 칸을 「3D 지도」 절로 다시 모음) ──
- 
+-
 -        Assert.IsFalse(form.CanApply, "2D 로 돌아가는 줌(16.5) 이하면 [저장] 꺼짐");
 -        StringAssert.Contains(form.FooterText, SettingsValidation.Map3DExitOrderMessage);
 -        Assert.AreEqual(0, form.Save());
 -        Assert.AreEqual(0, _port.Writes.Count);
 -    }
--
++    // ── 지도 절(2026-10-19 — 3D 줌 칸을 「3D 지도」 절로 다시 모음) ──
+ 
 -    [TestMethod]
 -    public void should_mark_field_error_when_3d_min_zoom_out_of_range()
 -    {
