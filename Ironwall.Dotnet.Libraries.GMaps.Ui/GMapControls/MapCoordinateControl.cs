@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
@@ -80,4 +80,15 @@ public class MapCoordinateControl : Control
     public static readonly DependencyProperty IsShowUTMProperty =
         DependencyProperty.Register("IsShowUTM", typeof(bool),
             typeof(MapCoordinateControl), new PropertyMetadata(false));
+
+    /// <summary>고도 글("58.3 m") — 3D 에서 마우스가 가리키는 땅 높이. null 이면 고도 줄을 숨긴다(2D).</summary>
+    public string? AltitudeText
+    {
+        get { return (string?)GetValue(AltitudeTextProperty); }
+        set { SetValue(AltitudeTextProperty, value); }
+    }
+
+    public static readonly DependencyProperty AltitudeTextProperty =
+        DependencyProperty.Register("AltitudeText", typeof(string),
+            typeof(MapCoordinateControl), new PropertyMetadata(null));
 }

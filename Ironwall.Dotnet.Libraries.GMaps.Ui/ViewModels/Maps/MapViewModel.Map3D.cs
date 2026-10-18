@@ -61,6 +61,11 @@ public partial class MapViewModel
     public string Map3DStatusText => Map3DMath.StatusText(_map3DState == Map3DState.Shown);
     /// <summary>3D 가 보이는 동안 — 지도 위 「나가기」 단추(MapView.xaml "GMaps.Map3D.ExitButton"). <see cref="Map3DStatusText"/> 에서만 파생한다.</summary>
     public bool IsMap3DShown => Map3DMath.IsExitButtonVisible(Map3DStatusText);
+    /// <summary>오른쪽 아래 줌 컨트롤 보임 — 3D 에는 줌 개념이 없어 3D 동안 숨긴다. <see cref="Map3DStatusText"/> 에서만 파생한다.</summary>
+    public bool IsMap3DZoomControlVisible => Map3DMath.IsZoomControlVisible(Map3DStatusText);
+    private string? _currentAltitudeText;
+    /// <summary>좌표 칩 고도 줄 — 3D 에서 마우스가 가리키는 땅 높이("58.3 m"), 2D 는 null(줄 숨김).</summary>
+    public string? CurrentAltitudeText { get => _currentAltitudeText; private set { _currentAltitudeText = value; NotifyOfPropertyChange(); } }
 
     /// <summary>3D 상태는 여기서만 바꾼다 — "3D" 표시와 「나가기」 보임을 함께 알린다.</summary>
     private void SetMap3DState(Map3DState state)
@@ -68,6 +73,7 @@ public partial class MapViewModel
         _map3DState = state;
         NotifyOfPropertyChange(nameof(Map3DStatusText));
         NotifyOfPropertyChange(nameof(IsMap3DShown));
+        NotifyOfPropertyChange(nameof(IsMap3DZoomControlVisible));
     }
 
     private RelayCommand? _exitMap3DCommand;
@@ -179,7 +185,7 @@ public partial class MapViewModel
             if (!Map3DGuide.ShouldGuideAfterLogin(_map3DRevealedBehindLogin, _map3DState == Map3DState.Shown)) return;
             _map3DRevealedBehindLogin = false;
             _log?.Info("[Map3D] 로그인 직후 3D 안내");
-            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("login", Map3DCurrentGate.Exit));
+            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("shown"));   // 3D 위 안내 — 줌 표기 없이
             RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.AfterLoginShow, timedBar: false);
         });
     }
@@ -457,9 +463,6 @@ public partial class MapViewModel
     private Map3DZoomGate Map3DGateFor(Map3DScene? scene)
         => Map3DGateFor(scene == null ? _map3DSettings.EnterZoom : Map3DAreaEnterZoom(scene.Id, scene.EnterZoom));
 
-    /// <summary>지금 3D 로 보는(또는 여는) 장면의 게이트.</summary>
-    private Map3DZoomGate Map3DCurrentGate => Map3DGateFor(_map3DScenes.Find(sc => sc.Id == _map3DJob));
-
     // ── 게이트(코얼레싱 · 장면 조회) ──
 
     private void QueueMap3DGate()
@@ -648,6 +651,8 @@ public partial class MapViewModel
         Map3DHost.Park();
         MainMap.IsHitTestVisible = true;
         if (cam is { } c) Apply3DCameraTo2D(c);
+        CreateScaleBar();              // 축척 막대를 2D 값으로(줌이 그대로면 줌 변경 이벤트가 오지 않는다)
+        CurrentAltitudeText = null;    // 좌표 칩 고도 줄은 3D 에서만
         EndMap3DWindows();   // 열린 창은 닫지 않고 같은 마커의 2D 자리로(MapViewModel.Map3DWindows)
         MainMap.Focus();
         _log?.Info($"[Map3D] 2D 복귀({cause}) zoom={MainMap.EffectiveZoom:F1} bearing={MainMap.Bearing:F1}");
@@ -711,6 +716,11 @@ public partial class MapViewModel
                                              System.Windows.Media.RenderCapability.Tier >> 16, _map3DWpfFrames.Take(), _map3DSync2D.Take()));
             return;
         }
+        if (msg.Type == "cursor")
+        {
+            if (_map3DState == Map3DState.Shown && msg.Cursor is { } cursor) SetMap3DCursor(cursor);
+            return;
+        }
         if (msg.Pick is { } pick)
         {
             try { OnMap3DPick(pick); }
@@ -729,6 +739,31 @@ public partial class MapViewModel
             Apply3DCameraTo2D(cam);
             _map3DSync2D.Add(System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
         }
+        CreateScaleBar();   // 축척 막대 = 3D 화면 가운데 1 px 의 실제 거리(TryCreateMap3DScaleBar)
+    }
+
+    /// <summary>좌표 칩 = 3D 마우스가 가리키는 땅(2D 마우스 이동과 같은 형식 — WGS-84 · MGRS · UTM, 고도는 덧붙임).</summary>
+    private void SetMap3DCursor(Map3DCursor c)
+    {
+        CurrentCoordinatePosition = new CoordinateModel(c.Lat, c.Lon, c.Alt ?? 0.0);
+        var coordinate = new CoordinateSharp.Coordinate(c.Lat, c.Lon);
+        CurrentMGRS = coordinate.MGRS.ToString();
+        CurrentUTM = coordinate.UTM.ToString();
+        CurrentAltitudeText = Map3DMath.AltitudeText(c.Alt);
+    }
+
+    /// <summary>
+    /// 3D 표시 중이고 3D 카메라를 받았으면 축척 막대를 3D 화면 가운데 m/px 로 세운다(CreateScaleBar 서두) — 뒤의 2D 줌은 0.5 단위로 맞춰지고
+    /// 2D 막대는 정수 줌 표라 3D 화면과 맞지 않는다. 세웠으면 true.
+    /// </summary>
+    private bool TryCreateMap3DScaleBar()
+    {
+        if (_map3DState != Map3DState.Shown || _map3DLastCamera is not { } cam) return false;
+        if (Map3DMath.ScaleBar(Map3DMath.MetersPerPixel(cam.Zoom, cam.Lat)) is not { } bar) return false;
+        Scale = bar.Label;
+        ScalePoints = new System.Windows.Media.PointCollection { new Point(0.0, 0.0), new Point(0.0, 5.0), new Point(bar.Px, 5.0), new Point(bar.Px, 0.0) };
+        NotifyOfPropertyChange(() => ScalePoints);
+        return true;
     }
 
     /// <summary>WPF 프레임 하나(3D 표시 중만 구독) — 간격을 모아 perf 로그 줄에 싣는다.</summary>

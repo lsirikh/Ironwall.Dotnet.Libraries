@@ -7983,6 +7983,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void CreateScaleBar()
     {
+        if (TryCreateMap3DScaleBar()) return;   // 3D 표시 중 — 3D 화면 가운데 m/px(MapViewModel.Map3D)
         (var scaleX, var scale) = ScaleHelper.RelativeCreateScalebar(Zoom);
 
         // ★ C2/FR-12: 디지털 줌 시 바 픽셀 폭은 고정하고 거리 라벨 숫자만 ÷배율(같은 픽셀폭이 더 짧은 거리 표현).

@@ -24,7 +24,10 @@ public readonly record struct Map3DCamera(double Lon, double Lat, double Zoom, d
 /// <summary>3D 영역 하나의 게이트 줌 — 3D 로 바뀌는 줌 · 2D 로 돌아가는 줌 · 미리 준비하는 줌(<see cref="Map3DMath.AreaGate"/>).</summary>
 public readonly record struct Map3DZoomGate(double Enter, double Exit, double Preload);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D 마우스가 가리키는 땅(지형 · 건물 지붕) — 경도 · 위도 · 고도(m, 모르면 null). 좌표 칩용.</summary>
+public readonly record struct Map3DCursor(double Lon, double Lat, double? Alt);
+
+/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
@@ -40,6 +43,9 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>perf.stats 일 때 3D 프레임 단계 요약 줄(조작 중 move · 멈춤 idle, 각 600 자까지 — <see cref="Map3DPerf"/>).</summary>
     public IReadOnlyList<string>? PerfLines { get; init; }
+
+    /// <summary>cursor 일 때 마우스가 가리키는 땅(좌표 칩).</summary>
+    public Map3DCursor? Cursor { get; init; }
 }
 
 /// <summary>
@@ -120,6 +126,38 @@ public static class Map3DMath
 
     /// <summary>「나가기」 단추를 보이는가 — 지금 화면 표시(<see cref="StatusText"/>)가 "3D" 일 때만.</summary>
     public static bool IsExitButtonVisible(string? statusText) => statusText == "3D";
+
+    /// <summary>오른쪽 아래 줌 컨트롤을 보이는가 — 3D 에는 줌 개념이 없어 지금 화면 표시가 "3D" 가 아닐 때만(2026-10-18).</summary>
+    public static bool IsZoomControlVisible(string? statusText) => statusText != "3D";
+
+    // ── 3D 좌표 칩 · 축척 막대(2026-10-18) ──
+
+    /// <summary>
+    /// 메르카토르 줌 · 위도에서 화면 1 px(DIP)의 땅 길이(m). 3D 가 보내는 camera 의 zoom 은 화면 가운데(바라보는 점) 거리 · 시야각 · 화면 높이로 셈한
+    /// 값이라(map-3d camsync.mapFromCamera) 이 값이 곧 3D 화면 가운데 가로 1 px 의 실제 거리다. 수가 아니면 NaN.
+    /// </summary>
+    public static double MetersPerPixel(double mercatorZoom, double lat)
+        => double.IsFinite(mercatorZoom) && double.IsFinite(lat)
+            ? 2 * Math.PI * 6378137d * Math.Cos(lat * Math.PI / 180d) / (256d * Math.Pow(2d, mercatorZoom))
+            : double.NaN;
+
+    /// <summary>
+    /// 축척 막대 — 1 · 2 · 3 · 5 × 10ⁿ m 중 막대가 <paramref name="maxPx"/> 이하가 되는 가장 긴 거리와 그 막대 길이(DIP).
+    /// 글은 2D 축척 막대와 같은 꼴("30m" · "1Km" · "1.5Km"). m/px 가 양수가 아니면 null.
+    /// </summary>
+    public static (double Px, string Label)? ScaleBar(double metersPerPixel, double maxPx = 100d)
+    {
+        if (!double.IsFinite(metersPerPixel) || metersPerPixel <= 0 || maxPx <= 0) return null;
+        double limit = metersPerPixel * maxPx * (1 + 1e-9), p = Math.Pow(10, Math.Floor(Math.Log10(limit))), best = p;
+        foreach (double k in new[] { 2d, 3d, 5d })
+            if (k * p <= limit) best = k * p;
+        string label = best >= 1000 ? $"{(best / 1000d).ToString("0.##", CultureInfo.InvariantCulture)}Km" : $"{best.ToString("0.##", CultureInfo.InvariantCulture)}m";
+        return (best / metersPerPixel, label);
+    }
+
+    /// <summary>좌표 칩 고도 글 — "58.3 m"(없으면 null = 줄을 숨긴다).</summary>
+    public static string? AltitudeText(double? alt)
+        => alt is double a && double.IsFinite(a) ? $"{a.ToString("0.0", CultureInfo.InvariantCulture)} m" : null;
 
     /// <summary>
     /// 3D 표시 중 2D 이동(이벤트 시 지도 이동 · 지도에서 보기)이 끝난 자리에서 3D 를 유지하는가 —
@@ -291,6 +329,11 @@ public static class Map3DMath
                 double? pct = Finite(o["pct"]);
                 return new Map3DMessage(type, o["stage"]?.Type == JTokenType.String ? o.Value<string>("stage") : null, null, null)
                     { Progress = pct is double v ? Math.Clamp(v, 0, 100) : null };
+            }
+            if (type == "cursor")
+            {
+                double? clon = Finite(o["lon"]), clat = Finite(o["lat"]);
+                return clon == null || clat == null ? null : new Map3DMessage(type, null, null, null) { Cursor = new Map3DCursor(clon.Value, clat.Value, Finite(o["alt"])) };
             }
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);

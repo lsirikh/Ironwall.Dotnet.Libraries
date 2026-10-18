@@ -1598,9 +1598,10 @@
 							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 				</Border>
-			<!--  좌표 표시  -->
+			<!--  좌표 표시 — 3D 동안은 3D 마우스가 가리키는 땅(cursor 메시지, 고도 줄 덧붙음)  -->
 			<ctrl:MapCoordinateControl
 				VerticalAlignment="Top"
+				AltitudeText="{Binding CurrentAltitudeText}"
 				IsShowMGRS="{Binding IsShowMGRS}"
 				IsShowUTM="{Binding IsShowUTM}"
 				IsShowWGS84="{Binding IsShowWSG84}"
@@ -1829,7 +1830,7 @@
 				</StackPanel>
 			</Border>
 
-			<!--  줌 컨트롤  -->
+			<!--  줌 컨트롤 — 3D 에는 줌 개념이 없어 3D 동안 숨긴다(IsMap3DZoomControlVisible = Map3DStatusText 가 "3D" 가 아닐 때)  -->
 			<ctrl:MapZoomControl
 				x:Name="MapZoomCtrl"
 				Grid.Row="2"
@@ -1837,6 +1838,7 @@
 				Margin="5,5,300,5"
 				HorizontalAlignment="Right"
 				VerticalAlignment="Bottom"
+				Visibility="{Binding IsMap3DZoomControlVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
 				DigitalZoomLevel="{Binding MainMap.DigitalZoomLevel, Mode=TwoWay}"
 				DigitalZoomSteps="3"
 				MaxZoom="{Binding ZoomMax}"
