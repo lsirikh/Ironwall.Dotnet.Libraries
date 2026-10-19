@@ -46,6 +46,8 @@ public class UserBuildingScenarioTests
         public bool ThrowOnPut { get; set; }
         /// <summary>PUT 응답을 이것이 끝날 때까지 붙든다(연타 시험).</summary>
         public TaskCompletionSource? PutGate { get; set; }
+        /// <summary>서버에 있는 장면(다시 만들기 시험 — 새 job 을 더하고 옛 job 은 DELETE /api/jobs/{id} 로 지운다). 직접 그린 건물(Items)은 job 이 아니라 영역 단위.</summary>
+        public List<string> Jobs { get; } = new() { Job };
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -55,9 +57,15 @@ public class UserBuildingScenarioTests
             if (path == "/api/jobs" && request.Method == HttpMethod.Get)
                 return Json(HttpStatusCode.OK, new JObject
                 {
-                    ["scenes"] = new JArray(new JObject { ["id"] = Job, ["name"] = "시험 영역", ["bbox"] = new JArray(Bbox.Cast<object>().ToArray()),
-                                                          ["user_buildings"] = Items.Count }),
+                    ["scenes"] = new JArray(Jobs.Select(j => (object)new JObject { ["id"] = j, ["name"] = "시험 영역", ["bbox"] = new JArray(Bbox.Cast<object>().ToArray()),
+                                                                                ["user_buildings"] = Items.Count }).ToArray()),
                 }.ToString());
+            var seg = path.Split('/');   // "", "api", "jobs", {job}, …
+            if (seg.Length == 4 && request.Method == HttpMethod.Delete)   // 장면 지우기(다시 만들기가 옛 job 을 지운다)
+                return Jobs.Remove(seg[3]) ? new HttpResponseMessage(HttpStatusCode.NoContent) : Json(HttpStatusCode.NotFound, "{\"detail\":\"작업이 없습니다\"}");
+            if (seg.Length >= 5 && seg[4] == "user-buildings" && !Jobs.Contains(seg[3]))   // map-3d editable_job · jm.get — 없는 장면
+                return Json(HttpStatusCode.NotFound, "{\"detail\":\"작업이 없습니다\"}");
+            if (seg.Length >= 5 && seg[4] == "user-buildings") path = $"/api/jobs/{Job}/" + string.Join('/', seg.Skip(4));   // 살아 있는 장면이면 같은 영역 파일
             if (path.StartsWith($"/api/jobs/{Job}/buildings/"))   // 3D 「건물 높이」 판 — 다시 만든 직접 그린 건물(서버가 user-buildings 파일을 고친다)
             {
                 int id = int.Parse(path.Split('/')[^2]);
@@ -182,6 +190,33 @@ public class UserBuildingScenarioTests
 
         public bool Key(Key key, ModifierKeys mods = ModifierKeys.None, bool inBox = false)
             => (bool)Scenario.Call(Vm, "HandleUserBuildingKey", key, mods, inBox)!;
+
+        /// <summary>
+        /// 창 PreviewKeyDown 한 번 — 제품과 같은 구독 순서(지도 키 처리기(초기화) → 조준 Esc 처리기(먼저 쓴 모드가 걸어 둠) → 건물 그리기(그리기 시작))로,
+        /// 앞이 Handled 로 만들면 뒤는 받지 않는다(+= 구독). source = 키 원본(초점 요소).
+        /// </summary>
+        public KeyEventArgs WindowKey(Key key, object source)
+        {
+            var e = EditRig.Key(key);
+            e.Source = source;
+            Scenario.Call(Vm, "OnMapPreviewKeyDownForGroup", W.Map, e);
+            if (!e.Handled) Scenario.Call(Vm, "OnMapPreviewKeyDownForAim", W.Map, e);
+            if (!e.Handled) Scenario.Call(Vm, "OnUserBuildingKeyDown", W.Map, e);
+            return e;
+        }
+
+        /// <summary>편집 모드로 켜고 지도 중심 오른쪽 위에 심볼 하나를 올려 고른다(레이어 패널에서 고른 것처럼 — 그리는 중에도 선택이 남는다).</summary>
+        public Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols.GMapGeometricMarker SelectSymbol()
+        {
+            Scenario.SetField(Vm, "_isEditModeEnabled", true);
+            W.Map.SetEditMode(true);
+            var g = Geo(60, 60);
+            var marker = new Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols.GMapGeometricMarker(Moq.Mock.Of<Ironwall.Dotnet.Libraries.Base.Services.ILogService>(),
+                new Ironwall.Dotnet.Monitoring.Models.Symbols.GeometricSymbolModel { Id = 7, Title = "초소", Latitude = g.Y, Longitude = g.X, Width = 40, Height = 40 });
+            W.Map.Markers.Add(marker);
+            Vm.SelectedMarker = marker;
+            return marker;
+        }
 
         public Task Apply() => (Task)Scenario.Call(Vm, "ApplyUserBuildingAsync")!;
 
@@ -679,6 +714,150 @@ public class UserBuildingScenarioTests
         Assert.False(rig.HasSurface);
     });
 
+    /// <summary>「다시 만들기」 끝 — 같은 영역의 새 장면이 생기고 옛 job 은 서버에서 지워진다(ReplaceMap3DJobAsync) · 영역 목록도 새 장면만.</summary>
+    private static async Task RebakeTo(Rig rig, string newJob)
+    {
+        rig.Server.Jobs.Add(newJob);
+        await (Task)Scenario.Call(rig.Vm, "ReplaceMap3DJobAsync", Job, newJob)!;
+        Assert.DoesNotContain(Job, rig.Server.Jobs);
+        Scenario.Call(rig.Vm, "ApplyMap3DAreas", (IReadOnlyList<Map3DSceneInfo>)new[]
+        {
+            new Map3DSceneInfo(newJob, "시험 영역", rig.Server.Bbox, null, 2, null) { UserBuildings = rig.Server.Items.Count },
+        });
+        Assert.Equal(newJob, Assert.Single(rig.Vm.Map3DAreas).Id);
+    }
+
+    [Fact]
+    public void should_undo_and_redo_new_building_in_same_area_after_rebake_replaced_old_job() => RunAsync(async rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        await rig.Apply();
+        string uid = rig.Writes.Single().Path.Split('/')[^1];
+        await RebakeTo(rig, "j-ub2");
+        Assert.False(rig.Vm.IsUserBuildingDrawing);                          // 옛 영역에서 그리던 것은 끝남
+
+        await rig.W.Undo.UndoAsync();                                         // 넣기 되돌리기 = 그 영역의 지금 장면으로 지움
+        Assert.Equal((HttpMethod.Delete, $"/api/jobs/j-ub2/user-buildings/{uid}"), (rig.Writes[^1].Method, rig.Writes[^1].Path));
+        Assert.Empty(rig.Server.Items);
+        await rig.W.Undo.RedoAsync();                                         // 다시 하기도 지금 장면으로
+        Assert.Equal((HttpMethod.Put, $"/api/jobs/j-ub2/user-buildings/{uid}"), (rig.Writes[^1].Method, rig.Writes[^1].Path));
+        Assert.Single(rig.Server.Items);
+    });
+
+    [Fact]
+    public void should_undo_edit_of_saved_building_after_rebake_without_repeating_failure() => RunAsync(async rig =>
+    {
+        rig.Server.Items.Add(SavedItem(rig, "0123456789ab"));
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        await Rig.Until(() => rig.Vm.UserBuildingItems.Count == 1, "저장된 건물 목록");
+        rig.Click(-20, -30);
+        rig.Vm.UserBuildingFloorsText = "6";
+        await rig.Apply();
+        Assert.Equal(18.0, rig.Server.Items.Single().Value<double>("height"));
+        await RebakeTo(rig, "j-ub2");
+
+        await rig.W.Undo.UndoAsync();                                         // 고치기 되돌리기 = 앞 높이로 지금 장면에 다시 저장
+        Assert.Equal((HttpMethod.Put, $"/api/jobs/j-ub2/user-buildings/0123456789ab"), (rig.Writes[^1].Method, rig.Writes[^1].Path));
+        Assert.Equal(12.0, rig.Server.Items.Single().Value<double>("height"));
+        Assert.False(rig.W.Undo.CanUndo);                                     // 기록이 남아 Ctrl+Z 가 같은 실패를 되풀이하지 않는다
+    });
+
+    // ─────────────── 6. 키 — 지도 키 처리기 · 확인 창과 나누기 ───────────────
+
+    [Fact]
+    public void should_leave_delete_and_arrow_keys_to_drawing_while_symbol_stays_selected() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        var marker = rig.SelectSymbol();                                      // 그리는 중 레이어 패널에서 심볼을 고름
+        rig.DrawSquare();
+        rig.Click(10, 8);                                                     // 꼭짓점 고르기
+        Assert.True(rig.Vm.UserBuildingDraft!.SelectedVertex >= 0);
+        var before = marker.Position;
+
+        var del = rig.WindowKey(Key.Delete, rig.W.Map);
+        Assert.True(del.Handled);
+        Assert.Equal(3, rig.Vm.UserBuildingDraft.Points.Count);              // 고른 꼭짓점이 지워짐
+        Assert.DoesNotContain(rig.W.Published, m => m is OpenConfirmPopupMessageModel);   // 심볼 삭제 확인 창 없음
+        rig.WindowKey(Key.Right, rig.W.Map);
+        rig.WindowKey(Key.Up, rig.W.Map);
+        Assert.Equal(before, marker.Position);                                // 심볼이 움직이지 않음
+        Assert.True(rig.Vm.IsUserBuildingDrawing);
+    });
+
+    [Fact]
+    public void should_give_escape_to_drawing_not_selection_release_while_symbol_selected() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.SelectSymbol();
+        rig.Click(-10, 8); rig.Click(10, 8);
+        var esc = rig.WindowKey(Key.Escape, rig.W.Map);
+        Assert.True(esc.Handled);
+        Assert.Empty(rig.Vm.UserBuildingDraft!.Points);                       // Esc 1단계 = 그리던 점 지움
+        Assert.NotNull(rig.Vm.SelectedMarker);                                // 선택 해제로 새지 않음
+    });
+
+    [Fact]
+    public void should_leave_enter_and_delete_to_confirm_popup_shown_over_drawing() => RunAsync(async rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        rig.Click(10, 8);
+        Assert.True(rig.Vm.ApplyUserBuildingCommand.CanExecute(null));
+        var popupOk = new System.Windows.Controls.Button();                  // 지도 화면 밖(팝업층)에 뜬 확인 창의 단추
+        new System.Windows.Controls.Grid().Children.Add(popupOk);
+
+        var enter = rig.WindowKey(Key.Enter, popupOk);
+        Assert.False(enter.Handled, "확인 창 위 Enter 를 건물 그리기가 가져갔다");
+        var del = rig.WindowKey(Key.Delete, popupOk);
+        Assert.False(del.Handled);
+        await Task.Delay(50);
+        Assert.Empty(rig.Writes);                                             // 저장하지 않음
+        Assert.Equal(4, rig.Vm.UserBuildingDraft!.Points.Count);
+
+        // 지도 화면(지도 · 창 자체)에서 온 Enter 는 예전처럼 저장
+        var mapEnter = rig.WindowKey(Key.Enter, rig.W.Deco);
+        Assert.True(mapEnter.Handled);
+        await Rig.Until(() => rig.Writes.Count == 1, "지도에서 온 Enter = 저장");
+    });
+
+    [Fact]
+    public void should_keep_panel_keys_for_drawing_even_outside_map_tree() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Click(-10, 8); rig.Click(10, 8); rig.Click(10, -8);
+        var back = rig.WindowKey(Key.Back, rig.Vm.UserBuildingPanel);        // 판(제품에선 지도 화면 안)에 초점
+        Assert.True(back.Handled);
+        Assert.Equal(2, rig.Vm.UserBuildingDraft!.Points.Count);
+    });
+
+    // ─────────────── 7. 박공 지붕이 안 되는 모양 ───────────────
+
+    [Fact]
+    public void should_say_flat_only_when_gable_is_chosen_for_l_shaped_outline() => RunAsync(async rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        // ㄱ자(30 × 30 m 에서 20 × 20 m 를 뺀 모양) — 감싸는 직사각형의 56 % 만 채운다
+        rig.Click(-15, 15); rig.Click(15, 15); rig.Click(15, 5); rig.Click(-5, 5); rig.Click(-5, -15); rig.Click(-15, -15);
+        rig.Click(-15, 15);
+        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.False(rig.Vm.HasUserBuildingRoofStatus);                         // 평지붕이면 안내 없음
+        rig.Vm.UserBuildingRoof = Map3DUserBuilding.RoofGable;
+        Assert.True(rig.Vm.HasUserBuildingRoofStatus);
+        Assert.Equal(Map3DUserBuilding.GableFlatOnlyText, rig.Vm.UserBuildingRoofStatus);
+        rig.Vm.UserBuildingRoof = Map3DUserBuilding.RoofFlat;
+        Assert.False(rig.Vm.HasUserBuildingRoofStatus);
+
+        // 네모 + 박공 = 안내 없음 · 먼저 박공을 고르고 그려도 같은 판정
+        rig.Vm.CancelUserBuildingCommand.Execute(null);
+        rig.Vm.UserBuildingRoof = Map3DUserBuilding.RoofGable;
+        Assert.False(rig.Vm.HasUserBuildingRoofStatus);                         // 닫기 전에는 판정하지 않음
+        rig.DrawSquare();
+        Assert.False(rig.Vm.HasUserBuildingRoofStatus);
+        await rig.Apply();
+        Assert.Equal("gable", rig.Writes.Single().Body!.Value<string>("roof"));
+    });
+
     [Fact]
     public void should_show_user_drawn_source_when_baked_user_building_is_picked_in_3d() => Run(rig =>
     {
@@ -979,7 +1158,7 @@ public class UserBuildingScenarioTests
                                    "Map.UserBuilding.Apply", "Map.UserBuilding.Cancel", "Map.UserBuilding.Delete", "Map.UserBuilding.Handle",
                                    "Map.UserBuilding.Name", "Map.UserBuilding.Undo", "Map.UserBuilding.Close", "Map.UserBuilding.Error",
                                    "Map.UserBuilding.Tool.Rect", "Map.UserBuilding.Tool.Circle", "Map.UserBuilding.Tool.Ellipse", "Map.UserBuilding.Tool.Polygon",
-                                   "Map.UserBuilding.Roof", "Map.UserBuilding.Use", "Map.UserBuilding.CircleSides" })
+                                   "Map.UserBuilding.Roof", "Map.UserBuilding.Use", "Map.UserBuilding.CircleSides", "Map.UserBuilding.RoofStatus" })
             Assert.Contains($"AutomationProperties.AutomationId=\"{id}\"", xaml);
         Assert.DoesNotContain("x:Name", xaml);
         Assert.DoesNotContain("#", xaml.Split("<Style TargetType")[1].Replace("✓", ""));   // 색은 토큰만(하드코딩 색 없음)

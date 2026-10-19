@@ -631,4 +631,54 @@ public class Map3DUserBuildingTests
                                                           {""id"":""c"",""bbox"":[127,37,127.01,37.01],""user_buildings"":""x""}]}");
         Assert.Equal(new[] { 3, 0, 0 }, scenes.Select(s => s.UserBuildings));
     }
+
+    // ── 박공 지붕이 되는 모양(map-3d buildings.build_building 과 같은 판정) ──
+
+    /// <summary>미터 꼭짓점(동 · 북, 원점 기준 · rotDeg 만큼 돌림) → 위경도.</summary>
+    private static IReadOnlyList<UbPoint> Meters(double rotDeg, params (double E, double N)[] pts)
+    {
+        double r = rotDeg * Math.PI / 180, c = Math.Cos(r), s = Math.Sin(r);
+        return pts.Select(p => new UbPoint(Lon0 + (p.E * c - p.N * s) / (111320.0 * Math.Cos(Lat0 * Math.PI / 180)), Lat0 + (p.E * s + p.N * c) / 110540.0)).ToList();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(30)]
+    [InlineData(73)]
+    public void should_allow_gable_for_rectangle_in_any_direction(double rot)
+    {
+        Assert.True(Map3DUserBuilding.CanGable(Meters(rot, (0, 0), (20, 0), (20, 10), (0, 10))));
+        Assert.True(Map3DUserBuilding.CanGable(Meters(rot, (0, 0), (20, 0), (20, 8), (18, 10), (0, 10))));   // 모서리 조금 자른 네모(98 %)
+    }
+
+    [Fact]
+    public void should_refuse_gable_for_l_shape_circle_and_tiny_outline()
+    {
+        Assert.False(Map3DUserBuilding.CanGable(Meters(0, (0, 0), (30, 0), (30, 10), (10, 10), (10, 30), (0, 30))));   // ㄱ자 56 %
+        Assert.False(Map3DUserBuilding.CanGable(Map3DUserBuilding.CirclePoints(new UbPoint(127, 37.5), 0.0001, 32)));    // 원(약 78 %)
+        Assert.False(Map3DUserBuilding.CanGable(Meters(0, (0, 0), (2, 0), (2, 1.9), (0, 1.9))));                          // 감싸는 네모 4 m² 이하
+        Assert.False(Map3DUserBuilding.CanGable(Meters(0, (0, 0), (20, 0))));                                              // 윤곽 아님
+    }
+
+    [Theory]
+    [InlineData(7, true)]    // 20 × 10 네모에서 7 × 4 를 뺌 = 86 %
+    [InlineData(8, false)]   // 8 × 4 를 뺌 = 84 %
+    public void should_use_85_percent_fill_of_smallest_rotated_rectangle(double cut, bool gable)
+        => Assert.Equal(gable, Map3DUserBuilding.CanGable(Meters(20, (0, 0), (20, 0), (20, 6), (20 - cut, 6), (20 - cut, 10), (0, 10))));
+
+    [Fact]
+    public void should_allow_cone_and_dome_only_for_round_outline_with_16_or_more_points()
+    {
+        var circle = Meters(0, Enumerable.Range(0, 32).Select(i => (10 * Math.Cos(2 * Math.PI * i / 32), 10 * Math.Sin(2 * Math.PI * i / 32))).ToArray());
+        var octagon = Meters(0, Enumerable.Range(0, 8).Select(i => (10 * Math.Cos(2 * Math.PI * i / 8), 10 * Math.Sin(2 * Math.PI * i / 8))).ToArray());
+        var square = Meters(0, (0, 0), (20, 0), (20, 20), (0, 20));
+        Assert.True(Map3DUserBuilding.CanRoundRoof(circle));
+        Assert.False(Map3DUserBuilding.CanRoundRoof(octagon));                 // 꼭짓점 16개 미만
+        Assert.False(Map3DUserBuilding.CanRoundRoof(square));
+        Assert.True(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofDome, circle));
+        Assert.False(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofCone, square));
+        Assert.False(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofGable, circle));
+        Assert.True(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofGable, square));
+        Assert.True(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofFlat, octagon));   // 평지붕은 늘 된다
+    }
 }

@@ -203,6 +203,80 @@ public static class Map3DUserBuilding
         return Math.Abs(s) / 2.0;
     }
 
+    /// <summary>박공 지붕이 되는 채움 비율 — 윤곽 넓이 ÷ 그것을 감싸는 가장 작은(돌린) 직사각형 넓이(map-3d buildings.build_building 의 0.85).</summary>
+    public const double GableMinFill = 0.85;
+    /// <summary>박공(또는 원뿔 · 돔)을 골랐지만 그 모양으로는 안 될 때 판의 상태 글.</summary>
+    public const string GableFlatOnlyText = "이 모양은 평지붕만 됩니다";
+
+    /// <summary>
+    /// 박공 지붕이 되는 윤곽인가 — map-3d buildings.build_building 과 같은 판정: 감싸는 가장 작은(돌린) 직사각형이 4 m² 보다 넓고
+    /// 윤곽이 그 넓이의 <see cref="GableMinFill"/> 이상을 채워야 한다. 아니면(ㄱ자 · ㄷ자 · 원 · 타원 등) map-3d 가 평지붕으로 짓는다.
+    /// 미터는 <see cref="AreaSquareMeters"/> 와 같은 첫 점 위도의 등장방형 근사.
+    /// </summary>
+    public static bool CanGable(IReadOnlyList<UbPoint> geo)
+    {
+        if (geo.Count < MinPoints) return false;
+        double kx = 111320.0 * Math.Cos(geo[0].Y * Math.PI / 180.0), ky = 110540.0;
+        var m = geo.Select(p => new UbPoint((p.X - geo[0].X) * kx, (p.Y - geo[0].Y) * ky)).ToList();
+        var hull = ConvexHull(m);
+        double best = double.MaxValue;
+        for (int i = 0; i < hull.Count; i++)   // 가장 작은 돌린 직사각형의 한 변은 볼록 껍질의 한 변과 나란하다
+        {
+            var a = hull[i]; var b = hull[(i + 1) % hull.Count];
+            double len = Dist(a, b);
+            if (len < 1e-9) continue;
+            double ux = (b.X - a.X) / len, uy = (b.Y - a.Y) / len;
+            double minU = double.MaxValue, maxU = double.MinValue, minV = double.MaxValue, maxV = double.MinValue;
+            foreach (var p in hull)
+            {
+                double u = p.X * ux + p.Y * uy, v = -p.X * uy + p.Y * ux;
+                minU = Math.Min(minU, u); maxU = Math.Max(maxU, u); minV = Math.Min(minV, v); maxV = Math.Max(maxV, v);
+            }
+            best = Math.Min(best, (maxU - minU) * (maxV - minV));
+        }
+        return best < double.MaxValue && best > MinAreaM2 && AreaSquareMeters(geo) / best >= GableMinFill;
+    }
+
+    /// <summary>
+    /// 원뿔 · 돔 지붕이 되는 둥근 윤곽인가 — map-3d buildings.is_round 와 같은 판정: 꼭짓점 16개 이상(닫힌 고리 좌표 &gt; 16)이고
+    /// 원형도 4π·넓이 ÷ 둘레² ≥ 0.9(원 도구 32각은 통과). 아니면 map-3d 가 평지붕으로 짓는다.
+    /// </summary>
+    public static bool CanRoundRoof(IReadOnlyList<UbPoint> geo)
+    {
+        if (geo.Count < 16) return false;
+        double kx = 111320.0 * Math.Cos(geo[0].Y * Math.PI / 180.0), ky = 110540.0, perimeter = 0;
+        for (int i = 0; i < geo.Count; i++)
+        {
+            var a = geo[i]; var b = geo[(i + 1) % geo.Count];
+            perimeter += Math.Sqrt(Math.Pow((b.X - a.X) * kx, 2) + Math.Pow((b.Y - a.Y) * ky, 2));
+        }
+        return perimeter > 0 && 4 * Math.PI * AreaSquareMeters(geo) / (perimeter * perimeter) >= 0.9;
+    }
+
+    /// <summary>고른 지붕을 그 윤곽으로 지을 수 있는가(평지붕은 늘 된다) — 안 되면 map-3d 가 평지붕으로 짓는다.</summary>
+    public static bool CanBuildRoof(string roof, IReadOnlyList<UbPoint> geo)
+        => roof == RoofGable ? CanGable(geo) : roof is RoofCone or RoofDome ? CanRoundRoof(geo) : true;
+
+    /// <summary>볼록 껍질(단조 사슬, 반시계).</summary>
+    private static List<UbPoint> ConvexHull(IReadOnlyList<UbPoint> pts)
+    {
+        var s = pts.Distinct().OrderBy(p => p.X).ThenBy(p => p.Y).ToList();
+        if (s.Count < 3) return s;
+        var h = new List<UbPoint>();
+        for (int pass = 0; pass < 2; pass++)
+        {
+            int start = h.Count;
+            foreach (var p in s)
+            {
+                while (h.Count >= start + 2 && Cross(h[^2], h[^1], p) <= 0) h.RemoveAt(h.Count - 1);
+                h.Add(p);
+            }
+            h.RemoveAt(h.Count - 1);
+            s.Reverse();
+        }
+        return h;
+    }
+
     /// <summary>윤곽 가운데(꼭짓점 평균 — 표시용).</summary>
     public static UbPoint Center(IReadOnlyList<UbPoint> pts)
         => pts.Count == 0 ? default : new UbPoint(pts.Average(p => p.X), pts.Average(p => p.Y));

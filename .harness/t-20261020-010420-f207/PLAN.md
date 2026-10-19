@@ -23,7 +23,16 @@ map-3d 는 복사본에서 고치고 `.harness/t-20261020-010420-f207/map3d.patc
 - [x] 세션 끊김으로 멈춘 에이전트 4개 재개
 - [x] map3d 완료(313 passed · node 15 ok · map3d.patch apply --check 통과 — 조율자가 직접 재확인) — 보고 전문 artifacts/map3d-DONE.txt
 - [x] g1 완료(A1 · A2 · A9 재현 · 수정) → patches/g1.patch 로 이 작업 트리에 적용(파일 동일 확인)
-- [ ] g2 · g3 결과 수신 → 적용(MapViewModel.cs 는 g1 위에 patch 로 겹쳐 얹기)
+- [x] g3 완료(A5 · A6 · A7 · A8 · A13 재현 · 수정, 새 시험 3파일) → 겹치지 않는 파일은 복사, MapViewModel.cs 는 patches/g3-MapViewModel.patch(HEAD 를 CRLF 로 바꾼 기준)로 g1 위에 얹음
+- [x] 직전 검사 7건 실패 원인 = 복사본이 `artifacts/gN` 에 있어 Utils.Tests 소스 스캔이 복사본을 읽음 → `artifacts/obj/` 로 옮겨 해소(제품 · 시험 수정 없음)
+- [x] g2 완료(A3 · A4 · B-박공 재현 · 수정) → 겹치지 않는 8파일 복사, MapViewModel.cs 는 patches/g2-MapViewModel.patch 로 얹음
+- [x] r1(g1+g3): sln EXIT 0 · Ui 1684 · MapNav 67 · PropertyPanel 436 · MapLayer 99 통과, MapEdit 755/759 — 실패 4건은 Map3DNavComboScenarioTests 키 시험(0.7 초 안에 몰림, 처리기가 실제 Keyboard.Modifiers 를 읽음 → 그 순간 실제 Ctrl/Alt 눌림 추정), 단독 재실행 2회 8/8 통과 — 최종 r2 에서 재확인
+- [x] GIS 복사본(artifacts/obj) · artifacts/base 삭제(패치는 patches/ 에 보관)
+- [x] r2 최종 재검증: GMaps 5개 전부 통과(Ui 1691 · MapEdit 766 · MapNav 67 · PropertyPanel 436 · MapLayer 99), map-3d 313 · node 15 · apply --check 0. sln 은 CameraPopup 시간 기준 7건(동시 pytest 부하) → r3 단독 재실행 EXIT 0 전부 통과
+- [x] REPORT.md · DECISIONS.md(1~15) 완료, artifacts 전부 삭제
+
+## 남은 일
+- 없음(하네스 accept 뒤 map3d.patch 를 원본 map-3d 에 적용 · 커밋하는 것은 머지 단계 일)
 - [ ] 이 작업 트리로 합치기 · 전체 재검증
 - [ ] map3d.patch · REPORT.md · DECISIONS.md
 - [ ] 정리(artifacts 복사본 삭제)

@@ -286,6 +286,15 @@
 											Text="{Binding UserBuildingCircleSidesText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 									</StackPanel>
 								</Grid>
+								<!--  고른 지붕이 이 윤곽으로는 안 됨(ㄱ자에 박공 등) — 짧은 상태 글, 판정 규칙은 "?" 말풍선  -->
+								<TextBlock
+									Margin="2,6,2,0"
+									AutomationProperties.AutomationId="Map.UserBuilding.RoofStatus"
+									FontSize="11"
+									Foreground="{DynamicResource StatusWarningBrush}"
+									Text="{Binding UserBuildingRoofStatus}"
+									TextWrapping="Wrap"
+									Visibility="{Binding HasUserBuildingRoofStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 								<TextBlock
 									Margin="2,6,2,0"

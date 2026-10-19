@@ -1,0 +1,9 @@
+﻿  복원할 프로젝트를 확인하는 중...
+  C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\GMaps.Ui.Tests.csproj을(를) 1.71초 동안 복원했습니다.
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\Map3DBakeTests.cs(53,9): warning xUnit2000: The literal or constant value 127.0 should be passed as the 'expected' argument in the call to 'Assert.Equal(expected, actual, precision)' in method 'should_widen_extent_when_image_is_rotated' on type 'Map3DBakeTests'. Swap the parameter values. (https://xunit.net/xunit.analyzers/rules/xUnit2000) [C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\GMaps.Ui.Tests.csproj]
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\Map3DBakeTests.cs(54,9): warning xUnit2000: The literal or constant value 37.501 should be passed as the 'expected' argument in the call to 'Assert.Equal(expected, actual, precision)' in method 'should_widen_extent_when_image_is_rotated' on type 'Map3DBakeTests'. Swap the parameter values. (https://xunit.net/xunit.analyzers/rules/xUnit2000) [C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\GMaps.Ui.Tests.csproj]
+  GMaps.Ui.Tests -> C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\bin\Debug\net8.0\GMaps.Ui.Tests.dll
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261020-010420-f207\tests\GMaps.Ui.Tests\bin\Debug\net8.0\GMaps.Ui.Tests.dll(.NETCoreApp,Version=v8.0)에 대한 테스트 실행
+지정된 패턴과 일치한 총 테스트 파일 수는 1개입니다.
+
+통과!  - 실패:     0, 통과:  1684, 건너뜀:     0, 전체:  1684, 기간: 10 s - GMaps.Ui.Tests.dll (net8.0)
