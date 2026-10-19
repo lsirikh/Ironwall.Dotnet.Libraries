@@ -1,4 +1,0 @@
-﻿-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-313 passed, 369 warnings in 138.77s (0:02:18)
-node ok=15 bad=
-apply-check exit 128
