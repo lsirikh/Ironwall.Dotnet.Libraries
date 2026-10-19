@@ -37,3 +37,7 @@ public class CallDeletePresetProcessMessageModel : IMessageModel { }
 /// <summary>3D 영역(구운 장면) 지우기 확인 콜백(지도 3D 시나리오 S3). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
 /// 대기 대상(_pendingMap3DAreaDelete)을 map-3d 서버에서 지운다(DELETE /api/jobs/{id}). raw MessageBox 금지 — 표준 EventAggregator 확인 패턴.</summary>
 public class CallDeleteMap3DAreaProcessMessageModel : IMessageModel { }
+
+/// <summary>3D 영역 직접 입력 건물 높이 「모두 자동으로」 확인 콜백(2026-10-19). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
+/// 대기 대상(_pendingMap3DHeightsReset)의 직접 입력을 map-3d 에서 지운다(DELETE /api/jobs/{id}/height-overrides).</summary>
+public class CallResetMap3DHeightsProcessMessageModel : IMessageModel { }

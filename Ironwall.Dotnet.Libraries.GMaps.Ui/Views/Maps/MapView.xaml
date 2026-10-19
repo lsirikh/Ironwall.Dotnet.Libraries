@@ -2002,6 +2002,15 @@
 					Content="{Binding GroupRotationPanel}"
 					Visibility="{Binding IsGroupRotationPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+				<!--  「건물 높이」 판(2026-10-19) — 3D 에서 건물을 누르면 뜬다(3D 를 나가면 닫힘). 묶음 회전 판과 같은 크롬 · 머리 띠 끌기.
+				      3D 위 오른쪽 위 쪽(지도 왼쪽 위 「나가기」 · 좌표 칩을 가리지 않게).  -->
+				<ContentPresenter
+					Canvas.Left="620"
+					Canvas.Top="90"
+					Panel.ZIndex="126"
+					Content="{Binding BuildingHeightPanel}"
+					Visibility="{Binding IsBuildingHeightPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 				<!--  사이트 고정(맵 앵커) 설정 패널 (증분6, FR-B3) — OverlayWindow 패턴(Control+ControlTemplate, 헤더 드래그)  -->
 				<ContentPresenter
 					x:Name="MapAnchorPresenter"

@@ -27,7 +27,7 @@ public readonly record struct Map3DZoomGate(double Enter, double Exit, double Pr
 /// <summary>3D 마우스가 가리키는 땅(지형 · 건물 지붕) — 경도 · 위도 · 고도(m, 모르면 null). 좌표 칩용.</summary>
 public readonly record struct Map3DCursor(double Lon, double Lat, double? Alt);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor" | "building". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
@@ -46,6 +46,9 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>cursor 일 때 마우스가 가리키는 땅(좌표 칩).</summary>
     public Map3DCursor? Cursor { get; init; }
+
+    /// <summary>building 일 때 3D 에서 누른 건물(「건물 높이」 판, <see cref="Map3DBuilding"/>).</summary>
+    public Map3DBuildingPick? Building { get; init; }
 }
 
 /// <summary>
@@ -353,6 +356,8 @@ public static class Map3DMath
                 double? clon = Finite(o["lon"]), clat = Finite(o["lat"]);
                 return clon == null || clat == null ? null : new Map3DMessage(type, null, null, null) { Cursor = new Map3DCursor(clon.Value, clat.Value, Finite(o["alt"])) };
             }
+            if (type == "building")
+                return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b } : null;
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;

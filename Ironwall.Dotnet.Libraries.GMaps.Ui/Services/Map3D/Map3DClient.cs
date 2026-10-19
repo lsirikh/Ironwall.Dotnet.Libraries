@@ -39,7 +39,16 @@ public sealed record Map3DSceneInfo(string Id, string? Name, double[] Bbox, Date
 {
     /// <summary>그 영역의 3D 로 바뀌는 줌(scene.json enter_zoom) — 없으면 null(세팅값을 쓴다).</summary>
     public double? EnterZoom { get; init; }
+
+    /// <summary>직접 입력한 건물 높이 수(manual_heights) — 옛 서버면 0.</summary>
+    public int ManualHeights { get; init; }
+
+    /// <summary>다시 굽기에서 다시 붙이지 못한 직접 입력 수(manual_unmatched) — 옛 서버면 0.</summary>
+    public int ManualUnmatched { get; init; }
 }
+
+/// <summary>건물 높이 저장 · 되돌리기 응답 — Building = 서버가 고친 건물 줄(3D 에 그대로 보낸다), Pick = 그 해석.</summary>
+public sealed record Map3DBuildingSaved(JObject Building, Map3DBuildingPick Pick);
 
 /// <summary>서버에 닿지 않음(연결 거부 · 시간 초과).</summary>
 public sealed class Map3DServerUnavailableException : Exception
@@ -163,9 +172,58 @@ public sealed class Map3DClient : IDisposable
                 ParseCreated(o["created"]),
                 counts?["buildings"]?.Type == JTokenType.Integer ? counts.Value<int>("buildings") : null,
                 o["kind"]?.Type == JTokenType.String ? o.Value<string>("kind") : null)
-                { EnterZoom = ReadZoom(o["enter_zoom"]) });
+                {
+                    EnterZoom = ReadZoom(o["enter_zoom"]),
+                    ManualHeights = ReadCount(o["manual_heights"]),
+                    ManualUnmatched = ReadCount(o["manual_unmatched"]),
+                });
         }
         return list;
+    }
+
+    private static int ReadCount(JToken? t) => t?.Type == JTokenType.Integer && t.Value<long>() is long n && n > 0 && n < int.MaxValue ? (int)n : 0;
+
+    // ── 건물 높이 직접 입력(map-3d heights.py) ──
+
+    /// <summary>건물 높이 직접 입력(PUT /api/jobs/{id}/buildings/{bid}/height {"height", "floors"}) — 서버가 고친 건물 줄.</summary>
+    public async Task<Map3DBuildingSaved> SetBuildingHeightAsync(string job, int buildingId, double height, int? floors, CancellationToken ct = default)
+    {
+        var body = new JObject { ["height"] = height, ["floors"] = floors is int f ? f : JValue.CreateNull() }.ToString(Formatting.None);
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, BuildingHeightUrl(job, buildingId))
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return ParseBuildingSaved(json!);
+    }
+
+    /// <summary>자동으로 되돌리기(DELETE /api/jobs/{id}/buildings/{bid}/height) — 굽기 때 자동 추정 높이로 돌아간 건물 줄.</summary>
+    public async Task<Map3DBuildingSaved> ResetBuildingHeightAsync(string job, int buildingId, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, BuildingHeightUrl(job, buildingId)), allowNotFound: false, ct).ConfigureAwait(false);
+        return ParseBuildingSaved(json!);
+    }
+
+    /// <summary>「모두 자동으로」(DELETE /api/jobs/{id}/height-overrides) — 자동으로 되돌린 건물 줄들(형식이 틀린 줄은 뺀다).</summary>
+    public async Task<IReadOnlyList<Map3DBuildingSaved>> ResetAllBuildingHeightsAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{Map3DMath.JobUrl(_server, job)}/height-overrides"),
+                                   allowNotFound: false, ct).ConfigureAwait(false);
+        var list = new List<Map3DBuildingSaved>();
+        if (JObject.Parse(json!)["buildings"] is JArray rows)
+            foreach (var row in rows.OfType<JObject>())
+                if (Map3DBuilding.Parse(row) is { } pick) list.Add(new Map3DBuildingSaved(row, pick));
+        return list;
+    }
+
+    private string BuildingHeightUrl(string job, int buildingId)
+        => $"{Map3DMath.JobUrl(_server, job)}/buildings/{buildingId.ToString(CultureInfo.InvariantCulture)}/height";
+
+    internal static Map3DBuildingSaved ParseBuildingSaved(string json)
+    {
+        var building = JObject.Parse(json)["building"] as JObject;
+        if (Map3DBuilding.Parse(building) is not { } pick)
+            throw new Map3DRequestException(HttpStatusCode.OK, "건물 응답 형식이 올바르지 않습니다");
+        return new Map3DBuildingSaved(building!, pick);
     }
 
     /// <summary>enter_zoom — 유한한 수만(그 밖은 null = 세팅값).</summary>
