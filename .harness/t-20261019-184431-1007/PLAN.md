@@ -18,7 +18,7 @@
 - [x] GIS 시험: tests/GMaps.Ui.Tests/Map3DRotRectParityTests.cs(map-3d RotRect 동치 · 측지선 · GMap 화면 시늉) — GIS 코드 변경 없음
 - [x] 실제 안양 회전 영역 CLI 다시 굽기 → artifacts/rebake-anyang(무시 폴더), 수치 REPORT.md §3
 - [x] map-3d pytest 215 통과(수정 전 210) · node 전부 통과 · GMaps.Ui.Tests 1538 · GMaps.MapEdit.Tests 475 통과
-- [ ] dotnet test Ironwall.Dotnet.Libraries.sln (실행 중/결과는 REPORT.md)
+- [x] dotnet test Ironwall.Dotnet.Libraries.sln — exit 0, 10개 시험 dll 모두 통과(첫 하네스 검사는 이전 세션의 내 시험 실행이 남긴 testhost · CameraPopupHost 가 exe 를 잡고 있어 MSB3021 복사 실패 → 그 프로세스를 멈추고 다시 돌려 통과)
 
 ## 남은 일
 - map3d.patch 를 map-3d 저장소에 적용(사람이 · 하네스 수락 때). 실기(GIS 안 3D)는 미확인.

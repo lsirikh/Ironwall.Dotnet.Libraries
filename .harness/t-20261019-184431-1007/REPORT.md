@@ -35,7 +35,7 @@
 - 원인: GIS 로그 grep `[Map3D]` 18:42 · `.harness/…/measure_real.py`(실제 장면 읽기만) · 썸네일 비교
 - `node .harness/t-20261019-184431-1007/truth_eval.mjs <map-3d 7001042 깨끗한 클론> <truth…>` → 7건 모두 실패 / `… artifacts/map3d <truth…>` → 7건 모두 통과(진실값: test_rotated_truth.py `--basetemp` 의 truth.json 5개 + measure_real.py 2개)
 - map-3d pytest: 수정 전 깨끗한 클론 210 passed → 수정 후 215 passed(새 시험 5). node *.mjs 전부 통과(extract_view_check 는 pytest 가 인자로 부름)
-- GIS: `dotnet test tests/GMaps.Ui.Tests` 1538 통과(새 Map3DRotRectParityTests 14 포함) · `dotnet test tests/GMaps.MapEdit.Tests` 475 통과 · `dotnet test Ironwall.Dotnet.Libraries.sln` → 최종 보고 참조
+- GIS: `dotnet test tests/GMaps.Ui.Tests` 1538 통과(새 Map3DRotRectParityTests 14 포함) · `dotnet test tests/GMaps.MapEdit.Tests` 475 통과 · `dotnet test Ironwall.Dotnet.Libraries.sln` exit 0(실패 0)
 - 실기(GIS 안 3D 화면)는 **실기 미확인**(창 · WebView2 · 브라우저 시험 금지).
 
 ## 5. 범위 밖으로 남긴 것
