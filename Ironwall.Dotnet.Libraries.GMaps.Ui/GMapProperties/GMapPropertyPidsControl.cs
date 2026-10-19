@@ -497,6 +497,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 new PropertyMetadata(null));
 
         /// <summary>
+        /// 장비 콤보 항목 옆 흐린 글 — 다른 마커에 이미 연결된 장비 → "· 정문1 에 할당됨". 고를 수는 있고, 고르면 VM 이 재할당을 확인한다.
+        /// VM(MapViewModel)이 판을 띄울 때 · 재할당 뒤 채운다(장비 1개 = 마커 1개).
+        /// </summary>
+        public IReadOnlyDictionary<IBaseDeviceModel, string>? DeviceAssignmentNotes
+        {
+            get { return (IReadOnlyDictionary<IBaseDeviceModel, string>?)GetValue(DeviceAssignmentNotesProperty); }
+            set { SetValue(DeviceAssignmentNotesProperty, value); }
+        }
+
+        public static readonly DependencyProperty DeviceAssignmentNotesProperty =
+            DependencyProperty.Register(nameof(DeviceAssignmentNotes), typeof(IReadOnlyDictionary<IBaseDeviceModel, string>),
+                typeof(GMapPropertyPidsControl),
+                new PropertyMetadata(null));
+
+        /// <summary>
+        /// 이 마커의 연결 장비가 다른 마커에도 연결돼 있을 때(이미 중복된 자료) 콤보 아래 경고 글. 없으면 null(숨김).
+        /// </summary>
+        public string? LinkedDeviceSharedWarning
+        {
+            get { return (string?)GetValue(LinkedDeviceSharedWarningProperty); }
+            set { SetValue(LinkedDeviceSharedWarningProperty, value); }
+        }
+
+        public static readonly DependencyProperty LinkedDeviceSharedWarningProperty =
+            DependencyProperty.Register(nameof(LinkedDeviceSharedWarning), typeof(string),
+                typeof(GMapPropertyPidsControl),
+                new PropertyMetadata(null));
+
+        /// <summary>
         /// 탐지 범위 (미터)
         /// </summary>
         public double DetectionRange

@@ -391,6 +391,12 @@ public partial class MapViewModel : BasePanelViewModel,
 
                 if (symbol != null)
                 {
+                    // 장비 1개 = 마커 1개 — 이미 중복 연결된 자료는 첫 마커만 유효(위 FirstOrDefault). 자동 수정 저장은 하지 않는다(경고만).
+                    var duplicates = symbols!.OfType<GMapPidsMarker>()
+                        .Where(s => !ReferenceEquals(s, symbol) && s.LinkedDeviceId == device.Id && s.DeviceType == symbol.DeviceType).ToList();
+                    if (duplicates.Count > 0)
+                        _log?.Warning($"[장비 중복 연결] Device({device.Id},{device.DeviceType}) '{device.DeviceName}' — 유효: '{symbol.Title}', 무시: {string.Join(", ", duplicates.Select(d => $"'{d.Title}'"))} (속성 판에서 재할당 필요)");
+
                     // ★ 런타임 LinkedDevice 객체 재바인딩 — 카메라/제어기 재시작 연결끊김 근본수정(조사 결함1).
                     //   심볼 로드(MarkerFactory) 시점엔 로그인-게이팅으로 DeviceProvider가 비어 LinkedDevice=null이 됨.
                     //   여기(디바이스 로드 후 매칭 성공 지점)에서 실제 device 객체를 다시 붙여야 속성창 콤보·PTZ·
@@ -8900,6 +8906,7 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             _log?.Info($"PropertyPanel의 {pidsControlPanel?.LinkedDevice?.DeviceName}");
             WireDoorControl(pidsControlPanel!);   // [symbol-detail-and-door-control FR-03/07] 개폐 전송기·권한·통지
+            RefreshDeviceAssignmentNotes();       // 콤보 '· 정문1 에 할당됨' · 중복 경고 글(장비 1개 = 마커 1개)
         }
         if (PropertyPanel != null)
         {
@@ -8986,6 +8993,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
     {
         if (IsApplyingUndo) return;   // Undo/Redo 재적용 중 바인딩 에코 → 중복 DbUpdate/트리리로드/이미지싱크 방지(FIX 2)
+        if (_deviceLinkSyncDepth > 0) return;   // 장비 재할당이 마커 · 판 연결을 직접 맞추는 중의 에코(MapViewModel.DeviceReassign.cs)
         if (IsEditModeEnabled && !_isMarkerEditing)
         {
             // 맵편집 권한 게이트(RBAC, 2안) — 디바이스 연결(LinkedDevice) 포함 속성 영속은 map:edit 필요.
@@ -9002,6 +9010,11 @@ public partial class MapViewModel : BasePanelViewModel,
                 await ApplyGroupPropertyChangeAsync(groupSelForProp, e);
                 return;
             }
+
+            // 장비 1개 = 마커 1개 — 다른 마커에 연결된 장비를 고르면 저장하지 않고 확인 팝업(MapViewModel.DeviceReassign.cs)
+            if (e.PropertyName == "LinkedDevice" && e.Marker is GMapPidsMarker linkTarget && e.NewValue is IBaseDeviceModel linkDevice
+                && await TryRequestDeviceReassignAsync(linkTarget, linkDevice, e.OldValue as IBaseDeviceModel))
+                return;
 
             try { await DbUpdateProcess(e.Marker); }
             catch (Exception ex)
@@ -9031,6 +9044,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 SymbolLifecycle.RegisterDevice(pidsMarker.LinkedDevice, pidsMarker.Model);
                 SymbolLifecycle.ReconcileDevice(pidsMarker.LinkedDevice.Id, pidsMarker.LinkedDevice.DeviceType);   // A2: 늦게 붙은 심볼도 큐 상태로
             }
+            if (e.PropertyName == "LinkedDevice") RefreshDeviceAssignmentNotes();   // 중복 경고 글(연결 해제로 풀릴 수 있다)
 
             // LinkedDeviceGroup 변경 → _groupSymbolLookup 즉시 재등록 (FR-01, 근본원인 A)
             // 신규/재지정 구역이 제어기 고장 Blackout·그룹 이벤트 대상에 즉시 포함되도록 — 맵 리로드/AllDevicesLoadedMessage 대기 불필요.
