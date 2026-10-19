@@ -1,6 +1,0 @@
-﻿수정 전(VM 변경 전, Map3DClient 만 더한 상태) — dotnet test tests/GMaps.MapEdit.Tests --filter Map3DCancelBakeScenarioTests
-  실패 GMaps.MapEdit.Tests.Map3DCancelBakeScenarioTests.should_end_bake_with_cancelled_notice_when_server_reports_cancelled [5 s]
-  오류 메시지: 취소된 작업을 끝으로 보지 않고 계속 조회함
-실패!  - 실패: 1, 통과: 0, 전체: 1
-
-원본 map-3d(C:\workspace_python\map-3d): POST /api/jobs/abc/cancel -> 404 {"detail":"Not Found"}
