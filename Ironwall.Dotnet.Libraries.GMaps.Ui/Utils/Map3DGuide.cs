@@ -158,6 +158,14 @@ public static class Map3DGuide
         return (FormatAreaSize(w, h) + (warn ? $" — {LimitText(maxSideM)} 초과" : ""), warn);
     }
 
+    /// <summary>그리는 중 크기 표시 — 3D 영역(회전 영역이면 회전 사각형의 실제 가로 · 세로, 아니면 bbox)으로.</summary>
+    public static (string Text, bool IsWarning) AreaDrawLabel(Map3DArea area, double maxSideM)
+    {
+        var (w, h) = area.SizeMeters;
+        bool warn = IsAreaTooLarge(w, h, maxSideM);
+        return (FormatAreaSize(w, h) + (warn ? $" — {LimitText(maxSideM)} 초과" : ""), warn);
+    }
+
     /// <summary>놓았을 때 너무 크면 배너에 띄우는 이유.</summary>
     public static string AreaTooLargeText(double widthM, double heightM) => AreaTooLargeText(widthM, heightM, MaxAreaSideM);
 

@@ -66,7 +66,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         foreach (var scene in scenes)
         {
             _map3DScenes.RemoveAll(sc => sc.Id == scene.Id);
-            _map3DScenes.Add(new Map3DScene(scene.Id, scene.Bbox) { EnterZoom = scene.EnterZoom });
+            _map3DScenes.Add(new Map3DScene(scene.Id, scene.Bbox) { EnterZoom = scene.EnterZoom, Rect = scene.Rect });
 
             var item = new Map3DAreaItem(scene, Map3DAreaEnterZoom(scene.Id, scene.EnterZoom), ViewMap3DArea, OpenMap3DAreaZoomEditor,
                                          area => _ = RequestResetMap3DHeightsAsync(area), RebakeMap3DArea, area => _ = RequestDeleteMap3DAreaAsync(area));
@@ -102,7 +102,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         foreach (var marker in _map3DAreaMarkers.Values) marker.Refresh(MainMap, show);
 
         var center = MainMap.Position;
-        var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
+        var scene = FindMap3DSceneAt(center);   // 회전 영역은 회전 사각형 안
         double enter = Map3DGateFor(scene).Enter;   // 그 영역의 3D 줌
         if (_map3DChipEnterZoom != enter) { _map3DChipEnterZoom = enter; NotifyOfPropertyChange(nameof(Map3DChipText)); }
         // "줌 17 이상" 칩은 자동(줌)일 때만 — 수동(단추)이면 왼쪽 위 「3D 로 보기」 단추가 대신한다
@@ -127,9 +127,11 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
 
         _map3DReturn = before ?? Current2DCamera(0d);
         _map3DAreaViewJob = item.Id;
-        var (lat, lon) = Map3DGuide.AreaCenter(item.Bbox);
+        var (lat, lon) = item.Area.Center;   // 회전 영역은 사각형 가운데
         _map3DEntrySuppressed = false;
         MainMap.Position = new PointLatLng(lat, lon);
+        // 회전 영역 — 2D 도 그릴 때 방위로 돌려 사각형이 반듯하게(회전이 막혀 있으면 2D 는 그대로, 3D 는 Reveal3D 가 그 방위로 연다)
+        if (item.Area.Rect is { } rect) MainMap.MapRotation = Map3DMath.ToGMapBearing(rect.RotationDeg);
         double viewZoom = Map3DGuide.AreaViewZoomFor(item.EnterZoom);   // 그 영역 진입 줌을 높였으면 그 줌까지
         MainMap.SetEffectiveZoom(viewZoom);
         _log?.Info($"[Map3D] 영역 보기 id={item.Id} → ({lat:F6},{lon:F6}) zoom={viewZoom}");
@@ -143,7 +145,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     {
         if (_isMap3DBaking) { SetAimStatus("이미 3D 를 만드는 중입니다", autoHide: true); return; }
         _log?.Info($"[Map3D] 영역 다시 만들기 id={item.Id}");
-        RequestMap3DBake(item.Bbox, item.EnterZoom);   // 영역 그리기와 같은 만들기 패널(줌은 그 영역의 지금 줌)
+        RequestMap3DBake(item.Area, item.EnterZoom);   // 회전 영역은 같은 회전 사각형으로   // 영역 그리기와 같은 만들기 패널(줌은 그 영역의 지금 줌)
     }
 
     /// <summary>

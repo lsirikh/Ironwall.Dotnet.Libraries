@@ -47,6 +47,8 @@ public sealed class Map3DAreaItem
     public Map3DSceneInfo Scene { get; }
     public string Id => Scene.Id;
     public double[] Bbox => Scene.Bbox;
+    /// <summary>영역(회전 영역이면 회전 사각형 — 테두리 · 가운데 · 다시 만들기).</summary>
+    public Map3DArea Area => new(Scene.Bbox, Scene.Rect);
     /// <summary>그 영역의 3D 로 바뀌는 줌.</summary>
     public double EnterZoom { get; }
     public string Title => Map3DGuide.AreaTitle(Scene.Id, Scene.Name);
