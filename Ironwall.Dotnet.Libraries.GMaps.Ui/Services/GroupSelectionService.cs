@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Documents;
@@ -49,6 +49,9 @@ public sealed class GroupSelectionService : IDisposable
 
     /// <summary>회전 세션 상태가 바뀜(열림 · 각도 · 중심 · 중심 고르기 · 끝) — 컨트롤러 판이 세션에서 다시 읽는다.</summary>
     public event System.Action? RotationChanged;
+
+    /// <summary>선택 집합이 바뀌었다(설정 · 해제 · 일부 제거) — 레이어 패널 잎 선택 동기용.</summary>
+    public event System.Action? SelectionChanged;
 
     private GroupRotationSession? _rotation;
     /// <summary>열린 회전 세션(드래그 중이거나 키보드로 돌리고 아직 확정 전) — 없으면 null.</summary>
@@ -141,6 +144,7 @@ public sealed class GroupSelectionService : IDisposable
 
         _selection = markers.Where(m => m != null && !m.IsDisposed).ToList();
         if (_selection.Count == 0) return;
+        SelectionChanged?.Invoke();
         // IsSelected는 설정하지 않음 — 심볼별 선택표시는 GroupSelectionAdorner 정밀 박스가 균일 담당
         // (템플릿 PART_SelectionHighlight 불일치·부정확 회피). 그룹 이동/삭제/잠금은 _selection 기준.
 
@@ -221,6 +225,7 @@ public sealed class GroupSelectionService : IDisposable
         }
         if (_selection.Count < 2) { Clear(); return; }   // 1개 잔존 = 그룹 아님 — 어도너 제거(단일 선택은 사용자가 재클릭)
         _adorner?.SetMarkers(_selection);
+        SelectionChanged?.Invoke();
     }
 
     /// <summary>지오/크기 변경 후 바운딩박스 갱신.</summary>
@@ -249,9 +254,11 @@ public sealed class GroupSelectionService : IDisposable
             _adorner.Dispose();
             _adorner = null;
         }
+        bool had = _selection.Count > 0;
         foreach (var m in _selection)
             if (m != null && !m.IsDisposed) m.IsSelected = false;
         _selection = new();
+        if (had) SelectionChanged?.Invoke();
     }
 
     public void Dispose()
