@@ -441,4 +441,68 @@ public class GroupRotationScenarioTests
         Assert.False(rig.Undo.CanUndo);
         Assert.Empty(rig.Errors);
     });
+
+    // 확정 저장 일부 · 전부 실패(2026-10-19 사용자 결정) — 실패 멤버만 회전 전 자리로(화면 = DB), Undo 는 저장된 멤버만, "n개 저장 실패 — 원위치".
+    [Theory]
+    [InlineData(0)]   // 전부 성공
+    [InlineData(1)]   // 일부 실패(3개 중 1개)
+    [InlineData(3)]   // 전부 실패
+    public void should_restore_only_failed_members_and_undo_only_saved_when_rotation_save_fails(int failCount) => Scenario.StaAsync(async () =>
+    {
+        var rig = WiredMapRig.Create();
+        var ids = new[] { 2301, 2302, 2303 };
+        var failing = ids.Take(failCount).ToHashSet();
+        var saves = new List<int>();
+        rig.Db.Setup(d => d.UpdateGeometrySymbolAsync(It.IsAny<IGeometricSymbolModel>(), It.IsAny<CancellationToken>()))
+              .Returns<IGeometricSymbolModel, CancellationToken>((m, _) =>
+              {
+                  if (failing.Contains(m.Id)) throw new InvalidOperationException($"DB 끊김 {m.Id}");
+                  saves.Add(m.Id);
+                  return Task.FromResult<IGeometricSymbolModel?>(null);
+              });
+        var markers = new[] { AddSymbol(rig, ids[0], -120, 0, 10), AddSymbol(rig, ids[1], 120, 0, 20), AddSymbol(rig, ids[2], 0, 90, 30) };
+        Scenario.Layout(rig.Deco, 1200, 800);
+        var orig = markers.Select(m => (m.Position, m.Bearing)).ToArray();
+        var g = Group(rig);
+        g.SetSelection(markers);
+        Assert.True(g.BeginRotation());
+        var pivot = g.Rotation!.Pivot;
+        g.PreviewRotation(90);
+        g.EndRotation(commit: true);
+        await Task.Delay(60);
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (failing.Contains(ids[i]))
+            {
+                AssertAt(orig[i].Position, markers[i].Position);   // 실패 = 회전 전 자리(DB 와 같다)
+                Assert.Equal(orig[i].Bearing, markers[i].Bearing, 9);
+            }
+            else
+            {
+                AssertAt(Rotated(orig[i].Position, pivot, 90), markers[i].Position);
+                Assert.Equal(orig[i].Bearing + 90, markers[i].Bearing, 9);
+            }
+        }
+        int ok = 3 - failCount;
+        Assert.Equal(ids.Skip(failCount), saves.Distinct().OrderBy(x => x));
+        Assert.Equal(failCount, rig.Errors.Count(e => e.Contains("그룹 회전 영속 실패")));
+        Assert.Equal(failCount switch
+        {
+            0 => "3개 회전 +90.0° 저장",
+            3 => "3개 저장 실패 — 원위치",
+            _ => $"{ok}개 회전 +90.0° 저장 · {failCount}개 저장 실패 — 원위치",
+        }, rig.Vm.AimStatusMessage);
+
+        if (ok == 0) { Assert.False(rig.Undo.CanUndo, "저장된 멤버가 없으면 Undo 도 없다"); return; }
+        Assert.Equal($"그룹 회전 {ok}개", rig.Undo.NextUndoDescription);
+        Assert.True(await rig.Undo.UndoAsync());   // 저장된 멤버만 되돌린다 — 실패 멤버는 이미 원위치
+        await Task.Delay(30);
+        for (int i = 0; i < 3; i++)
+        {
+            AssertAt(orig[i].Position, markers[i].Position);
+            Assert.Equal(orig[i].Bearing, markers[i].Bearing, 9);
+        }
+        Assert.False(rig.Undo.CanUndo);
+    });
 }

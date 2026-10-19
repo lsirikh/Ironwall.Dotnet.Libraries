@@ -787,6 +787,55 @@ public class Map3DEntryExitMoreScenarioTests
             finally { System.Windows.Input.Mouse.OverrideCursor = null; }
         });
 
+    // 2026-10-19 사용자 결정 — 자동(줌)에서도 3D 중 편집 · 측정 등을 켰다 끄면 그 자리에서는 다시 들어가지 않는다(「나가기」와 같은 진입 보류).
+    // 지도를 움직여 진입 줌 · 영역을 새로 만족하면(한 번 게이트 밖 → 다시 안) 다시 들어간다.
+    [Theory]
+    [InlineData(InputMode.Measure)]
+    [InlineData(InputMode.TargetAim)]
+    [InlineData(InputMode.SymbolPlacement)]
+    [InlineData(InputMode.AnchorDraw)]
+    [InlineData(null)]   // 편집 모드
+    public void should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(InputMode? mode)
+        => Map3DEntryScenarioTests.Run(Map3DModel.EntryAuto, rig =>
+        {
+            X.Enter(rig);
+            Assert.True(rig.Shown, "자동 — 진입 줌 영역 안에서 3D");
+            try
+            {
+                switch (mode)
+                {
+                    case InputMode.Measure: Scenario.Call(rig.Vm, "ToggleMeasure", MeasureKind.Length); break;
+                    case InputMode.TargetAim: rig.W.Map.IsTargetAimMode = true; Scenario.Call(rig.Vm, "SyncMap3DWithInputModes"); break;
+                    case InputMode.SymbolPlacement: Scenario.Call(rig.Vm, "EnterSymbolPlacementMode", EnumMarkerCategory.BASIC_SHAPES, new object(), "시험 심볼"); break;
+                    case InputMode.AnchorDraw: Scenario.Call(rig.Vm, "EnterAnchorDrawMode"); break;
+                    case null: rig.Vm.IsEditModeEnabled = true; break;
+                }
+                Assert.False(rig.Shown, $"{mode} 시작 — 3D 를 먼저 접는다");
+
+                switch (mode)
+                {
+                    case InputMode.Measure: rig.W.Map.StopMeasure(); Scenario.Call(rig.Vm, "OnMeasureStopped"); break;
+                    case InputMode.TargetAim: rig.W.Map.IsTargetAimMode = false; Scenario.Call(rig.Vm, "SyncMap3DWithInputModes"); break;
+                    case InputMode.SymbolPlacement: Scenario.Call(rig.Vm, "ExitSymbolPlacementMode"); break;
+                    case InputMode.AnchorDraw: Scenario.Call(rig.Vm, "ExitAnchorDrawMode"); break;
+                    case null: rig.Vm.IsEditModeEnabled = false; break;
+                }
+                Scenario.Pump();
+                rig.Gate(); rig.Tick();
+                Assert.Equal("Off", rig.State);
+                Assert.False(rig.Shown, "자동 — 모드를 끝낸 그 자리에서 곧바로 다시 들어가지 않는다");
+                Assert.True(rig.Vm.IsMap3DEnterButtonVisible, "다시 들어갈 길 = 「3D 로 보기」");
+
+                double zoom = rig.W.Map.EffectiveZoom;
+                rig.SetZoom(14); rig.Gate();                                     // 진입 줌 밑으로 — 보류 풀림
+                Assert.False(rig.Shown);
+                rig.SetZoom(zoom); rig.Gate();                                   // 진입 줌을 새로 만족 — 다시 들어간다
+                Map3DEntryScenarioTests.SettleEntry(rig);
+                Assert.True(rig.Shown, "지도를 움직여 진입 줌을 새로 만족하면 다시 3D");
+            }
+            finally { System.Windows.Input.Mouse.OverrideCursor = null; }
+        });
+
     [Fact]
     public void should_cancel_pending_entry_and_close_guide_when_input_mode_starts_while_pending()
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>

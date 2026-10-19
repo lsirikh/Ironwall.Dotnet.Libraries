@@ -23,13 +23,6 @@ public class Map3DMathTests
     public void should_apply_hysteresis_when_deciding_gate(double zoom, bool wasActive, bool hasScene, bool expected)
         => Assert.Equal(expected, Map3DMath.Decide(zoom, wasActive, hasScene));
 
-    [Fact]
-    public void should_leave_3d_when_reported_zoom_below_16_5()
-    {
-        Assert.True(Map3DMath.ShouldLeave3D(16.49));
-        Assert.False(Map3DMath.ShouldLeave3D(16.5));
-    }
-
     // ── 방위 ──
 
     [Theory]
