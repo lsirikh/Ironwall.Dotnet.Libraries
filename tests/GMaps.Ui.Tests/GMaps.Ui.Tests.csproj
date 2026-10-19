@@ -91,6 +91,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\MapFlyToMath.cs" />
     <!-- 지도 3D 바꿔 끼우기(map-3d POC) — 게이트 · 방위 · 줌 · 주소 · 메시지 순수 함수, HTTP 응답 해석(가짜 처리기), 설정 모델 — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DMath.cs" />
+    <!-- 회전된 3D 영역(중심 · 가로 · 세로 · 회전각) — 위경도 ↔ 사각형 로컬 · 모서리 · 감싸는 bbox · 안/밖 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DRotRect.cs" />
     <!-- 3D 건물 높이 직접 입력(「건물 높이」 판) — 메시지 해석 · 층수↔높이 · 입력 검증 · 키 · 끌기 · 출처 글 — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DBuilding.cs" />
     <!-- 3D 화면 위 GIS 창 자리(overlay.watch · overlay.screen · 팝업 오프셋) — 실코드 링크 -->

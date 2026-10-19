@@ -999,6 +999,39 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     //   벤더 OnMouseDown(클래스 핸들러)은 파생 base 미호출과 무관하게 항상 먼저 실행되어 _core.MouseDown(팬 Armed)을 세운다.
     private readonly PanSuppressGate _panSuppress = new();
     private bool _isRubberBanding;
+
+    /// <summary>지금 마우스 처리기(누름 · 이동 · 휠)를 일찍 끝내거나 가로채는 상태 — 진단 로그용(3D 를 나간 직후 2D 입력 상태 줄). 없으면 "없음".</summary>
+    internal string InputGateText()
+    {
+        var gates = new List<string>();
+        if (_linePress.HasValue) gates.Add("linePress");
+        if (_isImageDrag) gates.Add("imageDrag");
+        if (_isRubberBanding) gates.Add("rubberBand");
+        if (_panSuppress.IsSuppressing) gates.Add("panSuppress");
+        if (IsDragging) gates.Add("coreDrag");
+        if (IsTargetAimMode) gates.Add("aim");
+        if (IsSymbolPlacementMode) gates.Add("symbolPlacement");
+        if (IsHomePlacementMode) gates.Add("homePlacement");
+        if (IsAnchorDrawMode) gates.Add("anchorDraw");
+        if (IsMeasuring) gates.Add("measure");
+        if (IsLineDrawing) gates.Add("lineDrawing");
+        return gates.Count == 0 ? "없음" : string.Join(",", gates);
+    }
+
+    /// <summary>
+    /// 3D 를 나올 때 — 3D 가 보이는 동안 뗌을 못 받아 남았을 수 있는 일시 제스처 상태(이미지 끌기 · 마퀴 · 선 눌림 · 팬 억제 · 지도 캡처)를 비운다.
+    /// 그리기 · 측정 같은 모드는 건드리지 않는다(3D 는 그 모드 중에 열리지 않는다). 비운 것 목록 — 없으면 빈 문자열.
+    /// </summary>
+    internal string ResetTransientInput()
+    {
+        var cleared = new List<string>();
+        if (_isImageDrag || _isDragging) { ResetDragState(); cleared.Add("imageDrag"); }   // 줌 변경 백스톱(GMapCustomControl_OnMapZoomChanged)과 같은 정리
+        if (_isRubberBanding && !IsAnchorDrawMode) { _isRubberBanding = false; _rubberStart = null; _rubberCurrent = null; HideRubberBand(); cleared.Add("rubberBand"); }
+        if (_linePress.HasValue && !IsLineDrawing) { _linePress = null; _lineDragging = false; cleared.Add("linePress"); }
+        if (_panSuppress.IsSuppressing) { _panSuppress.OnButtonDown(); cleared.Add("panSuppress"); }
+        if (IsMouseCaptured) { ReleaseMouseCapture(); cleared.Add("capture"); }
+        return string.Join(",", cleared);
+    }
     private Point? _rubberStart;
     private Point? _rubberCurrent;
     // [앵커 그리기] 사이트 고정 영역을 지도에서 드래그로 그리는 모드 — 러버밴드 마퀴 재사용, 릴리스 시 NW/SE 통지. (FR-B3)
@@ -1009,6 +1042,10 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     public event System.Action<PointLatLng, PointLatLng>? AnchorAreaDrawn;
     /// <summary>앵커 영역 그리기 중 마퀴 옆 글(NW, SE → 글 · 경고) — 3D 영역 그리기의 크기 표시 · 2 km 경고. null 이면 글 없음.</summary>
     public System.Func<PointLatLng, PointLatLng, (string Text, bool IsWarning)>? AnchorDrawLabel { get; set; }
+    /// <summary>앵커 영역 그리기 중 마퀴 옆 글 — 화면 사각형 네 모서리(좌상 · 우상 · 우하 · 좌하) 위경도로(회전된 3D 영역의 실제 가로 · 세로). 있으면 <see cref="AnchorDrawLabel"/> 대신.</summary>
+    public System.Func<IReadOnlyList<PointLatLng>, (string Text, bool IsWarning)>? AnchorDrawCornersLabel { get; set; }
+    /// <summary>마지막 앵커 영역 드래그의 화면 사각형 네 모서리(좌상 · 우상 · 우하 · 좌하) 위경도 — <see cref="AnchorAreaDrawn"/> 직전에 채운다(회전된 3D 영역).</summary>
+    public IReadOnlyList<PointLatLng>? LastAnchorCorners { get; private set; }
     private static readonly Pen _rubberPen = CreateDashedPen(Color.FromArgb(210, 0, 170, 255), 1.5d);
     private static readonly Brush _rubberFill = CreateFrozenBrush(Color.FromArgb(40, 0, 170, 255));
     private static Brush CreateFrozenBrush(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
@@ -1307,6 +1344,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
                     if (ar.Width >= 4 && ar.Height >= 4)   // 최소 드래그(오클릭 방지)
                     {
                         IsAnchorDrawMode = false;                                    // 유효 드래그 → 모드 종료
+                        LastAnchorCorners = RubberRectCorners(ar);                   // 회전된 3D 영역은 화면 사각형 그대로
                         var (nw, se) = RubberRectToGeo(ar);                          // 정규화 북서 · 남동(R-28)
                         AnchorAreaDrawn?.Invoke(nw, se);                             // VM이 채우고 ExitAnchorDrawMode(커서 복원)
                     }
@@ -2791,6 +2829,12 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     {
         if (_rubberBandAdorner == null || !_rubberStart.HasValue || !_rubberCurrent.HasValue) return;
         var rect = new Rect(_rubberStart.Value, _rubberCurrent.Value);
+        if (_rubberForAnchor && AnchorDrawCornersLabel is { } cornersLabelOf && rect.Width >= 1 && rect.Height >= 1)
+        {
+            var (text, warn) = cornersLabelOf(RubberRectCorners(rect));
+            _rubberBandAdorner.Update(rect, text, warn);
+            return;
+        }
         if (_rubberForAnchor && AnchorDrawLabel is { } labelOf && rect.Width >= 1 && rect.Height >= 1)
         {
             var (nw, se) = RubberRectToGeo(rect);
@@ -2805,16 +2849,22 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     /// 정규화(HeightLat 음수·뒤틀린 저장 방지). 비회전에선 2코너와 같은 결과.</summary>
     private (PointLatLng Nw, PointLatLng Se) RubberRectToGeo(Rect ar)
     {
-        var g1 = FromLocalToLatLng((int)ar.Left, (int)ar.Top);
-        var g2 = FromLocalToLatLng((int)ar.Right, (int)ar.Top);
-        var g3 = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);
-        var g4 = FromLocalToLatLng((int)ar.Left, (int)ar.Bottom);
+        var c = RubberRectCorners(ar);
+        PointLatLng g1 = c[0], g2 = c[1], g3 = c[2], g4 = c[3];
         double north = Math.Max(Math.Max(g1.Lat, g2.Lat), Math.Max(g3.Lat, g4.Lat));
         double south = Math.Min(Math.Min(g1.Lat, g2.Lat), Math.Min(g3.Lat, g4.Lat));
         double west = Math.Min(Math.Min(g1.Lng, g2.Lng), Math.Min(g3.Lng, g4.Lng));
         double east = Math.Max(Math.Max(g1.Lng, g2.Lng), Math.Max(g3.Lng, g4.Lng));
         return (new PointLatLng(north, west), new PointLatLng(south, east));
     }
+
+    /// <summary>화면 사각형 네 모서리 위경도 — 좌상 · 우상 · 우하 · 좌하(회전 시 지리 방향과 다르다).</summary>
+    private PointLatLng[] RubberRectCorners(Rect ar)
+        => new[]
+        {
+            FromLocalToLatLng((int)ar.Left, (int)ar.Top), FromLocalToLatLng((int)ar.Right, (int)ar.Top),
+            FromLocalToLatLng((int)ar.Right, (int)ar.Bottom), FromLocalToLatLng((int)ar.Left, (int)ar.Bottom),
+        };
 
     /// <summary>러버밴드 마퀴 어도너 제거(종료/취소).</summary>
     private void HideRubberBand()

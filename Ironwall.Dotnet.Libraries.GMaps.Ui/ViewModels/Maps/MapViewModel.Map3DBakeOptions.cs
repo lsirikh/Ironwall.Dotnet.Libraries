@@ -27,7 +27,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
  ****************************************************************************/
 public partial class MapViewModel
 {
-    private double[]? _map3DBakeOptionsBbox;
+    private Map3DArea? _map3DBakeOptionsArea;
     private List<Map3DBakeOverlay> _map3DBakeOptionsOverlays = new();
     private string _map3DBakeMode = Map3DBake.ModeTiles;
     private double _map3DBakeEnterZoom = Map3DMath.EnterZoom;
@@ -89,17 +89,18 @@ public partial class MapViewModel
 
     /// <summary>영역이 정해졌다 — 만들기 패널을 띄운다(줌 고르기 · 겹치는 오버레이 이미지가 있으면 방식도).</summary>
     /// <param name="enterZoom">처음 골라 둘 줌 — 비우면 세팅의 3D 최소 줌(「다시 만들기」는 그 영역의 지금 줌).</param>
-    private void RequestMap3DBake(double[] bbox, double? enterZoom = null)
+    /// <param name="area">영역 — 회전 영역이면 겹치는 이미지는 감싸는 bbox 로 고르고(map-3d 가 회전 사각형 밖 이미지는 굽지 않는다), 굽기 요청에 rect 를 함께 보낸다.</param>
+    private void RequestMap3DBake(Map3DArea area, double? enterZoom = null)
     {
         List<Map3DBakeOverlay> overlays;
-        try { overlays = CollectMap3DBakeOverlays(bbox); }
+        try { overlays = CollectMap3DBakeOverlays(area.Bbox); }
         catch (Exception ex)
         {
             _log?.Warning($"[Map3D] 영역 안 오버레이 이미지 찾기 실패(타일만으로 굽는다): {ex.Message}");
             overlays = new();
         }
         _map3DZoomEditArea = null;
-        _map3DBakeOptionsBbox = bbox;
+        _map3DBakeOptionsArea = area;
         _map3DBakeOptionsOverlays = overlays;
         SetMap3DBakeMode(Map3DBake.DefaultMode(_map3DSettings.OverlayMode, overlays.Count));
         OpenMap3DBakeOptions(enterZoom ?? _map3DSettings.EnterZoom);
@@ -134,7 +135,7 @@ public partial class MapViewModel
             _ = ChangeMap3DAreaZoomAsync(area, enterZoom);
             return;
         }
-        if (_map3DBakeOptionsBbox is not { } bbox) { CloseMap3DBakeOptions(); return; }
+        if (_map3DBakeOptionsArea is not { } bakeArea) { CloseMap3DBakeOptions(); return; }
         var overlays = _map3DBakeOptionsOverlays;
         string mode = _map3DBakeMode;
         CloseMap3DBakeOptions();
@@ -144,7 +145,7 @@ public partial class MapViewModel
             _map3DSettings.OverlayMode = mode;   // 다음 패널의 기본값(마지막 고른 값)
             _ = SaveMap3DOverlayModeAsync();
         }
-        _ = BakeMap3DAsync(bbox, mode, mode == Map3DBake.ModeTiles ? null : overlays, enterZoom);
+        _ = BakeMap3DAsync(bakeArea, mode, mode == Map3DBake.ModeTiles ? null : overlays, enterZoom);
     }
 
     private async System.Threading.Tasks.Task SaveMap3DOverlayModeAsync()
@@ -155,7 +156,7 @@ public partial class MapViewModel
 
     private void CloseMap3DBakeOptions()
     {
-        _map3DBakeOptionsBbox = null;
+        _map3DBakeOptionsArea = null;
         _map3DBakeOptionsOverlays = new();
         _map3DZoomEditArea = null;
         if (IsMap3DBakeOptionsOpen) IsMap3DBakeOptionsOpen = false;

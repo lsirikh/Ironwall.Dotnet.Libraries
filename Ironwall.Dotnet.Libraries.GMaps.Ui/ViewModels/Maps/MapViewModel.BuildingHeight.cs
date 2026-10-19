@@ -176,8 +176,13 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     {
         if (clearUndo) BhUndo.Clear();
         if (_bhBuilding is not { } b) return;
-        if (IsBuildingHeightChanged) PostBuilding3D(Map3DBuilding.PreviewMessageJson(b.Id, null));
-        PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+        // 3D 로 보내기(WebView2)가 실패해도 판은 닫는다 — 3D 나가기 도중 예외로 나머지 복귀가 끊기지 않게
+        try
+        {
+            if (IsBuildingHeightChanged) PostBuilding3D(Map3DBuilding.PreviewMessageJson(b.Id, null));
+            PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+        }
+        catch (Exception ex) { _log?.Error($"[Map3D] 「건물 높이」 판 닫기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
         _bhBuilding = null;
         _bhDragStart = null;
         _bhError = null;
