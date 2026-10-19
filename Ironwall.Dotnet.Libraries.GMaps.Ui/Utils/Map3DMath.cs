@@ -41,6 +41,9 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
     /// <summary>overlay.screen 일 때 지켜보는 항목의 화면 좌표(바뀐 것만, <see cref="Map3DScreen"/>).</summary>
     public IReadOnlyList<Map3DScreenPoint>? Screens { get; init; }
 
+    /// <summary>overlay.screen 일 때 그 프레임의 3D 줌 · 방위(옛 3D 는 null, <see cref="Map3DScreen.ParseScreenView"/>).</summary>
+    public Map3DScreenView? ScreenView { get; init; }
+
     /// <summary>perf.stats 일 때 3D 프레임 단계 요약 줄(조작 중 move · 멈춤 idle, 각 600 자까지 — <see cref="Map3DPerf"/>).</summary>
     public IReadOnlyList<string>? PerfLines { get; init; }
 
@@ -335,7 +338,7 @@ public static class Map3DMath
                 return new Map3DMessage(type, null, o["job"]?.ToString(), null)
                     { Items = o["items"]?.Type == JTokenType.Integer ? o.Value<int>("items") : null };
             if (type == "overlay.resync") return new Map3DMessage(type, null, null, null);
-            if (type == "overlay.screen") return new Map3DMessage(type, null, null, null) { Screens = Map3DScreen.ParseScreens(o) };
+            if (type == "overlay.screen") return new Map3DMessage(type, null, null, null) { Screens = Map3DScreen.ParseScreens(o), ScreenView = Map3DScreen.ParseScreenView(o) };
             if (type == "pick") return ParsePick(o);
             if (type == "perf.stats")
             {

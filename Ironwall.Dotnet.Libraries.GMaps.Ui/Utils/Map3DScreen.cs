@@ -25,6 +25,9 @@ public sealed record Map3DWatchItem(string Key, string? Kind, int? Id, double La
 /// <summary>3D 가 보낸 화면 좌표(CSS px). 카메라 뒤면 X · Y = null. Visible = 화면 안인가.</summary>
 public readonly record struct Map3DScreenPoint(string Key, double? X, double? Y, bool Visible);
 
+/// <summary>overlay.screen 이 함께 실어 온 그 프레임의 3D 메르카토르 줌 · 방위(view) — 마커 화면 자리와 같은 프레임 값.</summary>
+public readonly record struct Map3DScreenView(double Zoom, double Bearing);
+
 public static class Map3DScreen
 {
     /// <summary>카메라 팝업의 지켜볼 key(카메라 id 당 하나).</summary>
@@ -59,6 +62,24 @@ public static class Map3DScreen
         return list;
     }
 
+    /// <summary>overlay.screen 의 view(그 프레임 줌 · 방위) 해석 — 없거나(옛 3D) 수가 아니면 null.</summary>
+    public static Map3DScreenView? ParseScreenView(JObject o)
+        => o["view"] is JObject v && Finite(v["zoom"]) is double z && Finite(v["bearing"]) is double b ? new Map3DScreenView(z, b) : null;
+
+    /// <summary>
+    /// 상자 오프셋을 키우고 돌릴 3D 줌 · 방위 — 마커 화면 자리와 같은 프레임 값(overlay.screen 의 view)이 먼저,
+    /// 없으면(옛 3D) 마지막 camera 메시지, 그것도 없으면(펼친 직후) 2D 와 같다고 본다.
+    /// ★ camera 메시지는 150 ms 에 한 번이라 그 방위로 돌리면 관성 회전 중 상자가 마커 둘레에서 계단처럼 떨렸다(2026-10-19).
+    /// </summary>
+    public static (double Zoom, double Bearing) OffsetView3D(Map3DScreenView? frame, Map3DCamera? lastCamera, double zoom2D, double bearing2D)
+        => frame is { } f ? (f.Zoom, f.Bearing) : lastCamera is { } c ? (c.Zoom, c.Bearing) : (zoom2D, bearing2D);
+
+    /// <summary>
+    /// 2D 지도 통지(3D 카메라를 2D 에 맞추며 생기는 팬 · 줌 · 회전)로 상자를 다시 놓을지 — 같은 프레임 값(view)을 받는 동안은
+    /// overlay.screen 한 출처만 놓는다(한 프레임에 한 번 · 2D 정수 반올림이 끼어들지 않게). 옛 3D(view 없음)면 예전처럼 놓는다.
+    /// </summary>
+    public static bool PlaceOn2DChange(Map3DScreenView? frame) => frame == null;
+
     /// <summary>3D 화면 CSS px → 지도 칸(outer) DIP. originX · originY = 3D 호스트 왼쪽 위의 지도 칸 좌표. ZoomFactor 가 수가 아니거나 0 이하면 1.</summary>
     public static (double X, double Y) ToOuter(double cssX, double cssY, double zoomFactor, double originX, double originY)
     {
@@ -82,6 +103,21 @@ public static class Map3DScreen
                                                       double zoom2D, double zoom3D, double bearing2D, double bearing3D)
     {
         var (ox, oy) = Offset2DTo3D(anchor2D.X - marker2D.X, anchor2D.Y - marker2D.Y, zoom2D, zoom3D, bearing2D, bearing3D);
+        return (marker3D.X + ox, marker3D.Y + oy);
+    }
+
+    /// <summary>
+    /// 2D 화면 오프셋(앵커 − 마커, 2D 줌 · 방위에서) → 줌 0 · 방위 0 기준 오프셋. <see cref="PopupTopLeft3DFromBase"/> 와 이으면 <see cref="PopupTopLeft3D"/> 와 같다.
+    /// ★ 3D 동안 상자마다 한 번 셈해 둔다 — 2D 지도는 camera 메시지(150 ms)마다 따라 움직이고 2D 화면 좌표는 정수라, 매번 2D 에서 다시 재면
+    ///   오프셋이 그때마다 ±1 px(× 3D 줌 배율) 튀어 상자가 잘게 떨렸다(2026-10-19 재현 하네스 Map3DPopupJitterTests).
+    /// </summary>
+    public static (double X, double Y) BaseOffset((double X, double Y) marker2D, (double X, double Y) anchor2D, double zoom2D, double bearing2D)
+        => Offset2DTo3D(anchor2D.X - marker2D.X, anchor2D.Y - marker2D.Y, zoom2D, 0d, bearing2D, 0d);
+
+    /// <summary>카메라 상자 왼쪽 위 = 마커 3D 화면 자리 + 줌 0 · 방위 0 기준 오프셋(<see cref="BaseOffset"/>)을 3D 줌 · 방위로 옮긴 것.</summary>
+    public static (double X, double Y) PopupTopLeft3DFromBase((double X, double Y) marker3D, (double X, double Y) baseOffset, double zoom3D, double bearing3D)
+    {
+        var (ox, oy) = Offset2DTo3D(baseOffset.X, baseOffset.Y, 0d, zoom3D, 0d, bearing3D);
         return (marker3D.X + ox, marker3D.Y + oy);
     }
 
