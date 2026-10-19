@@ -999,6 +999,24 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     //   벤더 OnMouseDown(클래스 핸들러)은 파생 base 미호출과 무관하게 항상 먼저 실행되어 _core.MouseDown(팬 Armed)을 세운다.
     private readonly PanSuppressGate _panSuppress = new();
     private bool _isRubberBanding;
+
+    /// <summary>지금 마우스 처리기(누름 · 이동 · 휠)를 일찍 끝내거나 가로채는 상태 — 진단 로그용(3D 를 나간 직후 2D 입력 상태 줄). 없으면 "없음".</summary>
+    internal string InputGateText()
+    {
+        var gates = new List<string>();
+        if (_linePress.HasValue) gates.Add("linePress");
+        if (_isImageDrag) gates.Add("imageDrag");
+        if (_isRubberBanding) gates.Add("rubberBand");
+        if (_panSuppress.IsSuppressing) gates.Add("panSuppress");
+        if (IsDragging) gates.Add("coreDrag");
+        if (IsTargetAimMode) gates.Add("aim");
+        if (IsSymbolPlacementMode) gates.Add("symbolPlacement");
+        if (IsHomePlacementMode) gates.Add("homePlacement");
+        if (IsAnchorDrawMode) gates.Add("anchorDraw");
+        if (IsMeasuring) gates.Add("measure");
+        if (IsLineDrawing) gates.Add("lineDrawing");
+        return gates.Count == 0 ? "없음" : string.Join(",", gates);
+    }
     private Point? _rubberStart;
     private Point? _rubberCurrent;
     // [앵커 그리기] 사이트 고정 영역을 지도에서 드래그로 그리는 모드 — 러버밴드 마퀴 재사용, 릴리스 시 NW/SE 통지. (FR-B3)
