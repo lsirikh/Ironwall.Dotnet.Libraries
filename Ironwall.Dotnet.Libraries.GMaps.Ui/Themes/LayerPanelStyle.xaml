@@ -503,9 +503,57 @@
 						</Style.Triggers>
 					</Style>
 				</ItemsControl.Style>
+				<!--  잎 칸 — UIA 항목 id · 선택 상태(ItemStatus "선택됨"). 행 클릭 · Ctrl · Shift 판정은 패널(LayerSelection)  -->
+				<ItemsControl.ItemContainerStyle>
+					<Style TargetType="ContentPresenter">
+						<Setter Property="AutomationProperties.AutomationId" Value="{Binding Symbol.Id, StringFormat=GMaps.LayerPanel.Symbol.{0}}" />
+						<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsSelected}" Value="True">
+								<Setter Property="AutomationProperties.ItemStatus" Value="선택됨" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</ItemsControl.ItemContainerStyle>
 				<ItemsControl.ItemTemplate>
 					<DataTemplate DataType="{x:Type models:LayerTreeNode}">
-						<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource LeafNodeTemplate}" />
+						<!--
+							선택 = 좌측 3px 세로 바 · 키보드 초점 = 가는 고리 — 오버레이 순서 목록 행(LayerReorderItemStyle)과 같은 어휘(형태로 구분).
+							바는 들여쓰기 칸(-6px)에 그려 행 내용 자리를 옮기지 않는다.
+						-->
+						<Grid Background="Transparent">
+							<Rectangle
+								Width="3"
+								Margin="-6,3,0,3"
+								HorizontalAlignment="Left"
+								Fill="{DynamicResource PrimaryBrush}"
+								IsHitTestVisible="False"
+								RadiusX="1.5"
+								RadiusY="1.5"
+								Visibility="{Binding IsSelected, Converter={StaticResource BoolToVis}}" />
+							<Border
+								Margin="-3,0,0,0"
+								BorderBrush="{DynamicResource FocusRingBrush}"
+								BorderThickness="1"
+								CornerRadius="3"
+								IsHitTestVisible="False">
+								<Border.Style>
+									<Style TargetType="Border">
+										<Setter Property="Visibility" Value="Collapsed" />
+										<Style.Triggers>
+											<MultiDataTrigger>
+												<MultiDataTrigger.Conditions>
+													<Condition Binding="{Binding IsCurrent}" Value="True" />
+													<Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType={x:Type ctrl:LayerPanelControl}}}" Value="True" />
+												</MultiDataTrigger.Conditions>
+												<Setter Property="Visibility" Value="Visible" />
+											</MultiDataTrigger>
+										</Style.Triggers>
+									</Style>
+								</Border.Style>
+							</Border>
+							<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource LeafNodeTemplate}" />
+						</Grid>
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>
 			</ItemsControl>
@@ -579,6 +627,8 @@
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
 		<Setter Property="AutomationProperties.AutomationId" Value="{Binding Model.Id, StringFormat=GMaps.LayerPanel.Row.{0}}" />
 		<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+		<!--  선택은 노드(IsSelected)에 둔다 — 패널 전체 다중 선택(LayerSelection) · 지도 연동이 같은 값을 본다. UIA SelectionItemPattern 도 이 값을 따른다.  -->
+		<Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="ListBoxItem">
@@ -603,6 +653,11 @@
 				</ControlTemplate>
 			</Setter.Value>
 		</Setter>
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding IsSelected}" Value="True">
+				<Setter Property="AutomationProperties.ItemStatus" Value="선택됨" />
+			</DataTrigger>
+		</Style.Triggers>
 	</Style>
 
 	<!--
@@ -615,7 +670,8 @@
 		<Setter Property="Background" Value="Transparent" />
 		<Setter Property="BorderThickness" Value="0" />
 		<Setter Property="Padding" Value="0" />
-		<Setter Property="SelectionMode" Value="Single" />
+		<!--  여러 행 선택(Ctrl · Shift) — 행 클릭은 패널(LayerPanelControl)이 먼저 받아 판정하고, 목록은 노드 IsSelected 를 비춘다  -->
+		<Setter Property="SelectionMode" Value="Extended" />
 		<Setter Property="IsTextSearchEnabled" Value="False" />
 		<Setter Property="ScrollViewer.CanContentScroll" Value="False" />
 		<Setter Property="VirtualizingPanel.IsVirtualizing" Value="False" />
