@@ -401,6 +401,38 @@ public class BuildingHeightScenarioTests
         Assert.Equal(count, rig.Sent("building.preview").Count);
     });
 
+    // 3D 빈 땅 클릭(2026-10-19 사용자 결정) — map-3d 는 건물 · 빈 땅 모두 빈 pick 을 먼저 보내고, 건물 아닌 땅이면 building.none 을 더 보낸다.
+    // 빈 pick 만으로는 판을 닫지 않고(건물 클릭과 구분 못 함 — 빈 pick 경로는 바꾸지 않았다) building.none 이면 판을 닫는다 — 미리보기 중이면 원래 높이(취소).
+    [Fact]
+    public void should_close_panel_and_cancel_preview_when_empty_ground_is_clicked_in_3d() => Run(rig =>
+    {
+        const string None = "{\"type\":\"building.none\"}";
+        rig.Enter3D();
+        var vm = rig.Vm;
+        rig.PickBuilding(7, 14.5);
+        vm.BuildingHeightFloorsText = "12";                                 // 미리보기 36 m
+        rig.PickBuilding(7, 14.5);                                         // 같은 건물 다시 누름 — 판 그대로
+        Assert.True(vm.IsBuildingHeightPanelOpen);
+        Assert.Equal(36.0, vm.BuildingHeightPreview);
+
+        rig.Posts.Clear();
+        Assert.True(rig.From3D(None));                                      // 빈 땅(map-3d: 빈 pick 뒤 building.none)
+        Assert.False(vm.IsBuildingHeightPanelOpen);
+        AssertPreview(rig.Sent("building.preview").Single(), 7, null);     // 원래 높이로
+        Assert.Equal(JTokenType.Null, rig.Sent("building.select").Single()["id"]!.Type);
+        Assert.Empty(rig.Server.Requests);                                  // 저장하지 않았다
+        Assert.Equal("3D", vm.Map3DStatusText);                             // 3D 에는 남는다
+
+        rig.Posts.Clear();
+        Assert.True(rig.From3D(None));                                      // 판이 닫혀 있으면 아무 일 없음
+        Assert.Empty(rig.Posts);
+
+        rig.PickBuilding(8, 6.0);                                           // 바꾸지 않은 판도 닫는다(미리보기 보낼 것 없음)
+        Assert.True(rig.From3D(None));
+        Assert.False(vm.IsBuildingHeightPanelOpen);
+        Assert.Empty(rig.Sent("building.preview"));
+    });
+
     // ─────────────── 4. 권한 · 연타 · 실패 ───────────────
 
     [Fact]

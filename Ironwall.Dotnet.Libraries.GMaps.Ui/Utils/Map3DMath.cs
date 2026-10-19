@@ -29,7 +29,7 @@ public readonly record struct Map3DZoomGate(double Enter, double Exit, double Pr
 /// <summary>3D 마우스가 가리키는 땅(지형 · 건물 지붕) — 경도 · 위도 · 고도(m, 모르면 null). 좌표 칩용.</summary>
 public readonly record struct Map3DCursor(double Lon, double Lat, double? Alt);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor" | "building". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor" | "building" | "building.none". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
@@ -90,25 +90,6 @@ public static class Map3DMath
         if (!hasScene || double.IsNaN(zoom)) return false;
         return zoom >= (wasActive ? exitZoom : enterZoom);
     }
-
-    /// <summary>3D 가 보고한 줌으로 2D 로 돌아가야 하는가(&lt; 16.5).</summary>
-    public static bool ShouldLeave3D(double reportedZoom) => ShouldLeave3D(reportedZoom, ExitZoom);
-
-    /// <summary>3D 가 보고한 줌으로 2D 로 돌아가야 하는가(&lt; 설정의 이탈 줌).</summary>
-    public static bool ShouldLeave3D(double reportedZoom, double exitZoom) => reportedZoom < exitZoom;
-
-    /// <summary>
-    /// 줌으로 2D 로 돌아가야 하는가 — 「이 영역 3D 로 보기」로 들어온 3D(areaView)는 영역 전체를 보려고 멀리 빼면 이탈 줌보다 낮아지므로
-    /// 줌으로는 나가지 않는다(나가기 단추 · ESC 로만). 줌 게이트로 들어온 3D 는 &lt; 이탈 줌이면 돌아간다.
-    /// </summary>
-    public static bool ShouldLeave3D(double reportedZoom, double exitZoom, bool areaView) => !areaView && ShouldLeave3D(reportedZoom, exitZoom);
-
-    /// <summary>
-    /// 나가기(단추 · ESC) 때 2D 에 맞출 카메라 — 「영역 보기」로 들어왔으면 들어오기 전 2D 자리, 아니면 3D 의 마지막 카메라
-    /// (없으면 null = 2D 를 그대로 둔다).
-    /// </summary>
-    public static Map3DCamera? ExitCamera(bool areaView, Map3DCamera? beforeAreaView, Map3DCamera? last3D)
-        => areaView && beforeAreaView != null ? beforeAreaView : last3D;
 
     /// <summary>
     /// 나가기 때 2D 에 맞출 카메라(2026-10-18 — 진입 방식과 상관없이) — 3D 로 들어오기 직전 2D 자리,
@@ -398,6 +379,7 @@ public static class Map3DMath
             }
             if (type == "building")
                 return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b } : null;
+            if (type == "building.none") return new Map3DMessage(type, null, null, null);   // 건물 아닌 땅을 눌렀다(2026-10-19)
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;

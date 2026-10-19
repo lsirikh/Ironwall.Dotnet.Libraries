@@ -91,8 +91,6 @@ public class Map3DSettingsTests
     [Fact]
     public void should_use_configured_exit_zoom_when_leaving_or_staying()
     {
-        Assert.True(Map3DMath.ShouldLeave3D(18.4, 18.5));
-        Assert.False(Map3DMath.ShouldLeave3D(17.0, 16.0));
         Assert.True(Map3DMath.ShouldStay3DAfterMove(16.2, insideScene: true, exitZoom: 16.0));
         Assert.False(Map3DMath.ShouldStay3DAfterMove(16.2, insideScene: true, exitZoom: 16.5));
     }

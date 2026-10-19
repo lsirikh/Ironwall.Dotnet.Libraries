@@ -79,6 +79,8 @@ public partial class MapViewModel
         NotifyOfPropertyChange(nameof(IsMap3DShown));
         NotifyOfPropertyChange(nameof(IsMap3DZoomControlVisible));
         NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible));
+        NotifyOfPropertyChange(nameof(IsCompassShown));   // 3D 에서는 방향 링이 나침반 대신(MapViewModel.Map3DNav)
+        if (state != Map3DState.Shown) StopAllMap3DMoves();   // 누르고 있던 이동을 멈춘다
     }
 
     private RelayCommand? _exitMap3DCommand;
@@ -203,7 +205,7 @@ public partial class MapViewModel
             if (!Map3DGuide.ShouldGuideAfterLogin(_map3DRevealedBehindLogin, _map3DState == Map3DState.Shown)) return;
             _map3DRevealedBehindLogin = false;
             _log?.Info("[Map3D] 로그인 직후 3D 안내");
-            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("shown"));   // 3D 위 안내 — 줌 표기 없이
+            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.ShownText(Map3DHost.HostMode));   // 3D 위 안내 — 줌 표기 없이 · Esc 는 네이티브 창 3D 만
             RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.AfterLoginShow, timedBar: false);
         });
     }
@@ -998,6 +1000,15 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
+        if (msg.Type == "building.none")
+        {
+            // 3D 빈 땅(건물 · 마커 아님) 클릭 — 3D 는 윤곽을 지웠다. 판도 닫는다(미리보기 중이면 원래 높이로 = 취소, 2026-10-19 사용자 결정)
+            if (_map3DState != Map3DState.Shown || !IsBuildingHeightPanelOpen) return;
+            _log?.Info("[Map3D] 빈 땅 클릭 → 「건물 높이」 판 닫기");
+            try { CloseBuildingHeightPanel(clearUndo: false); }
+            catch (Exception ex) { _log?.Error($"[Map3D] 빈 땅 클릭 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
         if (msg.Pick is { } pick)
         {
             try { OnMap3DPick(pick); }
@@ -1006,6 +1017,7 @@ public partial class MapViewModel
         }
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
+        SetMap3DNavCamera(cam);   // 방향 링이 3D 방위를 따라간다
         NoteMap3DCameraForFlyTo(msg.Reason);   // 3D 조작 중이면 이벤트 이동이 양보한다(MapViewModel.EventFlyTo)
         // 3D 에서는 줌으로 나가지 않는다(진입 방식과 상관없이 나가기 · ESC 만 — Map3DMath.ShouldSync2DToCamera).
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를
@@ -1073,7 +1085,12 @@ public partial class MapViewModel
     {
         if (MainMap == null) return;
         if (!IsMap3DBlockedByInputMode()) { QueueMap3DGate(); return; }
-        if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, "input-mode");
+        if (_map3DState == Map3DState.Shown)
+        {
+            // 모드를 끝낸 그 자리에서 곧바로 다시 3D 로 들어가지 않는다 — 「나가기」와 같은 진입 보류(지도를 움직여 진입 줌 · 영역을 새로 만족할 때까지, 2026-10-19 사용자 결정)
+            _map3DEntrySuppressed = true;
+            Leave3D(Map3DExitCamera, "input-mode");
+        }
         else if (_map3DState == Map3DState.Pending)
         {
             _log?.Info("[Map3D] 로딩 중 입력 모드 시작 → 취소");

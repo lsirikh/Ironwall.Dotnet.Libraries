@@ -47,14 +47,6 @@ public class Map3DAreaZoomTests
         Assert.Equal(expected, Map3DMath.Decide(zoom, wasActive, hasScene: true, gate.Enter, gate.Exit));
     }
 
-    [Fact]
-    public void should_leave_3d_below_area_exit_when_camera_reports_zoom()
-    {
-        var gate = Map3DMath.AreaGate(19, 17, 16.5, 15);
-        Assert.True(Map3DMath.ShouldLeave3D(18.4, gate.Exit));
-        Assert.False(Map3DMath.ShouldLeave3D(18.5, gate.Exit));
-    }
-
     // ── 로컬 우선 규칙 ──
 
     [Theory]

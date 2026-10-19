@@ -116,11 +116,17 @@ public class Map3DHudTests
         Assert.Equal("1Km", far.Label);
     }
 
+    // 기대값 변경(2026-10-19 사용자 결정): WPF 안 3D(composition)는 Esc 로 나가지 않고 「나가기」 단추로만 나간다 —
+    // 옛 기대("ESC" 포함)는 실제와 다른 안내를 고정하고 있었다. Esc 는 Esc 로 나가는 네이티브 창 3D(hwnd)에서만 말한다.
     [Fact]
     public void should_guide_shown_3d_without_zoom_wording()
     {
         var text = Map3DGuide.StageText("shown");
         Assert.DoesNotContain("줌", text);
-        Assert.Contains("ESC", text);
+        Assert.DoesNotContain("ESC", text);
+        Assert.Contains("나가기", text);
+        Assert.Equal(text, Map3DGuide.ShownText("composition"));
+        Assert.Contains("ESC", Map3DGuide.ShownText("hwnd"));
+        Assert.DoesNotContain("줌", Map3DGuide.ShownText("hwnd"));
     }
 }

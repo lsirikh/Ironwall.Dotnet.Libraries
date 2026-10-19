@@ -1424,7 +1424,8 @@ public partial class MapViewModel : BasePanelViewModel,
         SetAimStatus(skipped > 0 ? $"{moved}개 이동 저장(잠금 {skipped}개 제외)" : $"{moved}개 이동 저장", true);
     }
 
-    /// <summary>묶음 회전 확정 → Undo 1단위(동기 기록) 후 멤버별 DB 영속(그룹 이동과 같은 저장 경로). 권한 없으면 원위치.</summary>
+    /// <summary>묶음 회전 확정 → 멤버별 DB 영속(그룹 이동과 같은 저장 경로) 후 저장된 멤버만 Undo 1단위. 권한 없으면 원위치.
+    /// 저장 실패 멤버는 회전 전 자리로 되돌린다(화면 = DB, 2026-10-19 사용자 결정).</summary>
     private async void OnGroupRotateCompleted(System.Collections.Generic.IReadOnlyList<GroupRotationSession.Original> changed, double angle)
     {
         if (changed == null || changed.Count == 0) return;
@@ -1435,25 +1436,40 @@ public partial class MapViewModel : BasePanelViewModel,
             ShowNoMapEditPermissionInfo();
             return;
         }
-        using (_editRecorder?.BeginBatch($"그룹 회전 {changed.Count}개"))
-        {
-            foreach (var o in changed)
-            {
-                if (o.LinePoints != null) _editRecorder?.RecordLineGeometry(o.Marker, o.LinePoints, o.Position);
-                else _editRecorder?.RecordTransform(new MarkerEditCompletedEventArgs(o.Marker, o.Position, o.Marker.Width, o.Marker.Height, o.Bearing));
-                if (o.DetectionBearing is double db && o.Marker is IPidsEditableMarker p)
-                    _editRecorder?.RecordPropertyChange(o.Marker, nameof(IPidsEditableMarker.DetectionBearing), db, p.DetectionBearing);
-            }
-        }
         _groupSelection?.RefreshAdorner();
         RefreshGroupPropertyPanelValues();   // 열린 그룹 속성 판의 회전 · 감시 방향 칸을 새 값으로
-        int saved = 0;
+        var saved = new System.Collections.Generic.List<GroupRotationSession.Original>();
+        int failed = 0;
         foreach (var o in changed)
         {
             if (o.Marker.IsDisposed) continue;
-            try { await DbUpdateProcess(o.Marker); saved++; } catch (Exception ex) { _log?.Error($"그룹 회전 영속 실패: {ex.Message}"); }
+            try { await DbUpdateProcess(o.Marker); saved.Add(o); }
+            catch (Exception ex)
+            {
+                _log?.Error($"그룹 회전 영속 실패: {ex.Message}");
+                GroupRotationSession.Restore(o);   // DB 는 회전 전 그대로 — 화면도 회전 전 자리로
+                failed++;
+            }
         }
-        SetAimStatus($"{saved}개 회전 {Helpers.GroupRotationMath.FormatAngle(angle)} 저장", true);
+        if (saved.Count > 0)
+            using (_editRecorder?.BeginBatch($"그룹 회전 {saved.Count}개"))
+            {
+                foreach (var o in saved)
+                {
+                    if (o.LinePoints != null) _editRecorder?.RecordLineGeometry(o.Marker, o.LinePoints, o.Position);
+                    else _editRecorder?.RecordTransform(new MarkerEditCompletedEventArgs(o.Marker, o.Position, o.Marker.Width, o.Marker.Height, o.Bearing));
+                    if (o.DetectionBearing is double db && o.Marker is IPidsEditableMarker p)
+                        _editRecorder?.RecordPropertyChange(o.Marker, nameof(IPidsEditableMarker.DetectionBearing), db, p.DetectionBearing);
+                }
+            }
+        if (failed > 0)
+        {
+            _groupSelection?.RefreshAdorner();
+            RefreshGroupPropertyPanelValues();
+        }
+        string savedText = $"{saved.Count}개 회전 {Helpers.GroupRotationMath.FormatAngle(angle)} 저장";
+        string failedText = $"{failed}개 저장 실패 — 원위치";
+        SetAimStatus(failed == 0 ? savedText : saved.Count == 0 ? failedText : $"{savedText} · {failedText}", true);
     }
 
     /// <summary>묶음 회전 키보드 폴백(드래그 우선 규칙 ①). ] / [ = ±1°(Shift ±0.1°) 미리보기, Enter 확정, Esc 원위치.
@@ -3794,6 +3810,8 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void ExecuteLoadImageOverlay(object obj)
     {
         if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 오버레이 추가 차단"); ShowNoMapEditPermissionInfo(); return; }
+        // 편집 모드에서만(2026-10-19 사용자 결정) — 단추 · Ctrl+I 같은 명령이라 둘 다 여기서 막고 짧게 알린다(CanExecute 는 그대로)
+        if (!IsEditModeEnabled) { SetAimStatus("편집 모드에서 쓸 수 있습니다", autoHide: true); return; }
         if (RejectWhileImageCropPanelOpen()) return;   // 자르기 판이 떠 있으면 파일 고르기 창을 열지 않는다(단축키 무반응 대신 안내)
         try
         {
