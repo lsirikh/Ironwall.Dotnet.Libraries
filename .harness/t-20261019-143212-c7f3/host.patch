@@ -1,0 +1,566 @@
+diff --git a/Dotnet.Monitoring.Solution.Tests/Maps/MapToolbarScenarioTests.cs b/Dotnet.Monitoring.Solution.Tests/Maps/MapToolbarScenarioTests.cs
+index d2bf1ba6..8bb9c06b 100644
+--- a/Dotnet.Monitoring.Solution.Tests/Maps/MapToolbarScenarioTests.cs
++++ b/Dotnet.Monitoring.Solution.Tests/Maps/MapToolbarScenarioTests.cs
+@@ -123,7 +123,7 @@ public class MapToolbarScenarioTests
+ 
+     [TestMethod]
+     [TestProperty("Scenario", "SHL-057")]
+-    public void should_show_the_map_combo_four_nav_buttons_two_measures_rotate_tilt_and_the_edit_switch_on_the_map_command_strip()
++    public void should_show_the_map_combo_four_nav_buttons_two_measures_rotate_and_the_edit_switch_without_tilt_on_the_map_command_strip()
+     {
+         var r = HeadlessUi.OnSta(() =>
+         {
+@@ -141,7 +141,8 @@ public class MapToolbarScenarioTests
+         CollectionAssert.AreEqual(nav, r.tips.Where(nav.Contains).ToList(), "② 이동 단추 4 — 이 순서");
+         CollectionAssert.IsSubsetOf(new[] { "길이 측정", "넓이 측정" }, r.tips, "③ 측정 2");
+         CollectionAssert.Contains(r.tips, "지도 회전 모드 (Ctrl+Shift+R)", "④ 회전 토글");
+-        Assert.IsTrue(r.tilt && r.angle, "④ 기울임 토글 · 각도 단추");
++        Assert.IsFalse(r.tilt || r.angle, "④ 기울임 토글 · 각도 단추는 제거됨(2026-10-19)");
++        Assert.IsFalse(r.tips.Any(t => t.Contains("기울", StringComparison.Ordinal)), "기울이기 툴팁 없음: " + string.Join(",", r.tips));
+         Assert.IsTrue(r.edit, "⑤ 편집 스위치(권한 있음)");
+         Assert.IsTrue(r.layerId, "레이어 단추 id");
+         Assert.IsFalse(r.overflow, "1250 폭에서는 다 들어간다");
+@@ -334,46 +335,31 @@ public class MapToolbarScenarioTests
+         Assert.IsTrue(r.locked.Item3, "꺼져도 이유 툴팁이 뜬다");
+     }
+ 
+-    // ─────────────── SHL-062 기울임 각도 팝업 ───────────────
++    // ─────────────── SHL-062 기울임 각도 팝업(2026-10-19 제거) ───────────────
+ 
+     [TestMethod]
+     [TestProperty("Scenario", "SHL-062")]
+-    public void should_step_the_tilt_angle_by_five_degrees_within_zero_to_thirty_five()
+-        => KeepAppSettings(() =>
++    public void should_have_no_tilt_angle_popup_shortcut_or_view_model_members_when_tilt_removed()
++    {
++        var r = HeadlessUi.OnSta(() =>
+         {
+-            var r = HeadlessUi.OnSta(() =>
+-            {
+-                // 뷰를 붙이지 않는다 — 기울임을 켜면 각도 팝업(실제 Popup 창)이 열린다.
+-                using var s = new Stage(withView: false);
+-                var control = new GMapCustomControl();
+-                s.Map.Set("<MainMap>k__BackingField", control);
+-                var view = new MapView();                                                  // 팝업 안 슬라이더 · 단추의 정의만 읽는다(붙이지 않는다)
+-                var slider = (Slider)LogicalTreeHelper.FindLogicalNode(view, "x") ?? FindSlider(view);
+-                s.Map.Vm.ToggleTiltFeatureCommand.Execute(null);
+-                var on = s.Map.Vm.IsTiltFeatureEnabled;
+-                var angles = new List<double> { s.Map.Vm.TiltAngleDeg };
+-                for (var i = 0; i < 10; i++) { if (s.Map.Vm.StepTiltAngleCommand.CanExecute("5")) s.Map.Vm.StepTiltAngleCommand.Execute("5"); angles.Add(s.Map.Vm.TiltAngleDeg); }
+-                var top = (s.Map.Vm.TiltAngleDeg, canUp: s.Map.Vm.StepTiltAngleCommand.CanExecute("5"));
+-                for (var i = 0; i < 10; i++) { if (s.Map.Vm.StepTiltAngleCommand.CanExecute("-5")) s.Map.Vm.StepTiltAngleCommand.Execute("-5"); angles.Add(s.Map.Vm.TiltAngleDeg); }
+-                var bottom = (s.Map.Vm.TiltAngleDeg, canDown: s.Map.Vm.StepTiltAngleCommand.CanExecute("-5"));
+-                s.Map.Vm.ToggleTiltAnglePopupCommand.Execute(null);
+-                var popupAfterClose = s.Map.Vm.IsTiltAnglePopupOpen;
+-                return (on, angles, top, bottom, slider.TickFrequency, slider.IsSnapToTickEnabled, slider.Minimum, max: s.Map.Vm.TiltMaxAngleDeg, popupAfterClose);
+-            });
+-
+-            Assert.IsTrue(r.on, "기울임 켬");
+-            Assert.IsTrue(r.angles.Zip(r.angles.Skip(1), (a, b) => Math.Abs(b - a)).All(d => d == 0 || Math.Abs(d - 5) < 0.01), "한 번에 5°: " + string.Join(",", r.angles));
+-            Assert.AreEqual(35, r.top.TiltAngleDeg, 0.01, "위 끝 35°");
+-            Assert.IsFalse(r.top.canUp, "35° 에서 +5 꺼짐");
+-            Assert.AreEqual(0, r.bottom.TiltAngleDeg, 0.01, "아래 끝 0°");
+-            Assert.IsFalse(r.bottom.canDown, "0° 에서 −5 꺼짐");
+-            Assert.AreEqual(5, r.TickFrequency, "슬라이더 눈금 5°");
+-            Assert.IsTrue(r.IsSnapToTickEnabled, "눈금에 붙는다");
+-            Assert.AreEqual(0, r.Minimum);
+-            Assert.AreEqual(35, r.max, "상한 35°");
+-            Assert.IsFalse(r.popupAfterClose, "닫기 → 팝업 닫힘");
+-            return 0;
++            using var s = new Stage(withView: false);                                      // 앱 자원(MaterialDesign 등)만 깐다
++            var view = new MapView();                                                      // 정의만 읽는다(붙이지 않는다)
++            var slider = FindSlider(view);
++            var keys = view.InputBindings.OfType<KeyBinding>().Select(k => $"{k.Modifiers}+{k.Key}").ToList();
++            var control = new GMapCustomControl();
++            return (slider, keys, control.IsTiltFeatureEnabled, control.TiltDeg);
+         });
++        var tiltMembers = typeof(Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps.MapViewModel)
++            .GetMembers(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
++            .Select(m => m.Name).Where(n => n.Contains("Tilt", StringComparison.Ordinal)).ToList();
++
++        Assert.IsNull(r.slider, "각도 판 슬라이더(GMaps.Tilt.AngleSlider)가 남아 있다");
++        CollectionAssert.DoesNotContain(r.keys, "Control, Shift+T", "Ctrl+Shift+T 가 아직 묶여 있다");
++        Assert.AreEqual(0, tiltMembers.Count, "VM 기울이기 멤버: " + string.Join(",", tiltMembers));
++        Assert.IsFalse(r.IsTiltFeatureEnabled, "지도는 항상 기울기 꺼짐");
++        Assert.AreEqual(0.0, r.TiltDeg);
++    }
+ 
+     private static Slider FindSlider(DependencyObject root)
+     {
+@@ -502,9 +488,8 @@ public class MapToolbarScenarioTests
+                     throw new AssertFailedException($"저장 안 됨: vm={s.Map.Vm.IsCenterCrosshairVisible} model={s.Map.Setup.MapInstrumentVisibility?.Crosshair} file={(at < 0 ? "(키 없음)" : text.Substring(at, Math.Min(200, text.Length - at)))}");
+                 }
+                 var saved = s.Map.Setup.MapInstrumentVisibility;
+-                var tilt = items["지도 기울이기"];
+                 return (flips, saved.Crosshair, saved.Compass, gestures: items.Values.Select(i => i.InputGestureText).ToList(),
+-                        tiltBound: AutomationProperties.GetAutomationId(tilt) == "GMaps.Tilt.MenuToggle");
++                        tiltGone: !items.ContainsKey("지도 기울이기") && items.Values.All(i => !(AutomationProperties.GetAutomationId(i) ?? "").StartsWith("GMaps.Tilt.", StringComparison.Ordinal)));
+             });
+ 
+             foreach (var (name, f) in r.flips)
+@@ -513,8 +498,9 @@ public class MapToolbarScenarioTests
+                 Assert.AreEqual(f.Before, f.Back, $"{name} — 되돌아온다");
+             }
+             Assert.IsTrue(r.Crosshair && r.Compass, "고른 상태가 설정 모델에 남는다(영속)");
+-            CollectionAssert.IsSubsetOf(new[] { "Ctrl+Shift+C", "Ctrl+Shift+W", "Ctrl+Shift+F", "Ctrl+Shift+X", "Ctrl+Shift+T" }, r.gestures);
+-            Assert.IsTrue(r.tiltBound, "보기>지도 기울이기(GMaps.Tilt.MenuToggle)");
++            CollectionAssert.IsSubsetOf(new[] { "Ctrl+Shift+C", "Ctrl+Shift+W", "Ctrl+Shift+F", "Ctrl+Shift+X" }, r.gestures);
++            CollectionAssert.DoesNotContain(r.gestures, "Ctrl+Shift+T", "보기 메뉴에 기울이기 단축키가 남아 있다");
++            Assert.IsTrue(r.tiltGone, "보기>지도 기울이기(GMaps.Tilt.MenuToggle)는 제거됨(2026-10-19)");
+             return 0;
+         });
+ 
+diff --git a/Dotnet.Monitoring.Solution.UiTests/Functional/LineDrawingHudScaleDiagTests.cs b/Dotnet.Monitoring.Solution.UiTests/Functional/LineDrawingHudScaleDiagTests.cs
+index 14f438de..b155db5e 100644
+--- a/Dotnet.Monitoring.Solution.UiTests/Functional/LineDrawingHudScaleDiagTests.cs
++++ b/Dotnet.Monitoring.Solution.UiTests/Functional/LineDrawingHudScaleDiagTests.cs
+@@ -250,7 +250,7 @@ public sealed class LineDrawingHudScaleDiagTests
+ 
+             // ══ (c) 틸트 ON 재측정 ═══════════════════════════════════════════════
+             var toggle = MapProbe.FindOnSurface(map, toolbar, TiltToggleId);
+-            if (toggle is null) results.Add($"ⓘ (c) 툴바 틸트 토글({TiltToggleId}) 미노출 — 틸트 축 검증 생략");
++            if (toggle is null) results.Add($"✅ (c) 툴바 틸트 토글({TiltToggleId}) 없음 — 지도 기울이기 제거됨(2026-10-19), 틸트 축 검증 생략");
+             else if (!toggle.IsEnabled) results.Add("ⓘ (c) 틸트 토글 비활성(앵커 잠금 추정) — 틸트 축 검증 생략");
+             else
+             {
+diff --git a/Dotnet.Monitoring.Solution.UiTests/Functional/MapComponentR24Tests.cs b/Dotnet.Monitoring.Solution.UiTests/Functional/MapComponentR24Tests.cs
+index 58b10c01..95c88bea 100644
+--- a/Dotnet.Monitoring.Solution.UiTests/Functional/MapComponentR24Tests.cs
++++ b/Dotnet.Monitoring.Solution.UiTests/Functional/MapComponentR24Tests.cs
+@@ -201,7 +201,7 @@ public sealed class MapComponentR24Tests
+             }
+             var allOpen = sizes.Skip(1).All(s => !s.Contains("닫힘", StringComparison.Ordinal));
+             p.Check("SC-MAP24-010", () => card != null && allOpen && sizes.Skip(1).All(Close) && inside,
+-                $"카드 [{string.Join(" · ", sizes)}] · 지도 안 {inside} · 틸트 {(tilted ? "함" : "토글 없음")}");
++                $"카드 [{string.Join(" · ", sizes)}] · 지도 안 {inside} · 틸트 {(tilted ? "함" : "토글 없음(기울이기 제거됨)")}");
+             p.Check("SC-MAP24-011", () => stateTexts.Any(t => t.Contains("설정 끔 / 관측 켜짐", StringComparison.Ordinal)),
+                 $"상태 칸 글 [{string.Join(" | ", stateTexts)}] (히터 설정 끔 · 관측 켜짐 → '설정 끔 / 관측 켜짐' 전체)");
+ 
+diff --git a/Dotnet.Monitoring.Solution.UiTests/Functional/MapSurfaceR27Tests.cs b/Dotnet.Monitoring.Solution.UiTests/Functional/MapSurfaceR27Tests.cs
+index 1e4b2419..88d88d4c 100644
+--- a/Dotnet.Monitoring.Solution.UiTests/Functional/MapSurfaceR27Tests.cs
++++ b/Dotnet.Monitoring.Solution.UiTests/Functional/MapSurfaceR27Tests.cs
+@@ -230,7 +230,12 @@ public sealed class MapSurfaceR27Tests
+                 p.Check("MAP-R27-008", () => angle0.Length > 0 && (angle1 != angle0 || up is null || !up.IsEnabled) && angle2 == angle0,
+                     $"각도 글 '{angle0}' → 한 단계 위 '{angle1}' → 한 단계 아래 '{angle2}'");
+             }
+-            else p.Skip("MAP-R27-007", "GMaps.Tilt.Toggle 없음(설정에서 기울이기 꺼짐?)");
++            else
++            {
++                // 지도 기울이기는 2026-10-19 제거 — 토글이 없는 것이 정상, 배지 · 각도 글도 없어야 한다
++                p.Check("MAP-R27-007", () => Find("GMaps.Tilt.Badge") is null && Find("GMaps.Tilt.AngleText") is null, "기울이기 제거됨 — 토글 · 배지 · 각도 글 없음");
++                p.Skip("MAP-R27-008", "기울이기 제거됨(2026-10-19) — 각도 단계 없음");
++            }
+ 
+             // ── MAP-R27-009 지도 메뉴 — 바탕 지도 항목 읽기(실행은 MAP-R27-010) ──
+             UiToast.Status("MAP-R27-009 지도 메뉴");
+diff --git a/Dotnet.Monitoring.Solution.UiTests/Functional/TiltRuntimeDiagTests.cs b/Dotnet.Monitoring.Solution.UiTests/Functional/TiltRuntimeDiagTests.cs
+index 0bcc5a79..fec00dd1 100644
+--- a/Dotnet.Monitoring.Solution.UiTests/Functional/TiltRuntimeDiagTests.cs
++++ b/Dotnet.Monitoring.Solution.UiTests/Functional/TiltRuntimeDiagTests.cs
+@@ -14,29 +14,21 @@ using Xunit.Abstractions;
+ namespace Dotnet.Monitoring.Solution.UiTests.Functional;
+ 
+ /// <summary>
+-/// 지도 2.5D 기울이기(틸트) 런타임 진단(map-tilt-25d PRD FR-15 ⑦ / Plan TEST-03) — 앱 1회 기동으로 (a)~(f) 를 순서대로 돌리고
+-/// 결과 시트(✅/✖/ⓘ)·대조표(<c>tilt-diag*.png</c>)·<c>tilt-diag.log</c> 를 artifacts 에 남긴다.
++/// 지도 기울이기 제거 확인(2026-10-19, 사용자 요청 "이 기능은 제거해도될 것 같다. 현재 동작도 안되고") — 예전엔 map-tilt-25d 런타임 진단
++/// ((a) 툴바 토글 실클릭 → 배지 · (b) 줌 게이트 왕복 · (c) 각도 35° · (d) 회전 빌보드 · (e) 카메라 리더선 · (f) OFF 복귀)이었다.
++/// 지금은 앱 1회 기동에서 다음만 본다(결과 시트 ✅/✖/ⓘ · <c>tilt-diag.log</c>):
+ /// <list type="number">
+-///   <item>(a) 툴바 <c>GMaps.Tilt.Toggle</c> <b>실마우스 클릭</b>(IsChecked OneWay + Command 구조 — TogglePattern 금지) → ON, 줌 슬라이더 18.5 → <c>GMaps.Tilt.Badge</c> "기울임 20°"</item>
+-///   <item>(b) 줌 17.5(히스테리시스 유지 — 배지 잔존) · 17.0(해제 — 배지 소멸) · 18.5(재진입) 게이트 왕복</item>
+-///   <item>(c) <c>GMaps.Tilt.AngleSlider</c> 35 → 배지 "기울임 35°"(슬라이더 미노출 시 Ctrl+↑ ×3 폴백, ⓘ)</item>
+-///   <item>(d) 회전 Ctrl+→ ×18 = 90° 후 PIDS 아이콘 크롭 DiffPixels — 빌보드(FR-10)면 글리프 불변. 배경 타일이 함께 도는 크롭이라 ⓘ 진단</item>
+-///   <item>(e) 카메라 마커 더블클릭 → 팝업, 리더선(빨강 점선) 끝점이 마커 중심 ±10 px 안에 닿는가(InnerToOuter, FR-05) ⓘ</item>
+-///   <item>(f) 토글 OFF → 배지 소멸 · 줌 18.5 화면 크롭이 (a) 이전 OFF 기준과 픽셀 동일(RenderTransform 항등)</item>
++///   <item>(a) 지도 화면에 <c>GMaps.Tilt.Toggle/AngleButton/AngleSlider/Badge/MenuToggle</c> 가 없다</item>
++///   <item>(b) 줌 18.5(예전 게이트 이상)에서 Ctrl+Shift+T · Ctrl+↑ 를 눌러도 「기울임 N°」 배지가 생기지 않는다</item>
++///   <item>(c) 툴바 회전 토글(지도 회전 모드)은 그대로 보인다</item>
+ /// </list>
+-/// <para><b>Skip 게이트</b>: 계정 env · 대화형 세션 Active(WTS). DB(monitor_db)는 (e) 카메라 탐색에만 쓰며 미가용이면 (e) 를 ⓘ 로 남긴다.</para>
+-/// <para><b>전제</b>: <see cref="EnvironmentGuard"/> 가 스왑본에 <c>AppSettings.MapTilt.IsEnabled=false</c> 를 강제 기록했으므로 부팅은 OFF 다 —
+-/// 파일 값은 시작 시 ⓘ 로 기록하고, ON 은 오직 툴바 토글(실마우스)로 켠다. 종료 시 OFF 복귀·각도 20 복귀·회전 리셋·줌 원복.</para>
+-/// <para><b>미검증(실기 전)</b>: 계측 id 3종(<c>GMaps.Tilt.Toggle/AngleSlider/Badge</c>)의 UIA 노출(IMPL-G2 계약) · 배지 TextBlock 이 컨트롤 뷰에 나오는지(미노출 시 raw 텍스트 폴백) ·
+-/// 회전 kill-switch 상태 판독(앱 로그 <c>[Rotation] kill-switch 토글</c> 줄로만) · 카메라 팝업 연동 설정(IsCameraPopupUsed) ON 여부.
+-/// 각 항목은 결과 목록에 ⓘ 로 남기고 ✖ 로 취급하지 않는다. 앱은 이 테스트가 직접 실행하지 않는다(픽스처).</para>
++/// <para><b>Skip 게이트</b>: 계정 env · 대화형 세션 Active(WTS). 앱은 이 테스트가 직접 실행하지 않는다(픽스처).
++/// appsettings 의 옛 <c>MapTilt</c> 키는 앱이 더 읽지 않는다 — 값은 시작 시 ⓘ 로만 기록한다.</para>
+ /// </summary>
+ [Collection("UI")]
+ public sealed class TiltRuntimeDiagTests
+ {
+-    private const string ToggleId = "GMaps.Tilt.Toggle";
+-    private const string AngleSliderId = "GMaps.Tilt.AngleSlider";
+-    private const string BadgeId = "GMaps.Tilt.Badge";
++    private static readonly string[] RemovedIds = { "GMaps.Tilt.Toggle", "GMaps.Tilt.AngleButton", "GMaps.Tilt.AngleSlider", "GMaps.Tilt.Badge", "GMaps.Tilt.MenuToggle" };
+     private const string ZoomSliderId = "GMaps.MapZoom.Slider";
+     private static readonly Regex BadgePattern = new(@"기울임\s*(\d+(?:\.\d+)?)\s*°", RegexOptions.Compiled);
+     private static readonly Regex RotationToggleLog = new(@"\[Rotation\] kill-switch [^:]*:\s*(ON|OFF)", RegexOptions.Compiled);
+@@ -86,79 +78,13 @@ public sealed class TiltRuntimeDiagTests
+         try { var e = _fx.Shell.FindFirstDescendant(cf => cf.ByAutomationId(id)); return e is not null && MapProbe.IsClickable(e) ? e : null; } catch { return null; }
+     }
+ 
+-    /// <summary>배지 텍스트 — AutomationId 우선, 미노출이면 raw 텍스트에서 "기울임 N°" 패턴 폴백. 없으면 null(= 배지 없음).</summary>
+-    private (string? text, string how) BadgeText()
+-    {
+-        var el = Find(BadgeId);
+-        if (el is not null)
+-        {
+-            var name = MapProbe.NameOf(el);
+-            if (!string.IsNullOrWhiteSpace(name)) return (name, "AutomationId");
+-            // TextBlock 을 감싼 Border 등이 id 를 가진 경우 — 하위 Text 를 읽는다
+-            try { var t = el.FindFirstDescendant(cf => cf.ByControlType(ControlType.Text)); var n = MapProbe.NameOf(t); if (!string.IsNullOrWhiteSpace(n)) return (n, "AutomationId/child"); } catch { }
+-        }
+-        var raw = MapProbe.RawTextNames(_fx.Shell).FirstOrDefault(t => BadgePattern.IsMatch(t));
+-        return (raw, raw is null ? "없음" : "raw 텍스트 폴백");
+-    }
+-
+-    private double? WaitBadge(bool expectPresent, TimeSpan timeout, out string how)
+-    {
+-        string h = "없음"; string? txt = null;
+-        var end = DateTime.UtcNow + timeout;
+-        while (DateTime.UtcNow < end)
+-        {
+-            (txt, h) = BadgeText();
+-            bool present = ParseBadgeAngle(txt) is not null;
+-            if (present == expectPresent) break;
+-            Thread.Sleep(250);
+-        }
+-        how = h;
+-        return ParseBadgeAngle(txt);
+-    }
+-
+-    private (double? value, double min, double max) SetZoom(Slider slider, double value)
+-    {
+-        double min = 0, max = 0;
+-        try { min = slider.Minimum; max = slider.Maximum; } catch { }
+-        var v = Math.Clamp(value, min, max);
+-        slider.Value = v;
+-        MapProbe.Poll(() => Math.Abs(slider.Value - v) < 0.01 ? "ok" : null, TimeSpan.FromSeconds(8));
+-        Thread.Sleep(900);   // 타일 로드·재평가(Render 우선순위 코얼레싱) 정착
+-        double? got = null; try { got = slider.Value; } catch { }
+-        Log($"[줌] 슬라이더 {value:0.0} → {got:0.0} (범위 {min}~{max}) · 라벨 '{MapProbe.ZoomIndicator(_fx.Shell)}'");
+-        return (got, min, max);
+-    }
+-
+-    /// <summary>키 입력 전에 맵에 포커스를 준다 — 편집 모드 OFF 에서 빈 지점 클릭(선택·팬 없음).</summary>
+-    private void FocusMap(MapPage page, AutomationElement map)
+-    {
+-        var spot = MapProbe.EmptySpot(page, map);
+-        Mouse.Click(spot); Thread.Sleep(250);
+-    }
+-
+-    /// <summary>회전 kill-switch 를 원하는 상태로 — Ctrl+Shift+R 후 앱 로그 줄로 결과 판독(툴바 회전 토글에는 AutomationId 가 없다). 반환 = 토글 횟수(원복용), null=판독 불가.</summary>
+-    private int? EnsureRotationFeature(bool on)
+-    {
+-        int toggles = 0;
+-        for (int i = 0; i < 2; i++)
+-        {
+-            var at = DateTime.Now;
+-            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_R); Thread.Sleep(400); toggles++;
+-            var line = MapProbe.Poll(() => MapProbe.AppLogLastMatch(RotationToggleLog, at), TimeSpan.FromSeconds(3));
+-            var state = ParseRotationToggle(line);
+-            Log($"[회전] Ctrl+Shift+R #{toggles} → 로그 '{line?.Trim()}' → {(state is null ? "판독 불가" : state.Value ? "ON" : "OFF")}");
+-            if (state is null) return null;
+-            if (state == on) return toggles;
+-        }
+-        return toggles;
+-    }
+-
+-    private static int RedPixels(System.Drawing.Bitmap? crop) => crop is null ? -1 : MapProbe.CountRedOrange(crop).red;
++    /// <summary>화면 어딘가에 「기울임 N°」 배지 글이 있는가(raw 텍스트).</summary>
++    private string? BadgeTextOnScreen() => MapProbe.RawTextNames(_fx.Shell).FirstOrDefault(t => ParseBadgeAngle(t) is not null);
+ 
+     // ═══════════════════════════════════════════════════════════════════════════
+     [SkippableFact]
+     [Trait("Category", "UiDiagnostic")]
+-    public void should_tilt_gate_badge_and_restore_identity_when_toggle_clicked()
++    public void should_show_no_tilt_controls_or_badge_when_tilt_shortcuts_pressed_after_tilt_removed()
+     {
+         // ── Skip 게이트 ─────────────────────────────────────────────────────────
+         Skip.IfNot(AppFixture.HasCredentials, "IRONWALL_UITEST_ID/PW 미지정");
+@@ -172,249 +98,46 @@ public sealed class TiltRuntimeDiagTests
+         MapProbe.Attach(_fx, Log);
+         var appSettingsPath = Path.Combine(Path.GetDirectoryName(_fx.ExePath)!, "Config", "appsettings.json");
+         bool? fileFlag = null; try { fileFlag = EnvironmentGuard.ReadMapTiltEnabled(File.ReadAllText(appSettingsPath)); } catch { }
+-        Log($"[시작] exe={_fx.ExePath} · 세션 Active={(session is null ? "판독불가" : session)} · appsettings MapTilt.IsEnabled={(fileFlag is null ? "키 없음" : fileFlag)} · 가드 강제 OFF={_fx.MapTiltForcedOff}");
++        Log($"[시작] exe={_fx.ExePath} · 세션 Active={(session is null ? "판독불가" : session)} · 옛 appsettings MapTilt.IsEnabled={(fileFlag is null ? "키 없음" : fileFlag)}(앱은 읽지 않음)");
+         var shell = _fx.Shell;
+         SmokeNav.DismissBlockingPopups(shell, _log);
+         SmokeNav.CloseOpenPanel(shell, _log);
+-        MapProbe.MoveToRoi(shell, page, "안양발전소").Should().BeTrue("관심지역 이동");
+-        page.WaitMarkersAtLeast(1, TimeSpan.FromSeconds(90));
+         var map = Support.Wait.Until(() => shell.FindFirstDescendant(cf => cf.ByAutomationId("GMaps.Map.Root")), Support.Wait.Transition, "GMaps.Map.Root");
+-        var mainMap = Support.Wait.Until(() => map.FindFirstDescendant(cf => cf.ByAutomationId("MainMap")), Support.Wait.Transition, "MainMap");
+         var toolbar = Support.Wait.Until(() => map.FindFirstDescendant(cf => cf.ByControlType(ControlType.ToolBar)), Support.Wait.Transition, "지도 ToolBar");
+         Keyboard.Type(VirtualKeyShort.ESCAPE); Thread.Sleep(300);
+         MapProbe.SetEditMode(map, toolbar, false); Thread.Sleep(300);
+-        DbProbe? db = null; try { var cand = new DbProbe(); if (cand.IsAvailable()) db = cand; } catch { }
+-
+-        var results = new List<string>
+-        {
+-            $"{(fileFlag == false ? "✅" : "ⓘ")} 전제 appsettings MapTilt.IsEnabled={(fileFlag is null ? "키 없음" : fileFlag)} (EnvironmentGuard 강제 OFF={_fx.MapTiltForcedOff}) — 부팅 OFF 전제",
+-        };
+ 
++        var results = new List<string> { $"ⓘ 옛 appsettings MapTilt.IsEnabled={(fileFlag is null ? "키 없음" : fileFlag)} — 앱은 이 키를 읽지도 쓰지도 않는다" };
+         var zoomEl = Find(ZoomSliderId) ?? map.FindFirstDescendant(cf => cf.ByControlType(ControlType.Slider));
+         zoomEl.Should().NotBeNull("줌 슬라이더(GMaps.MapZoom.Slider)");
+         var zoom = zoomEl!.AsSlider();
+         double zoomOriginal = 0; try { zoomOriginal = zoom.Value; } catch { }
+-
+-        var visible = MapProbe.VisibleMap(mainMap);
+-        var center = new System.Drawing.Point(visible.Left + visible.Width / 2, visible.Top + visible.Height / 2);
+-        const int baseHalf = 150;
+-
+-        var toggle = MapProbe.FindOnSurface(map, toolbar, ToggleId);
+-        Log($"[계측] {ToggleId} {(toggle is null ? "미노출" : $"OK rect={toggle.BoundingRectangle} enabled={toggle.IsEnabled} state={MapProbe.ToggleStateOf(toggle)}")} · {AngleSliderId} {(Find(AngleSliderId) is null ? "미노출(팝업 닫힘일 수 있음)" : "노출")} · {BadgeId} {(Find(BadgeId) is null ? "미노출(OFF 라 정상)" : "노출")}");
+-
+-        int? rotationToggles = null; bool rotated = false; bool tiltOn = false;
+-        System.Drawing.Bitmap? baseline = null;
+-        var openedPopups = new List<AutomationElement>();
+-        bool abort = false;
+         try
+         {
+-            if (toggle is null)
+-            {
+-                // return 으로 빠지면 마지막 단언을 건너뛰어 ✖ 가 통과로 위장한다 — 플래그로 본문만 건너뛴다
+-                results.Add($"✖ (a) 툴바 틸트 토글({ToggleId}) UIA 미노출 — IMPL-G2 계측 계약 위반 또는 미구현 · 이하 시나리오 Skip");
+-                Log("[UIA 덤프] " + _fx.DumpTree("tilt-no-toggle"));
+-                abort = true;
+-            }
+-            else
+-            {
+-                var stateAtStart = MapProbe.ToggleStateOf(toggle);
+-                results.Add($"{(stateAtStart != ToggleState.On ? "✅" : "✖")} 전제 토글 초기 상태 {stateAtStart}(부팅 OFF 기대) · IsEnabled={toggle.IsEnabled}");
+-                if (!toggle.IsEnabled)
+-                {
+-                    results.Add("ⓘ 토글 비활성(앵커 A모드 잠금 추정 — 툴팁 사유) · 앵커 해제는 이 진단 범위 밖 · 이하 Skip");
+-                    abort = true;
+-                }
+-            }
+-            if (!abort)
+-            {
+-            // ── 기준: OFF · 줌 18.5 화면 크롭 ──────────────────────────────────────
+-            SetZoom(zoom, 18.5);
+-            baseline = MapProbe.CaptureCrop(center, baseHalf);
+-            if (baseline is not null) MapProbe.AddToSheet(baseline, "T0 OFF 18.5 기준");
+-            Log("[캡처] " + _fx.Capture("tilt-00-off-baseline"));
+-
+-            // ══ (a) 토글 ON(실마우스) · 18.5 → 배지 "기울임 20°" ══════════════════
+-            Mouse.Click(MapProbe.CenterOf(toggle!)); Thread.Sleep(600);
+-            var on = MapProbe.Poll(() => MapProbe.ToggleStateOf(MapProbe.FindOnSurface(map, toolbar, ToggleId)!) == ToggleState.On ? "on" : null, TimeSpan.FromSeconds(5)) is not null;
+-            tiltOn = on;
+-            results.Add($"{(on ? "✅" : "✖")} (a) 토글 실마우스 클릭 → ToggleState {(on ? "On" : MapProbe.ToggleStateOf(toggle!)?.ToString() ?? "?")}");
+-            Log($"ⓘ 앱 로그 [Tilt] kill-switch 토글 존재={MapProbe.AppLogHas("[Tilt] kill-switch 토글: ON")}");
+-            var angleA = WaitBadge(true, TimeSpan.FromSeconds(5), out var howA);
+-            MapProbe.Zoom(center, "T1 ON 18.5 배지", 200);
+-            results.Add($"{(angleA is not null && Math.Abs(angleA.Value - 20) < 0.01 ? "✅" : "✖")} (a) 줌 18.5 · 배지 '{BadgeText().text}'(기대 '기울임 20°') · 판독 {howA}");
+-            results.Add(howA == "AutomationId" ? $"✅ (a) {BadgeId} 컨트롤 뷰 노출" : $"ⓘ (a) {BadgeId} 판독 경로 = {howA}(AutomationId 미노출이면 TextBlock 템플릿 내부 여부 확인)");
+-            Log("[캡처] " + _fx.Capture("tilt-01-on-18.5"));
+-
+-            // ══ (b) 게이트 왕복 17.5(유지) · 17.0(해제) · 18.5(재진입) ════════════════
+-            SetZoom(zoom, 17.5);
+-            var hold = WaitBadge(true, TimeSpan.FromSeconds(3), out _);
+-            MapProbe.Zoom(center, "T2 17.5 유지", 200);
+-            results.Add($"{(hold is not null ? "✅" : "✖")} (b) 줌 17.5 → 배지 {(hold is null ? "소멸" : $"유지 '{BadgeText().text}'")}(히스테리시스 1스텝 — 유지 기대, SIM-T 매트릭스)");
+-            SetZoom(zoom, 17.0);
+-            var released = WaitBadge(false, TimeSpan.FromSeconds(3), out _);
+-            MapProbe.Zoom(center, "T3 17.0 해제", 200);
+-            results.Add($"{(released is null ? "✅" : "✖")} (b) 줌 17.0 → 배지 {(released is null ? "소멸" : $"잔존 '{BadgeText().text}'")}(이탈 임계 17.5 아래 — 해제 기대)");
+-            SetZoom(zoom, 18.5);
+-            var reenter = WaitBadge(true, TimeSpan.FromSeconds(3), out _);
+-            results.Add($"{(reenter is not null && Math.Abs(reenter.Value - 20) < 0.01 ? "✅" : "✖")} (b) 줌 18.5 재진입 → 배지 '{BadgeText().text}'(기대 '기울임 20°')");
+-            Log("[캡처] " + _fx.Capture("tilt-02-gate-roundtrip"));
+-
+-            // ══ (c) 각도 슬라이더 35 → 배지 ═══════════════════════════════════════
+-            var angleSlider = Find(AngleSliderId);
+-            string angleHow;
+-            if (angleSlider is not null)
+-            {
+-                var rv = angleSlider.Patterns.RangeValue.PatternOrDefault;
+-                if (rv is not null) { rv.SetValue(35); angleHow = "AngleSlider RangeValue.SetValue(35)"; }
+-                else { angleSlider.AsSlider().Value = 35; angleHow = "AngleSlider.Value=35"; }
+-                Thread.Sleep(150 + 600);   // DeferredCommit 150 ms + 정착
+-            }
+-            else
+-            {
+-                FocusMap(page, map);
+-                for (int i = 0; i < 3; i++) { Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.UP); Thread.Sleep(250); }
+-                Thread.Sleep(500);
+-                angleHow = "Ctrl+↑ ×3 폴백(AngleSlider 미노출 — 팝업 닫힘/미구현)";
+-            }
+-            var angleC = WaitBadge(true, TimeSpan.FromSeconds(4), out _);
+-            MapProbe.Zoom(center, "T4 각도 35", 200);
+-            results.Add($"{(angleC is not null && Math.Abs(angleC.Value - 35) < 0.01 ? "✅" : "✖")} (c) 각도 35 설정({angleHow}) → 배지 '{BadgeText().text}'(기대 '기울임 35°')");
+-            if (angleSlider is null) results.Add($"ⓘ (c) {AngleSliderId} UIA 미노출 — 키보드 폴백으로 판정(슬라이더 팝업 도달성 미검증)");
+-            Log("[캡처] " + _fx.Capture("tilt-03-angle-35"));
+-            // 20 으로 복귀(다음 단계 기준각) — 슬라이더 있으면 슬라이더, 없으면 Ctrl+↓ ×3
+-            if (angleSlider is not null) { try { angleSlider.Patterns.RangeValue.PatternOrDefault?.SetValue(20); } catch { } Thread.Sleep(800); }
+-            else { FocusMap(page, map); for (int i = 0; i < 3; i++) { Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.DOWN); Thread.Sleep(250); } Thread.Sleep(500); }
+-            var back20 = WaitBadge(true, TimeSpan.FromSeconds(3), out _);
+-            results.Add($"{(back20 is not null && Math.Abs(back20.Value - 20) < 0.01 ? "✅" : "⚠")} (c) 각도 20 복귀 → 배지 '{BadgeText().text}'");
+-
+-            // ══ (d) 회전 90° 후 PIDS 아이콘 글리프 ═════════════════════════════════
+-            try
+-            {
+-                var pids = page.MarkerRects().Where(r => r.Type.Contains("GMapPidsMarker", StringComparison.Ordinal) && r.Rect.Width < 200 && r.Rect.Height < 200)
+-                    .Select(r => new System.Drawing.Point(r.Rect.Left + r.Rect.Width / 2, r.Rect.Top + r.Rect.Height / 2))
+-                    .Where(p => MapProbe.ContainsCrop(visible, p, 60))
+-                    .OrderBy(p => Math.Abs(p.X - center.X) + Math.Abs(p.Y - center.Y)).FirstOrDefault();
+-                if (pids.IsEmpty) results.Add("ⓘ (d) 가시 영역 안의 PIDS 마커 없음 — 회전 아이콘 진단 Skip");
+-                else
+-                {
+-                    FocusMap(page, map);
+-                    rotationToggles = EnsureRotationFeature(true);
+-                    using var glyphBefore = MapProbe.CaptureCrop(pids, 40);
+-                    if (glyphBefore is not null) MapProbe.AddToSheet(glyphBefore, "T5 회전 0° 아이콘");
+-                    var rotAt = DateTime.Now;
+-                    for (int i = 0; i < 18; i++) { Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.RIGHT); Thread.Sleep(120); }
+-                    Thread.Sleep(1200); rotated = true;
+-                    // 회전 방향 부호는 실측 전 미확정 — ±90° 두 후보 중 마커 rect 가 잡히는 쪽을 쓴다(마커 rect 는 UIA 가 보고)
+-                    var candidates = new[] { RotateAround(pids, center, 90), RotateAround(pids, center, -90), pids };
+-                    System.Drawing.Point? found = null;
+-                    foreach (var cnd in candidates)
+-                    {
+-                        var rect = MapProbe.MarkerRectAt(page, cnd);
+-                        if (rect is { } rr && rr.Width < 200) { found = new System.Drawing.Point(rr.Left + rr.Width / 2, rr.Top + rr.Height / 2); break; }
+-                    }
+-                    Log($"[회전] 마커 {pids} → 후보 {string.Join("/", candidates)} → {(found is null ? "재탐색 실패" : found.Value.ToString())}");
+-                    if (found is null || !MapProbe.ContainsCrop(visible, found.Value, 40))
+-                        results.Add($"ⓘ (d) 회전 90° 후 마커 재탐색 실패/가시 영역 밖({(found is null ? "없음" : found.Value.ToString())}) — 글리프 비교 Skip · 회전 kill-switch {(rotationToggles is null ? "판독 불가" : "ON")}");
+-                    else
+-                    {
+-                        using var glyphAfter = MapProbe.CaptureCrop(found.Value, 40);
+-                        if (glyphAfter is not null) MapProbe.AddToSheet(glyphAfter, "T6 회전 90° 아이콘");
+-                        int diff = glyphBefore is not null && glyphAfter is not null ? MapProbe.DiffPixels(glyphBefore, glyphAfter) : -1;
+-                        double ratio = diff >= 0 && glyphBefore is not null ? (double)diff / (glyphBefore.Width * glyphBefore.Height) : double.NaN;
+-                        results.Add($"ⓘ (d) 회전 Ctrl+→ ×18(90°) 후 PIDS 아이콘 크롭 DiffPixels={diff}({ratio:P0}) — 빌보드(FR-10)면 글리프 정립·배경 타일만 회전. 육안 판정은 대조표 T5/T6 · 회전 kill-switch {(rotationToggles is null ? "판독 불가(로그 없음)" : "ON")}");
+-                    }
+-                    using var wide = MapProbe.CaptureCrop(center, baseHalf);
+-                    int wideDiff = baseline is not null && wide is not null ? MapProbe.DiffPixels(baseline, wide) : -1;
+-                    results.Add($"ⓘ (d) 회전 중 화면 중앙 크롭 vs OFF 기준 DiffPixels={wideDiff}(회전·틸트 동시 적용 증거, 클수록 정상) · 로그 [Rotation] 기록={MapProbe.AppLogLastMatch(new Regex(@"\[Rotation\]"), rotAt) is not null}");
+-                    Log("[캡처] " + _fx.Capture("tilt-04-rotated-90"));
+-                    // 정북 복귀(Ctrl+R 은 kill-switch 무관 항상 허용)
+-                    FocusMap(page, map);
+-                    Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_R); Thread.Sleep(1200); rotated = false;
+-                }
+-            }
+-            catch (Exception ex) { results.Add($"ⓘ (d) 예외: {ex.Message}"); Log("[(d) 예외] " + ex); }
+-
+-            // ══ (e) 카메라 팝업 리더선 앵커(InnerToOuter) ═══════════════════════════
+-            try
+-            {
+-                if (db is null) results.Add("ⓘ (e) 로컬 monitor_db 미가용 — 카메라 마커 식별 불가, 팝업 앵커 진단 Skip");
+-                else
+-                {
+-                    MapProbe.SetEditMode(map, toolbar, true);
+-                    var cam = MapProbe.PickMarkerByDeviceType(shell, mainMap, page, db, "IpCamera", null);
+-                    try { page.ClosePropertyPanel(); } catch { }
+-                    Keyboard.Type(VirtualKeyShort.ESCAPE); Thread.Sleep(300);
+-                    MapProbe.SetEditMode(map, toolbar, false); Thread.Sleep(300);
+-                    if (cam is null) results.Add("ⓘ (e) IpCamera 마커를 찾지 못함 — 팝업 앵커 진단 Skip");
+-                    else
+-                    {
+-                        var (camCenter, camTitle) = cam.Value;
+-                        var closeBefore = shell.FindAllDescendants(cf => cf.ByAutomationId("PART_CloseButton")).Where(MapProbe.IsClickable).Select(e => e.BoundingRectangle).ToList();
+-                        using var anchorBefore = MapProbe.CaptureCrop(camCenter, 12);
+-                        int redBefore = RedPixels(anchorBefore);
+-                        // 더블클릭 = 500 ms 안의 연속 클릭(컨트롤 레벨 감지 — GMapCustomControl MarkerDoubleClickIntervalMs).
+-                        // Mouse.Click 두 번은 안 된다 — FlaUI 가 같은 자리 두 번째 클릭 전에 시스템 더블클릭 시간만큼 일부러 기다린다.
+-                        Mouse.DoubleClick(camCenter); Thread.Sleep(2500);
+-                        var closeAfter = shell.FindAllDescendants(cf => cf.ByAutomationId("PART_CloseButton")).Where(MapProbe.IsClickable).ToList();
+-                        var newClose = closeAfter.Where(e => !closeBefore.Any(r => r == e.BoundingRectangle)).ToList();
+-                        openedPopups.AddRange(newClose);
+-                        bool popupOpen = newClose.Count > 0 || MapProbe.AppLogHas($"[CameraPopup] 카메라") ;
+-                        Log($"[팝업] '{camTitle}' @{camCenter} 더블클릭 → 새 닫기 버튼 {newClose.Count}개 · 로그 [CameraPopup]={MapProbe.AppLogHas("[CameraPopup]")}");
+-                        using var anchorAfter = MapProbe.CaptureCrop(camCenter, 12);
+-                        int redAfter = RedPixels(anchorAfter);
+-                        MapProbe.Zoom(camCenter, "T7 카메라 팝업 리더선 앵커", 120);
+-                        Log("[캡처] " + _fx.Capture("tilt-05-camera-popup"));
+-                        if (!popupOpen) results.Add($"ⓘ (e) 카메라 '{camTitle}' 더블클릭 후 팝업 미확인(연동 OFF·RTSP URL 없음·LinkedDevice null 가능 — 로그 확인) · 앵커 진단 Skip");
+-                        else
+-                            results.Add($"ⓘ (e) 팝업 열림 · 리더선(빨강 점선) 마커 중심 ±10 px 크롭 빨강 픽셀 {redBefore} → {redAfter}({(redAfter > redBefore ? "리더선 끝점이 마커 중심에 닿음 — InnerToOuter 앵커 정합" : "증가 없음 — 끝점이 ±10 px 밖이거나 마커 자체 빨강과 겹침, 대조표 T7 육안 판정")})");
+-                        foreach (var c in newClose) { try { c.AsButton().Invoke(); } catch { try { Mouse.Click(MapProbe.CenterOf(c)); } catch { } } Thread.Sleep(400); }
+-                        openedPopups.Clear();
+-                    }
+-                }
+-            }
+-            catch (Exception ex) { results.Add($"ⓘ (e) 예외: {ex.Message}"); Log("[(e) 예외] " + ex); }
+-
+-            // ══ (f) OFF 복귀 → 배지 소멸 · 항등(픽셀) ═══════════════════════════════
+-            SetZoom(zoom, 18.5);
+-            var toggle2 = MapProbe.FindOnSurface(map, toolbar, ToggleId) ?? toggle!;
+-            Mouse.Click(MapProbe.CenterOf(toggle2)); Thread.Sleep(600);
+-            var off = MapProbe.Poll(() => MapProbe.ToggleStateOf(MapProbe.FindOnSurface(map, toolbar, ToggleId)!) != ToggleState.On ? "off" : null, TimeSpan.FromSeconds(5)) is not null;
+-            tiltOn = !off;
+-            var gone = WaitBadge(false, TimeSpan.FromSeconds(4), out _);
+-            results.Add($"{(off ? "✅" : "✖")} (f) 토글 OFF 클릭 → ToggleState {(off ? "Off" : "On 잔존")}");
+-            results.Add($"{(gone is null ? "✅" : "✖")} (f) OFF 후 배지 {(gone is null ? "소멸" : $"잔존 '{BadgeText().text}'")}");
+-            Thread.Sleep(1200);
+-            using var final = MapProbe.CaptureCrop(center, baseHalf);
+-            if (final is not null) MapProbe.AddToSheet(final, "T8 OFF 18.5 복귀");
+-            int diffF = baseline is not null && final is not null ? MapProbe.DiffPixels(baseline, final) : -1;
+-            double ratioF = diffF >= 0 && baseline is not null ? (double)diffF / (baseline.Width * baseline.Height) : double.NaN;
+-            results.Add($"{(diffF == 0 ? "✅" : ratioF < 0.005 ? "⚠" : "✖")} (f) OFF 복귀 화면 크롭 vs (a) 이전 OFF 기준 DiffPixels={diffF}({ratioF:P2}) — 0 이면 RenderTransform 항등 확정(깜빡임 심볼·타일 로드 잔차는 ⚠, 0.5% 이상 ✖)");
+-            Log("[캡처] " + _fx.Capture("tilt-06-off-final"));
+-            }   // if (!abort)
++            // (a) 기울이기 화면 요소 없음
++            var left = RemovedIds.Where(id => MapProbe.FindOnSurface(map, toolbar, id) is not null || Find(id) is not null).ToList();
++            results.Add($"{(left.Count == 0 ? "✅" : "✖")} (a) 기울이기 요소 {(left.Count == 0 ? "없음" : "남음: " + string.Join(", ", left))}");
++
++            // (b) 예전 게이트 이상 줌에서 예전 단축키를 눌러도 배지 없음
++            double max = 19; try { max = zoom.Maximum; } catch { }
++            zoom.Value = Math.Min(18.5, max); Thread.Sleep(1200);
++            Mouse.Click(MapProbe.EmptySpot(page, map)); Thread.Sleep(250);
++            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_T); Thread.Sleep(600);
++            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.UP); Thread.Sleep(900);
++            var badge = BadgeTextOnScreen();
++            results.Add($"{(badge is null ? "✅" : "✖")} (b) 줌 {MapProbe.ZoomIndicator(shell)} · Ctrl+Shift+T · Ctrl+↑ 뒤 배지 {(badge is null ? "없음" : $"'{badge}'")}");
++            Log("[캡처] " + _fx.Capture("tilt-01-removed"));
++
++            // (c) 회전 토글은 그대로
++            bool rotate = MapProbe.RawTextNames(toolbar).Any(t => t.Contains("지도 회전", StringComparison.Ordinal))
++                          || toolbar.FindAllDescendants(cf => cf.ByControlType(ControlType.Button)).Any(b => (b.HelpText ?? "").Contains("지도 회전", StringComparison.Ordinal));
++            results.Add($"{(rotate ? "✅" : "ⓘ")} (c) 툴바 회전 토글 {(rotate ? "보임" : "툴팁 판독 불가")}");
+         }
+         finally
+         {
+-            // ── 원복: 팝업 닫기 · 회전 리셋/kill-switch 원복 · 틸트 OFF · 각도 20 · 줌 원복 ──
+-            foreach (var c in openedPopups) { try { c.AsButton().Invoke(); } catch { } }
+-            try
+-            {
+-                if (rotated) { FocusMap(page, map); Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_R); Thread.Sleep(800); }
+-                if (rotationToggles is int n && n % 2 == 1) { FocusMap(page, map); Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_R); Thread.Sleep(400); Log("[원복] 회전 kill-switch 원상태(OFF) 복귀"); }
+-            }
+-            catch (Exception ex) { Log("[원복] 회전: " + ex.Message); }
+-            try
+-            {
+-                var t = MapProbe.FindOnSurface(map, toolbar, ToggleId);
+-                if (t is not null && MapProbe.ToggleStateOf(t) == ToggleState.On) { Mouse.Click(MapProbe.CenterOf(t)); Thread.Sleep(500); Log("[원복] 틸트 토글 OFF"); }
+-                tiltOn = false;
+-            }
+-            catch (Exception ex) { Log("[원복] 틸트 토글: " + ex.Message); }
+             try { zoom.Value = zoomOriginal; Thread.Sleep(600); Log($"[원복] 줌 {zoomOriginal:0.0}"); } catch { }
+             try { Keyboard.Type(VirtualKeyShort.ESCAPE); } catch { }
+-            baseline?.Dispose();
+-            MapProbe.SaveSheet("tilt-diag");
+             foreach (var r in results) Log("[결과] " + r);
+-            Log("[캡처] " + _fx.Capture("tilt-99-final"));
+             MapProbe.ScanAppLog();
+         }
+         results.Where(r => r.StartsWith("✅", StringComparison.Ordinal) || r.StartsWith("✖", StringComparison.Ordinal))
+diff --git a/Dotnet.Monitoring.Solution.UiTests/Support/UiToast.cs b/Dotnet.Monitoring.Solution.UiTests/Support/UiToast.cs
+index 14c985f5..be8f2274 100644
+--- a/Dotnet.Monitoring.Solution.UiTests/Support/UiToast.cs
++++ b/Dotnet.Monitoring.Solution.UiTests/Support/UiToast.cs
+@@ -371,7 +371,7 @@ internal static class UiToast
+         ["Symbol3DLeftoverCleanupTests"] = "3D 심볼 잔여 정리",
+         ["Symbol3DRuntimeDiagTests"] = "3D 심볼 실행 진단",
+         ["SymbolDetailRuntimeDiagTests"] = "심볼 상세보기 진단",
+-        ["TiltRuntimeDiagTests"] = "지도 틸트 진단",
++        ["TiltRuntimeDiagTests"] = "지도 기울이기 제거 확인",
+         ["ToolbarOverflowHwndDiagnosticTests"] = "툴바 오버플로 진단",
+         ["UiaDiscoveryTests"] = "UIA 탐색",
+         ["UnitRelationshipMapTests"] = "부대 관계도",

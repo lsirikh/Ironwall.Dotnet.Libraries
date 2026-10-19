@@ -323,7 +323,6 @@ public partial class MapViewModel : BasePanelViewModel,
                 _rotationSaveTimer.Stop();
                 await SaveMapRotationState();
             }
-            await FlushPendingTiltSaveAsync();   // [map-tilt-25d FR-07] 각도 debounce 대기분 플러시(파셜)
 
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
@@ -5415,7 +5414,6 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         SetInitialHomePosition();
-        LoadMapTiltFromSettings();      // [map-tilt-25d FR-07] 틸트 kill-switch/각도 복원(파셜, 홈 줌 적용 뒤 Flush, 저장 억제 내장)
         LoadMap3DFromSettings();        // [map-3d POC] 3D 게이트 설정 · 줌/위치 구독(파셜)
         LoadMapCompassFromSettings();   // [Compass FR-08] 나침반 위치/설정 복원(파셜, 저장 억제 내장)
         InitializeInstruments();        // [Map_Instruments] 강풍/탐지장애 EQM 구독+가시성 복원(파셜)

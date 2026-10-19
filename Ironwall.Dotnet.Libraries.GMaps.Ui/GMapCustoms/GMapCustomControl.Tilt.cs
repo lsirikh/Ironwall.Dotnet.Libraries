@@ -18,19 +18,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
                   ★ 판정 원자성(FR-03): 휠/스텝/SetEffectiveZoom 은 정수 줌 → 디지털 줌 순으로 두 번 발화하므로
                     ReevaluateTilt 는 Dispatcher Render 우선순위로 프레임당 1회만 커밋한다(QueueViewportSnapshot 동형).
                     게이트 여부는 decision.Active 로 판단하고 WasActive 로 되먹인다(State==Active 비교 금지 — Hold 도 Active 일 수 있다).
-                  ★ φ_layout(TiltLayoutDeg)은 MainMap Height/Margin MultiBinding(G 그룹, TiltOverscanConverter)이 소비한다.
-                    게이트 전이는 즉시, 사용자 각도 조작은 Active 일 때만 φmax 선확장 → 150 ms 정착(TiltLayoutSettler, G8).
+                  ★ φ_layout(TiltLayoutDeg)은 게이트 전이는 즉시, 각도 변경은 Active 일 때만 φmax 선확장 → 150 ms 정착(TiltLayoutSettler, G8).
+                  ★ 2026-10-19 사용자 요청으로 지도 기울이기 기능 제거 — 툴바 · 보기 메뉴 · 단축키(Ctrl+Shift+T, Ctrl(+Shift)+↑/↓) ·
+                    배지 · VM 배선 · 설정 복원/저장 · MainMap 오버스캔 바인딩을 없앴다. 이 판정 · 렌더 엔진은 다른 기능(스냅 게이트 ·
+                    스냅샷 TiltCos · 팝업 좌표)과 얽혀 있어 남기되, 운영 코드 어디도 IsTiltFeatureEnabled 를 켜지 않으므로 φ 는 항상 0 이다.
                   ★ x:Name 무변경 · R-40 TransformGroup 무변경 · Marker.Bearing write-back 없음.
    Created On   : 2026-09-08 · Sensorway Co., Ltd.
 ****************************************************************************/
 public partial class GMapCustomControl
 {
     #region Tilt — 상수·필드
-
-    /// <summary>틸트 각 입력 스텝(도) — 거친 조정(Ctrl+↑/↓).</summary>
-    public const double TILT_STEP_COARSE = 5;
-    /// <summary>틸트 각 입력 스텝(도) — 미세 조정(Ctrl+Shift+↑/↓).</summary>
-    public const double TILT_STEP_FINE = 1;
 
     /// <summary>스냅 격자 비활성 판정 임계(도) — R-41 회전 게이트(|θ|&gt;0.1)와 같은 값(FR-09 "|θ|&gt;0.1 ∨ φ&gt;0.1" 단일 식).</summary>
     public const double TILT_SNAP_GATE_EPSILON = 0.1;
@@ -59,13 +56,13 @@ public partial class GMapCustomControl
     private static readonly DependencyPropertyKey TiltLayoutDegPropertyKey = DependencyProperty.RegisterReadOnly(
         nameof(TiltLayoutDeg), typeof(double), typeof(GMapCustomControl), new PropertyMetadata(0.0));
 
-    /// <summary>레이아웃 각 φ_layout(도, 읽기 전용) — MainMap Height/Margin MultiBinding(TiltOverscanConverter) 입력.</summary>
+    /// <summary>레이아웃 각 φ_layout(도, 읽기 전용). 기울이기 제거(2026-10-19) 뒤로는 항상 0.</summary>
     public static readonly DependencyProperty TiltLayoutDegProperty = TiltLayoutDegPropertyKey.DependencyProperty;
 
     /// <summary>레이아웃 각 φ_layout(도). 각도 조작 중엔 φmax 로 선확장, 마지막 변경 150 ms 뒤 φ 로 정착(G8). 게이트 전이는 즉시.</summary>
     public double TiltLayoutDeg => (double)GetValue(TiltLayoutDegProperty);
 
-    /// <summary>사용자 요청 각(도, 0~35 하드 클램프). 게이트 통과 시 φ = clamp(값, 0, TiltSettings.MaxAngleDeg). 슬라이더 TwoWay 바인딩 대상.</summary>
+    /// <summary>사용자 요청 각(도, 0~35 하드 클램프). 게이트 통과 시 φ = clamp(값, 0, TiltSettings.MaxAngleDeg). 기울이기 제거(2026-10-19) 뒤로 운영 코드는 대입하지 않는다.</summary>
     public static readonly DependencyProperty RequestedTiltDegProperty = DependencyProperty.Register(
         nameof(RequestedTiltDeg), typeof(double), typeof(GMapCustomControl),
         new FrameworkPropertyMetadata(MapTiltModel.DefaultAngleDeg, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
@@ -83,7 +80,7 @@ public partial class GMapCustomControl
         nameof(IsTiltFeatureEnabled), typeof(bool), typeof(GMapCustomControl),
         new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnIsTiltFeatureEnabledChanged));
 
-    /// <summary>틸트 kill-switch. 변경 시 재평가(코얼레싱). 토글은 <see cref="ToggleTiltFeature"/> 단일 진입점.</summary>
+    /// <summary>틸트 kill-switch. 변경 시 재평가(코얼레싱). 기울이기 제거(2026-10-19) 뒤로 운영 코드는 켜지 않는다(항상 OFF).</summary>
     public bool IsTiltFeatureEnabled
     {
         get => (bool)GetValue(IsTiltFeatureEnabledProperty);
@@ -124,24 +121,6 @@ public partial class GMapCustomControl
     /// <summary>형제 캔버스(팝업) Y 보정용 뷰포트 오프셋 = −Δ(오버스캔 상단 여분). 오버스캔 미적용이면 0.
     /// Δ 는 FR-04 레이아웃(음수 Margin)에서 읽는다 — 컨버터가 Margin=(0,−Δ,0,−Δ) 를 세우므로 <c>−Margin.Top</c> 이 곧 적용된 Δ.</summary>
     public double ViewportOffsetY => -CurrentOverscanDelta();
-
-    /// <summary>틸트 kill-switch 토글(단일 진입점, ToggleRotationFeature 동형) — 키보드/툴바/메뉴 공용. 앵커 A모드 잠금은 판정(Locked)이 처리한다.</summary>
-    public void ToggleTiltFeature()
-    {
-        IsTiltFeatureEnabled = !IsTiltFeatureEnabled;
-        _log?.Info($"[Tilt] kill-switch 토글: {(IsTiltFeatureEnabled ? $"ON — Ctrl+↑/↓ {TILT_STEP_COARSE}°, Ctrl+Shift+↑/↓ {TILT_STEP_FINE}° (줌 {TiltSettings.MinZoom:0.0} 이상에서 적용)" : "OFF — 즉시 φ=0")}");
-    }
-
-    /// <summary>요청 각을 ±delta 만큼 조정(0~TiltSettings.MaxAngleDeg 클램프). 키보드 Ctrl(+Shift)+↑/↓ 와 VM 커맨드 공용.</summary>
-    public void StepTiltAngle(double deltaDeg)
-    {
-        if (!double.IsFinite(deltaDeg) || deltaDeg == 0) return;
-        double max = TiltMath.ClampAngle(TiltSettings.MaxAngleDeg, MapTiltModel.HardMaxAngleDeg);
-        double next = TiltMath.ClampAngle(RequestedTiltDeg + deltaDeg, max);
-        if (Math.Abs(next - RequestedTiltDeg) < TiltOverscanMath.AngleEpsilon) return;
-        RequestedTiltDeg = next;
-        _log?.Info($"[Tilt] 각도 스텝 {(deltaDeg > 0 ? "+" : "")}{deltaDeg:0.#}° → 요청 {next:F1}°");
-    }
 
     /// <summary>
     /// inner(컨트롤 로컬) 좌표계에서 실제로 화면에 보이는 사각형(FR-04) = 컨트롤 중심 ± (W/(2s), H_view/(2·s·cosφ)).

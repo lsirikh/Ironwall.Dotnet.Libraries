@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using Ironwall.Dotnet.Libraries.GMaps.Models;
+﻿using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -9,7 +8,8 @@ using Xunit;
 namespace GMaps.MapNav.Tests;
 
 /// <summary>카탈로그 §1 회전 · 기울이기(MAP-016~020 · 024~028). 실제 수식키(Keyboard.Modifiers)는 하드웨어 상태라 흉내 낼 수 없어,
-/// 키가 부르는 같은 처리(RotateMap/ResetRotation/StepTiltAngle · 명령)와 그 스텝 상수 · 키 바인딩 표를 단언한다.</summary>
+/// 키가 부르는 같은 처리(RotateMap/ResetRotation · 명령)와 그 스텝 상수 · 키 바인딩 표를 단언한다.
+/// 기울이기(MAP-024~028)는 2026-10-19 제거 — 그 길이 없어졌음을 단언한다.</summary>
 public class RotationTiltScenarioTests
 {
     private const double N = 37.55, S = 37.45, W = 126.95, E = 127.05;
@@ -124,103 +124,85 @@ public class RotationTiltScenarioTests
         Assert.Equal("지도 회전 모드 — 사이트 고정 중에는 바꿀 수 없습니다(고정을 먼저 해제하세요)", (string?)disabledTip.Attribute("Value"));
     });
 
+    // ── 지도 기울이기 제거(2026-10-19, 사용자 요청 "이 기능은 제거해도될 것 같다. 현재 동작도 안되고") ──
+    // MAP-024~028 은 예전 기울이기 조작(각도 ± · 각도 판 · 단축키 · 메뉴/툴바 동기 · 앵커 잠금)이었다. 지금은 그 길이 모두 없어졌음을 단언한다.
+
+    private static IEnumerable<string> TiltAutomationIds()
+        => NavKit.MapViewXaml().Descendants()
+            .Select(e => (string?)e.Attributes().FirstOrDefault(a => a.Name.LocalName == "AutomationProperties.AutomationId")?.Value)
+            .Where(id => id != null && id.StartsWith("GMaps.Tilt.", StringComparison.Ordinal))!;
+
     [Fact]
     [Trait("Scenario", "MAP-024")]
-    public void should_step_tilt_by_five_and_disable_step_buttons_at_zero_and_35() => Scenario.Sta(() =>
+    public void should_have_no_tilt_toggle_angle_popup_menu_item_or_badge_when_map_view_loaded()
     {
-        var (map, vm) = Rig();
-        Assert.False(vm.StepTiltAngleCommand.CanExecute("5"));   // OFF 면 ± 단추 꺼짐
-        vm.ToggleTiltFeatureCommand.Execute(null);
-        Assert.Equal(20.0, vm.TiltAngleDeg, 6);
-        for (int i = 0; i < 3; i++) vm.StepTiltAngleCommand.Execute("5");
-        Assert.Equal(35.0, vm.TiltAngleDeg, 6);
-        Assert.False(vm.StepTiltAngleCommand.CanExecute("5"));   // 상한 — StepUp 꺼짐
-        Assert.True(vm.StepTiltAngleCommand.CanExecute("-5"));
-        for (int i = 0; i < 7; i++) vm.StepTiltAngleCommand.Execute("-5");
-        Assert.Equal(0.0, vm.TiltAngleDeg, 6);
-        Assert.False(vm.StepTiltAngleCommand.CanExecute("-5"));  // 하한 — StepDown 꺼짐
-        vm.StepTiltAngleCommand.Execute("-5");                    // 더 눌러도 0
-        Assert.Equal(0.0, map.RequestedTiltDeg, 6);
-    });
+        Assert.Empty(TiltAutomationIds());                                   // 툴바 토글 · 각도 판(StepDown/AngleSlider/StepUp/AngleText) · 각도 단추 · 보기 메뉴 · 배지
+        var xaml = System.IO.File.ReadAllText(NavKit.RepoFile(System.IO.Path.Combine("Ironwall.Dotnet.Libraries.GMaps.Ui", "Views", "Maps", "MapView.xaml")));
+        Assert.DoesNotContain("Tilt", xaml.Replace("Map.Toolbar.RotateTilt", ""), StringComparison.Ordinal);   // 기울이기 바인딩(명령 · 팝업 · 배지 · 오버스캔) 없음 — 회전 "?" 의 도움말 키 이름만 예외
+        Assert.DoesNotContain("PerspectiveMore", xaml, StringComparison.Ordinal);   // 캡처의 아이콘
+        Assert.DoesNotContain(NavKit.MapViewXaml().Descendants(), e => (string?)e.Attribute("Header") == "지도 기울이기");   // 보기 메뉴 항목
+    }
 
     [Fact]
     [Trait("Scenario", "MAP-025")]
-    public void should_reopen_angle_popup_when_angle_button_used_and_refuse_when_tilt_off() => Scenario.Sta(() =>
+    public void should_expose_no_tilt_members_on_map_view_model_when_tilt_removed()
     {
-        var (_, vm) = Rig();
-        vm.ToggleTiltFeatureCommand.Execute(null);
-        Assert.True(vm.IsTiltAnglePopupOpen);                     // 켜면 자동 열림
-        vm.IsTiltAnglePopupOpen = false;                          // 팝업 닫힘(StaysOpen=False)
-        vm.ToggleTiltAnglePopupCommand.Execute(null);             // 「각도」 단추
-        Assert.True(vm.IsTiltAnglePopupOpen);
-
-        vm.ToggleTiltFeatureCommand.Execute(null);                // 끔
-        Assert.False(vm.IsTiltAnglePopupOpen);
-        vm.IsTiltAnglePopupOpen = true;                           // 끈 상태 — 열리지 않는다
-        Assert.False(vm.IsTiltAnglePopupOpen);
-        var angleButton = NavKit.MapViewXaml().Descendants().Single(e => (string?)e.Attributes().FirstOrDefault(a => a.Name.LocalName == "AutomationProperties.AutomationId")?.Value == "GMaps.Tilt.AngleButton");
-        Assert.Equal("{Binding IsTiltFeatureEnabled}", (string?)angleButton.Attribute("IsEnabled"));   // 끄면 단추 꺼짐
-    });
+        var names = typeof(MapViewModel).GetMembers(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
+            .Select(m => m.Name).Where(n => n.Contains("Tilt", StringComparison.Ordinal)).ToList();
+        Assert.Empty(names);                                                 // 명령 · 팝업 상태 · 배지 · 각도 · 설정 복원/저장 모두 없음
+    }
 
     [Fact]
     [Trait("Scenario", "MAP-026")]
-    public void should_toggle_and_step_tilt_badge_when_tilt_shortcuts_applied() => Scenario.Sta(() =>
+    public void should_not_bind_ctrl_shift_t_or_tilt_arrow_keys_when_tilt_removed() => Scenario.Sta(() =>
     {
-        var (map, vm) = Rig();
-        Assert.Equal("{Binding ToggleTiltFeatureCommand}", NavKit.MapViewKeyBindings()["Ctrl+Shift+T"]);
-        Assert.Equal(5.0, GMapCustomControl.TILT_STEP_COARSE);    // Ctrl+↑/↓
-        Assert.Equal(1.0, GMapCustomControl.TILT_STEP_FINE);      // Ctrl+Shift+↑/↓
+        var keys = NavKit.MapViewKeyBindings();
+        Assert.False(keys.ContainsKey("Ctrl+Shift+T"), "Ctrl+Shift+T 가 아직 묶여 있다");
+        Assert.DoesNotContain(keys.Values, c => c.Contains("Tilt", StringComparison.Ordinal));
+        var control = typeof(GMapCustomControl);
+        Assert.NotNull(control.GetMethod("ToggleRotationFeature"));          // 회전 단축키(Ctrl+Shift+R — 컨트롤 키 처리)는 그대로
+        Assert.Null(control.GetMethod("ToggleTiltFeature"));                 // 단축키 · 툴바 공용 진입점 없음
+        Assert.Null(control.GetMethod("StepTiltAngle"));                     // Ctrl(+Shift)+↑/↓ 각도 처리 없음
+        Assert.Null(control.GetField("TILT_STEP_COARSE"));
+        Assert.Null(control.GetField("TILT_STEP_FINE"));
 
-        vm.ToggleTiltFeatureCommand.Execute(null);                // Ctrl+Shift+T
-        NavKit.Pump();
-        Assert.Equal("기울임 20°", vm.TiltBadgeText);
-        map.StepTiltAngle(GMapCustomControl.TILT_STEP_COARSE);    // Ctrl+↑
-        NavKit.Pump();
-        Assert.Equal("기울임 25°", vm.TiltBadgeText);
-        map.StepTiltAngle(-GMapCustomControl.TILT_STEP_FINE);     // Ctrl+Shift+↓
-        NavKit.Pump();
-        Assert.Equal("기울임 24°", vm.TiltBadgeText);
-        vm.ToggleTiltFeatureCommand.Execute(null);                // Ctrl+Shift+T 다시 — 끔
-        NavKit.Pump();
-        Assert.False(vm.IsTiltBadgeVisible);
-        Assert.Equal(string.Empty, vm.TiltBadgeText);
+        var (map, _) = Rig();
+        Assert.False(map.IsTiltFeatureEnabled);                              // 기본 꺼짐 · 0°
+        Assert.Equal(0.0, map.TiltDeg);
     });
 
     [Fact]
     [Trait("Scenario", "MAP-027")]
-    public void should_keep_menu_and_toolbar_tilt_state_in_sync_both_ways() => Scenario.Sta(() =>
+    public void should_stay_flat_when_saved_tilt_setting_was_on_and_vm_restored() => Scenario.Sta(() =>
     {
-        var (map, vm) = Rig();
-        var changed = new List<string?>();
-        ((INotifyPropertyChanged)vm).PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-
-        vm.IsTiltFeatureEnabled = true;                           // 보기 → 「지도 기울이기」(TwoWay)
-        Assert.True(map.IsTiltFeatureEnabled);                    // 툴바 토글(OneWay 원천)
-        Assert.Contains(nameof(MapViewModel.IsTiltFeatureEnabled), changed);
-
-        changed.Clear();
-        vm.ToggleTiltFeatureCommand.Execute(null);                // 툴바 토글
-        Assert.False(map.IsTiltFeatureEnabled);
-        Assert.False(vm.IsTiltFeatureEnabled);                    // 메뉴 체크도 꺼짐
-        Assert.Contains(nameof(MapViewModel.IsTiltFeatureEnabled), changed);
-
-        var menu = NavKit.MapViewXaml().Descendants().Single(e => (string?)e.Attributes().FirstOrDefault(a => a.Name.LocalName == "AutomationProperties.AutomationId")?.Value == "GMaps.Tilt.MenuToggle");
-        Assert.Equal("{Binding IsTiltFeatureEnabled, Mode=TwoWay}", (string?)menu.Attribute("IsChecked"));
+        NavKit.ResetSettings();
+        var map = NavKit.NewMap(zoom: 18);
+        var vm = NavKit.NewVm(map, new GMapSetupModel { MapTilt = new MapTiltModel { IsEnabled = true, AngleDeg = 30, MinZoom = 5, HysteresisSteps = 1, MaxAngleDeg = 35 } });
+        Scenario.Call(vm, "InitializeRotationCommands");
+        NavKit.Pump();
+        Assert.False(map.IsTiltFeatureEnabled, "저장된 IsEnabled=true 를 따라 기울이기가 켜졌다");
+        Assert.Equal(0.0, map.TiltDeg);
+        Assert.True(map.RenderTransform == null || map.RenderTransform.Value.IsIdentity);
+        Assert.Null(NavKit.Setting("MapTilt"));                              // 쓰지도 않는다
     });
 
     [Fact]
     [Trait("Scenario", "MAP-028")]
-    public void should_lock_tilt_toggle_and_menu_with_reason_when_anchor_disallows_rotation() => Scenario.Sta(() =>
+    public void should_keep_rotation_toggle_working_when_tilt_removed() => Rotation(() =>
     {
-        var (map, vm) = Rig(anchor: NavKit.Anchor(N, W, S, E, allowRotation: false));
-        Assert.False(vm.IsTiltToggleEnabled);
-        Assert.False(vm.ToggleTiltFeatureCommand.CanExecute(null));
-        Assert.Contains("앵커(정북 고정) 중 사용 불가", vm.TiltToggleToolTip);
-        vm.IsTiltFeatureEnabled = true;                           // 메뉴 경로도 막힘
-        Assert.False(map.IsTiltFeatureEnabled);
+        var (map, vm) = Rig();
+        Assert.True(vm.IsRotationToggleEnabled);
+        vm.ToggleRotationFeatureCommand!.Execute(null);
+        Assert.True(vm.IsRotationFeatureEnabled);
+        map.RotateMap(5);
+        Assert.Equal(5f, map.Bearing, 3);
+        Assert.Equal(0.0, map.TiltDeg);                                      // 회전해도 기울기는 0
 
-        var (_, vmB) = Rig(anchor: NavKit.Anchor(N, W, S, E, allowRotation: true));   // B모드는 허용
-        Assert.True(vmB.IsTiltToggleEnabled);
-        Assert.True(vmB.ToggleTiltFeatureCommand.CanExecute(null));
+        // 툴바 ④ 묶음 = 회전 토글 + "?" 만(기울이기 토글 · 각도 단추 없음)
+        var rotate = NavKit.MapViewXaml().Descendants().Single(e => e.Name.LocalName == "ToggleButton"
+            && (string?)e.Attribute("Command") == "{Binding ToggleRotationFeatureCommand}");
+        var group = rotate.Parent!;
+        Assert.Equal(new[] { "ToggleButton", "HelpTip" }, group.Elements().Select(e => e.Name.LocalName).ToArray());
+        Assert.Equal("Map.Toolbar.RotateTilt", (string?)group.Elements().Last().Attribute("HelpKey"));
     });
 }

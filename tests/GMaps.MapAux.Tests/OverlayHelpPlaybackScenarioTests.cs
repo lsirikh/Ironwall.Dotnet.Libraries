@@ -351,10 +351,22 @@ public class OverlayHelpPlaybackScenarioTests
     private static void DragHeader(FrameworkElement overlay, Canvas canvas, double dx, double dy)
     {
         var cur = Mouse.PrimaryDevice.GetPosition(canvas);
-        Scenario.SetField(overlay, "_isDragging", true);
-        Scenario.SetField(overlay, "_lastMousePosition", new Point(cur.X - dx, cur.Y - dy));
+        var state = DragState(overlay);
+        Scenario.SetField(state, "_isDragging", true);
+        Scenario.SetField(state, "_lastMousePosition", new Point(cur.X - dx, cur.Y - dy));
         overlay.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseMoveEvent });
-        Scenario.SetField(overlay, "_isDragging", false);
+        Scenario.SetField(state, "_isDragging", false);
+    }
+
+    /// <summary>끌기 상태(눌림 · 직전 위치)를 가진 객체 — 겹창 자신, 또는 공용 머리 끌기(Helpers.OverlayHeaderDrag.Attach)를 쓰는 겹창이면
+    /// 그 MouseMove 처리기의 주인(사이트 고정 창 · 묶음 회전 판, 2026-10-18 공용화).</summary>
+    private static object DragState(FrameworkElement overlay)
+    {
+        const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        if (overlay.GetType().GetField("_isDragging", F) != null) return overlay;
+        var store = typeof(UIElement).GetProperty("EventHandlersStore", F)!.GetValue(overlay)!;
+        var handlers = (RoutedEventHandlerInfo[])store.GetType().GetMethod("GetRoutedEventHandlers")!.Invoke(store, new object[] { UIElement.MouseMoveEvent })!;
+        return handlers.Select(h => h.Handler.Target).Single(t => t?.GetType().Name == "OverlayHeaderDrag")!;
     }
 
     [Fact]

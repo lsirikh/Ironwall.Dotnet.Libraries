@@ -69,14 +69,12 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Fence\StrokeReducer.cs" />
     <!-- 드래그 드로잉 입력 게이트(C11 휠 차단·C13 팬 억제·C14 클릭 최소 간격) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\LineDrawingInputGates.cs" />
-    <!-- 지도 카드 틸트 오버스캔 수식·φ_layout 정착기(map-tilt-25d PRD FR-04/FR-05, G8) — 실코드 링크(WPF 컨버터 TiltOverscanConverter.cs 는 미링크) -->
+    <!-- 지도 카드 틸트 오버스캔 수식·φ_layout 정착기(map-tilt-25d PRD FR-04/FR-05, G8) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\TiltOverscanMath.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\TiltLayoutSettler.cs" />
     <!-- 지도 카드 틸트 판정 순수 함수(map-tilt-25d PRD FR-02, SIM-T 매트릭스) — 실코드 링크. ZoomLadder 는 GateEpsilon/Snap 의존 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\ZoomLadder.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\TiltMath.cs" />
-    <!-- 틸트 VM 표시 로직(툴팁 사유 매핑·배지·토글 잠금·스텝 클램프, map-tilt-25d FR-08/09) — 실코드 링크 -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\TiltUiText.cs" />
     <!-- 틸트 게이트 재평가 코얼레싱 큐(map-tilt-25d PRD v1.1 FR-03 판정 원자성 — 래더 스텝을 하나의 판정으로) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\TiltGateCoalescer.cs" />
     <!-- 렌더 Tier 0 강등 순수 판정(map-tilt-25d FR-13, SIM-C008) — 실코드 링크(WPF 어댑터 .Wpf.cs 는 미링크) -->
