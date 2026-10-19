@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+﻿using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using System;
 using System.Windows;
 using System.Windows.Data;
@@ -242,6 +242,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             }
         }
 
+        /// <summary>그룹 Pending — 이 종류의 칸도 "전원 동일=값 / 다름=빈칸(—)"(같은 종류 다중 선택 = 단일 선택 칸 전부, 2026-10-19).</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            base.ApplyGroupPendingSpecific();
+            var g = System.Linq.Enumerable.ToList(System.Linq.Enumerable.OfType<IImageEditableMarker>(GroupMarkers!));
+            if (g.Count < 2) return;
+            bool AllEq<T>(Func<IImageEditableMarker, T> sel) => System.Linq.Enumerable.All(g, m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+            ImageOpacity = AllEq(m => m.Opacity) ? g[0].Opacity : MIXED_DOUBLE;
+        }
+
         public override Type GetSupportedMarkerType()
         {
             return typeof(GMapImageMarker);
@@ -257,7 +267,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IImageEditableMarker imageMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                imageMarker.FilePath = (string)e.NewValue;
+                if (!control.IsGroupMode) imageMarker.FilePath = (string)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("FilePath", e.OldValue, e.NewValue);
             }
         }
@@ -268,7 +278,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IImageEditableMarker imageMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                imageMarker.Opacity = (double)e.NewValue;
+                if (!control.IsGroupMode) imageMarker.Opacity = (double)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("Opacity", e.OldValue, e.NewValue);
             }
         }
@@ -279,7 +289,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IImageEditableMarker imageMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                imageMarker.IsVisible = (bool)e.NewValue;
+                if (!control.IsGroupMode) imageMarker.IsVisible = (bool)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("Visibility", e.OldValue, e.NewValue);
             }
         }
@@ -290,7 +300,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IImageEditableMarker imageMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                imageMarker.MaintainAspectRatio = (bool)e.NewValue;
+                if (!control.IsGroupMode) imageMarker.MaintainAspectRatio = (bool)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("MaintainAspectRatio", e.OldValue, e.NewValue);
             }
         }
