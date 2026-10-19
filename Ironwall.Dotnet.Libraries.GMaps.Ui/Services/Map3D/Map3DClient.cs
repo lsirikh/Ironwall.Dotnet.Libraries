@@ -78,6 +78,10 @@ public sealed record Map3DBuildingSaved(JObject Building, Map3DBuildingPick Pick
 public sealed class Map3DServerUnavailableException : Exception
 {
     public Map3DServerUnavailableException(string message, Exception? inner = null) : base(message, inner) { }
+    public Map3DServerUnavailableException(string message, Exception? inner, bool isTimeout) : base(message, inner) { IsTimeout = isTimeout; }
+
+    /// <summary>응답 시간 초과 — 요청은 서버에 닿았을 수 있다(굽기 시작이면 서버가 이미 만들고 있을 수 있다). 연결 거부면 false.</summary>
+    public bool IsTimeout { get; }
 }
 
 /// <summary>서버가 요청을 거절함(예: 한 변 2000 m 초과 → 400). Message = 서버 detail.</summary>
@@ -98,8 +102,17 @@ public sealed class Map3DClient : IDisposable
     {
         _server = serverUrl.TrimEnd('/');
         _http = handler == null ? new HttpClient() : new HttpClient(handler);
-        _http.Timeout = TimeSpan.FromSeconds(10);
+        _http.Timeout = System.Threading.Timeout.InfiniteTimeSpan;   // 시간 제한은 요청마다(SendAsync) — 굽기 시작은 큰 이미지 본문을 올린다
     }
+
+    /// <summary>보통 요청(조회 · 저장 · 지우기)의 응답 시간 제한.</summary>
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// 굽기 시작(POST /api/jobs)의 시간 제한 — 본문에 오버레이 이미지(수십 MB)가 실려 올리기만 10 초를 넘을 수 있다.
+    /// 10 초로 끊으면 서버는 이미 굽기를 시작했는데 GIS 는 "닿지 않음"으로 알려, 다시 누르면 같은 영역을 두 번 구웠다.
+    /// </summary>
+    public TimeSpan BakeStartTimeout { get; init; } = TimeSpan.FromMinutes(3);
 
     /// <summary>굽기 시작(POST /api/jobs) → 202 작업.</summary>
     public Task<Map3DJob> StartBakeAsync(double[] bbox, CancellationToken ct = default)
@@ -122,7 +135,7 @@ public sealed class Map3DClient : IDisposable
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, Map3DMath.JobsUrl(_server))
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        }, allowNotFound: false, ct).ConfigureAwait(false);
+        }, allowNotFound: false, ct, BakeStartTimeout).ConfigureAwait(false);
         return ParseJob(json!);
     }
 
@@ -170,6 +183,19 @@ public sealed class Map3DClient : IDisposable
     {
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, Map3DMath.JobsUrl(_server)), allowNotFound: false, ct).ConfigureAwait(false);
         return ParseScenes(json!);
+    }
+
+    /// <summary>작업 목록(GET /api/jobs) — 구운 장면과 지금 만드는 중(queued · running)인 작업 수(옛 서버라 running 이 없으면 0).</summary>
+    public async Task<(IReadOnlyList<Map3DSceneInfo> Scenes, int Running)> ListJobsAsync(CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, Map3DMath.JobsUrl(_server)), allowNotFound: false, ct).ConfigureAwait(false);
+        return (ParseScenes(json!), ParseRunningCount(json!));
+    }
+
+    internal static int ParseRunningCount(string json)
+    {
+        try { return JToken.Parse(json) is JObject o && o["running"] is JArray running ? running.Count : 0; }
+        catch (JsonException) { return 0; }
     }
 
     /// <summary>굽은 장면 지우기(DELETE /api/jobs/{id}) — 지웠으면 true, 이미 없으면(404) false. 지울 수 없는 장면(예: 견본 405)은 Map3DRequestException.</summary>
@@ -333,16 +359,21 @@ public sealed class Map3DClient : IDisposable
 
     /// <summary>보내고 본문을 돌려준다. 404 + allowNotFound → null. 그 밖의 실패 → Map3DRequestException(detail).
     /// 연결 실패 · 시간 초과 → Map3DServerUnavailableException. 호출자 취소는 그대로 OperationCanceledException.</summary>
-    private async Task<string?> SendAsync(HttpRequestMessage request, bool allowNotFound, CancellationToken ct)
+    private async Task<string?> SendAsync(HttpRequestMessage request, bool allowNotFound, CancellationToken ct, TimeSpan? timeout = null)
     {
+        // 시간 제한 = 요청마다(보통 RequestTimeout, 굽기 시작은 BakeStartTimeout) — 보내기 · 받기 · 본문 읽기까지
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(timeout ?? RequestTimeout);
         HttpResponseMessage response;
-        try { response = await _http.SendAsync(request, ct).ConfigureAwait(false); }
+        try { response = await _http.SendAsync(request, limit.Token).ConfigureAwait(false); }
         catch (HttpRequestException ex) { throw new Map3DServerUnavailableException(ex.Message, ex); }
-        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested) { throw new Map3DServerUnavailableException("응답 시간 초과", ex); }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested) { throw new Map3DServerUnavailableException("응답 시간 초과", ex, isTimeout: true); }
 
         using (response)
         {
-            var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            string text;
+            try { text = await response.Content.ReadAsStringAsync(limit.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException ex) when (!ct.IsCancellationRequested) { throw new Map3DServerUnavailableException("응답 시간 초과", ex, isTimeout: true); }
             if (response.IsSuccessStatusCode) return text;
             if (allowNotFound && response.StatusCode == HttpStatusCode.NotFound) return null;
             throw new Map3DRequestException(response.StatusCode, ReadDetail(text) ?? $"HTTP {(int)response.StatusCode}");

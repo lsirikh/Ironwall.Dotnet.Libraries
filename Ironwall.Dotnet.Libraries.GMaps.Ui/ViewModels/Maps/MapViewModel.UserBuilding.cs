@@ -115,8 +115,23 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     public string UserBuildingRoof
     {
         get => _ubRoof ?? Map3DUserBuilding.RoofFlat;
-        set { _ubRoof = value ?? Map3DUserBuilding.RoofFlat; _ubRoofChosen = true; NotifyOfPropertyChange(); }
+        set
+        {
+            _ubRoof = value ?? Map3DUserBuilding.RoofFlat;
+            _ubRoofChosen = true;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(UserBuildingRoofStatus));
+            NotifyOfPropertyChange(nameof(HasUserBuildingRoofStatus));
+        }
     }
+
+    /// <summary>
+    /// 고른 지붕(박공 · 원뿔 · 돔)이 닫은 윤곽으로는 안 되는 모양(Map3DUserBuilding.CanBuildRoof)이면 지붕 줄 밑 짧은 상태 글 — map-3d 가 평지붕으로 짓는다.
+    /// 아니면 null(닫기 전에는 판정하지 않는다).
+    /// </summary>
+    public string? UserBuildingRoofStatus
+        => _ubDraft is { IsClosed: true } d && !Map3DUserBuilding.CanBuildRoof(UserBuildingRoof, d.Points) ? Map3DUserBuilding.GableFlatOnlyText : null;
+    public bool HasUserBuildingRoofStatus => UserBuildingRoofStatus != null;
 
     /// <summary>외벽 성격(auto · commercial · industrial · residential).</summary>
     public string UserBuildingUse
@@ -254,6 +269,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         _ubFloorHeightValue = Map3DBuilding.DefaultFloorHeight;
         ResetUserBuildingDraft(null);
         AttachUserBuildingSurface();
+        MainMap.Focus();   // 그리기 키는 지도 화면에서 온 것만 받는다(IsUserBuildingKey) — 메뉴 · 다른 화면에 남은 초점을 지도로(선 그리기와 같은 관용구)
         SyncMap3DWithInputModes();   // 3D 중이면 2D 로(그리기는 2D)
         _log?.Info($"[UserBuilding] 그리기 시작 area={item.Id}");
         SetAimStatus("지도를 눌러 건물 윤곽(위에서 본 모양)을 그리세요 — 첫 점을 누르거나 Enter 로 닫기", autoHide: true);
@@ -312,7 +328,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     private void OnUserBuildingDraftChanged()
     {
         // 원으로 만든 윤곽 — 지붕을 고른 적 없으면 돔 제안(탱크처럼, map-3d 의 둥근 윤곽 규칙)
-        if (_ubDraft is { IsClosed: true, CompletedBy: UbTool.Circle } && !_ubRoofChosen && UserBuildingRoof == Map3DUserBuilding.RoofFlat)
+        if (_ubDraft is { IsClosed: true, CompletedBy: UbTool.Circle } d && !_ubRoofChosen && UserBuildingRoof == Map3DUserBuilding.RoofFlat
+            && Map3DUserBuilding.CanRoundRoof(d.Points))   // 꼭짓점이 적은 원(16 미만)은 map-3d 가 둥근 지붕으로 짓지 않는다
             _ubRoof = Map3DUserBuilding.RoofDome;
         _ubAdorner?.InvalidateVisual();
         RefreshUserBuildingPanel();
@@ -394,9 +411,28 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
 
     private void OnUserBuildingKeyDown(object sender, KeyEventArgs e)
     {
-        if (!IsUserBuildingDrawing) return;
+        if (!IsUserBuildingKey(e)) return;   // 지도 화면 밖(그 위에 뜬 확인 창 등)의 키는 그쪽 몫 — Enter 로 저장되지 않게
         bool inBox = e.OriginalSource is TextBoxBase;
         e.Handled = HandleUserBuildingKey(e.Key, Keyboard.Modifiers, inBox);
+    }
+
+    /// <summary>
+    /// 그리는 중이고 키가 지도 화면(지도를 품은 MapView — 지도 · 툴바 · 판, 또는 창 자체처럼 그 위 조상)에서 왔는가 — 「건물 그리기」 몫.
+    /// 지도 키 처리기(Delete = 선택 심볼 삭제 · Ctrl+Z · 방향키 이동 · Esc 선택 해제)는 이 키를 건드리지 않는다(이미지 자르기 IsImageCropPanelKey 관용구).
+    /// 지도 화면 밖(팝업층의 확인 창 · 다른 화면)에서 온 키는 그쪽 몫이다.
+    /// </summary>
+    private bool IsUserBuildingKey(KeyEventArgs e)
+    {
+        if (!IsUserBuildingDrawing || MainMap is not { } map) return false;
+        if ((e.OriginalSource ?? Keyboard.FocusedElement) is not System.Windows.DependencyObject d) return true;
+        if (_ubPanel != null && IsInImageCropPanel(_ubPanel, d)) return true;   // 판(같은 Visual 안 판정)
+        System.Windows.DependencyObject root = map;   // 지도를 품은 가장 가까운 UserControl(MapView), 없으면 맨 위 조상
+        for (var p = System.Windows.Media.VisualTreeHelper.GetParent(map); p != null; p = System.Windows.Media.VisualTreeHelper.GetParent(p))
+        {
+            root = p;
+            if (p is System.Windows.Controls.UserControl) break;
+        }
+        return d is System.Windows.Media.Visual v && root is System.Windows.Media.Visual r && (ReferenceEquals(v, r) || r.IsAncestorOf(v) || v.IsAncestorOf(r));
     }
 
     /// <summary>그리기 키 — Esc 두 단계 · Enter 닫기 · Backspace · Delete · Ctrl+Z. 입력칸 안에서는 Esc 만. 처리했으면 true.</summary>
@@ -466,6 +502,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(UserBuildingFloorHeightText), nameof(UserBuildingError), nameof(HasUserBuildingError),
                      nameof(UserBuildingTool), nameof(IsUserBuildingToolRect), nameof(IsUserBuildingToolCircle), nameof(IsUserBuildingToolEllipse),
                      nameof(IsUserBuildingToolPolygon), nameof(UserBuildingCircleSidesText), nameof(UserBuildingRoof), nameof(UserBuildingUse),
+                     nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus),
                  })
             NotifyOfPropertyChange(name);
         ApplyUserBuildingCommand.RaiseCanExecuteChanged();
@@ -514,7 +551,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (await SaveUserBuildingAsync(area.Id, uid, after))
         {
             _undoService?.Push(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} {(before == null ? "넣기" : "고치기")}", area.Id, uid, before, after,
-                                                       ApplyUserBuildingStateAsync));
+                                                       ApplyUserBuildingStateAsync, ResolveUserBuildingJob));
             SetAimStatus(Map3DUserBuilding.SavedText(after.Height, floors), autoHide: true);
             ResetUserBuildingDraft(null);   // 다음 건물을 바로 그릴 수 있게
         }
@@ -527,7 +564,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (await SaveUserBuildingAsync(area.Id, e.Uid, null))
         {
             _undoService?.Push(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} 지우기", area.Id, e.Uid,
-                                                       StateOf(e), null, ApplyUserBuildingStateAsync));
+                                                       StateOf(e), null, ApplyUserBuildingStateAsync, ResolveUserBuildingJob));
             SetAimStatus("건물을 지웠습니다 — 3D 를 다시 만들면 원래 건물로 돌아갑니다", autoHide: true);
             ResetUserBuildingDraft(null);
         }
@@ -549,6 +586,19 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         try { await _undoService.UndoAsync(); }
         catch (Exception ex) { _log?.Error($"[UserBuilding] 되돌리기 실패: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// 편집 기록이 잡은 job → 그 건물이 든 영역의 지금 job. 옛 job 이 아직 목록에 있으면 그대로, 「다시 만들기」 · 다른 곳에서 바뀌어 없어졌으면
+    /// 건물 가운데를 덮는 지금 영역(가장 새것 — map-3d 도 장면 범위에 가운데가 든 건물을 그 장면 것으로 본다). 찾지 못하면 옛 job(서버가 판단).
+    /// </summary>
+    private string ResolveUserBuildingJob(string job, UbPoint center)
+    {
+        if (Map3DAreas.Any(a => a.Id == job)) return job;
+        var now = Map3DAreas.Where(a => a.Area.Contains(center.X, center.Y)).OrderByDescending(a => a.Scene.Created ?? DateTime.MinValue).FirstOrDefault();
+        if (now == null) return job;
+        _log?.Info($"[UserBuilding] 편집 기록 영역 job {job} → {now.Id}");
+        return now.Id;
     }
 
     /// <summary>GIS 편집 기록 적용(UserBuildingCommand) — 그 상태로 다시 저장(null = 지움). 실패는 예외(편집 기록이 그 칸을 남긴다).</summary>

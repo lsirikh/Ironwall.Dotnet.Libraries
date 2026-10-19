@@ -81,6 +81,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
 
     /// <summary>적용할 내용 한 줄 — "적용하면 12.0 m → 30.0 m(10층)" · 바꾸지 않았으면 그렇게.</summary>
     public string BuildingHeightSummary => _bhBuilding is not { } b ? ""
+        : _bhBusy ? "저장하는 중… 끝날 때까지 닫을 수 없습니다"
         : IsBuildingHeightChanged
             ? $"적용하면 {Map3DBuilding.FormatMeters(b.Height)} m → {Map3DBuilding.FormatMeters(_bhPreview)} m({Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight)}층)"
             : b.Manual ? "직접 입력한 높이입니다 — 바꾸려면 층수나 높이를 넣으세요" : "아직 바꾸지 않았습니다";
@@ -143,8 +144,15 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _ => _ = ApplyBuildingHeightAsync(), _ => IsBuildingHeightEditable && IsBuildingHeightChanged && !_bhInputError);
 
     private RelayCommand? _cancelBuildingHeightCommand;
-    /// <summary>「취소」 · 닫기(✕) · Esc — 미리보기를 원래대로 하고 판을 닫는다.</summary>
-    public RelayCommand CancelBuildingHeightCommand => _cancelBuildingHeightCommand ??= new RelayCommand(_ => CloseBuildingHeightPanel(clearUndo: false));
+    /// <summary>「취소」 · 닫기(✕) · Esc — 미리보기를 원래대로 하고 판을 닫는다. 저장 중에는 막는다(취소했는데 저장되지 않게 — 단추가 흐려진다).</summary>
+    public RelayCommand CancelBuildingHeightCommand => _cancelBuildingHeightCommand ??= new RelayCommand(_ =>
+    {
+        if (_bhBusy) { SetAimStatus(BuildingHeightSavingText, autoHide: true); return; }
+        CloseBuildingHeightPanel(clearUndo: false);
+    }, _ => !_bhBusy);
+
+    /// <summary>저장 중 [취소] · ✕ · Esc 를 눌렀을 때 한 줄.</summary>
+    private const string BuildingHeightSavingText = "건물 높이를 저장하는 중입니다 — 끝난 뒤 닫을 수 있습니다";
 
     private RelayCommand? _resetBuildingHeightCommand;
     /// <summary>「자동으로 되돌리기」 — 직접 입력을 지우고 굽기 때 자동 추정 높이로.</summary>
@@ -252,6 +260,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         ApplyBuildingHeightCommand.RaiseCanExecuteChanged();
         ResetBuildingHeightCommand.RaiseCanExecuteChanged();
         UndoBuildingHeightCommand.RaiseCanExecuteChanged();
+        CancelBuildingHeightCommand.RaiseCanExecuteChanged();
     }
 
     private void SetBuildingHeightBusy(bool busy)
@@ -387,7 +396,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         if (!IsBuildingHeightPanelOpen) return false;
         if (_bhPanel?.CancelHandleDrag() == true) return true;
         if (_bhDragStart != null) { ((IBuildingHeightPanelHost)this).EndHeightDrag(canceled: true); return true; }
-        CloseBuildingHeightPanel(clearUndo: false);
+        CancelBuildingHeightCommand.Execute(null);   // 저장 중이면 닫지 않고 알린다(3D 도 나가지 않는다)
         return true;
     }
 

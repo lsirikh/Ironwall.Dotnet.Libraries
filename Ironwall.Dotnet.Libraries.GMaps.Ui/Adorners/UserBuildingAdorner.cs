@@ -75,6 +75,7 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
+        _map.Focus();   // 키 초점을 지도로 — 다른 화면 단추에 초점이 남으면 그리기 키(Enter · Delete …)가 그 단추 몫으로 판정된다
         CaptureMouse();
         _host.UserBuildingPointerDown(At(e), e.ClickCount);
         e.Handled = true;

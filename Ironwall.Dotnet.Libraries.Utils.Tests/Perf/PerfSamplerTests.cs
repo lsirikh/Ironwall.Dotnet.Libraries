@@ -51,7 +51,7 @@ public sealed class PerfSamplerTests : IDisposable
     public void should_measure_scheduled_to_run_delay_when_ui_thread_is_blocked()
     {
         double now = 1000;
-        using var gate = new ManualResetEventSlim();
+        var gate = new ManualResetEventSlim();   // 폐기하지 않음 — 아래 시험과 같은 이유(늦게 돈 콜백의 gate.Wait)
         using var probe = new PerfUiLagProbe(_dispatcher, PerfKinds.Gis, () => Volatile.Read(ref now), TimeSpan.FromSeconds(1), DispatcherPriority.Send, startTimer: false);
         _dispatcher.BeginInvoke(new Action(() => gate.Wait(TimeSpan.FromSeconds(10))));   // UI 스레드가 한 가지 일에서 돌아오지 않는다
 
@@ -75,7 +75,7 @@ public sealed class PerfSamplerTests : IDisposable
     public void should_include_pending_age_in_max_when_reporting_during_stall()
     {
         double now = 0;
-        using var gate = new ManualResetEventSlim();
+        var gate = new ManualResetEventSlim();   // 폐기하지 않음 — 부하로 늦게 돈 디스패처 콜백이 시험 끝난 뒤 gate.Wait 를 부르면 ObjectDisposedException 으로 테스트 호스트가 죽는다
         using var probe = new PerfUiLagProbe(_dispatcher, PerfKinds.Gis, () => Volatile.Read(ref now), TimeSpan.FromSeconds(1), DispatcherPriority.Send, startTimer: false);
         _dispatcher.BeginInvoke(new Action(() => gate.Wait(TimeSpan.FromSeconds(10))));
         probe.Probe();

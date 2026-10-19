@@ -22,11 +22,21 @@ public sealed record UserBuildingState(IReadOnlyList<UbPoint> Outline, double He
 public sealed class UserBuildingCommand : IUndoableCommand
 {
     private readonly Func<string, string, UserBuildingState?, CancellationToken, Task> _apply;
-    private readonly string _job, _uid;
+    private readonly Func<string, UbPoint, string>? _resolveJob;
+    private readonly string _uid;
+    private string _job;
     private readonly UserBuildingState? _before, _after;
 
     public UserBuildingCommand(string description, string job, string uid, UserBuildingState? before, UserBuildingState? after,
                                Func<string, string, UserBuildingState?, CancellationToken, Task> apply)
+        : this(description, job, uid, before, after, apply, null) { }
+
+    /// <param name="resolveJob">
+    /// 적용할 때 그 건물이 든 영역의 지금 job 을 찾는다(옛 job, 건물 가운데 위경도 → job). 직접 그린 건물은 map-3d 가 job 이 아니라 영역 단위로
+    /// 저장하므로 「다시 만들기」로 job 이 바뀌어도(옛 job 은 지워짐 — 404) 같은 영역의 새 job 으로 되돌린다. null 이면 처음 job 그대로.
+    /// </param>
+    public UserBuildingCommand(string description, string job, string uid, UserBuildingState? before, UserBuildingState? after,
+                               Func<string, string, UserBuildingState?, CancellationToken, Task> apply, Func<string, UbPoint, string>? resolveJob)
     {
         Description = description;
         _job = job;
@@ -34,10 +44,18 @@ public sealed class UserBuildingCommand : IUndoableCommand
         _before = before;
         _after = after;
         _apply = apply;
+        _resolveJob = resolveJob;
     }
 
     public string Description { get; }
     public int ScopeMapId { get; set; }
-    public Task ExecuteAsync(CancellationToken ct = default) => _apply(_job, _uid, _after, ct);
-    public Task UndoAsync(CancellationToken ct = default) => _apply(_job, _uid, _before, ct);
+    public Task ExecuteAsync(CancellationToken ct = default) => _apply(CurrentJob(), _uid, _after, ct);
+    public Task UndoAsync(CancellationToken ct = default) => _apply(CurrentJob(), _uid, _before, ct);
+
+    /// <summary>그 건물 영역의 지금 job(찾은 것은 기억해 다음 되돌리기 · 다시 하기의 출발점으로 쓴다).</summary>
+    private string CurrentJob()
+    {
+        if (_resolveJob != null && (_after ?? _before) is { Outline.Count: > 0 } s) _job = _resolveJob(_job, Map3DUserBuilding.Center(s.Outline));
+        return _job;
+    }
 }
