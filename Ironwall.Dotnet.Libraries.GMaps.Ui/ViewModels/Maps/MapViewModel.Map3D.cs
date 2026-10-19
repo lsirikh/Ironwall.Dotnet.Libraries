@@ -79,6 +79,8 @@ public partial class MapViewModel
         NotifyOfPropertyChange(nameof(IsMap3DShown));
         NotifyOfPropertyChange(nameof(IsMap3DZoomControlVisible));
         NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible));
+        NotifyOfPropertyChange(nameof(IsCompassShown));   // 3D 에서는 방향 링이 나침반 대신(MapViewModel.Map3DNav)
+        if (state != Map3DState.Shown) StopAllMap3DMoves();   // 누르고 있던 이동을 멈춘다
     }
 
     private RelayCommand? _exitMap3DCommand;
@@ -1015,6 +1017,7 @@ public partial class MapViewModel
         }
         if (_map3DState != Map3DState.Shown || msg.Camera is not { } cam) return;
         _map3DLastCamera = cam;
+        SetMap3DNavCamera(cam);   // 방향 링이 3D 방위를 따라간다
         NoteMap3DCameraForFlyTo(msg.Reason);   // 3D 조작 중이면 이벤트 이동이 양보한다(MapViewModel.EventFlyTo)
         // 3D 에서는 줌으로 나가지 않는다(진입 방식과 상관없이 나가기 · ESC 만 — Map3DMath.ShouldSync2DToCamera).
         // WPF 안 3D(CompositionControl)면 2D 오버레이(나침반 · 축척바 · 줌 · 좌표)가 3D 위에 그대로 보인다 — 뒤의 2D 지도를

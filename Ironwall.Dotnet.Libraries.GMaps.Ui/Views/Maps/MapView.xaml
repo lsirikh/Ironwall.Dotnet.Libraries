@@ -1718,6 +1718,18 @@
 				</StackPanel>
 			</Border>
 
+			<!--  3D 방향 링 · 이동 단추(2026-10-19) — 3D 가 보이는 동안만(IsMap3DShown), 2D 나침반 자리(오른쪽 위)에 나침반 대신.
+			      링 끌기 = 방위 · N = 정북 · 가운데 지구본 위아래 끌기 = 기울기 · 위에서 보기 · 비스듬히 · 앞뒤좌우 이동(누르고 있으면 계속) · 확대 축소.
+			      ZIndex 150 = 3D 호스트(0) 위 · 속성창 캔버스(200) 아래. 디자인 = MapFloatingPanelStyle · PanelSecondaryButtonStyle · 토큰만.  -->
+			<local:Map3DNavControl
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Margin="0,16,16,0"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Top"
+				Panel.ZIndex="150"
+				Visibility="{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 			<!--  줌 컨트롤 — 3D 에는 줌 개념이 없어 3D 동안 숨긴다(IsMap3DZoomControlVisible = Map3DStatusText 가 "3D" 가 아닐 때)  -->
 			<ctrl:MapZoomControl
 				x:Name="MapZoomCtrl"
@@ -1780,7 +1792,8 @@
 				<!--  방위각 심볼(나침반) — GMap_Compass_Control PRD v1.0. 계기층 z6(D-03):
 				      리더선(5) 위 · 카메라 팝업(10)/OverlayWindow 패널(20~120)/제어 허브(210) 아래.
 				      RotationFeature OFF=Collapsed(컨트롤 자체 게이트) → 비회전 회귀 0(NFR-01).
-				      위치/설정 영속=VM(MapCompassX/Y 등 TwoWay + SaveMapCompassCommand).  -->
+				      위치/설정 영속=VM(MapCompassX/Y 등 TwoWay + SaveMapCompassCommand).
+				      3D 가 보이는 동안은 숨고 3D 방향 링(local:Map3DNavControl)이 대신한다(IsCompassShown = IsCompassVisible 이고 3D 아님).  -->
 				<!--  Canvas.Left/Top은 컨트롤이 직접 세팅(UpdateDisplayPosition) — 표시=클램프,
 				      CompassX/Y=영속 원본(desired) 분리로 작은 창 부팅 시 저장 좌표 훼손 방지(리뷰 #4).  -->
 				<ctrl:GMapCompassControl
@@ -1794,7 +1807,7 @@
 					SettingsChangedCommand="{Binding SaveMapCompassCommand}"
 					TargetMap="{Binding ElementName=MainMap}"
 					Variant="{Binding CompassVariant, Mode=TwoWay}"
-					Visibility="{Binding IsCompassVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Visibility="{Binding IsCompassShown, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  강풍모드(WINDY) 인디케이터 — 계기층 z6, 보기 메뉴 가시성(FR-17), 클릭→WINDY 패널(D-10).  -->
 				<ctrl:GMapWindyIndicatorControl
