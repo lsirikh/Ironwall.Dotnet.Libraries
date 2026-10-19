@@ -756,7 +756,7 @@ public partial class MapViewModel
         }
         if (msg.Type == "overlay.screen")
         {
-            try { if (msg.Screens is { } screens) OnMap3DScreens(screens); }
+            try { if (msg.Screens is { } screens) OnMap3DScreens(screens, msg.ScreenView); }
             catch (Exception ex) { _log?.Error($"[Map3D] 창 자리 처리 실패(격리): {ex.Message}"); }
             return;
         }

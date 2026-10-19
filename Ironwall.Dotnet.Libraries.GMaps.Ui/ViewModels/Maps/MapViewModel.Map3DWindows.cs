@@ -25,6 +25,10 @@ public partial class MapViewModel
 {
     /// <summary>3D 가 마지막으로 알려 준 화면 좌표(CSS px) — key → 점. 카메라 뒤로 가면 지운다.</summary>
     private readonly Dictionary<string, Point> _map3DScreens = new();
+    /// <summary>마지막 overlay.screen 의 그 프레임 3D 줌 · 방위 — 상자 오프셋을 마커 자리와 같은 프레임 값으로 셈한다(옛 3D 는 null).</summary>
+    private Map3DScreenView? _map3DScreenView;
+    /// <summary>카메라 id → 줌 0 · 방위 0 기준 상자 오프셋(Map3DScreen.BaseOffset) — 앵커 · 마커 위경도가 같으면 3D 동안 다시 재지 않는다(2D 정수 반올림 떨림).</summary>
+    private readonly Dictionary<int, (PointLatLng Anchor, PointLatLng Camera, (double X, double Y) Base)> _map3DPopupOffsets = new();
     private bool _map3DWindowsHooked;
 
     /// <summary>WPF 안 3D 가 펼쳐져 있어 창이 3D 마커 자리를 따라가는가.</summary>
@@ -58,6 +62,8 @@ public partial class MapViewModel
             _map3DWindowsHooked = false;
         }
         _map3DScreens.Clear();
+        _map3DScreenView = null;
+        _map3DPopupOffsets.Clear();
         try
         {
             _componentCard?.UseOverlay(null, null);
@@ -86,33 +92,42 @@ public partial class MapViewModel
         catch (Exception ex) { _log?.Error($"[Map3D] 지켜볼 목록 보내기 실패(격리): {ex.Message}"); }
     }
 
-    /// <summary>3D 의 overlay.screen — 좌표를 기록하고 따라가는 중이면 창 자리를 다시 잡는다.</summary>
-    private void OnMap3DScreens(IReadOnlyList<Map3DScreenPoint> screens)
+    /// <summary>3D 의 overlay.screen — 좌표(와 그 프레임 줌 · 방위)를 기록하고 따라가는 중이면 창 자리를 다시 잡는다.</summary>
+    private void OnMap3DScreens(IReadOnlyList<Map3DScreenPoint> screens, Map3DScreenView? view)
     {
         foreach (var s in screens)
         {
             if (s.X is double x && s.Y is double y) _map3DScreens[s.Key] = new Point(x, y);
             else _map3DScreens.Remove(s.Key);   // 카메라 뒤 — 창은 마지막 자리에
         }
+        if (view != null) _map3DScreenView = view;
         if (!IsMap3DWindowFollow) return;
-        RefreshCameraPopupPositions();
+        TryPlaceCameraPopupsIn3D(fromScreens: true);
         _componentCard?.Relayout();
     }
 
     /// <summary>
-    /// 3D 를 따라가는 중이면 카메라 상자 자리를 3D 화면 기준으로 잡고 true(2D 규칙을 건너뛴다). 화면 좌표를 아직 모르는 상자는 그대로 둔다.
-    /// (RefreshCameraPopupPositions 서두 — 3D 카메라를 2D 에 맞추며 생기는 2D 팬 · 줌 통지도 여기로 온다)
+    /// 3D 를 따라가는 중이면 카메라 상자 자리를 3D 화면 기준으로 잡고 true(2D 규칙을 건너뛴다). 화면 좌표를 아직 모르는 상자 · 끄는 중인 상자는 그대로 둔다.
+    /// (RefreshCameraPopupPositions 서두 — 3D 카메라를 2D 에 맞추며 생기는 2D 팬 · 줌 통지도 여기로 온다. 같은 프레임 값(view)을 받는 동안은
+    ///  그 통지로는 놓지 않는다 — overlay.screen 한 출처만, Map3DScreen.PlaceOn2DChange)
     /// </summary>
-    private bool TryPlaceCameraPopupsIn3D()
+    private bool TryPlaceCameraPopupsIn3D(bool fromScreens = false)
     {
         if (MainMap == null || _cameraPopups == null || !IsMap3DWindowFollow) return false;
+        if (!fromScreens && !Map3DScreen.PlaceOn2DChange(_map3DScreenView)) return true;
         var view = Map3DViewPair();
         foreach (var vm in _cameraPopups.ToList())
         {
+            if (vm.IsWindowDragging) continue;   // 끄는 중 — 놓으면 끌기와 번갈아 자리를 정해 떨린다(놓으면 DragCompleted 가 새 앵커로 저장)
             if (Map3DScreenOuter(Map3DScreen.CameraPopupKey(vm.CameraId)) is not Point cam) continue;
-            var c = Outer2D(vm.CameraGeo);
-            var a = Outer2D(vm.AnchorGeo);
-            var (left, top) = Map3DScreen.PopupTopLeft3D((cam.X, cam.Y), (c.X, c.Y), (a.X, a.Y), view.Zoom2D, view.Zoom3D, view.Bearing2D, view.Bearing3D);
+            if (!_map3DPopupOffsets.TryGetValue(vm.CameraId, out var off) || off.Anchor != vm.AnchorGeo || off.Camera != vm.CameraGeo)
+            {
+                var c = Outer2D(vm.CameraGeo);
+                var a = Outer2D(vm.AnchorGeo);
+                off = (vm.AnchorGeo, vm.CameraGeo, Map3DScreen.BaseOffset((c.X, c.Y), (a.X, a.Y), view.Zoom2D, view.Bearing2D));
+                _map3DPopupOffsets[vm.CameraId] = off;
+            }
+            var (left, top) = Map3DScreen.PopupTopLeft3DFromBase((cam.X, cam.Y), off.Base, view.Zoom3D, view.Bearing3D);
             vm.CameraScreenX = cam.X;
             vm.CameraScreenY = cam.Y;
             vm.CanvasLeft = left;
@@ -156,11 +171,11 @@ public partial class MapViewModel
         return MainMap.InnerToOuter(new Point(g.X, g.Y));
     }
 
-    /// <summary>지금 2D(메르카토르 줌 · 방위)와 3D 카메라 — 3D 카메라 보고가 아직 없으면(펼친 직후) 2D 와 같다고 본다.</summary>
+    /// <summary>지금 2D(메르카토르 줌 · 방위)와 3D — 3D 는 마커 자리와 같은 프레임 값이 먼저(Map3DScreen.OffsetView3D), 보고가 아직 없으면(펼친 직후) 2D 와 같다고 본다.</summary>
     private (double Zoom2D, double Zoom3D, double Bearing2D, double Bearing3D) Map3DViewPair()
     {
         var cam2 = Current2DCamera(0d);
-        var cam3 = _map3DLastCamera ?? cam2;
-        return (cam2.Zoom, cam3.Zoom, cam2.Bearing, cam3.Bearing);
+        var (zoom3, bearing3) = Map3DScreen.OffsetView3D(_map3DScreenView, _map3DLastCamera, cam2.Zoom, cam2.Bearing);
+        return (cam2.Zoom, zoom3, cam2.Bearing, bearing3);
     }
 }

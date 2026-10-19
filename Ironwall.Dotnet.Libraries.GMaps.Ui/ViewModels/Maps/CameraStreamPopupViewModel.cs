@@ -79,6 +79,9 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤이 드래그 종료 시 호출 → DragCompleted 발화.</summary>
     internal void RaiseDragCompleted() => Raise(DragCompleted, nameof(DragCompleted));
 
+    /// <summary>헤더를 끌어 창을 옮기는 중인가(컨트롤이 켜고 끈다) — 3D 관성 회전이 이어져도 끄는 동안은 3D 따라가기가 자리를 덮지 않는다.</summary>
+    public bool IsWindowDragging { get; internal set; }
+
     /// <summary>좌클릭 선택 요청 — MapViewModel이 SelectedCameraPopup 설정 + 맨앞 이동. (FR-SEL-01)</summary>
     public event EventHandler? SelectRequested;
 

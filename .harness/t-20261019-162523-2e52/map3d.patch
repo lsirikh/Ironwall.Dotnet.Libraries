@@ -1,0 +1,96 @@
+diff --git a/map3d/static/overlay-screen.js b/map3d/static/overlay-screen.js
+index 1cd6198..2ca22ea 100644
+--- a/map3d/static/overlay-screen.js
++++ b/map3d/static/overlay-screen.js
+@@ -2,8 +2,18 @@
+ //   화면 좌표(CSS px = WebView2 DIP, pick 의 screen 과 같은 기준)를 계산해 바뀐 것만 overlay.screen 으로 보낸다.
+ //   카메라 팝업 등 GIS 창이 3D 에서 마커가 보이는 자리를 따라가게 한다. 마우스를 움직일 때마다가 아니라 그린 프레임 뒤에만,
+ //   0.5 px 넘게 바뀐 항목만 보낸다(three 무의존 — 시험: tests/overlay_screen_check.mjs).
++//   ★ 그 프레임의 줌 · 방위(view)를 함께 싣는다 — GIS 는 상자 오프셋(줌 · 방위로 키우고 돌림)을 마커 자리와 같은 프레임 값으로 셈한다.
++//     camera 메시지는 150 ms 에 한 번이라 그것으로 돌리면 관성 회전 중 상자가 마커 둘레에서 계단처럼 떨렸다(2026-10-19).
++//     줌 · 방위가 바뀌면 마커 자리가 그대로여도(마커를 중심으로 돌 때) 전부 다시 보낸다.
+ 
+ export const SCREEN_EPS_PX = 0.5;
++export const VIEW_EPS = { zoom: 1e-4, bearing: 0.01 };
++
++// 카메라 자세(mapFromCamera) → overlay.screen 의 view(줌 소수 4자리 · 방위 소수 2자리). 수가 아니면 null.
++export function frameView(v) {
++  if (!v || !Number.isFinite(v.zoom) || !Number.isFinite(v.bearing)) return null;
++  return { zoom: Math.round(v.zoom * 1e4) / 1e4, bearing: Math.round(v.bearing * 100) / 100 };
++}
+ 
+ // {type:"overlay.watch", items:[{key, kind?, id?, lon?, lat?, altM?}]} → 쓸 수 있는 항목만(key 필수 · kind+id 또는 lon+lat 중 하나 이상).
+ export function parseWatch(msg) {
+@@ -28,10 +38,15 @@ export function screenOf(ndcX, ndcY, camZ, left, top, width, height) {
+ }
+ 
+ // 직전에 보낸 값과 비교해 바뀐 항목만 돌려준다. 목록에서 빠진 key 는 잊는다. reset() 뒤엔 전부 다시 보낸다.
++//   view(frameView)를 주면 직전에 보낸 view 와 달라졌을 때 전부 다시 보낸다.
+ export class ScreenReporter {
+-  constructor(eps = SCREEN_EPS_PX) { this.eps = eps; this.last = new Map(); }
+-  reset() { this.last.clear(); }
+-  changes(current) {
++  constructor(eps = SCREEN_EPS_PX) { this.eps = eps; this.last = new Map(); this.view = null; }
++  reset() { this.last.clear(); this.view = null; }
++  changes(current, view = null) {
++    if (view && !(this.view && Math.abs(this.view.zoom - view.zoom) < VIEW_EPS.zoom && Math.abs(this.view.bearing - view.bearing) < VIEW_EPS.bearing)) {
++      this.view = view;
++      this.last.clear();
++    }
+     const out = [], keys = new Set();
+     for (const c of current) {
+       keys.add(c.key);
+diff --git a/map3d/static/view.js b/map3d/static/view.js
+index 9d4d56e..9ab61de 100644
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -12,7 +12,7 @@ import { GROUND_LAYER, Overlay3D, OVERLAY_LAYER, TOP_LAYER } from "./overlay3d.j
+ import { bakedImageIds } from "./overlay-store.js";
+ import { loadHousing } from "./housing.js";
+ import { makeHeightField } from "./overlay-geom.js";
+-import { parseWatch, screenOf, ScreenReporter } from "./overlay-screen.js";
++import { frameView, parseWatch, screenOf, ScreenReporter } from "./overlay-screen.js";
+ import { GpuTimer, lowerWhileMoving, movePixelRatio, PerfWindow, SETTLE_MS } from "./perf.js";
+ import { bakedLight, sunOf, sunVector } from "./light.js";
+ import { buildingMessage, isClick, parseHostBuilding, stretchPositions, wallTop } from "./buildingedit.js";
+@@ -634,8 +634,9 @@ function reportScreens() {
+     projV.copy(p).project(camera);
+     return { key: w.key, ...screenOf(projV.x, projV.y, camV.z, r.left, r.top, r.width, r.height) };
+   });
+-  const changed = screens.changes(cur);
+-  if (changed.length) post({ type: "overlay.screen", items: changed });
++  const view = frameView(currentMapView());   // 같은 프레임의 줌 · 방위 — GIS 가 상자 오프셋을 이 값으로 돌린다(overlay-screen.js 머리말)
++  const changed = screens.changes(cur, view);
++  if (changed.length) post({ type: "overlay.screen", items: changed, view });
+ }
+ // 맨 위 층(보안 가림 이미지 · 화면 표식 · 재기 선 · 고른 건물 윤곽)을 음영 · 후처리가 끝난 화면 위에 그린다 — 지우지 않고 · 그림자도 다시 계산하지 않는다.
+ //   표식은 지금까지처럼 다른 것 위에 보이고, 가림 이미지에는 음영(AO)이 아래 건물 윤곽을 비추지 않는다.
+diff --git a/tests/overlay_screen_check.mjs b/tests/overlay_screen_check.mjs
+index ec9f469..62fd27b 100644
+--- a/tests/overlay_screen_check.mjs
++++ b/tests/overlay_screen_check.mjs
+@@ -1,5 +1,5 @@
+ // overlay-screen.js 시험 — 지켜볼 항목 해석 · 투영 → 화면 좌표 · 바뀐 것만 보내기(pytest 가 node 로 부른다).
+-import { parseWatch, screenOf, ScreenReporter } from "../map3d/static/overlay-screen.js";
++import { frameView, parseWatch, screenOf, ScreenReporter } from "../map3d/static/overlay-screen.js";
+ 
+ const fails = [];
+ const ok = (c, what) => { if (!c) fails.push(what); };
+@@ -42,5 +42,17 @@ ok(c.length === 1, "re-added key sent again");
+ r.reset();
+ ok(r.changes([{ key: "a", x: 12, y: 10, visible: true }]).length === 1, "reset sends again");
+ 
++// 같은 프레임 줌 · 방위(view) — 바뀌면 마커 자리가 그대로여도 전부 다시(마커 둘레로 돌 때 상자 오프셋이 돌아야 한다)
++ok(frameView({ zoom: 19.123456, bearing: 45.6789 }).zoom === 19.1235 && frameView({ zoom: 19, bearing: 45.6789 }).bearing === 45.68, "frame view rounded");
++ok(frameView(null) === null && frameView({ zoom: NaN, bearing: 0 }) === null, "no view -> null");
++const rv = new ScreenReporter();
++const pts = [{ key: "a", x: 100, y: 100, visible: true }, { key: "b", x: 50, y: 50, visible: true }];
++ok(rv.changes(pts, { zoom: 19, bearing: 10 }).length === 2, "first view sends all");
++ok(rv.changes(pts, { zoom: 19, bearing: 10.005 }).length === 0, "same view, same points -> nothing");
++ok(rv.changes(pts, { zoom: 19, bearing: 10.5 }).length === 2, "bearing changed -> all again");
++ok(rv.changes(pts, { zoom: 19.01, bearing: 10.5 }).length === 2, "zoom changed -> all again");
++ok(rv.changes([{ key: "a", x: 101, y: 100, visible: true }, pts[1]], { zoom: 19.01, bearing: 10.5 }).length === 1, "view same -> only moved");
++ok(rv.changes(pts).length === 1 && rv.view.bearing === 10.5, "no view given -> old rule (moved only)");
++
+ if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
+ console.log("overlay screen ok");
