@@ -1,0 +1,175 @@
+diff --git a/map3d/static/view.js b/map3d/static/view.js
+index c0b7bca..8a245d4 100644
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -16,6 +16,7 @@ import { frameView, parseWatch, screenOf, ScreenReporter } from "./overlay-scree
+ import { GpuTimer, lowerWhileMoving, movePixelRatio, PerfWindow, SETTLE_MS } from "./perf.js";
+ import { bakedLight, sunOf, sunVector } from "./light.js";
+ import { buildingMessage, isClick, parseHostBuilding, stretchPositions, wallTop } from "./buildingedit.js";
++import { fetchSceneJson, loadFailure } from "./sceneload.js";
+ 
+ const $ = (id) => document.getElementById(id);
+ const qs = new URLSearchParams(location.search);
+@@ -159,7 +160,8 @@ async function loadScene(bust) {
+   performance.mark("m3d:load-start");
+   $("loading").hidden = false;
+   postProgress("scene", 5);
+-  sceneInfo = await (await fetch(`/api/jobs/${encodeURIComponent(jobId)}/files/scene.json?${bust || ""}`)).json();
++  // 지워진 장면(404) · 깨진 scene.json 은 SceneLoadError — 404 본문을 장면으로 읽어 TypeError 가 나던 것(2026-10-19)
++  sceneInfo = await fetchSceneJson(fetch, `/api/jobs/${encodeURIComponent(jobId)}/files/scene.json?${bust || ""}`);
+   performance.mark("m3d:scene-json");
+   fillInfo();
+   const sv = sunOf(sceneInfo);   // 굽기 때 그림자(구운 그림자)와 같은 해 — 아래 setSun 이 읽는다
+@@ -887,7 +889,10 @@ try {
+   const q = ["lon", "lat", "zoom", "bearing", "pitch"].map((k) => parseFloat(qs.get(k)));
+   if (q.slice(0, 3).every(Number.isFinite)) applyMapView({ lon: q[0], lat: q[1], zoom: q[2], bearing: q[3] || 0, pitch: q[4] || 0, animate: qs.get("animate") === "1" });
+ } catch (e) {
+-  $("loading").textContent = "불러오지 못했습니다: " + e;
++  // 쉬운 말 안내 + GIS 에 실패 메시지({type:"error", reason, job}) — GIS 는 지워진 장면이면 2D 로 돌아가고 영역 목록을 새로 고친다
++  const f = loadFailure(e, jobId);
++  $("loading").textContent = f.text;
++  post(f.message);
+   throw e;
+ }
+ frame();
+diff --git a/map3d/static/sceneload.js b/map3d/static/sceneload.js
+new file mode 100644
+index 00000000..91cfe347
+--- /dev/null
++++ b/map3d/static/sceneload.js
+@@ -0,0 +1,48 @@
++// 장면 불러오기 실패 판정 — scene.json · GLB 가 없거나(지워진 장면 = 404) 깨졌으면 TypeError 대신 쉬운 말 안내와
++// GIS 메시지 {type:"error", reason, job} 을 만든다(view.js 가 화면에 띄우고 GIS 에 보낸다). DOM · three 무의존(node 시험: sceneload_check.mjs).
++//   reason: "scene-missing"(지워짐 · 없음) | "scene-broken"(읽을 수 없음) | "server-unreachable"(서버에 닿지 않음)
++
++export class SceneLoadError extends Error {
++  constructor(reason, detail) {
++    super(detail || reason);
++    this.reason = reason;
++  }
++}
++
++export const LOAD_TEXT = {
++  "scene-missing": "이 3D 장면은 지워졌습니다 — 다시 만들거나 영역 목록을 새로 고치세요.",
++  "scene-broken": "이 3D 장면을 읽지 못했습니다 — 영역을 다시 만들어 보세요.",
++  "server-unreachable": "3D 서버에 닿지 않습니다 — 서버가 켜져 있는지 확인하세요.",
++};
++
++// scene.json 받기 — 404 면 scene-missing, 그 밖의 실패 응답 · JSON 이 아님 · 장면 모양이 아님(예: 404 본문 {"detail":…})이면 scene-broken.
++export async function fetchSceneJson(fetchFn, url) {
++  let r;
++  try { r = await fetchFn(url); } catch (e) { throw new SceneLoadError("server-unreachable", String(e)); }
++  if (r.status === 404) throw new SceneLoadError("scene-missing", "HTTP 404");
++  if (!r.ok) throw new SceneLoadError("scene-broken", `HTTP ${r.status}`);
++  let s;
++  try { s = await r.json(); } catch (e) { throw new SceneLoadError("scene-broken", String(e)); }
++  if (!isSceneInfo(s)) throw new SceneLoadError("scene-broken", "scene.json 형식이 아닙니다");
++  return s;
++}
++
++// 보기 화면이 바로 읽는 칸(원점 · bbox · 크기 · 지형 · 개수)이 있는가
++export function isSceneInfo(s) {
++  return !!s && typeof s === "object" && !!s.origin && Array.isArray(s.bbox) && s.bbox.length === 4
++    && Array.isArray(s.size_m) && !!s.terrain && !!s.counts;
++}
++
++// 실패 이유 — SceneLoadError 는 그 이유, GLB 받기(three FileLoader HttpError: err.response.status) 404 는 scene-missing, 나머지는 scene-broken
++export function classifyLoadError(err) {
++  if (err && typeof err.reason === "string" && LOAD_TEXT[err.reason]) return err.reason;
++  if (err && err.response && err.response.status === 404) return "scene-missing";
++  return "scene-broken";
++}
++
++// 화면 안내 글 + GIS 에 보낼 메시지
++export function loadFailure(err, job) {
++  const reason = classifyLoadError(err);
++  const detail = String((err && err.message) || err || "").slice(0, 300);
++  return { text: LOAD_TEXT[reason], message: { type: "error", reason, job: job || null, detail } };
++}
+diff --git a/tests/sceneload_check.mjs b/tests/sceneload_check.mjs
+new file mode 100644
+index 00000000..b042ad58
+--- /dev/null
++++ b/tests/sceneload_check.mjs
+@@ -0,0 +1,64 @@
++// sceneload.js 순수 함수 · view.js 연결 시험 — 지워진 장면(404) · 깨진 scene.json 이면 TypeError 대신 쉬운 말 안내와
++// GIS 메시지 {type:"error", reason, job}(pytest 가 node 로 부른다).
++import { readFileSync } from "node:fs";
++import { classifyLoadError, fetchSceneJson, isSceneInfo, LOAD_TEXT, loadFailure, SceneLoadError } from "../map3d/static/sceneload.js";
++
++const fails = [];
++const eq = (a, b, what) => { if (a !== b) fails.push(`${what}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
++const ok = (c, what) => { if (!c) fails.push(what); };
++
++const SCENE = { origin: { lon: 127, lat: 37.5, height: 10 }, bbox: [127, 37.5, 127.01, 37.51], size_m: [800, 1100], terrain: { grid: [2, 2] }, counts: { buildings: 3 } };
++const resp = (status, body, badJson = false) => ({
++  status, ok: status >= 200 && status < 300,
++  json: async () => { if (badJson) throw new SyntaxError("Unexpected token < in JSON"); return typeof body === "string" ? JSON.parse(body) : body; },
++});
++async function reasonOf(fetchFn) {
++  try { await fetchSceneJson(fetchFn, "/api/jobs/x/files/scene.json"); return "ok"; }
++  catch (e) { ok(e instanceof SceneLoadError, `SceneLoadError 가 아님: ${e}`); return e.reason; }
++}
++
++// should_report_scene_missing_when_scene_json_404 — 지워진 장면(서버 404 본문 {"detail":"Not Found"})을 장면으로 읽지 않는다
++eq(await reasonOf(async () => resp(404, { detail: "Not Found" })), "scene-missing", "404");
++// should_report_scene_broken_when_json_invalid_or_not_a_scene
++eq(await reasonOf(async () => resp(200, null, true)), "scene-broken", "깨진 JSON");
++eq(await reasonOf(async () => resp(200, { detail: "Not Found" })), "scene-broken", "장면 모양 아님(200 + detail)");
++eq(await reasonOf(async () => resp(200, { ...SCENE, size_m: undefined })), "scene-broken", "size_m 없음");
++eq(await reasonOf(async () => resp(200, { ...SCENE, bbox: [1, 2, 3] })), "scene-broken", "bbox 3개");
++eq(await reasonOf(async () => resp(500, { detail: "boom" })), "scene-broken", "500");
++// should_report_server_unreachable_when_fetch_throws
++eq(await reasonOf(async () => { throw new TypeError("Failed to fetch"); }), "server-unreachable", "fetch 실패");
++// should_return_scene_when_valid
++{
++  const s = await fetchSceneJson(async () => resp(200, SCENE), "u");
++  eq(s.origin.lon, 127, "정상 장면");
++  ok(isSceneInfo(SCENE) && !isSceneInfo(null) && !isSceneInfo([]) && !isSceneInfo("x"), "isSceneInfo");
++}
++// should_classify_glb_404_as_missing_and_other_errors_as_broken — three FileLoader HttpError 는 err.response.status
++eq(classifyLoadError({ message: "fetch responded with 404", response: { status: 404 } }), "scene-missing", "GLB 404");
++eq(classifyLoadError({ message: "x", response: { status: 500 } }), "scene-broken", "GLB 500");
++eq(classifyLoadError(new TypeError("Cannot read properties of undefined (reading '0')")), "scene-broken", "TypeError");
++eq(classifyLoadError(null), "scene-broken", "null");
++eq(classifyLoadError({ reason: "bogus" }), "scene-broken", "모르는 reason");
++// should_build_plain_text_and_error_message_when_load_fails
++{
++  const f = loadFailure(new SceneLoadError("scene-missing", "HTTP 404"), "20261019-182721-023f6d");
++  eq(f.text, LOAD_TEXT["scene-missing"], "안내 글");
++  ok(f.text.includes("지워졌습니다") && !f.text.includes("TypeError"), "쉬운 말");
++  eq(JSON.stringify(Object.keys(f.message)), JSON.stringify(["type", "reason", "job", "detail"]), "메시지 칸");
++  eq(f.message.type, "error", "type"); eq(f.message.reason, "scene-missing", "reason"); eq(f.message.job, "20261019-182721-023f6d", "job");
++  eq(loadFailure(new Error("x".repeat(1000)), "j").message.detail.length, 300, "detail 자름");
++  eq(loadFailure("문자열", undefined).message.job, null, "job 없음 = null");
++  for (const r of Object.keys(LOAD_TEXT)) ok(LOAD_TEXT[r] && !/TypeError|undefined/.test(LOAD_TEXT[r]), `글 ${r}`);
++}
++// should_wire_view_js_to_sceneload_when_loading — scene.json 은 fetchSceneJson 으로, 실패는 loadFailure 글 + GIS 메시지
++{
++  const src = readFileSync(new URL("../map3d/static/view.js", import.meta.url), "utf8");
++  ok(/from "\.\/sceneload\.js"/.test(src), "view.js 가 sceneload.js 를 가져온다");
++  ok(/sceneInfo = await fetchSceneJson\(fetch,/.test(src), "scene.json 은 fetchSceneJson");
++  ok(!/files\/scene\.json[^\n]*\)\)\.json\(\)/.test(src), "404 본문을 그대로 .json() 하지 않는다");
++  ok(/loadFailure\(e, jobId\)/.test(src) && /post\(f\.message\)/.test(src) && /textContent = f\.text/.test(src), "실패 → 안내 글 + post");
++  ok(!/"불러오지 못했습니다: " \+ e/.test(src), "날것 오류 글 없음");
++}
++
++if (fails.length) { console.error(fails.join("\n")); process.exit(1); }
++console.log("sceneload ok");
+diff --git a/tests/test_viewer_load.py b/tests/test_viewer_load.py
+new file mode 100644
+index 00000000..27de4091
+--- /dev/null
++++ b/tests/test_viewer_load.py
+@@ -0,0 +1,11 @@
++"""보기 화면 장면 불러오기 실패 — 지워진 장면(404) · 깨진 scene.json 이면 쉬운 말 안내 + GIS 에 {type:"error", reason, job}."""
++import shutil
++import subprocess
++from pathlib import Path
++
++
++def should_report_missing_or_broken_scene_in_plain_words_when_checked_with_node():
++    node = shutil.which("node")
++    assert node, "node 가 없어 장면 불러오기 실패 시험(sceneload_check.mjs)을 돌릴 수 없다"
++    r = subprocess.run([node, str(Path(__file__).with_name("sceneload_check.mjs"))], capture_output=True, text=True, timeout=60)
++    assert r.returncode == 0, r.stdout + r.stderr

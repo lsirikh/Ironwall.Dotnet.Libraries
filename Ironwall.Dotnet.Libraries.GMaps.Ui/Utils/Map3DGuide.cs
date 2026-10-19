@@ -259,4 +259,16 @@ public static class Map3DGuide
 
     /// <summary>Esc 로 3D 를 나가는가 — WPF 안 3D(composition)는 「나가기」 단추로만, 네이티브 창 3D 는 그 창이 단추를 가려 Esc 를 남긴다.</summary>
     public static bool EscExitsMap3D(string hostMode) => hostMode == "hwnd";
+
+    // ── ⑤ 장면 불러오기 실패(3D 화면의 error 메시지, 2026-10-19) ──
+
+    /// <summary>3D 화면이 알린 "장면이 지워졌다(scene.json 404)" 이유.</summary>
+    public const string SceneMissingReason = "scene-missing";
+
+    /// <summary>지워진 장면을 보려다 2D 로 돌아왔을 때 안내.</summary>
+    public const string SceneMissingText = "이 3D 장면은 지워졌습니다 — 2D 지도로 돌아왔고 3D 영역 목록을 새로 고칩니다";
+
+    /// <summary>그 밖의 불러오기 실패 안내(깨진 장면 · 서버에 닿지 않음).</summary>
+    public static string SceneLoadFailedText(string? reason)
+        => reason == "server-unreachable" ? "3D 서버(map-3d)가 꺼져 있습니다" : "이 3D 장면을 읽지 못했습니다 — 영역을 다시 만들어 보세요";
 }
