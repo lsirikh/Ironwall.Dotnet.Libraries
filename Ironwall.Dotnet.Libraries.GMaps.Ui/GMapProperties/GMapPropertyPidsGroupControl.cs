@@ -196,6 +196,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             var g = GroupMarkers!.OfType<IPidsGroupEditableMarker>().ToList();
             if (g.Count < 2) return;
             bool AllEq<T>(Func<IPidsGroupEditableMarker, T> sel) => g.All(m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+            // 라인 스타일(같은 종류 다중 선택 = 단일 선택 칸 전부, 2026-10-19) · 읽기 전용 정보 = 고른 구역 전부의 합계
+            LinePattern = AllEq(m => m.LinePattern) ? g[0].LinePattern : (EnumLinePattern)(-1);
+            LineOpacity = AllEq(m => m.LineOpacity) ? g[0].LineOpacity : MIXED_DOUBLE;
+            PointCount = g.Sum(m => m.RuntimePoints?.Count ?? 0);
+            TotalDistance = g.Sum(m => m.TotalDistance);
 
             SyncFence(() =>
             {
@@ -262,8 +267,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private void UpdateFenceSummary()
         {
-            // 그룹 편집: 요약은 마커 하나의 선 모양에 딸린 값이라 비운다
-            if (IsGroupMode || SelectedMarker is not IPidsGroupEditableMarker marker || marker.RuntimePoints is not { Count: >= 2 } pts)
+            // 그룹 편집: 요약(기둥 수 · 실간격)은 구역마다 선 모양이 달라 하나로 못 적는다 → "—"(여러 값)
+            if (IsGroupMode) { FenceLayoutSummary = "—"; return; }
+            if (SelectedMarker is not IPidsGroupEditableMarker marker || marker.RuntimePoints is not { Count: >= 2 } pts)
             { FenceLayoutSummary = string.Empty; return; }
             var local = Helpers.Fence.FenceLayout.ToLocalMeters(pts.Select(p => (p.Lat, p.Lng)).ToList());
             var result = Helpers.Fence.FenceLayout.Compute(local, PostSpacingM, FenceMode, marker.IsClosedPath);
@@ -515,7 +521,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsGroupMarker.LinePattern = (EnumLinePattern)e.NewValue;
+                if (!control.IsGroupMode) pidsGroupMarker.LinePattern = (EnumLinePattern)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("LinePattern", e.OldValue, e.NewValue);
             }
         }
@@ -528,7 +534,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsGroupMarker.LineOpacity = (double)e.NewValue;
+                if (!control.IsGroupMode) pidsGroupMarker.LineOpacity = (double)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("LineOpacity", e.OldValue, e.NewValue);
             }
         }
@@ -541,7 +547,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsGroupMarker.IsClosedPath = (bool)e.NewValue;
+                if (!control.IsGroupMode) pidsGroupMarker.IsClosedPath = (bool)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("IsClosedPath", e.OldValue, e.NewValue);
             }
         }
@@ -558,7 +564,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsGroupMarker.LinkedDeviceGroup = (int)e.NewValue;
+                if (!control.IsGroupMode) pidsGroupMarker.LinkedDeviceGroup = (int)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("LinkedDeviceGroup", e.OldValue, e.NewValue);
             }
         }
@@ -571,7 +577,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsGroupMarker.EventStatus = (EnumEventStatus)e.NewValue;
+                if (!control.IsGroupMode) pidsGroupMarker.EventStatus = (EnumEventStatus)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("EventStatus", e.OldValue, e.NewValue);
             }
         }

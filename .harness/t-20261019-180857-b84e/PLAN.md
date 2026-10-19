@@ -1,35 +1,47 @@
-# PLAN — PIDS 그룹 다중 선택 속성 판에 3D 철망(펜스) 칸 보이기 · 그룹 편집
+# PLAN — 같은 종류 다중 선택 속성 판 = 단일 선택 칸 전부 (PIDS 그룹 펜스에서 시작해 전 종류로 확대)
 
-## 목표
-다중 선택(PIDS 그룹 ≥2) 속성 판에도 3D 철망 칸을 보이고, 기존 그룹 편집 관용구(동일=값 / 다름=— · 바꾼 필드만 전원 적용 ·
-마커별 DB 저장 · Undo 1단위)를 따르게 한다. 3D 기능 꺼짐이면 숨김 유지. 장비 그룹은 대표값 + 비활성.
+## 목표(끝의 정의, 2026-10-19 추가 지시로 확대)
+1. 같은 종류만 여러 개 고르면 속성 판 = 그 종류 하나 골랐을 때의 칸 전부(순서 · 디자인 그대로).
+   공통 값 = 그룹 편집(같으면 값 · 다르면 '여러 값' · 바꾼 필드만 전원 적용 · 마커별 저장 · Undo 1단위 · 잠금 제외),
+   심볼마다 고유한 값 = 대표값 + 비활성, 읽기 전용 정보 = 합계 / '—'.
+2. 서로 다른 종류가 섞이면 지금 규칙(공통 칸만, GMapPropertyCommonControl) 유지.
+3. 전 종류 표 시험 + 수정 전 실패 → 수정 후 통과 증명.
 
-## 펜스 칸 전수(Themes/PidsGroupPropertyStyle.xaml, AutomationId)
-| 칸 | 모델 필드 | 그룹 표시(다름) | 그룹 적용 |
+## 종류 전수(PropertyPanelFactory._markerToPanelMap + PIDS DeviceType)
+| 종류 | 판 / 스타일 | 다중 선택에서 빠졌던 칸(수정 전) | 처리 |
 |---|---|---|---|
-| FenceMode 콤보 | FenceMode | 무선택((EnumFenceMode)(-1)) | 고른 값 전원 |
-| Render3D 체크 | Render3D | indeterminate(새 DP Render3DState=null) | 누른 값 전원 |
-| PostSpacing 슬라이더 + 글 + 「기본」 표시 | PostSpacingM(null=상속) | NaN → 글 "—", 슬라이더 최소값 파킹 | 지연 커밋 뒤 전원 |
-| 프리셋 2/3/5 m | PostSpacingM | — | 전원 |
-| PostSpacingReset 「기본」 | PostSpacingM=null | — | 전원 null |
-| FenceHeight 슬라이더 + 글 | FenceHeightM(null=상속) | NaN → "—" | 전원 |
-| FenceHeightReset 「기본」 | FenceHeightM=null | — | 전원 null |
-| FenceSummary | (계산값, 마커 하나 선 모양) | 그룹에선 빈칸 | — |
-(ReverseSensorOrder 는 모델 · Undo 에는 있으나 이 칸에 UI 없음 → 대상 아님)
+| PIDS 그룹(펜스) | PidsGroup / PidsGroupPropertyStyle | 3D 철망 칸 전체(1차 작업에서 수정) | 그룹 편집 · 「기본」 그룹 적용 · 요약 "—" · 포인트 수/총 거리 합계 · 장비 그룹 비활성 |
+| PIDS 장비 2D(20종: Controller · Multi · Fence · Underground · Contact · PIR · IoController · Laser · Cable · IpCamera · SmartSensor · SmartSensor2 · SmartCompound · IpSpeaker · Radar · OpticalCable · Lamp · Enclosure · SmartMultisensor2 · Gate) | Pids / PidsPropertyStyle | Gate: 통문 폭 · 문 상태 / Enclosure: 문 상태 | 통문 폭 그룹 편집(「기본」 포함), 문 단추=장비별 명령이라 비활성 |
+| PIDS 장비 3D 하우징(같은 20종) | 〃 | 색상 강도 · 설치 높이 (+IpCamera 모델 변형, Gate/Enclosure 문 · 통문) | 설치 높이 · 모델 변형 그룹 편집, 색상 강도 비활성(저장 안 되는 화면 값) |
+| 건물 3D | Infra / InfraPropertyStyle | 색상 강도 · 설치 높이 | 〃 + 건물 칸 혼합 표시(종류 · 용도 무선택, 층수 "—", 면적 빈칸) |
+| 건물 2D · 도형 · 핀(Custom) · 선 · 군사 심볼 · 오버레이 이미지 | 각 판 | 없음(칸은 다 보였음) | 대표 마커 직접쓰기 → VM 일괄 적용 경로로(대표 Undo 결함), 혼합 표시, Undo 불가였던 공통 칸(도형 투명도 · 이미지 비율유지 · 군사 7칸) 일괄 적용/Undo 등록 |
+
+## 고유 값(대표값 + 비활성) 목록과 근거
+- 제목(전 종류) — 사용자 지시 "제목처럼 하나뿐이어야 하는 값". 표시 규칙(같으면 값 · 다르면 빈칸)은 기존대로.
+- PIDS 연결디바이스 · [현재위치 적용] — 장비 1개 = 마커 1개(기존).
+- PIDS 문 열림/닫힘 — 장비별 제어 명령.
+- PIDS · 건물 색상 강도 — 모델에 저장되지 않는 대표 심볼 그림 값(일괄 적용 · Undo 경로 없음).
+- PIDS 그룹 장비 그룹 — 구역 ↔ 장치 그룹 1:1.
+- 군사 심볼 부대 지시자 · 콜사인 — 부대마다 하나.
+- 이미지 파일경로(원래 읽기 전용) · 이미지 표시(그룹 어도너 메뉴 '그룹 표시/숨김' 담당).
 
 ## 진행
-- [x] 원인 확인(XAML IsGroupEditing→Collapsed, CanWriteFence !IsGroupEditing, Reset* 그룹 차단)
-- [x] GMapPropertyPidsGroupControl: 그룹 Pending(ApplyGroupPendingSpecific override) · 그룹이면 대표 직접쓰기 억제 · 「기본」 그룹 지원 · Render3DState(bool?) DP 추가
-- [x] MapViewModel.ApplyGroupPropertyChangeAsync: PostSpacingM/FenceHeightM 의 null(「기본」) 허용
-- [x] DoubleNaNToBlankConverter.ParkValue(공개 속성 추가) — NaN 파킹값을 슬라이더 최소값으로
-- [x] XAML: 그룹 숨김 트리거 제거 · 값 글 NaN→"—" · 3D 체크=Render3DState · 장비 그룹 콤보 그룹 편집 비활성
-- [x] 시험: tests/GMaps.PropertyPanel.Tests/PidsGroupFenceGroupEditScenarioTests.cs(11개) · PropertyPanelRenderTests 의 옛 "그룹이면 숨김" 단언을 새 규칙으로
-- [x] 시험 실행: PropertyPanel 328/328 · MapEdit 451/451 · Housing 353/353 통과
-- [ ] sln 시험(dotnet test Ironwall.Dotnet.Libraries.sln)
-- [x] 수정 전 실패 증명: 제품 소스 4개를 HEAD 원본으로 잠시 되돌려 should_hide_fence_block_when_symbol3d_disabled_but_show_it_in_group_editing 실행 → 실패(Expected Visible, Actual Collapsed) → 복원 후 통과
-  (새 시나리오 파일은 새 공개 속성 Render3DState 를 써서 원본에선 컴파일이 안 되므로 증명엔 이 시험을 썼다)
+- [x] 1차: PIDS 그룹 펜스 칸 그룹 편집(PidsGroupFenceGroupEditScenarioTests 11개)
+- [x] UndoableCommandBase: MarkerOpacity · MaintainAspectRatio · 군사 7칸(Affiliation · BattleDimension · StandardIdentity · UnitType · UnitSize · HigherFormation · CountryCode) Apply/Read/Replay 추가
+- [x] Base: 설치 높이(Altitude) 혼합(NaN), 제목 그룹 비활성(AutomationId GMaps.Property.Title)
+- [x] PIDS: 그룹 숨김 트리거 5개 제거, 모델 변형 · 통문 폭 · 「기본」 그룹 편집, 문 단추 비활성, IsMixedDeviceType(장비 종류 섞이면 종류 전용 칸 숨김)
+- [x] Infra: 그룹 숨김 트리거 2개 제거, 혼합 표시, IsFloorCountMixed/IsBasementFloorCountMixed
+- [x] Line · Geometric · Image · Military · PidsGroup: 그룹이면 대표 직접쓰기 억제, ApplyGroupPendingSpecific(혼합 표시), 고유 칸 비활성
+- [x] 시험: tests/GMaps.PropertyPanel.Tests/SameKindGroupPanelParityTests.cs — 48종(2D 27 + 3D 21) × ① 칸 집합 비교 · ②③⑤ 공통 값 적용/혼합/잠금/저장/Undo, ④ 고유 값 7건, 통문 · 모델 변형 · 종류 혼합 · 합계
+- [x] 수정 전/후 표(아래)
+- [ ] sln 시험
+
+## 수정 전 실패 → 수정 후 통과(① 칸 집합 Theory, 제품 소스만 HEAD 로 되돌려 실행)
+- 수정 전 실패 23종: Gate · Enclosure(2D), 3D:전 PIDS 20종, 3D:Infra → 수정 후 48종 전부 통과
+- 2D 나머지 25종(도형 · 핀 · 선 · PIDS 그룹 · 건물 · 군사 · 이미지 · PIDS 18종)은 수정 전에도 칸은 같았음(PIDS 그룹은 1차 작업 커밋에 이미 포함 — 1차 증명: should_hide_fence_block… Collapsed→Visible)
+- ②(일괄 적용 · Undo) 시험은 새 공개 속성(IsFloorCountMixed 등)을 써서 수정 전 소스로는 컴파일되지 않아 전/후 비교 대신 수정 후 48종 통과만 기록
 
 ## 발견
-- PIDS 그룹 판은 ApplyGroupPendingSpecific 를 override 하지 않아 라인 · 장비 그룹은 대표값 표시(기존 동작, 범위 밖이라 유지).
-- PidsGroup 판의 장비 그룹 콤보는 그룹 편집에서도 켜져 있었다(목표 3 "지금처럼 비활성" 과 다름) → 비활성 트리거 추가(DECISIONS 2).
-- VM 그룹 적용은 잠긴 마커 제외 · 마커별 DbUpdateProcess · BeginBatch(1 매크로) — 그대로 재사용.
+- 판이 그룹 모드에서도 대표 마커에 직접 쓰던 종류(선 · 도형 · 이미지 · 군사 · 건물 · PIDS 그룹 라인)는 VM 이 before 를 이미 바뀐 값으로 읽어 Undo 가 대표 마커를 되돌리지 못했다.
+- 군사 심볼 칸 · 도형 투명도 · 이미지 비율유지는 IsReplayableProperty 밖이라 다중 선택에서 대표 하나만 저장되고 Undo 기록도 없었다.
+- 시험 장치 함정: Undo 는 지도(Map.Markers)에서 Id 로 마커를 찾는다 — 시험 마커를 지도에 올려야 한다. 3D 전용 행은 Shape 가 3D 하우징일 때만 보인다.

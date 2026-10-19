@@ -30,9 +30,6 @@
 									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
 										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
-									</DataTrigger>
 								</Style.Triggers>
 							</Style>
 						</Grid.Style>
@@ -42,7 +39,19 @@
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="색상 강도" Style="{StaticResource PropertyLabel}"/>
 						<!--  첨부 속성 경로는 Path= 로 적는다 — 위치 인자는 접두사(house:)를 풀지 못해 PathError 였다(결함 P3D-D1 · MAP-126)  -->
-						<Slider Grid.Column="1" Minimum="0" Maximum="1" IsSnapToTickEnabled="True" TickFrequency="0.01" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="1" IsSnapToTickEnabled="True" TickFrequency="0.01" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}" ToolTipService.ShowOnDisabled="True" AutomationProperties.AutomationId="GMaps.Property.TintStrength">
+							<!--  그룹 편집: 색상 강도는 저장되지 않는 화면 값(대표 심볼 그림에만 붙음) → 대표값 표시 + 비활성  -->
+							<Slider.Style>
+								<Style TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+											<Setter Property="IsEnabled" Value="False"/>
+											<Setter Property="ToolTip" Value="그룹 편집에서는 색상 강도를 바꿀 수 없습니다 (저장되지 않는 화면 값)"/>
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Slider.Style>
+						</Slider>
 					</Grid>
 					<Grid Margin="0,5">
 						<Grid.Style>
@@ -52,9 +61,6 @@
 									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
 										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
-									</DataTrigger>
 								</Style.Triggers>
 							</Style>
 						</Grid.Style>
@@ -63,7 +69,7 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="설치 높이" Style="{StaticResource PropertyLabel}"/>
-						<Slider Grid.Column="1" Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="설치 높이 (0~100, 정수)"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding MarkerAltitude, Mode=TwoWay, Converter={StaticResource NaNBlank}}" ToolTip="설치 높이 (0~100, 정수)" AutomationProperties.AutomationId="GMaps.Property.Altitude"/>
 					</Grid>
 
 					<!--  건물 종류 — 늘 보이는 첫 줄이라 3D 하우징 "?"(help-callout H-4)를 끝에 둔다(색상 강도 · 설치 높이 · 층수 잠금의 뜻)  -->
@@ -126,8 +132,19 @@
 							Grid.Column="2"
 							Margin="5,0"
 							VerticalAlignment="Center"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Text="{Binding FloorCount, StringFormat='F{0}'}" />
+							Foreground="{DynamicResource OnPrimaryFixedBrush}">
+							<!--  그룹 편집: 값이 서로 다르면 "—"  -->
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Text" Value="{Binding FloorCount, StringFormat='F{0}'}" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsFloorCountMixed}" Value="True">
+											<Setter Property="Text" Value="—" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
 					</Grid>
 
 					<!--  지하 층수  -->
@@ -153,8 +170,19 @@
 							Grid.Column="2"
 							Margin="5,0"
 							VerticalAlignment="Center"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Text="{Binding BasementFloorCount, StringFormat='B{0}'}" />
+							Foreground="{DynamicResource OnPrimaryFixedBrush}">
+							<!--  그룹 편집: 값이 서로 다르면 "—"  -->
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Text" Value="{Binding BasementFloorCount, StringFormat='B{0}'}" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsBasementFloorCountMixed}" Value="True">
+											<Setter Property="Text" Value="—" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
 					</Grid>
 
 					<!--  건물 면적  -->
@@ -171,7 +199,7 @@
 						<TextBox
 							Grid.Column="1"
 							Style="{StaticResource CompactTextBox}"
-							Text="{Binding BuildingArea, StringFormat='{}{0:F0}'}" />
+							Text="{Binding BuildingArea, Converter={StaticResource NaNBlankF0}}" />
 						<TextBlock
 							Grid.Column="2"
 							Margin="5,0,0,0"

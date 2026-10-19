@@ -1110,6 +1110,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             TitleBoldFlag = AllEqual("TitleBold", out var tbf) && tbf is bool tbb ? tbb : (bool?)null;
             TitleItalicFlag = AllEqual("TitleItalic", out var tif) && tif is bool tib ? tib : (bool?)null;
             TitleMaxWidthPx = AllEqual("TitleMaxWidth", out var tmw) ? ToD(tmw) : MIXED_DOUBLE;
+            // 설치 높이(PIDS · 건물만 보유, float) — 다름=NaN
+            MarkerAltitude = AllEqual("Altitude", out var alt) && alt is float altF ? altF : MIXED_DOUBLE;
 
             static double ToD(object? v) => v is double d ? d : MIXED_DOUBLE;
         }

@@ -106,6 +106,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             }
         }
 
+        /// <summary>그룹 Pending — 이 종류의 칸도 "전원 동일=값 / 다름=빈칸(—)"(같은 종류 다중 선택 = 단일 선택 칸 전부, 2026-10-19).</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            base.ApplyGroupPendingSpecific();
+            var g = System.Linq.Enumerable.ToList(System.Linq.Enumerable.OfType<ILineEditableMarker>(GroupMarkers!));
+            if (g.Count < 2) return;
+            bool AllEq<T>(Func<ILineEditableMarker, T> sel) => System.Linq.Enumerable.All(g, m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+            LinePattern = AllEq(m => m.LinePattern) ? g[0].LinePattern : (EnumLinePattern)(-1);
+            LineOpacity = AllEq(m => m.LineOpacity) ? g[0].LineOpacity : MIXED_DOUBLE;
+            // 읽기 전용 정보 = 고른 선 전부의 합계
+            PointCount = System.Linq.Enumerable.Sum(g, m => m.RuntimePoints?.Count ?? 0);
+            TotalDistance = System.Linq.Enumerable.Sum(g, m => m.TotalDistance);
+        }
+
         public override Type GetSupportedMarkerType()
         {
             return typeof(GMapPropertyLineControl);
@@ -197,7 +211,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 control.SelectedMarker is ILineEditableMarker lineMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                lineMarker.LinePattern = (EnumLinePattern)e.NewValue;
+                if (!control.IsGroupMode) lineMarker.LinePattern = (EnumLinePattern)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("LinePattern", e.OldValue, e.NewValue);
             }
         }
@@ -210,7 +224,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 control.SelectedMarker is ILineEditableMarker lineMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                lineMarker.LineOpacity = (double)e.NewValue;
+                if (!control.IsGroupMode) lineMarker.LineOpacity = (double)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("LineOpacity", e.OldValue, e.NewValue);
             }
         }
@@ -223,7 +237,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 control.SelectedMarker is ILineEditableMarker lineMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                lineMarker.IsClosedPath = (bool)e.NewValue;
+                if (!control.IsGroupMode) lineMarker.IsClosedPath = (bool)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("IsClosedPath", e.OldValue, e.NewValue);
             }
         }

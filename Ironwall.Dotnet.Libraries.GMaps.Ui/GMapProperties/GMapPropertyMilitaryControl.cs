@@ -121,6 +121,22 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
             }
         }
 
+        /// <summary>그룹 Pending — 이 종류의 칸도 "전원 동일=값 / 다름=빈칸(—)"(같은 종류 다중 선택 = 단일 선택 칸 전부, 2026-10-19).</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            base.ApplyGroupPendingSpecific();
+            var g = System.Linq.Enumerable.ToList(System.Linq.Enumerable.OfType<IMilitarySymbolEditableMarker>(GroupMarkers!));
+            if (g.Count < 2) return;
+            bool AllEq<T>(Func<IMilitarySymbolEditableMarker, T> sel) => System.Linq.Enumerable.All(g, m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+            Affiliation = AllEq(m => m.Affiliation) ? g[0].Affiliation : (EnumMilitaryAffiliation)(-1);
+            BattleDimension = AllEq(m => m.BattleDimension) ? g[0].BattleDimension : (EnumMilitaryBattleDimension)(-1);
+            StandardIdentity = AllEq(m => m.StandardIdentity) ? g[0].StandardIdentity : (EnumMilitaryStandardIdentity)(-1);
+            UnitType = AllEq(m => m.UnitType) ? g[0].UnitType : (EnumMilitaryUnitType)(-1);
+            UnitSize = AllEq(m => m.UnitSize) ? g[0].UnitSize : (EnumMilitaryUnitSize)(-1);
+            HigherFormation = AllEq(m => m.HigherFormation) ? g[0].HigherFormation ?? string.Empty : string.Empty;
+            CountryCode = AllEq(m => m.CountryCode) ? g[0].CountryCode ?? string.Empty : string.Empty;
+        }
+
         public override Type GetSupportedMarkerType()
         {
             return typeof(GMapPropertyMilitaryControl);
@@ -280,7 +296,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.Affiliation = (EnumMilitaryAffiliation)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.Affiliation = (EnumMilitaryAffiliation)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("Affiliation", e.OldValue, e.NewValue);
             }
         }
@@ -293,7 +309,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.BattleDimension = (EnumMilitaryBattleDimension)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.BattleDimension = (EnumMilitaryBattleDimension)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("BattleDimension", e.OldValue, e.NewValue);
             }
         }
@@ -306,7 +322,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.StandardIdentity = (EnumMilitaryStandardIdentity)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.StandardIdentity = (EnumMilitaryStandardIdentity)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("StandardIdentity", e.OldValue, e.NewValue);
             }
         }
@@ -319,7 +335,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.UnitType = (EnumMilitaryUnitType)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.UnitType = (EnumMilitaryUnitType)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("UnitType", e.OldValue, e.NewValue);
             }
         }
@@ -332,7 +348,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.UnitSize = (EnumMilitaryUnitSize)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.UnitSize = (EnumMilitaryUnitSize)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("UnitSize", e.OldValue, e.NewValue);
             }
         }
@@ -345,7 +361,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.UnitDesignator = (string)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.UnitDesignator = (string)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("UnitDesignator", e.OldValue, e.NewValue);
             }
         }
@@ -358,7 +374,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.HigherFormation = (string)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.HigherFormation = (string)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("HigherFormation", e.OldValue, e.NewValue);
             }
         }
@@ -371,7 +387,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.CallSign = (string)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.CallSign = (string)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("CallSign", e.OldValue, e.NewValue);
             }
         }
@@ -384,7 +400,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                militaryMarker.CountryCode = (string)e.NewValue;
+                if (!control.IsGroupMode) militaryMarker.CountryCode = (string)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("CountryCode", e.OldValue, e.NewValue);
             }
         }
