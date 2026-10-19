@@ -864,6 +864,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (MainMap.IsTargetAimMode) ExitTargetAimMode();
         if (MainMap.IsLineDrawing) _ = MainMap.LineDrawingService?.CancelDrawingAsync();
         if (MainMap.IsMeasuring) MainMap.StopMeasure();
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("symbol-place");   // 「건물 그리기」 표면이 배치 클릭을 가로챈다
         _placeCategory = category; _placeType = type; _placeTitle = title; _placeVariant = null;
         MainMap.IsSymbolPlacementMode = true;
         SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로
@@ -1048,6 +1049,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void OnLineDrawingStarted(string status)
     {
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("line-draw");   // 「건물 그리기」 표면이 선 그리기 클릭을 가로챈다
         IsLineDrawing = true;
         LineDrawingStatus = status;
         ClearAllSelections();

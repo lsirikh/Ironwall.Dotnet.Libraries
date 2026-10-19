@@ -201,6 +201,7 @@ public partial class MapViewModel
     private void EnterAnchorDrawMode()
     {
         if (MainMap == null) return;
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("anchor-draw");   // 「건물 그리기」 표면이 러버밴드 끌기를 가로챈다
         _isMap3DDrawMode = false;   // 3D 영역 그리기(MapViewModel.Map3D)는 이 뒤에 다시 켠다
         if (!_anchorDrawSubscribed)
         {

@@ -369,8 +369,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (_ubDraft is not { } d || _ubBusy) return;
         if (clickCount >= 2) { d.DoubleClick(); return; }
-        // 빈 윤곽에서 저장된 건물 안을 누르면 그 건물 고치기
-        if (d.Points.Count == 0 && MainMap != null)
+        // 빈 윤곽에서 저장된 건물 안을 누르면 그 건물 고치기(형상 도구로 찍던 점이 있으면 그리기 계속)
+        if (d.Points.Count == 0 && d.Anchors.Count == 0 && MainMap != null)
         {
             var g = MainMap.FromLocalToLatLng((int)Math.Round(screen.X), (int)Math.Round(screen.Y));
             var hit = UserBuildingItems.LastOrDefault(it => Map3DUserBuilding.Contains(it.Outline, new UbPoint(g.Lng, g.Lat)));
@@ -587,6 +587,11 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             _log?.Warning($"[UserBuilding] 저장 — 서버 닿지 않음: {ex.Message}");
             SetUserBuildingError(Map3DUnavailableText);
+        }
+        catch (Map3DRequestException ex) when (ex.Message is "Not Found" or "Method Not Allowed")   // 옛 map-3d — 그 주소가 없다(FastAPI 기본 문구)
+        {
+            _log?.Warning($"[UserBuilding] 저장 — 옛 서버({(int)ex.StatusCode} {ex.Message})");
+            SetUserBuildingError(Map3DUserBuilding.OldServerText);
         }
         catch (Map3DRequestException ex) { SetUserBuildingError($"저장하지 못했습니다: {ex.Message}"); }
         catch (Exception ex)

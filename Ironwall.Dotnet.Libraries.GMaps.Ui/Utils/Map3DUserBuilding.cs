@@ -130,6 +130,7 @@ public static class Map3DUserBuilding
     public const string TooSmallText = "윤곽이 너무 작습니다(4 m² 미만).";
     public const string OutsideText = "3D 영역 밖입니다 — 영역 안에 그려 주세요.";
     public const string TooManyText = "꼭짓점은 200개까지입니다.";
+    public const string OldServerText = "이 3D 서버(map-3d)는 직접 그린 건물을 저장하지 못합니다 — map-3d 를 새 판으로 바꿔 주세요.";
 
     // ── 검사 ──
 
@@ -565,7 +566,11 @@ public sealed class Map3DUserBuildingDraft
     /// <summary>형상 완성 — 검사(너무 작음 · 영역 밖) 뒤 닫힌 윤곽으로. 막히면 찍던 점을 버리고 이유를 남긴다.</summary>
     private void Finish(IReadOnlyList<UbPoint> screen)
     {
-        var geo = screen.Select(_toGeo).ToList();
+        // 화면 → 위경도가 1 px 로 반올림되어 이웃 꼭짓점이 같은 자리가 되면(작은 원 · 많은 꼭짓점) 하나로 — 엇갈림으로 막지 않게
+        var geo = new List<UbPoint>();
+        foreach (var p in screen.Select(_toGeo))
+            if (geo.Count == 0 || geo[^1] != p) geo.Add(p);
+        if (geo.Count > 1 && geo[0] == geo[^1]) geo.RemoveAt(geo.Count - 1);
         _anchors.Clear();
         _preview.Clear();
         if (Map3DUserBuilding.Validate(geo, _inside) is { } why) { LastError = why; Changed?.Invoke(); return; }

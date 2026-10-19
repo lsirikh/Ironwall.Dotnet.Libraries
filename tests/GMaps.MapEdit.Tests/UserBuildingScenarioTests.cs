@@ -40,6 +40,12 @@ public class UserBuildingScenarioTests
         public List<JObject> Items { get; } = new();
         public double[] Bbox { get; set; } = Array.Empty<double>();
         public HttpStatusCode? FailPutWith { get; set; }
+        /// <summary>FailPutWith 의 detail(없으면 영역 밖 문구) — 옛 서버(FastAPI 기본 404)는 "Not Found".</summary>
+        public string? FailPutDetail { get; set; }
+        /// <summary>PUT 에서 연결 실패(서버 꺼짐).</summary>
+        public bool ThrowOnPut { get; set; }
+        /// <summary>PUT 응답을 이것이 끝날 때까지 붙든다(연타 시험).</summary>
+        public TaskCompletionSource? PutGate { get; set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -65,7 +71,9 @@ public class UserBuildingScenarioTests
                 return Json(HttpStatusCode.OK, new JObject { ["items"] = new JArray(Items), ["count"] = Items.Count }.ToString());
             if (request.Method == HttpMethod.Put)
             {
-                if (FailPutWith is { } code) return Json(code, "{\"detail\":\"윤곽이 이 3D 영역 밖에 있습니다\"}");
+                if (ThrowOnPut) throw new HttpRequestException("연결 거부");
+                if (FailPutWith is { } code) return Json(code, new JObject { ["detail"] = FailPutDetail ?? "윤곽이 이 3D 영역 밖에 있습니다" }.ToString());
+                if (PutGate is { } gate) await gate.Task;
                 var body = JObject.Parse(text!);
                 var item = new JObject { ["uid"] = uid, ["outline"] = body["outline"], ["height"] = body["height"], ["floors"] = body["floors"],
                                          ["name"] = body["name"], ["baked_id"] = null };
@@ -710,6 +718,255 @@ public class UserBuildingScenarioTests
         await (Task)Scenario.Call(rig.Vm, "UndoBuildingHeightAsync")!;
         Assert.Equal(HttpMethod.Put, rig.Writes[1].Method);                  // DELETE(자동으로)가 아니라 앞 높이로 다시 저장
         Assert.Equal(12.0, rig.Writes[1].Body!.Value<double>("height"));
+    });
+
+    // ─────────────── 5-1. 빈 칸 시나리오(2026-10-20 시나리오 표 대조) ───────────────
+
+    [Theory]
+    [InlineData(10d)]   // 약 314 m² — 흔한 탱크
+    [InlineData(4d)]    // 약 50 m² — 작은 저장고(줌 18 에서 반지름 약 8 px · 꼭짓점 사이 1 px 미만)
+    [InlineData(2.5d)]  // 약 20 m²
+    public void should_close_small_circle_when_max_sides_round_to_same_pixel(double radiusM) => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Circle");
+        rig.Vm.UserBuildingCircleSidesText = "128";                              // 범위 안 최댓값
+        DragOnMap(rig, rig.ScreenOf(0, 0), rig.ScreenOf(radiusM, 0));
+        var d = rig.Vm.UserBuildingDraft!;
+        Assert.Null(rig.Vm.UserBuildingError);                                    // "선이 엇갈립니다" 로 막히면 안 된다
+        Assert.True(d.IsClosed);
+        Assert.Null(d.Validate());
+        Assert.InRange(Map3DUserBuilding.AreaSquareMeters(d.Points) / (Math.PI * radiusM * radiusM), 0.75, 1.25);
+    });
+
+    [Fact]
+    public void should_complete_two_click_rectangle_when_second_click_is_inside_saved_building() => RunAsync(async rig =>
+    {
+        rig.Server.Items.Add(SavedItem(rig, "0123456789ab"));                    // (-30..-10, -40..-20) m
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        await Rig.Until(() => rig.Vm.UserBuildingItems.Count == 1, "저장된 건물 목록");
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Rect");
+        rig.Click(-50, -5);                                                       // 첫 클릭은 빈 곳
+        rig.Click(-20, -30);                                                      // 둘째 클릭이 저장된 건물 안(붙여 짓기)
+        Assert.False(rig.Vm.IsUserBuildingEditingSaved);                          // 그리던 사각형을 버리고 고치기로 넘어가면 안 된다
+        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.Equal(4, rig.Vm.UserBuildingDraft.Points.Count);
+    });
+
+    [Fact]
+    public void should_open_saved_building_for_edit_when_first_click_of_new_drawing_is_inside_it() => RunAsync(async rig =>
+    {
+        rig.Server.Items.Add(SavedItem(rig, "0123456789ab"));
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        await Rig.Until(() => rig.Vm.UserBuildingItems.Count == 1, "저장된 건물 목록");
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Rect");
+        DragOnMap(rig, rig.ScreenOf(-20, -30), rig.ScreenOf(0, -50));            // 같은 자리에서 시작 = 그 건물 고치기(새 건물 아님)
+        Assert.True(rig.Vm.IsUserBuildingEditingSaved);
+        Assert.Equal("0123456789ab", rig.Vm.UserBuildingEditingUid);
+        Assert.Empty(rig.Writes);
+        // 빈 곳에서 시작해 겹치게 그리면 새 건물(서버가 겹침을 판단 — GIS 는 막지 않는다)
+        Assert.True(rig.Key(Key.Escape));
+        DragOnMap(rig, rig.ScreenOf(-40, -10), rig.ScreenOf(-20, -30));
+        Assert.False(rig.Vm.IsUserBuildingEditingSaved);
+        await rig.Apply();
+        Assert.DoesNotContain("0123456789ab", rig.Writes.Single().Path);
+    });
+
+    [Theory]
+    [InlineData("measure")]
+    [InlineData("symbol")]
+    [InlineData("anchor")]
+    [InlineData("line")]
+    public void should_end_drawing_when_other_map_input_mode_starts_while_drawing(string mode) => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Click(-10, 8);
+        switch (mode)
+        {
+            case "measure": Scenario.Call(rig.Vm, "ToggleMeasure", MeasureKind.Length); Assert.True(rig.W.Map.IsMeasuring); break;
+            case "symbol": Scenario.Call(rig.Vm, "EnterSymbolPlacementMode", default(Ironwall.Dotnet.Libraries.Enums.EnumMarkerCategory), "시험", "시험 심볼"); break;
+            case "anchor": Scenario.Call(rig.Vm, "EnterAnchorDrawMode"); break;
+            case "line": Scenario.Call(rig.Vm, "OnLineDrawingStarted", "선 그리는 중"); break;
+        }
+        // 지도 표면(어도너)이 왼쪽 입력을 모두 받으므로 둘이 함께 켜져 있으면 새 모드의 클릭이 닿지 않는다 — 그리기가 먼저 끝나야 한다
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.False(rig.HasSurface);
+        System.Windows.Input.Mouse.OverrideCursor = null;
+    });
+
+    [Fact]
+    public void should_keep_drawing_and_save_when_edit_mode_turns_off_mid_drawing() => RunAsync(async rig =>
+    {
+        rig.Vm.IsEditModeEnabled = true;
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        rig.Vm.IsEditModeEnabled = false;                                         // 편집 모드와 무관(권한만 본다)
+        Assert.True(rig.Vm.IsUserBuildingDrawing);
+        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.True((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
+        await rig.Apply();
+        Assert.Single(rig.Writes);
+    });
+
+    [Fact]
+    public void should_explain_old_server_when_put_route_is_missing() => RunAsync(async rig =>
+    {
+        rig.Server.FailPutWith = HttpStatusCode.NotFound;                         // 옛 map-3d(FastAPI 기본 404)
+        rig.Server.FailPutDetail = "Not Found";
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        await rig.Apply();
+        var err = rig.Vm.UserBuildingError!;
+        Assert.DoesNotContain("Not Found", err);                                  // 영어 서버 문구를 그대로 보이지 않는다
+        Assert.Contains("새 판", err);
+        Assert.Equal(4, rig.Vm.UserBuildingDraft!.Points.Count);
+        Assert.False(rig.W.Undo.CanUndo);
+    });
+
+    [Fact]
+    public void should_keep_draft_and_say_server_off_when_put_cannot_connect() => RunAsync(async rig =>
+    {
+        rig.Server.ThrowOnPut = true;
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        await rig.Apply();
+        Assert.Equal("3D 서버(map-3d)가 꺼져 있습니다", rig.Vm.UserBuildingError);
+        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.True(rig.Vm.ApplyUserBuildingCommand.CanExecute(null));          // 서버를 켠 뒤 다시 누를 수 있다
+        Assert.Empty(rig.Sent("userbuilding.preview"));
+        Assert.False(rig.W.Undo.CanUndo);
+    });
+
+    [Fact]
+    public void should_send_single_put_when_apply_and_enter_are_pressed_repeatedly() => RunAsync(async rig =>
+    {
+        rig.Server.PutGate = new TaskCompletionSource();
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        var first = rig.Apply();
+        Assert.False(rig.Vm.ApplyUserBuildingCommand.CanExecute(null));         // 보내는 중 = 단추 꺼짐
+        var second = rig.Apply();
+        Assert.True(rig.Key(Key.Enter));
+        rig.Server.PutGate.SetResult();
+        await Task.WhenAll(first, second);
+        await Rig.Until(() => rig.Vm.UserBuildingItems.Count == 1, "저장 뒤 목록");
+        Assert.Single(rig.Writes);
+        Assert.Single(rig.Server.Items);
+    });
+
+    [Fact]
+    public void should_refuse_rectangle_larger_than_area_and_send_nothing() => RunAsync(async rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Rect");
+        DragOnMap(rig, rig.ScreenOf(-100, 100), rig.ScreenOf(300, -100));        // 영역(약 ±170 m) 밖까지
+        var d = rig.Vm.UserBuildingDraft!;
+        Assert.False(d.IsClosed);
+        Assert.Empty(d.Points);
+        Assert.Equal(Map3DUserBuilding.OutsideText, rig.Vm.UserBuildingError);
+        Assert.False(rig.Vm.ApplyUserBuildingCommand.CanExecute(null));
+        await rig.Apply();
+        Assert.Empty(rig.Writes);
+    });
+
+    [Fact]
+    public void should_refuse_close_with_two_points_and_crossing_close_on_enter() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Click(-10, 8); rig.Click(10, 8);
+        Assert.True(rig.Key(Key.Enter));
+        Assert.False(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.Equal(Map3DUserBuilding.TooFewText, rig.Vm.UserBuildingError);
+        Assert.False(rig.Vm.ApplyUserBuildingCommand.CanExecute(null));
+        rig.Click(-10, -8); rig.Click(10, -8);                                    // 나비 모양 — 닫는 선이 엇갈린다
+        Assert.True(rig.Key(Key.Enter));
+        Assert.False(rig.Vm.UserBuildingDraft.IsClosed);
+        Assert.Equal(Map3DUserBuilding.CrossText, rig.Vm.UserBuildingError);
+    });
+
+    [Theory]
+    [InlineData(0d)]
+    [InlineData(30d)]
+    [InlineData(90d)]
+    public void should_save_same_geo_outline_and_area_when_map_is_rotated(double rotation) => RunAsync(async rig =>
+    {
+        rig.W.Map.MapRotation = rotation;
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.InRange(Map3DUserBuilding.AreaSquareMeters(rig.Vm.UserBuildingDraft.Points), 300, 340);   // 20 × 16 m
+        await rig.Apply();
+        var outline = (JArray)rig.Writes.Single().Body!["outline"]!;
+        var want = new[] { rig.Geo(-10, 8), rig.Geo(10, 8), rig.Geo(10, -8), rig.Geo(-10, -8) };
+        for (int i = 0; i < 4; i++)
+        {
+            Assert.Equal(want[i].X, outline[i]![0]!.Value<double>(), 4);
+            Assert.Equal(want[i].Y, outline[i]![1]!.Value<double>(), 4);
+        }
+    });
+
+    [Fact]
+    public void should_point_ellipse_long_axis_along_clicked_direction_when_map_is_rotated() => Run(rig =>
+    {
+        rig.W.Map.MapRotation = 30;
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Ellipse");
+        rig.Click(0, 0); rig.Click(20, 20); rig.Click(-4, 4);                     // 가운데 · 북동 28 m · 짧은 축 약 5.7 m
+        var d = rig.Vm.UserBuildingDraft!;
+        Assert.True(d.IsClosed);
+        Assert.Equal(UbTool.Ellipse, d.CompletedBy);
+        double kx = 111320.0 * Math.Cos(rig.Center.Lat * Math.PI / 180), ky = 110540.0;
+        var far = d.Points.Select(p => (E: (p.X - rig.Center.Lng) * kx, N: (p.Y - rig.Center.Lat) * ky))
+                          .OrderByDescending(v => v.E * v.E + v.N * v.N).First();
+        Assert.InRange(Math.Sqrt(far.E * far.E + far.N * far.N), 26, 30.5);
+        double bearing = Math.Atan2(Math.Abs(far.N), Math.Abs(far.E)) * 180 / Math.PI;
+        Assert.InRange(bearing, 40, 50);                                          // 화면이 돌아도 위경도에서 북동(45°) 축
+        Assert.True(far.E * far.N > 0);                                           // 북동-남서(북서-남동 아님)
+    });
+
+    [Fact]
+    public void should_refuse_start_when_area_is_being_rebuilt() => Run(rig =>
+    {
+        Scenario.SetField(rig.Vm, "_isMap3DBaking", true);
+        Scenario.SetField(rig.Vm, "_map3DBakeJob", "j-new");
+        Scenario.SetField(rig.Vm, "_map3DBakeSourceId", Job);
+        rig.Areas();
+        Assert.True(rig.Area.IsBaking);
+        Assert.DoesNotContain(rig.Area.Actions, a => a.Header == "건물 그리기");   // 다시 만드는 중엔 메뉴에 없다
+        rig.Vm.DrawUserBuildingCommand.Execute(null);                            // 툴바(화면 가운데 영역)로도 막힌다
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.False(rig.HasSurface);
+    });
+
+    [Fact]
+    public void should_refuse_points_outside_rotated_area_even_inside_its_bbox() => Run(rig =>
+    {
+        Scenario.Call(rig.Vm, "ApplyMap3DAreas", (IReadOnlyList<Map3DSceneInfo>)new[]
+        {
+            new Map3DSceneInfo(Job, "회전 영역", rig.Server.Bbox, null, 2, null) { Rect = new Map3DRotRect(rig.Center.Lng, rig.Center.Lat, 100, 30, 45) },
+        });
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        Assert.True(rig.Vm.IsUserBuildingDrawing);
+        rig.Click(40, 0);                                                         // bbox 안 · 회전 사각형(폭 30 m) 밖
+        Assert.Empty(rig.Vm.UserBuildingDraft!.Points);
+        Assert.Equal(Map3DUserBuilding.OutsideText, rig.Vm.UserBuildingError);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Rect");
+        DragOnMap(rig, rig.ScreenOf(-5, 5), rig.ScreenOf(5, -5));                 // 가운데 10 m 네모 = 안
+        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+    });
+
+    [Fact]
+    public void should_clear_shape_clicks_then_exit_when_escape_twice_with_ellipse_clicks() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Ellipse");
+        rig.Click(0, 0); rig.Click(20, 0);                                        // 세 클릭 중 둘
+        Assert.Equal(2, rig.Vm.UserBuildingDraft!.Anchors.Count);
+        Assert.True(rig.Key(Key.Escape));                                         // 1단계 = 찍던 점만
+        Assert.Empty(rig.Vm.UserBuildingDraft.Anchors);
+        Assert.True(rig.Vm.IsUserBuildingDrawing);
+        Assert.True(rig.Key(Key.Escape));                                         // 2단계 = 끝
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
     });
 
     // ─────────────── 6. 판 템플릿 ───────────────
