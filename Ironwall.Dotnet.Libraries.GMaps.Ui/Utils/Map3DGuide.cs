@@ -248,4 +248,7 @@ public static class Map3DGuide
     /// <see cref="ShouldLeave3DForPanel"/> 은 화면 자리를 받기 전의 옛 규칙이다.
     /// </summary>
     public static bool ShouldLeave3DForWindow(string hostMode) => hostMode != "composition";
+
+    /// <summary>Esc 로 3D 를 나가는가 — WPF 안 3D(composition)는 「나가기」 단추로만, 네이티브 창 3D 는 그 창이 단추를 가려 Esc 를 남긴다.</summary>
+    public static bool EscExitsMap3D(string hostMode) => hostMode == "hwnd";
 }

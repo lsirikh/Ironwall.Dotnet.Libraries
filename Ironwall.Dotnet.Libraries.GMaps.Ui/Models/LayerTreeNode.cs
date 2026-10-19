@@ -137,6 +137,25 @@ public class LayerTreeNode : INotifyPropertyChanged
         set { _isExpanded = value; OnPropertyChanged(); }
     }
 
+    private bool _isSelected;
+    /// <summary>
+    /// 레이어 패널 선택 상태(잎만) — 화면 밖 · 접힌 묶음 안의 행도 선택은 데이터(이 값)에 둔다.
+    /// 클릭 · Ctrl · Shift · 키보드 판정은 <see cref="LayerSelection"/> 이, 편집 모드의 지도 연동은 MapViewModel 이 맡는다.
+    /// </summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set { if (_isSelected == value) return; _isSelected = value; OnPropertyChanged(); }
+    }
+
+    private bool _isCurrent;
+    /// <summary>키보드 초점 행(↑/↓ · Ctrl+Space 의 기준) — 패널에 초점이 있을 때 가는 고리로 보인다.</summary>
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set { if (_isCurrent == value) return; _isCurrent = value; OnPropertyChanged(); }
+    }
+
     /// <summary>
     /// 해당 카테고리의 마커/아이템 개수 (런타임 업데이트)
     /// </summary>

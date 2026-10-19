@@ -1385,9 +1385,9 @@
 
 			<!--  왼쪽 위 줄 — [3D 나가기] + 좌표 표시. 좌측 메뉴(50) 오른쪽 · 바람 위젯(좌표 아래 도킹) 위라 겹치지 않는다.
 			      「나가기」는 3D 가 보이는 동안만(IsMap3DShown = Map3DStatusText "3D" 에서 파생) 좌표 칩 왼쪽에 붙는다.
-			      ESC 와 같은 경로(ExitMap3DCommand → ExitMap3D)로 들어오기 직전 2D 자리에 돌아온다 — 3D 는 줌으로 나가지 않는다. 설명은 "?" 말풍선.
-			      WPF 안에서 그리는 3D(기본) 위에 보인다 — 네이티브 창 3D 로 바뀐 경우엔 그 창에 가려 ESC 만 남는다.
-			      디자인 = 지도 HUD 와 같은 MapFloatingPanelStyle + 패널 주 단추(PanelPrimaryButtonStyle) + 키 힌트 칩(Esc), 토큰만(라이트/다크).  -->
+			      ExitMap3DCommand → ExitMap3D 로 들어오기 직전 2D 자리에 돌아온다 — 3D 는 줌으로도 Esc 로도 나가지 않는다(2026-10-19). 설명은 "?" 말풍선.
+			      WPF 안에서 그리는 3D(기본) 위에 보인다 — 네이티브 창 3D 로 바뀐 경우엔 그 창에 가려 Esc 만 남는다(Map3DGuide.EscExitsMap3D).
+			      디자인 = 지도 HUD 와 같은 MapFloatingPanelStyle + 패널 주 단추(PanelPrimaryButtonStyle), 토큰만(라이트/다크).  -->
 			<StackPanel
 				Grid.Row="2"
 				Grid.ColumnSpan="2"
@@ -1444,7 +1444,7 @@
 							AutomationProperties.Name="나가기"
 							Command="{Binding ExitMap3DCommand}"
 							Style="{StaticResource PanelPrimaryButtonStyle}"
-							ToolTip="2D 지도로 돌아갑니다 (Esc)">
+							ToolTip="2D 지도로 돌아갑니다">
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon
 									Width="16"
@@ -1456,19 +1456,6 @@
 									VerticalAlignment="Center"
 									FontWeight="SemiBold"
 									Text="나가기" />
-								<Border
-									Margin="8,0,0,0"
-									Padding="4,0"
-									VerticalAlignment="Center"
-									BorderBrush="{DynamicResource OnPrimaryFixedBrush}"
-									BorderThickness="1"
-									CornerRadius="3"
-									Opacity="0.85">
-									<TextBlock
-										FontFamily="Consolas"
-										FontSize="10"
-										Text="Esc" />
-								</Border>
 							</StackPanel>
 						</Button>
 						<help:HelpTip
@@ -1846,6 +1833,14 @@
 					Panel.ZIndex="126"
 					Content="{Binding BuildingHeightPanel}"
 					Visibility="{Binding IsBuildingHeightPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  「이미지 자르기」 판(2026-10-19) — 오버레이 이미지를 처음 불러올 때 · 우클릭 「다각형으로 자르기」. 같은 크롬 · 머리 띠 끌기.  -->
+				<ContentPresenter
+					Canvas.Left="200"
+					Canvas.Top="60"
+					Panel.ZIndex="127"
+					Content="{Binding ImageCropPanel}"
+					Visibility="{Binding IsImageCropPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  사이트 고정(맵 앵커) 설정 패널 (증분6, FR-B3) — OverlayWindow 패턴(Control+ControlTemplate, 헤더 드래그)  -->
 				<ContentPresenter

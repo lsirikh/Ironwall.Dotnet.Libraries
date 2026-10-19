@@ -168,4 +168,13 @@ public class Map3DScreenTests
     [InlineData("none", true)]
     public void should_stay_in_3d_when_window_opens_over_composition_host(string hostMode, bool expected)
         => Assert.Equal(expected, Map3DGuide.ShouldLeave3DForWindow(hostMode));
+
+    // ── Esc 로 3D 나가기 ──
+
+    [Theory]
+    [InlineData("composition", false)]   // WPF 안 3D — 「나가기」 단추로만(2026-10-19)
+    [InlineData("hwnd", true)]           // 네이티브 창 3D 는 그 창이 단추를 가린다 — Esc 를 남긴다
+    [InlineData("none", false)]
+    public void should_exit_3d_by_esc_only_when_native_window_hides_exit_button(string hostMode, bool expected)
+        => Assert.Equal(expected, Map3DGuide.EscExitsMap3D(hostMode));
 }
