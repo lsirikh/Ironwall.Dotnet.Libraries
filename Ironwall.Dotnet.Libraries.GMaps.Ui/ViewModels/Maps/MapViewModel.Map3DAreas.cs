@@ -69,7 +69,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             _map3DScenes.Add(new Map3DScene(scene.Id, scene.Bbox) { EnterZoom = scene.EnterZoom });
 
             var item = new Map3DAreaItem(scene, Map3DAreaEnterZoom(scene.Id, scene.EnterZoom), ViewMap3DArea, OpenMap3DAreaZoomEditor,
-                                         RebakeMap3DArea, area => _ = RequestDeleteMap3DAreaAsync(area));
+                                         area => _ = RequestResetMap3DHeightsAsync(area), RebakeMap3DArea, area => _ = RequestDeleteMap3DAreaAsync(area));
             int index = Map3DAreas.ToList().FindIndex(a => a.Id == scene.Id);
             if (index >= 0) Map3DAreas[index] = item; else Map3DAreas.Add(item);
 
@@ -79,6 +79,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             MainMap.Markers.Add(marker);
         }
         NotifyOfPropertyChange(nameof(HasMap3DAreas));
+        NotifyMap3DUnmatchedHeights(Map3DAreas);   // 다시 굽기에서 못 붙인 직접 입력 건물 높이 알림(MapViewModel.BuildingHeight)
         _log?.Info($"[Map3D] 영역 목록 {scenes.Count}개");
         QueueMap3DGate();   // 테두리 크기 · 칩 · 게이트(새 장면)
     }

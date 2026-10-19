@@ -41,6 +41,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                     (나가기 · ESC 만), 나가면 들어오기 직전 2D 자리(_map3DReturn). 상태는 SetMap3DState 하나로 바꿔 "3D" 표시와 「나가기」 보임이 늘 같다.
                   ★ 8차(2026-10-19, 들어가는 방식): 설정 Map3D.EntryMode — 자동(줌, 기본)은 지금처럼 줌 게이트, 수동(단추)은 줌으로 들어가지 않는다.
                     어느 방식이든 화면 가운데가 3D 영역 안이면 왼쪽 위 「3D 로 보기」 단추 · 「이 영역 3D 로 보기」로 바로 들어간다(EnterMap3DDirect).
+                  ★ 9차(2026-10-19, 건물 높이): 3D 의 building 메시지 → 「건물 높이」 판(MapViewModel.BuildingHeight). 판이 열려 있으면 ESC 는 판만 취소하고,
+                    3D 를 나가면 판을 닫으며 미리보기를 원래대로 한다.
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
@@ -385,7 +387,8 @@ public partial class MapViewModel
         }
         if (e.Key == System.Windows.Input.Key.Escape && _map3DState == Map3DState.Shown)
         {
-            ExitMap3D("esc");
+            // 「건물 높이」 판이 열려 있으면 3D 를 나가지 않고 판만 취소(끄는 중이면 끌기만)
+            if (!TryCancelBuildingHeightByEscape()) ExitMap3D("esc");
             e.Handled = true;
             return true;
         }
@@ -685,6 +688,7 @@ public partial class MapViewModel
     private void Leave3D(Map3DCamera? cam, string cause)
     {
         SetMap3DState(Map3DState.Off);   // 지도가 없어도 상태는 내린다 — "3D"(「나가기」)로 남지 않게
+        CloseBuildingHeightPanel(clearUndo: true);   // 「건물 높이」 판 — 미리보기 원래대로 · 판 안 되돌리기 비움
         if (MainMap == null) return;
         _map3DAreaViewJob = null; _map3DReturn = null;   // 다음 진입은 다시 줌 게이트 또는 새 「영역 보기」
         _map3DRevealedBehindLogin = false;
@@ -764,6 +768,12 @@ public partial class MapViewModel
         if (msg.Type == "cursor")
         {
             if (_map3DState == Map3DState.Shown && msg.Cursor is { } cursor) SetMap3DCursor(cursor);
+            return;
+        }
+        if (msg.Type == "building")
+        {
+            try { if (msg.Building is { } building) OnMap3DBuildingPicked(building); }   // 「건물 높이」 판(MapViewModel.BuildingHeight)
+            catch (Exception ex) { _log?.Error($"[Map3D] 건물 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
         if (msg.Pick is { } pick)
