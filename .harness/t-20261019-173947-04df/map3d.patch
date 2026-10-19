@@ -1,0 +1,977 @@
+diff --git a/map3d/__main__.py b/map3d/__main__.py
+index 7ef6109..b5398c4 100644
+--- a/map3d/__main__.py
++++ b/map3d/__main__.py
+@@ -11,7 +11,7 @@ from .config import llm_key_present, load_settings
+ 
+ 
+ def _gen(args):
+-    from .geo import parse_bbox
++    from .geo import parse_bbox, parse_rect
+     from .params import SceneParams
+     from .pipeline import GenerateRequest, generate
+     from .llm import EXTERNAL_NOTICE
+@@ -29,10 +29,18 @@ def _gen(args):
+     if args.overlay:
+         data = json.loads(Path(args.overlay).read_text(encoding="utf-8"))
+         overlays = data.get("overlays", [data]) if isinstance(data, dict) else list(data)
+-    req = GenerateRequest(bbox=parse_bbox(args.bbox), params=p, dem_path=args.dem,
++    rect = None
++    if args.rect:
++        lon, lat, w, h, rot = (float(v) for v in args.rect.split(","))
++        rect = {"lon": lon, "lat": lat, "width_m": w, "height_m": h, "rotation_deg": rot}
++    rr = parse_rect(rect)
++    if rr is None and not args.bbox:
++        print("오류: --bbox 또는 회전이 있는 --rect 가 필요합니다.", file=sys.stderr)
++        return 2
++    req = GenerateRequest(bbox=rr.bbox() if rr else parse_bbox(args.bbox), params=p, dem_path=args.dem,
+                           buildings_geojson=args.buildings, offline=args.offline,
+                           overlay_mode=args.overlay_mode, overlays=overlays, enter_zoom=args.enter_zoom,
+-                          fill_gaps=not args.no_fill_gaps)
++                          fill_gaps=not args.no_fill_gaps, rect=rect)
+     out = Path(args.out)
+ 
+     def prog(f, msg):
+@@ -107,7 +115,8 @@ def main(argv=None):
+     ap.add_argument("-v", "--verbose", action="store_true")
+     sub = ap.add_subparsers(dest="cmd", required=True)
+     g = sub.add_parser("generate", help="bbox 로 3D 장면 만들기")
+-    g.add_argument("--bbox", required=True, help="minLon,minLat,maxLon,maxLat")
++    g.add_argument("--bbox", help="minLon,minLat,maxLon,maxLat")
++    g.add_argument("--rect", help="회전 영역 lon,lat,가로m,세로m,회전각(지도 방위 °) — 주면 bbox 대신")
+     g.add_argument("--zoom", type=int, help="정사영상 줌(기본 18, 영역이 크면 자동으로 낮춤)")
+     g.add_argument("--max-texture", type=int, help="텍스처 한 변 상한 px(기본 8192)")
+     g.add_argument("--grid", type=float, help="지형 격자 간격 m(기본: 영역에 맞춰 2~5)")
+diff --git a/map3d/geo.py b/map3d/geo.py
+index 58376f8..e4c166d 100644
+--- a/map3d/geo.py
++++ b/map3d/geo.py
+@@ -65,11 +65,16 @@ _FROM_ECEF = Transformer.from_crs("EPSG:4978", "EPSG:4979", always_xy=True)
+ 
+ @dataclass
+ class LocalFrame:
+-    """원점(lon0, lat0, h0) 기준 동(E)·북(N)·위(U) 미터 좌표계."""
++    """원점(lon0, lat0, h0) 기준 동(E)·북(N)·위(U) 미터 좌표계.
++
++    rotation_deg ≠ 0 이면 회전 영역(RotRect)의 장면 로컬 축 — x = 사각형 오른쪽(방위 rotation+90), y = 사각형 위쪽(방위 rotation).
++    이름(lonlat_to_enu …)은 그대로 쓰되 결과는 이 회전 축 좌표다. 장면 메시 · 잘라내기는 모두 이 축의 반듯한 직사각형으로 하고,
++    뷰어가 모델을 −rotation 만큼 돌려 세계 좌표 = 진짜 ENU 로 맞춘다(view.js loadScene · camsync.sceneYaw)."""
+ 
+     lon0: float
+     lat0: float
+     h0: float = 0.0
++    rotation_deg: float = 0.0
+ 
+     def __post_init__(self):
+         x0, y0, z0 = _TO_ECEF.transform(self.lon0, self.lat0, self.h0)
+@@ -78,7 +83,10 @@ class LocalFrame:
+         e = np.array([-math.sin(lo), math.cos(lo), 0.0])
+         n = np.array([-math.sin(la) * math.cos(lo), -math.sin(la) * math.sin(lo), math.cos(la)])
+         u = np.array([math.cos(la) * math.cos(lo), math.cos(la) * math.sin(lo), math.sin(la)])
+-        self.rot = np.vstack([e, n, u])  # ECEF 차이 → ENU
++        if self.rotation_deg:
++            b = math.radians(self.rotation_deg)
++            e, n = math.cos(b) * e - math.sin(b) * n, math.sin(b) * e + math.cos(b) * n
++        self.rot = np.vstack([e, n, u])  # ECEF 차이 → ENU(회전 영역이면 회전 축)
+ 
+     def lonlat_to_enu(self, lon, lat, h=0.0):
+         lon = np.asarray(lon, dtype=np.float64)
+@@ -116,6 +124,95 @@ def bbox_side_lengths_m(bbox: tuple[float, float, float, float]) -> tuple[float,
+     return abs(w), abs(h)
+ 
+ 
++@dataclass(frozen=True)
++class RotRect:
++    """회전 영역 — 중심(lon, lat) · 가로 · 세로(m) · 회전각(도). 회전각 = 그릴 때 지도 방위(사각형 위쪽 변이 가리키는 방위, 북 0 · 시계).
++    위경도 ↔ 사각형 로컬(x 오른쪽 · y 위쪽, m)은 중심 위도의 등장방형 근사 — 1° 길이는 WGS84 타원체의 묘유선 · 자오선 곡률 반지름으로
++    (GIS Map3DMath.Map3DRotRect 와 같은 식). 구(球)로 셈하면 LocalFrame(타원체 ENU)과 0.1~0.3 % 어긋나 2 km 영역 모서리가 수 m 틀어진다."""
++
++    lon: float
++    lat: float
++    width_m: float
++    height_m: float
++    rotation_deg: float
++
++    def _k(self):
++        e2, s2 = 6.69437999014e-3, math.sin(math.radians(self.lat)) ** 2
++        n_r = WGS84_A / math.sqrt(1 - e2 * s2)                 # 묘유선 곡률 반지름(동서)
++        m_r = WGS84_A * (1 - e2) / (1 - e2 * s2) ** 1.5        # 자오선 곡률 반지름(남북)
++        return math.radians(1.0) * n_r * math.cos(math.radians(self.lat)), math.radians(1.0) * m_r
++
++    def to_lonlat(self, x, y):
++        b = math.radians(self.rotation_deg)
++        x, y = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
++        e, n = x * math.cos(b) + y * math.sin(b), -x * math.sin(b) + y * math.cos(b)
++        kx, ky = self._k()
++        return self.lon + e / kx, self.lat + n / ky
++
++    def to_local(self, lon, lat):
++        b = math.radians(self.rotation_deg)
++        kx, ky = self._k()
++        e, n = (np.asarray(lon, dtype=np.float64) - self.lon) * kx, (np.asarray(lat, dtype=np.float64) - self.lat) * ky
++        return e * math.cos(b) - n * math.sin(b), e * math.sin(b) + n * math.cos(b)
++
++    def corners(self) -> list[list[float]]:
++        """네 모서리 [lon, lat] — 왼쪽 아래 · 오른쪽 아래 · 오른쪽 위 · 왼쪽 위(사각형 로컬 기준)."""
++        hw, hh = self.width_m / 2, self.height_m / 2
++        lon, lat = self.to_lonlat([-hw, hw, hw, -hw], [-hh, -hh, hh, hh])
++        return [[float(a), float(b)] for a, b in zip(lon, lat)]
++
++    def bbox(self, pad_deg: float = 1e-5) -> tuple[float, float, float, float]:
++        """감싸는 북쪽 정렬 bbox(자료 받기 · 장면 찾기 · 높이 덮어쓰기 영역 키) — 소수 7자리로 고정해 같은 사각형이면 늘 같은 값."""
++        c = np.asarray(self.corners())
++        return (round(float(c[:, 0].min()) - pad_deg, 7), round(float(c[:, 1].min()) - pad_deg, 7),
++                round(float(c[:, 0].max()) + pad_deg, 7), round(float(c[:, 1].max()) + pad_deg, 7))
++
++    def contains(self, lon, lat) -> bool:
++        x, y = self.to_local(lon, lat)
++        return bool(abs(x) <= self.width_m / 2 + 1e-6 and abs(y) <= self.height_m / 2 + 1e-6)
++
++    def to_json(self) -> dict:
++        return {"lon": self.lon, "lat": self.lat, "width_m": self.width_m, "height_m": self.height_m,
++                "rotation_deg": self.rotation_deg}
++
++
++def parse_rect(d) -> RotRect | None:
++    """요청 rect {lon, lat, width_m, height_m, rotation_deg} → RotRect. 회전각이 0(360 의 배수)이면 None(북쪽 정렬 bbox 경로 그대로)."""
++    if d is None:
++        return None
++    if not isinstance(d, dict):
++        raise ValueError("rect 는 {lon, lat, width_m, height_m, rotation_deg} 여야 합니다")
++    try:
++        lon, lat, w, h, r = (float(d[k]) for k in ("lon", "lat", "width_m", "height_m", "rotation_deg"))
++    except (KeyError, TypeError, ValueError):
++        raise ValueError("rect 는 lon · lat · width_m · height_m · rotation_deg 다섯 숫자가 필요합니다") from None
++    if not all(math.isfinite(v) for v in (lon, lat, w, h, r)):
++        raise ValueError("rect 값이 수가 아닙니다")
++    if not (-180 <= lon <= 180 and -85 <= lat <= 85 and w > 0 and h > 0):
++        raise ValueError(f"rect 범위가 잘못되었습니다: {d}")
++    r = r % 360.0
++    if r < 1e-9 or 360.0 - r < 1e-9:
++        return None
++    return RotRect(lon, lat, w, h, r)
++
++
++def scene_rect(scene: dict) -> RotRect | None:
++    """scene.json 의 rect(회전 영역) — 없거나 잘못됐으면 None."""
++    try:
++        return parse_rect(scene.get("rect"))
++    except ValueError:
++        return None
++
++
++def scene_contains(scene: dict, lon: float, lat: float) -> bool:
++    """장면이 그 지점을 덮는가 — 회전 영역이면 회전 사각형 안, 아니면 bbox 안(경계 포함)."""
++    rr = scene_rect(scene)
++    if rr is not None:
++        return rr.contains(lon, lat)
++    b = scene.get("bbox")
++    return bool(b) and b[0] <= lon <= b[2] and b[1] <= lat <= b[3]
++
++
+ def parse_bbox(text) -> tuple[float, float, float, float]:
+     if isinstance(text, (list, tuple)):
+         vals = [float(v) for v in text]
+diff --git a/map3d/heights.py b/map3d/heights.py
+index 8e2cb53..3356240 100644
+--- a/map3d/heights.py
++++ b/map3d/heights.py
+@@ -21,6 +21,8 @@ from pathlib import Path
+ import numpy as np
+ from shapely.geometry import Point, Polygon
+ 
++from .geo import scene_contains
++
+ MATCH_IOU = 0.4          # 다시 붙이는 겹침 하한(바닥 윤곽 IoU) — 다시 굽기에서 윤곽이 조금 달라도(몇 m 밀림 · 꼭짓점 차이) 붙는다
+ MIN_H, MAX_H = 1.0, 600.0
+ MIN_FLOORS, MAX_FLOORS = 1, 200
+@@ -344,8 +346,7 @@ def reset_all(data_dir, job_dir: Path) -> list[dict]:
+     ids = [b["id"] for b in scene.get("buildings", []) if b.get("manual")]
+     rows = [set_height(data_dir, job_dir, bid, None) for bid in ids]
+     with _lock:
+-        bbox = scene["bbox"]
+-        _drop_items(data_dir, lambda it: bbox[0] <= it["center"][0] <= bbox[2] and bbox[1] <= it["center"][1] <= bbox[3])
++        _drop_items(data_dir, lambda it: scene_contains(scene, it["center"][0], it["center"][1]))   # 회전 영역은 회전 사각형 안만
+         scene = json.loads((job_dir / "scene.json").read_text(encoding="utf-8"))
+         scene.setdefault("height_overrides", {})["unmatched"] = []
+         _recount(scene)
+diff --git a/map3d/jobs.py b/map3d/jobs.py
+index 9a94aeb..68e7d1a 100644
+--- a/map3d/jobs.py
++++ b/map3d/jobs.py
+@@ -90,6 +90,7 @@ class JobManager:
+                         "created": s.get("created"), "bbox": s.get("bbox"), "counts": s.get("counts"),
+                         "glb_bytes": s.get("files", {}).get("glb_bytes"), "warnings": len(s.get("warnings", [])),
+                         **({"enter_zoom": s["enter_zoom"]} if "enter_zoom" in s else {}),
++                        **({"rect": s["rect"]} if s.get("rect") else {}),   # 회전 영역(GIS 가 기울어진 네모로 그린다)
+                         # 직접 입력한 건물 높이 수 · 다시 붙이지 못한 직접 입력 수(GIS 영역 목록 · 알림)
+                         "manual_heights": int((s.get("height_overrides") or {}).get("applied") or 0),
+                         "manual_unmatched": len((s.get("height_overrides") or {}).get("unmatched") or []),
+diff --git a/map3d/pipeline.py b/map3d/pipeline.py
+index 732252e..8e09682 100644
+--- a/map3d/pipeline.py
++++ b/map3d/pipeline.py
+@@ -24,7 +24,7 @@ from .buildings import (add_facade_images, build_building, building_node, clip_t
+ from .buildings_local import empty_cells, height_from, query_local, unimported
+ from .config import Settings
+ from .dem import DemSource, flat_dem, load_copernicus, load_geotiff
+-from .geo import LocalFrame, bbox_side_lengths_m, global_px_to_lonlat, lonlat_to_global_px, parse_bbox
++from .geo import LocalFrame, bbox_side_lengths_m, global_px_to_lonlat, lonlat_to_global_px, parse_bbox, parse_rect
+ from .gltf import GltfBuilder, MaterialDef, merge_parts
+ from .linear import fence_parts, line_enu, road_parts, wall_parts
+ from .ortho import MBTiles, Ortho, build_ortho, choose_zoom
+@@ -67,19 +67,22 @@ class GenerateRequest:
+     overlays: list[dict] = field(default_factory=list)
+     enter_zoom: float | None = None   # GIS 가 3D 로 바꾸는 줌(10~20.5) — scene.json 에 그대로 기록
+     fill_gaps: bool = True            # 건물 자료 빈 곳(buildings_gap · 50 m 빈 칸)을 위성 타일 사진에서 찾아 채운다
++    # 회전 영역 {lon, lat, width_m, height_m, rotation_deg}(geo.RotRect) — 회전각이 0 이 아니면 bbox 대신 이 사각형으로 장면을 자른다
++    # (자료는 감싸는 bbox 로 받는다). 없거나 회전 0 이면 bbox 그대로(예전과 같은 결과).
++    rect: dict | None = None
+ 
+     def to_json(self) -> dict:
+         return {"bbox": list(self.bbox), "params": self.params.model_dump(mode="json"),
+                 "dem_path": self.dem_path, "buildings_geojson": self.buildings_geojson, "offline": self.offline,
+                 "overlay_mode": self.overlay_mode, "overlays": self.overlays, "enter_zoom": self.enter_zoom,
+-                "fill_gaps": self.fill_gaps}
++                "fill_gaps": self.fill_gaps, **({"rect": self.rect} if self.rect else {})}
+ 
+     @classmethod
+     def from_json(cls, d: dict) -> "GenerateRequest":
+         return cls(bbox=tuple(d["bbox"]), params=SceneParams(**d.get("params", {})), dem_path=d.get("dem_path"),
+                    buildings_geojson=d.get("buildings_geojson"), offline=bool(d.get("offline", False)),
+                    overlay_mode=d.get("overlay_mode") or "tiles", overlays=list(d.get("overlays") or []), enter_zoom=d.get("enter_zoom"),
+-                   fill_gaps=d.get("fill_gaps") is not False)
++                   fill_gaps=d.get("fill_gaps") is not False, rect=d.get("rect"))
+ 
+ 
+ def srgb_hex_to_linear(hexstr: str) -> tuple[float, float, float, float]:
+@@ -115,8 +118,13 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+     def tick(name, t):
+         timings[name] = round(time.time() - t, 2)
+ 
+-    bbox = parse_bbox(req.bbox)
+-    w_m, h_m = bbox_side_lengths_m(bbox)
++    try:
++        rr = parse_rect(req.rect)
++    except ValueError as ex:
++        raise GenerateError(str(ex)) from ex
++    # 회전 영역: 자료(DEM · 정사영상 · OSM · 건물 · 오버레이)는 감싸는 bbox 로 받고, 장면은 회전 사각형으로 자른다
++    bbox = rr.bbox() if rr else parse_bbox(req.bbox)
++    w_m, h_m = (rr.width_m, rr.height_m) if rr else bbox_side_lengths_m(bbox)
+     if max(w_m, h_m) > settings.max_side_m:
+         warnings.append(f"영역 {w_m:.0f}×{h_m:.0f}m 가 권장 상한 {settings.max_side_m:.0f}m 를 넘음 — 오래 걸리고 무거움")
+     say(0.02, f"영역 {w_m:.0f}m × {h_m:.0f}m")
+@@ -140,13 +148,20 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+     tick("dem", t)
+ 
+     # ---------------------------------------------------------------- 좌표계 · 격자
+-    lonc, latc = (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2
++    # 회전 영역은 원점 = 사각형 중심, 장면 로컬 축 = 사각형 축(LocalFrame.rotation_deg) — 장면 직사각형이 그대로 회전 사각형이다
++    lonc, latc = (rr.lon, rr.lat) if rr else ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+     h0 = float(dem.sample(np.array([lonc]), np.array([latc]))[0])
+-    frame = LocalFrame(lonc, latc, h0)
++    frame = LocalFrame(lonc, latc, h0, rr.rotation_deg if rr else 0.0)
++    rect = (-rr.width_m / 2, rr.width_m / 2, -rr.height_m / 2, rr.height_m / 2) if rr else inner_enu_rect(frame, bbox)
+     t = time.time()
+-    grid = build_grid(frame, bbox, dem, P.grid_spacing)
++    grid = build_grid(frame, bbox, dem, P.grid_spacing, rect if rr else None)
+     tick("terrain_grid", t)
+-    rect = inner_enu_rect(frame, bbox)
++    # 장면 직사각형의 경위도 다각형(회전 영역이면 기울어진 네모) — 건물 · 빈 곳 채우기 · 오버레이 범위를 이 안으로
++    re_ = np.array([rect[0], rect[1], rect[1], rect[0], rect[0]])
++    rn_ = np.array([rect[2], rect[2], rect[3], rect[3], rect[2]])
++    rlon, rlat, _ = frame.enu_to_lonlat(re_, rn_, 0.0)
++    rect_ll = ShapelyPolygon(list(zip(rlon, rlat)))
++    area_ll = rect_ll if rr else box(*bbox)
+     say(0.15, f"지형 격자 {grid.shape[1]}×{grid.shape[0]} (간격 {grid.spacing:.2f}m), 높이 {grid.H.min():.0f}~{grid.H.max():.0f}m")
+ 
+     # ---------------------------------------------------------------- 정사영상
+@@ -196,6 +211,8 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+             # extract: 그림은 건물 찾기 · 높이 재기에만 쓰고 지형 텍스처에는 합성하지 않는다(바닥 · 지붕 = 위성 타일).
+             # 비스듬한 사진의 기울어진 건물이 땅에 그려져 세운 상자와 어긋나 붙어 보이므로.
+             info = {"pixels": int(coverage_mask(ortho, spec).sum())} if mode == "extract" else composite(ortho, spec, img)
++            if rr and not spec.region_ll().intersects(rect_ll):   # 감싸는 bbox 에는 걸쳐도 회전 사각형 밖이면 쓸 데가 없다
++                info["pixels"] = 0
+             if not info["pixels"]:
+                 warnings.append(f"오버레이 {spec.id}({spec.title}) 가 영역 밖이라 굽지 않음")
+                 continue
+@@ -235,7 +252,7 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+         warnings.append("OSM 을 가져오지 못해 건물·철책 없이 지형만 만듦: " + " | ".join(osm.errors))
+     tick("osm", t)
+     bld_source = "user" if user_bld else "local" if use_local else "osm" if osm.of("building") else "none"
+-    bld_base = [f for f in (user_bld or osm.of("building")) if f.geom.intersects(box(*bbox))]
++    bld_base = [f for f in (user_bld or osm.of("building")) if f.geom.intersects(area_ll)]
+     buildings_info = {"source": bld_source, "count": len(bld_base), "height_from": height_from(bld_base)}
+     if local is not None:
+         buildings_info["local"] = {"index": str(settings.buildings_index), "applies": local.applies,
+@@ -330,7 +347,8 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+             found.append(Feature("building", poly, tags, "overlay", sid))
+         n_found = len(found)
+         if mode == "extract":
+-            b_feats, found, pairs, dec = _pick_sources(b_feats, found, found_by_sid, item["spec"].region_ll(),
++            region = item["spec"].region_ll()
++            b_feats, found, pairs, dec = _pick_sources(b_feats, found, found_by_sid, region.intersection(rect_ll) if rr else region,
+                                                        _blur_test(ortho, item.get("blur")))
+             photo_for.update(pairs)
+             if dec["map_removed"]:
+@@ -351,11 +369,11 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+     fill_info: dict = {"enabled": req.fill_gaps}
+     if req.fill_gaps and mb is not None:
+         if gap_cells is None:
+-            region_ll = box(*bbox)
++            region_ll = area_ll
+         else:
+             (lo0, la0), (dlo, dla) = gap_cells["origin"], gap_cells["step_deg"]
+             region_ll = unary_union([box(lo0 + i * dlo, la0 + j * dla, lo0 + (i + 1) * dlo, la0 + (j + 1) * dla)
+-                                     for i, j in gap_cells["empty"]]).intersection(box(*bbox))
++                                     for i, j in gap_cells["empty"]]).intersection(area_ll)
+         for item in baked:
+             region_ll = region_ll.difference(item["spec"].region_ll().buffer((FEATHER_M + 2) / 111320.0))
+         region = _raster_mask(ortho, region_ll)
+@@ -410,10 +428,6 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+                 s.roof_color = "#%02x%02x%02x" % f.color
+     specs = [s for s in specs if clip_to_rect(s, frame, rect)]
+     # 지형 직사각형 밖으로 나간 부분은 잘라 낸다(지형 가장자리 밖에 벽이 떠 있지 않게)
+-    re_ = np.array([rect[0], rect[1], rect[1], rect[0], rect[0]])
+-    rn_ = np.array([rect[2], rect[2], rect[3], rect[3], rect[2]])
+-    rlon, rlat, _ = frame.enu_to_lonlat(re_, rn_, 0.0)
+-    rect_ll = ShapelyPolygon(list(zip(rlon, rlat)))
+     for s in specs:
+         if not rect_ll.contains(s.footprint_ll):
+             g = s.footprint_ll.intersection(rect_ll)
+@@ -433,7 +447,10 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+             s.roof_color, s.wall_color = o.roof_color, o.wall_color
+     # 운영자가 GIS 에서 직접 넣은 건물 높이(heights.py) — 자리(바닥 윤곽)로 다시 붙인다. 못 붙인 것은 남겨 두고 알린다.
+     from . import heights
+-    manual_by_id, auto_by_id, manual_left = heights.apply_to_specs(specs, heights.items_in(settings.data_dir, bbox))
++    h_items = heights.items_in(settings.data_dir, bbox)
++    if rr:   # 감싸는 bbox 의 모서리(회전 사각형 밖) 항목은 이 장면 것이 아니다 — 못 붙인 것으로 세지 않는다
++        h_items = [it for it in h_items if rr.contains(*it["center"])]
++    manual_by_id, auto_by_id, manual_left = heights.apply_to_specs(specs, h_items)
+     if manual_left:
+         warnings.append(f"다시 붙이지 못한 직접 입력 건물 높이 {len(manual_left)}개(그 자리에 건물이 없음) — 지우지 않고 남겨 둠")
+     llm_info ={"enabled": bool(P.use_llm), "sent_images": 0, "classified": 0, "errors": []}
+@@ -652,6 +669,11 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+         "frame": "지역 ENU(미터). glTF 축: x=동, y=위, z=-북",
+         "enu_rect": [round(v, 3) for v in rect],
+     }
++    if rr:
++        # 회전 영역 — 장면 로컬 축이 사각형 축(x=사각형 오른쪽 · z=-사각형 위쪽). 뷰어는 모델을 y 축으로 −rotation_deg 돌려 진짜 ENU 에 놓는다.
++        meta["frame"] = f"회전 지역 ENU(미터) — 동북을 시계 방향 {rr.rotation_deg:g}° 돌린 축. glTF 축: x=사각형 오른쪽, y=위, z=-사각형 위쪽"
++        meta["rect"] = {**rr.to_json(), "corners": rr.corners()}
++        meta["rotation_deg"] = rr.rotation_deg
+     gb.scene_extras = meta
+     glb_path = out_dir / "scene.glb"
+     glb_bytes = gb.to_glb()
+diff --git a/map3d/server.py b/map3d/server.py
+index 30bddd4..3fa8fe6 100644
+--- a/map3d/server.py
++++ b/map3d/server.py
+@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
+ 
+ from . import heights
+ from .config import Settings, llm_key_present
+-from .geo import bbox_side_lengths_m, parse_bbox
++from .geo import bbox_side_lengths_m, parse_bbox, parse_rect, scene_contains
+ from .jobs import ALLOWED_FILES, JobManager
+ from .llm import EXTERNAL_NOTICE
+ from .ortho import MBTiles
+@@ -41,6 +41,7 @@ class JobIn(BaseModel):
+     overlays: list[dict] = Field(default_factory=list)   # 규약: overlay.py · README
+     enter_zoom: float | None = None   # GIS 가 3D 로 바뀌는 줌(10~20.5, check_enter_zoom)
+     fill_gaps: bool = True            # 건물 자료 빈 곳을 위성 타일 사진에서 찾아 채우기
++    rect: dict | None = None          # 회전 영역 {lon, lat, width_m, height_m, rotation_deg}(geo.parse_rect) — 있으면 bbox 는 이것으로 다시 셈
+ 
+ 
+ class PatchIn(BaseModel):
+@@ -133,10 +134,11 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+     def create_job(body: JobIn):
+         check_enter_zoom(body.enter_zoom)
+         try:
+-            bbox = parse_bbox(body.bbox)
++            rr = parse_rect(body.rect)
++            bbox = rr.bbox() if rr else parse_bbox(body.bbox)
+         except ValueError as ex:
+             raise HTTPException(400, str(ex))
+-        w, h = bbox_side_lengths_m(bbox)
++        w, h = (rr.width_m, rr.height_m) if rr else bbox_side_lengths_m(bbox)
+         if max(w, h) > settings.max_side_m and not body.force:
+             raise HTTPException(400, f"영역 {w:.0f}×{h:.0f}m 가 상한 {settings.max_side_m:.0f}m 를 넘습니다(force=true 로 강행)")
+         if body.use_llm and not llm_allowed():
+@@ -157,7 +159,8 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+         job = jm.submit(GenerateRequest(bbox=bbox, params=p, dem_path=body.dem_path,
+                                         buildings_geojson=body.buildings_geojson,
+                                         overlay_mode=body.overlay_mode, overlays=overlays,
+-                                        enter_zoom=body.enter_zoom, fill_gaps=body.fill_gaps))
++                                        enter_zoom=body.enter_zoom, fill_gaps=body.fill_gaps,
++                                        rect=rr.to_json() if rr else None))
+         return JSONResponse(job.to_dict(), status_code=202)
+ 
+     @app.get("/api/jobs")
+@@ -167,13 +170,13 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+ 
+     @app.get("/api/scenes/at")
+     def scene_at(lon: float, lat: float):
+-        """그 지점을 덮는 다 만든 장면 중 가장 최근 것 — GIS 가 줌 게이트에서 3D 로 바꿀지 판정한다."""
+-        hits = [s for s in jm.list_scenes()
+-                if s.get("bbox") and s["bbox"][0] <= lon <= s["bbox"][2] and s["bbox"][1] <= lat <= s["bbox"][3]]
++        """그 지점을 덮는 다 만든 장면 중 가장 최근 것 — GIS 가 줌 게이트에서 3D 로 바꿀지 판정한다(회전 영역은 회전 사각형 안)."""
++        hits = [s for s in jm.list_scenes() if scene_contains(s, lon, lat)]
+         if not hits:
+             raise HTTPException(404, "이 지점을 덮는 장면이 없습니다")
+         best = max(hits, key=lambda s: s.get("created") or "")
+         return {"id": best["id"], "bbox": best["bbox"], "created": best.get("created"),
++                **({"rect": best["rect"]} if best.get("rect") else {}),
+                 "view_url": f"/view?job={best['id']}&embed=1"}
+ 
+     @app.get("/api/jobs/{job_id}")
+diff --git a/map3d/static/camsync.js b/map3d/static/camsync.js
+index 082734a..c6f0733 100644
+--- a/map3d/static/camsync.js
++++ b/map3d/static/camsync.js
+@@ -54,8 +54,9 @@ export function mapFromCamera(origin, position, target, fovDeg, heightPx) {
+ //   margin = 화면 가장자리 여백(반폭 비율). 바라볼 점 = 영역 가운데, 땅은 평평하다고 본다(높이 차는 여백이 덮는다).
+ //   카메라 축은 three.js lookAt 과 같다(back = 바라볼 점 → 카메라, right = 위 × back, up = back × right).
+ //   모서리 하나의 화면 비율 = 옆 거리 / (d − 앞 거리) 라 거리 d 는 모서리마다 닫힌 꼴로 구해 가장 큰 값을 쓴다.
++//   bbox 자리에 회전 영역(scene.json rect — {lon, lat, corners})을 주면 그 중심 · 네 모서리로 셈한다(areaOf).
+ export function fitAreaView(bbox, fovDeg, widthPx, heightPx, { pitch = 60, bearing = 0, margin = 0.08 } = {}) {
+-  const c = { lon: (bbox[0] + bbox[2]) / 2, lat: (bbox[1] + bbox[3]) / 2 };
++  const { c, corners } = areaOf(bbox);
+   const p = Math.max(MIN_PITCH, Math.min(85, pitch)) * D2R, b = bearing * D2R;
+   const back = { x: -Math.sin(p) * Math.sin(b), y: Math.cos(p), z: Math.sin(p) * Math.cos(b) };
+   const rl = Math.hypot(back.x, back.z);
+@@ -65,7 +66,7 @@ export function fitAreaView(bbox, fovDeg, widthPx, heightPx, { pitch = 60, beari
+   const lim = 1 - Math.max(0, Math.min(0.9, margin));
+   const tanY = Math.tan((fovDeg * D2R) / 2), tanX = tanY * Math.max(1, widthPx) / Math.max(1, heightPx);
+   let d = 1;
+-  for (const [lon, lat] of [[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]]]) {
++  for (const [lon, lat] of corners) {
+     const e = enuOf(c, lon, lat), q = { x: e.x, y: 0, z: e.z };
+     d = Math.max(d, dot(q, back) + Math.max(Math.abs(dot(q, right)) / (tanX * lim), Math.abs(dot(q, up)) / (tanY * lim)));
+   }
+@@ -75,12 +76,30 @@ export function fitAreaView(bbox, fovDeg, widthPx, heightPx, { pitch = 60, beari
+ 
+ // 3D 축소 한계(2026-10-18) — 3D 는 줌으로 2D 로 나가지 않으므로 끝없이 물러나 장면이 점이 되지 않게
+ //   카메라 최대 거리 = 영역 전체가 화면에 꽉 차는 거리(fitAreaView, 여백 없이) × factor. 돌려 봐도 영역이 다 보이게 방위 0/45/90/135 중 가장 먼 값.
++//   회전 영역이면 방위를 사각형 회전각에서 센다(사각형이 반듯한 방위 0 · 45 · 90 · 135).
+ export function maxOrbitDistance(bbox, fovDeg, widthPx, heightPx, pitch, factor = 1.3) {
+   let d = 1;
+-  for (const bearing of [0, 45, 90, 135]) d = Math.max(d, fitAreaView(bbox, fovDeg, widthPx, heightPx, { pitch, bearing, margin: 0 }).distance);
++  const r0 = areaOf(bbox).rotation;
++  for (const bearing of [0, 45, 90, 135]) d = Math.max(d, fitAreaView(bbox, fovDeg, widthPx, heightPx, { pitch, bearing: r0 + bearing, margin: 0 }).distance);
+   return d * factor;
+ }
+ 
++// 영역 = bbox [minLon, minLat, maxLon, maxLat] 또는 회전 영역 {lon, lat, rotation_deg, corners:[[lon, lat] × 4]}(scene.json rect)
++//   → 가운데 · 네 모서리 · 회전각(북쪽 정렬이면 0).
++export function areaOf(area) {
++  if (area && !Array.isArray(area) && Array.isArray(area.corners) && area.corners.length === 4)
++    return { c: { lon: area.lon, lat: area.lat }, corners: area.corners, rotation: Number.isFinite(area.rotation_deg) ? area.rotation_deg : 0 };
++  const b = area;
++  return { c: { lon: (b[0] + b[2]) / 2, lat: (b[1] + b[3]) / 2 }, corners: [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]], rotation: 0 };
++}
++
++// 회전 영역 장면의 모델 회전(three.js rotation.y, 라디안) — 장면 GLB 는 사각형 축(LocalFrame.rotation_deg)이라
++//   −회전각만큼 돌려야 세계 좌표 = 진짜 ENU(x=동 · z=-북)가 된다. 회전 정보가 없으면 0(예전 장면).
++export function sceneYaw(sceneInfo) {
++  const r = sceneInfo && sceneInfo.rect ? sceneInfo.rect.rotation_deg : 0;
++  return Number.isFinite(r) && r ? -r * D2R : 0;
++}
++
+ // 휠 칸 수를 거리 한계 안으로 줄인다 — 한 칸(줌 0.5)이 한계를 넘으면 한계에 딱 멈추게(소수 칸). 더 갈 수 없으면 0.
+ //   zoomAboutPoint 는 카메라와 바라볼 점을 같은 비율로 당기므로 거리도 2^(-0.5·steps) 배가 된다.
+ export function clampZoomSteps(distance, steps, minDistance, maxDistance) {
+diff --git a/map3d/static/overlay-geom.js b/map3d/static/overlay-geom.js
+index 4fe34dd..dc7286e 100644
+--- a/map3d/static/overlay-geom.js
++++ b/map3d/static/overlay-geom.js
+@@ -190,7 +190,16 @@ export class KeyedAssets {
+ 
+ // 지형 높이표 — 지형 정격자 정점(x,y,z 연속, 순서 무관)을 칸에 넣고, 지형 삼각형 분할과 같게 보간한다(광선 쏘기보다 훨씬 빠르다).
+ //   정점 수가 nx × ny 가 아니거나 빈칸이 있으면 null.
+-export function makeHeightField(pos, nx, ny) {
++//   yaw(라디안) = 모델 회전(camsync.sceneYaw) — 회전 영역 장면은 격자가 세계 축에 기울어 있으므로 정점을 모델 축으로 되돌려 표를 만들고,
++//   묻는 점(세계 x, z)도 같은 식으로 되돌려 읽는다. 0 이면 예전과 똑같다.
++export function makeHeightField(pos, nx, ny, yaw = 0) {
++  if (yaw) {
++    const c = Math.cos(yaw), s = Math.sin(yaw), back = (x, z) => [x * c - z * s, x * s + z * c];
++    const local = Float64Array.from(pos);
++    for (let k = 0; k < local.length; k += 3) [local[k], local[k + 2]] = back(pos[k], pos[k + 2]);
++    const hf = makeHeightField(local, nx, ny);
++    return hf && { sample: (x, z) => hf.sample(...back(x, z)) };
++  }
+   const n = pos.length / 3;
+   if (nx < 2 || ny < 2 || n !== nx * ny) return null;
+   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+diff --git a/map3d/static/view.js b/map3d/static/view.js
+index 9ab61de..c0b7bca 100644
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -7,7 +7,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+ import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+-import { cameraFromMap, clampZoomSteps, cursorDelay, cursorMessage, enuOf, fitAreaView, flyDurationMs, FrameTimes, lerpView, mapFromCamera, maxOrbitDistance, mouseButtonsFor, moveMode, qualityFor, zoomAboutPoint } from "./camsync.js";
++import { cameraFromMap, clampZoomSteps, cursorDelay, cursorMessage, enuOf, fitAreaView, flyDurationMs, FrameTimes, lerpView, mapFromCamera, maxOrbitDistance, mouseButtonsFor, moveMode, qualityFor, sceneYaw, zoomAboutPoint } from "./camsync.js";
+ import { GROUND_LAYER, Overlay3D, OVERLAY_LAYER, TOP_LAYER } from "./overlay3d.js";
+ import { bakedImageIds } from "./overlay-store.js";
+ import { loadHousing } from "./housing.js";
+@@ -135,8 +135,10 @@ function homeView(opts = {}) {
+   if (!sceneInfo) return;
+   if (embed && host.clientHeight < MIN_CAMERA_HEIGHT_PX) { homePending = opts; return; }
+   homePending = null;
+-  const v = fitAreaView(sceneInfo.bbox, camera.fov, host.clientWidth, host.clientHeight,
+-    { pitch: Number.isFinite(opts.pitch) ? opts.pitch : HOME_PITCH, bearing: Number.isFinite(opts.bearing) ? opts.bearing : 0 });
++  // 회전 영역은 그 사각형이 반듯하게 보이는 방위(그릴 때 지도 방위)가 기본
++  const v = fitAreaView(sceneInfo.rect || sceneInfo.bbox, camera.fov, host.clientWidth, host.clientHeight,
++    { pitch: Number.isFinite(opts.pitch) ? opts.pitch : HOME_PITCH,
++      bearing: Number.isFinite(opts.bearing) ? opts.bearing : (sceneInfo.rect ? sceneInfo.rect.rotation_deg : 0) });
+   // 다 옮긴 뒤 GIS 에 지금 자리를 한 번 알린다(2D 오버레이 · 축척이 3D 를 따라간다)
+   applyMapView({ ...v, animate: !!opts.animate }, () => post({ type: "camera", reason: "home", ...currentMapView() }));
+ }
+@@ -185,6 +187,7 @@ async function loadScene(bust) {
+   }
+   if (model) { scene.remove(model); model.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
+   model = gltf.scene;
++  model.rotation.y = sceneYaw(sceneInfo);   // 회전 영역 — 사각형 축 GLB 를 진짜 ENU 로(세계 좌표 · camsync · 오버레이는 그대로)
+   committed.clear(); selNode = null; clearOutline();   // 새 모델 — 건물 미리보기 원래 모양 · 윤곽은 옛 모델 것
+   const maxAniso = renderer.capabilities.getMaxAnisotropy();
+   model.traverse((o) => {
+@@ -238,7 +241,7 @@ function indexGround() {
+     if (!a || a.count !== grid[0] * grid[1]) return;          // 스커트(가장자리 벽)가 아닌 지형 윗면만
+     const arr = new Float32Array(a.count * 3);
+     for (let i = 0; i < a.count; i++) { v.fromBufferAttribute(a, i).applyMatrix4(o.matrixWorld); arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z; }
+-    heightField = makeHeightField(arr, grid[0], grid[1]);
++    heightField = makeHeightField(arr, grid[0], grid[1], model.rotation.y);
+   });
+ }
+ // 그 구역(x0~x1, z0~z1)에 걸친 건물 중 가장 높은 꼭대기(없으면 -Infinity) — 보안 가림 상자 높이
+@@ -794,7 +797,7 @@ renderer.domElement.addEventListener("pointerup", (ev) => {
+ //   접힌(1×1) 화면에서는 건너뛰고 펼칠 때(resize) 다시 셈한다. 줄어든 한계는 궤도 조작이 다음 update 에서 거리를 당겨 맞춘다.
+ function updateMaxDistance() {
+   if (!embed || !sceneInfo || host.clientHeight < MIN_CAMERA_HEIGHT_PX) return;
+-  controls.maxDistance = maxOrbitDistance(sceneInfo.bbox, camera.fov, host.clientWidth, host.clientHeight, HOME_PITCH);
++  controls.maxDistance = maxOrbitDistance(sceneInfo.rect || sceneInfo.bbox, camera.fov, host.clientWidth, host.clientHeight, HOME_PITCH);
+ }
+ // 접힌(1×1) 화면에서는 줌을 다시 셈하지 않는다 — 줌은 화면 높이로 셈해 엉뚱한 값(23 등)이 나온다. 펼치면(resize) 다시 셈한다.
+ function refreshOverlayZoom() { if (overlay && sceneInfo && host.clientHeight >= MIN_CAMERA_HEIGHT_PX) overlay.refreshVisibility(currentMapView().zoom); }
+diff --git a/map3d/terrain.py b/map3d/terrain.py
+index 02f9727..8cf1d79 100644
+--- a/map3d/terrain.py
++++ b/map3d/terrain.py
+@@ -1,4 +1,4 @@
+-"""지형 메시 — ENU 정격자, DEM bicubic 재표본, 가장자리 스커트, 정점 법선, 정사영상 UV."""
++"""지형 메시 — ENU 정격자(회전 영역이면 회전 축 정격자), DEM bicubic 재표본, 가장자리 스커트, 정점 법선, 정사영상 UV."""
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass
+@@ -62,8 +62,9 @@ def inner_enu_rect(frame: LocalFrame, bbox):
+     return max(e[0], e[2]), min(e[1], e[3]), max(n[0], n[1]), min(n[2], n[3])
+ 
+ 
+-def build_grid(frame: LocalFrame, bbox, dem, spacing: float | None = None) -> TerrainGrid:
+-    e_min, e_max, n_min, n_max = inner_enu_rect(frame, bbox)
++def build_grid(frame: LocalFrame, bbox, dem, spacing: float | None = None, rect=None) -> TerrainGrid:
++    """rect(장면 로컬 e_min, e_max, n_min, n_max)를 주면 그 직사각형(회전 영역 — 회전 축 기준)으로, 아니면 bbox 안쪽 직사각형으로."""
++    e_min, e_max, n_min, n_max = rect if rect is not None else inner_enu_rect(frame, bbox)
+     w, h = e_max - e_min, n_max - n_min
+     s = spacing or auto_spacing(w, h)
+     nx = max(int(round(w / s)) + 1, 2)
+diff --git a/tests/rotated_check.mjs b/tests/rotated_check.mjs
+new file mode 100644
+index 0000000..7b1cf5f
+--- /dev/null
++++ b/tests/rotated_check.mjs
+@@ -0,0 +1,117 @@
++// 회전 영역 뷰어 순수 함수 시험 — 처음 시점(fitAreaView) · 축소 한계(maxOrbitDistance) · 모델 회전(sceneYaw) · 높이표(makeHeightField yaw).
++//   pytest(test_rotated_area.py)가 node 로 부른다.
++import { areaOf, cameraFromMap, enuOf, fitAreaView, maxOrbitDistance, sceneYaw } from "../map3d/static/camsync.js";
++import { makeHeightField } from "../map3d/static/overlay-geom.js";
++
++const fails = [];
++const near = (a, b, tol, what) => { if (!(Math.abs(a - b) <= tol)) fails.push(`${what}: ${a} != ${b}`); };
++const D2R = Math.PI / 180, R = 6378137;
++const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
++const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
++const cross = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
++const norm = (a) => { const l = Math.hypot(a.x, a.y, a.z); return { x: a.x / l, y: a.y / l, z: a.z / l }; };
++
++// 회전 사각형(map3d.geo.RotRect 와 같은 식) — 로컬 x 오른쪽 · y 위쪽(m) → 경위도
++function rect(lon, lat, w, h, rot) {
++  const k = { x: D2R * R * Math.cos(lat * D2R), y: D2R * R }, b = rot * D2R;
++  const ll = (x, y) => [lon + (x * Math.cos(b) + y * Math.sin(b)) / k.x, lat + (-x * Math.sin(b) + y * Math.cos(b)) / k.y];
++  return { lon, lat, width_m: w, height_m: h, rotation_deg: rot, ll,
++           corners: [ll(-w / 2, -h / 2), ll(w / 2, -h / 2), ll(w / 2, h / 2), ll(-w / 2, h / 2)] };
++}
++
++// 화면 투영(카메라 축 = three.js lookAt) — [-1, 1] 화면 비율
++function project(c, origin, lon, lat, aspect, fov = 50) {
++  const e = enuOf(origin, lon, lat), pos = c.position, t = c.target;
++  const back = norm(sub(pos, t)), right = norm(cross({ x: 0, y: 1, z: 0 }, back)), up = cross(back, right);
++  const v = sub({ x: e.x, y: 0, z: e.z }, pos), tanY = Math.tan(fov / 2 * D2R), depth = -dot(v, back);
++  return { x: dot(v, right) / (depth * tanY * aspect), y: dot(v, up) / (depth * tanY), depth };
++}
++
++// 1) 영역 해석 — 회전 영역은 그 중심 · 네 모서리 · 회전각, bbox 는 예전 그대로
++{
++  const r = rect(127.102, 37.3616, 200, 120, 45);
++  const a = areaOf(r);
++  near(a.c.lon, r.lon, 0, "area center lon"); near(a.rotation, 45, 0, "area rotation");
++  if (a.corners !== r.corners) fails.push("area corners");
++  const b = areaOf([127.1, 37.36, 127.104, 37.3632]);
++  near(b.c.lon, 127.102, 1e-12, "bbox center"); near(b.rotation, 0, 0, "bbox rotation");
++  if (b.corners.length !== 4 || b.corners[2][0] !== 127.104 || b.corners[2][1] !== 37.3632) fails.push("bbox corners");
++}
++
++// 2) 처음 시점 — 그릴 때 방위로 보면 사각형이 반듯하게(위 두 모서리 같은 높이 · 좌우 대칭) 화면에 꽉 찬다
++for (const rot of [30, 45, 90, -60]) {
++  const r = rect(127.102, 37.3616, 200, 120, rot);
++  for (const [w, h, pitch] of [[1600, 900, 60], [900, 1200, 45], [1920, 1080, 0]]) {
++    const v = fitAreaView(r, 50, w, h, { pitch, bearing: rot, margin: 0.1 });
++    near(v.lon, r.lon, 1e-12, "fit center lon"); near(v.lat, r.lat, 1e-12, "fit center lat");
++    const c = cameraFromMap(r, v, 50, h, 0);
++    const s = r.corners.map(([lon, lat]) => project(c, r, lon, lat, w / h));
++    if (s.some((p) => !(p.depth > 0))) fails.push(`fit r${rot}: corner behind camera`);
++    near(Math.max(...s.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y)))), 0.9, 1e-3, `fit r${rot} ${w}x${h} p${pitch} tight`);
++    // 모서리 0 왼쪽 아래 · 1 오른쪽 아래 · 2 오른쪽 위 · 3 왼쪽 위 — 반듯하면 아래 · 위 변이 화면에 수평, 좌우 대칭
++    near(s[0].y, s[1].y, 1e-9, `fit r${rot} bottom edge level`); near(s[2].y, s[3].y, 1e-9, `fit r${rot} top edge level`);
++    near(s[0].x, -s[1].x, 1e-9, `fit r${rot} symmetric`);
++    if (!(s[3].y > s[0].y)) fails.push(`fit r${rot}: rect top should be up on screen`);
++  }
++  // 회전 영역 중심 · 모서리로 셈 — 같은 사각형을 감싸는 bbox 로 보는 것보다 가깝다(꽉 찬다)
++  const xs = r.corners.map((p) => p[0]), ys = r.corners.map((p) => p[1]);
++  const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
++  if (rot % 90 !== 0 && !(fitAreaView(r, 50, 1600, 900, { bearing: rot }).distance < fitAreaView(box, 50, 1600, 900, { bearing: rot }).distance - 1))
++    fails.push(`fit r${rot}: rotated rect should fit closer than its bbox`);
++}
++
++// 3) 축소 한계 — 회전 사각형 기준(사각형 방위에서 0 · 45 · 90 · 135), 어느 방위로 돌려도 영역 전체가 들어온다
++{
++  const r = rect(127.102, 37.3616, 200, 120, 45);
++  const max = maxOrbitDistance(r, 50, 1600, 900, 60);
++  near(max, 1.3 * Math.max(...[0, 45, 90, 135].map((b) => fitAreaView(r, 50, 1600, 900, { pitch: 60, bearing: 45 + b, margin: 0 }).distance)), 1e-6, "max = 1.3 x fit(rect)");
++  for (const b of [0, 20, 45, 90, 160, 225, 300]) {
++    const tight = fitAreaView(r, 50, 1600, 900, { pitch: 60, bearing: b, margin: 0 });
++    if (!(tight.distance * 1.15 <= max)) fails.push(`max distance rect: whole area b${b}`);
++  }
++  if (!(max < 2 * fitAreaView(r, 50, 1600, 900, { pitch: 60, bearing: 45 }).distance)) fails.push("max distance rect: only a bit beyond home");
++  // 예전 bbox 장면은 그대로(0 · 45 · 90 · 135)
++  const bb = [127.105, 37.364, 127.112, 37.369];
++  near(maxOrbitDistance(bb, 50, 1600, 900, 60), 1.3 * Math.max(...[0, 45, 90, 135].map((b) => fitAreaView(bb, 50, 1600, 900, { pitch: 60, bearing: b, margin: 0 }).distance)), 1e-9, "bbox max unchanged");
++}
++
++// 4) 모델 회전 — 장면 GLB(사각형 축: x 오른쪽 · z −위쪽)를 rotation.y = sceneYaw 로 돌리면 세계 = ENU(enuOf)
++for (const rot of [30, 45, 90, -60, 300]) {
++  const r = rect(127.102, 37.3616, 200, 120, rot);
++  const yaw = sceneYaw({ rect: { rotation_deg: rot } });
++  for (const [x, y] of [[0, 50], [80, 0], [-100, -60], [37, 12]]) {
++    const lx = x, lz = -y;   // GLB 로컬
++    const wx = lx * Math.cos(yaw) + lz * Math.sin(yaw), wz = -lx * Math.sin(yaw) + lz * Math.cos(yaw);   // three.js Ry
++    const [lon, lat] = r.ll(x, y), e = enuOf(r, lon, lat);
++    near(wx, e.x, 1e-6, `yaw r${rot} x`); near(wz, e.z, 1e-6, `yaw r${rot} z`);
++  }
++}
++near(sceneYaw({ bbox: [1, 2, 3, 4] }), 0, 0, "no rect -> 0"); near(sceneYaw(null), 0, 0, "null -> 0");
++near(sceneYaw({ rect: { rotation_deg: 0 } }), 0, 0, "rect 0 -> 0");
++
++// 5) 높이표 — 회전 영역 지형(세계 축에 기운 격자)도 정점 높이를 그대로 읽는다(yaw 로 되돌려 표를 만든다)
++{
++  const nx = 6, ny = 4, yaw = -45 * D2R, hf = (x, z) => 50 + 0.1 * x + 0.02 * z;   // 로컬 평면(삼각형 보간이 정확)
++  const loc = [], wld = [];
++  for (let i = 0; i < ny; i++) for (let j = 0; j < nx; j++) {
++    const x = -100 + 40 * j, z = -60 + 40 * i, y = hf(x, z);
++    loc.push(x, y, z);
++    wld.push(x * Math.cos(yaw) + z * Math.sin(yaw), y, -x * Math.sin(yaw) + z * Math.cos(yaw));
++  }
++  const field = makeHeightField(Float32Array.from(wld), nx, ny, yaw);
++  if (!field) fails.push("height field yaw: null");
++  else for (const [x, z] of [[0, 0], [33, -12], [-90, 50], [95, 55]]) {
++    const wx = x * Math.cos(yaw) + z * Math.sin(yaw), wz = -x * Math.sin(yaw) + z * Math.cos(yaw);
++    near(field.sample(wx, wz), hf(x, z), 1e-3, `height field yaw at ${x},${z}`);
++  }
++  // yaw 없이 같은(기운) 정점을 주면 축 정렬 격자가 아니라 읽을 수 없다 — 그래서 yaw 가 필요하다
++  const plain = makeHeightField(Float32Array.from(wld), nx, ny);
++  if (plain && Math.abs(plain.sample(0, 0) - hf(0, 0)) < 1e-3 && Math.abs(plain.sample(50, 20) - hf(50 * Math.cos(-yaw) + 20 * Math.sin(-yaw), -50 * Math.sin(-yaw) + 20 * Math.cos(-yaw))) < 1e-3)
++    fails.push("height field without yaw unexpectedly right");
++  // yaw 0 은 예전과 같다
++  const a = makeHeightField(Float32Array.from(loc), nx, ny), b = makeHeightField(Float32Array.from(loc), nx, ny, 0);
++  for (const [x, z] of [[0, 0], [33, -12]]) near(a.sample(x, z), b.sample(x, z), 0, "yaw 0 same");
++}
++
++if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
++console.log("rotated ok");
+diff --git a/tests/test_rotated_area.py b/tests/test_rotated_area.py
+new file mode 100644
+index 0000000..ce355c0
+--- /dev/null
++++ b/tests/test_rotated_area.py
+@@ -0,0 +1,269 @@
++"""회전 영역 — 지도가 돌아간 상태에서 그린 사각형 그대로 굽기(rect: 중심 · 가로 · 세로 · 회전각).
++
++자료는 감싸는 bbox 로 받고 장면은 회전 사각형으로 자른다. 장면 로컬 축 = 사각형 축(LocalFrame.rotation_deg),
++뷰어가 모델을 −회전각 돌려 세계 = ENU(camsync.sceneYaw). 회전 0 이면 bbox 경로 그대로(예전과 같은 결과)."""
++import json
++import math
++import shutil
++import subprocess
++from pathlib import Path
++
++import httpx
++import numpy as np
++import pytest
++import trimesh
++from fastapi.testclient import TestClient
++from PIL import Image
++from shapely.geometry import Polygon
++
++from map3d import heights
++from map3d.config import Settings
++from map3d.geo import LocalFrame, RotRect, parse_rect, scene_contains
++from map3d.params import SceneParams
++from map3d.pipeline import GenerateError, GenerateRequest, generate
++from map3d.server import create_app
++
++# conftest.BBOX(127.1000~127.1040, 37.3600~37.3632) 가운데 200 m × 120 m, 지도 방위 45°
++RECT = {"lon": 127.1020, "lat": 37.3616, "width_m": 200.0, "height_m": 120.0, "rotation_deg": 45.0}
++
++
++def _rr(**kw):
++    return parse_rect({**RECT, **kw})
++
++
++# ---------------------------------------------------------------- 기하
++@pytest.mark.parametrize("rot", [30.0, 45.0, 90.0, -60.0, 300.0])
++def should_round_trip_local_and_lonlat_when_rotated(rot):
++    rr = _rr(rotation_deg=rot)
++    x, y = np.array([0.0, 100.0, -100.0, 37.5]), np.array([0.0, 60.0, -60.0, -12.0])
++    lon, lat = rr.to_lonlat(x, y)
++    bx, by = rr.to_local(lon, lat)
++    assert np.allclose(bx, x, atol=1e-6) and np.allclose(by, y, atol=1e-6)
++    # 사각형 위쪽(로컬 +y)은 지도 방위 rot 를 가리킨다(북 0 · 시계)
++    lon1, lat1 = rr.to_lonlat(0.0, 50.0)
++    e, n, _ = LocalFrame(rr.lon, rr.lat).lonlat_to_enu(lon1, lat1)
++    assert math.degrees(math.atan2(e, n)) % 360 == pytest.approx(rot % 360, abs=1e-3)
++    assert math.hypot(e, n) == pytest.approx(50.0, abs=1e-3)      # 타원체 ENU 와 같은 길이
++
++
++def should_describe_corners_bbox_and_containment_when_rotated():
++    rr = _rr()
++    c = np.asarray(rr.corners())
++    sides = [math.dist(*map(lambda p: rr.to_local(*p), (c[i], c[(i + 1) % 4]))) for i in range(4)]
++    assert sides == pytest.approx([200, 120, 200, 120], abs=1e-6)
++    b = rr.bbox()
++    assert b[0] < c[:, 0].min() and b[2] > c[:, 0].max() and b[1] < c[:, 1].min() and b[3] > c[:, 1].max()
++    assert rr.bbox() == _rr().bbox()            # 같은 사각형 = 같은 bbox(높이 덮어쓰기 영역 키가 안정적)
++    assert rr.contains(rr.lon, rr.lat)
++    # 모서리 근처: 안쪽 1 m 는 안, 바깥 1 m 는 밖
++    for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
++        assert rr.contains(*rr.to_lonlat(sx * 99.0, sy * 59.0))
++        assert not rr.contains(*rr.to_lonlat(sx * 101.0, sy * 59.0))
++        assert not rr.contains(*rr.to_lonlat(sx * 99.0, sy * 61.0))
++    # 감싸는 bbox 모서리는 회전 사각형 밖
++    assert not rr.contains(b[2] - 1e-5, b[3] - 1e-5)
++
++
++def should_fall_back_to_bbox_when_rotation_is_zero_or_rect_bad():
++    assert parse_rect(None) is None
++    assert parse_rect({**RECT, "rotation_deg": 0}) is None
++    assert parse_rect({**RECT, "rotation_deg": 360}) is None
++    assert parse_rect({**RECT, "rotation_deg": -720}) is None
++    assert parse_rect({**RECT, "rotation_deg": -60}).rotation_deg == pytest.approx(300)
++    for bad in ({**RECT, "width_m": 0}, {**RECT, "lat": 91}, {k: v for k, v in RECT.items() if k != "lon"},
++                {**RECT, "height_m": float("nan")}, [1, 2, 3], {**RECT, "rotation_deg": "x"}):
++        with pytest.raises(ValueError):
++            parse_rect(bad)
++
++
++def should_put_rect_up_on_local_y_when_frame_rotated():
++    f0 = LocalFrame(127.1020, 37.3616, 50.0)
++    f = LocalFrame(127.1020, 37.3616, 50.0, 45.0)
++    rr = _rr()
++    lon, lat = rr.to_lonlat([0.0, 80.0, 0.0], [50.0, 0.0, 0.0])
++    x, y, u = f.lonlat_to_enu(lon, lat, 50.0)
++    assert x == pytest.approx([0, 80, 0], abs=0.005) and y == pytest.approx([50, 0, 0], abs=0.005)
++    e, n, _ = f0.lonlat_to_enu(lon, lat, 50.0)
++    assert np.hypot(x, y) == pytest.approx(np.hypot(e, n), abs=1e-6)   # 회전만(길이 그대로)
++    back = f.enu_to_lonlat(x, y, u)
++    assert np.allclose(back[0], lon, atol=1e-10) and np.allclose(back[1], lat, atol=1e-10)
++    m = np.asarray(f.rot)
++    assert np.allclose(m @ m.T, np.eye(3), atol=1e-12)                  # 3D Tiles 변환도 직교
++
++
++# ---------------------------------------------------------------- 굽기
++def _square(rr, x, y, half=5.0):
++    lon, lat = rr.to_lonlat([x - half, x + half, x + half, x - half, x - half], [y - half, y - half, y + half, y + half, y - half])
++    return [[float(a), float(b)] for a, b in zip(lon, lat)]
++
++
++def _user_geojson(tmp_path, rr):
++    """A 가운데(안) · B 감싸는 bbox 모서리(사각형 밖) · C 오른쪽 변에 걸침(중심 안) · D 오른쪽 변 바로 밖(중심 밖) · 철책(사각형을 가로지름)."""
++    feats = []
++    for name, (x, y) in {"A": (0, 0), "B": (0, 95), "C": (95, 0), "D": (106, 0)}.items():
++        feats.append({"type": "Feature", "properties": {"height": 10, "name": name},
++                      "geometry": {"type": "Polygon", "coordinates": [_square(rr, x, y, 4.0 if name != "C" else 8.0)]}})
++    fl, fa = rr.to_lonlat([-150.0, 150.0], [10.0, 10.0])
++    feats.append({"type": "Feature", "properties": {"barrier": "fence"},
++                  "geometry": {"type": "LineString", "coordinates": [[float(a), float(b)] for a, b in zip(fl, fa)]}})
++    p = tmp_path / "rot.geojson"
++    p.write_text(json.dumps({"type": "FeatureCollection", "features": feats}), encoding="utf-8")
++    # B 는 감싸는 bbox 안(사각형 밖 모서리 자리)에 있어야 뜻이 있다 — 90° 배수면 bbox = 사각형이라 그런 자리가 없다
++    b = rr.bbox()
++    if rr.rotation_deg % 90:
++        for lo, la in _square(rr, 0, 95, 4.0):
++            assert b[0] <= lo <= b[2] and b[1] <= la <= b[3]
++    return p
++
++
++def _offline():
++    return (httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(504))),
++            httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404))))
++
++
++def _gen(tmp_path, mbtiles, slope_dem, sub, rect=None, bbox=None, gj=None, overlay_mode="tiles", overlays=()):
++    s = Settings(mbtiles_path=str(mbtiles), data_dir=str(tmp_path / "data"), overpass_endpoints=["https://a.example/api"])
++    rr = parse_rect(rect)
++    req = GenerateRequest(bbox=bbox or rr.bbox(), params=SceneParams(zoom=16), dem_path=str(slope_dem),
++                          buildings_geojson=str(gj) if gj else None, rect=rect, overlay_mode=overlay_mode, overlays=list(overlays))
++    oc, dc = _offline()
++    with oc, dc:
++        return generate(req, s, tmp_path / sub, osm_client=oc, dem_client=dc)
++
++
++def should_cut_scene_to_rotated_rect_when_baking(tmp_path, mbtiles, slope_dem):
++    rr = _rr()
++    gj = _user_geojson(tmp_path, rr)
++    sc = _gen(tmp_path, mbtiles, slope_dem, "r", rect=RECT, gj=gj)
++    # scene.json 회전 정보
++    assert sc["rotation_deg"] == 45.0 and sc["rect"]["rotation_deg"] == 45.0
++    assert sc["rect"]["width_m"] == 200.0 and sc["rect"]["height_m"] == 120.0 and len(sc["rect"]["corners"]) == 4
++    assert sc["size_m"] == [200.0, 120.0] and sc["bbox"] == list(rr.bbox())
++    assert sc["origin"]["lon"] == RECT["lon"] and sc["origin"]["lat"] == RECT["lat"]
++    assert sc["enu_rect"] == [-100.0, 100.0, -60.0, 60.0]
++    # 건물: 중심이 사각형 안인 A · C 만, C 는 사각형 테두리로 잘림 — 밖 건물 없음
++    names = sorted(b.get("tags", {}).get("name") or b.get("name") or "" for b in sc["buildings"])
++    assert len(sc["buildings"]) == 2, names
++    poly = Polygon(sc["rect"]["corners"]).buffer(2e-7)
++    for b in sc["buildings"]:
++        assert poly.contains(Polygon(b["footprint"])), b["footprint"]
++    areas = sorted(b["area_m2"] for b in sc["buildings"])
++    assert areas[0] == pytest.approx(64, rel=0.05)            # A 8 m × 8 m
++    assert areas[1] == pytest.approx(16 * 13, rel=0.08)       # C 16 m × 16 m 중 사각형 안 13 m
++    # 철책: 300 m 선이 200 m 사각형으로 잘림
++    assert sc["counts"]["fence_length_m"] == pytest.approx(200, abs=3)
++    # GLB: 모든 정점(지형 윗면 · 옆면 · 건물 · 철책)이 장면 로컬 사각형(±100, ±60) 안 — glTF x = 사각형 오른쪽, z = −사각형 위쪽
++    #   (잘린 철책 끝 기둥의 반 두께 0.05 m 까지)
++    g = trimesh.load(tmp_path / "r" / "scene.glb", force="scene")
++    v = np.vstack([geom.vertices for geom in g.dump()])
++    assert v[:, 0].min() >= -100.06 and v[:, 0].max() <= 100.06 and v[:, 2].min() >= -60.06 and v[:, 2].max() <= 60.06
++    assert v[:, 0].max() > 99.9 and v[:, 2].max() > 59.9   # 지형은 사각형 끝까지
++    # 3D Tiles 변환 = 회전 축 → ECEF(동쪽 단위벡터가 아니라 사각형 오른쪽)
++    ts = json.loads((tmp_path / "r" / "tileset.json").read_text(encoding="utf-8"))
++    assert ts["root"]["boundingVolume"]["box"][3] == pytest.approx(100) and ts["root"]["boundingVolume"]["box"][7] == pytest.approx(60)
++    req = json.loads((tmp_path / "r" / "request.json").read_text(encoding="utf-8"))
++    assert req["rect"] == RECT and GenerateRequest.from_json(req).rect == RECT
++    assert (tmp_path / "r" / "thumbnail.png").exists()
++
++
++def should_cut_same_way_at_other_angles_when_rotation_varies(tmp_path, mbtiles, slope_dem):
++    for k, rot in enumerate((30.0, 90.0, -60.0)):
++        rect = {**RECT, "rotation_deg": rot}
++        rr = parse_rect(rect)
++        sc = _gen(tmp_path, mbtiles, slope_dem, f"a{k}", rect=rect, gj=_user_geojson(tmp_path, rr))
++        assert len(sc["buildings"]) == 2 and sc["rect"]["rotation_deg"] == pytest.approx(rot % 360)
++        assert sc["counts"]["fence_length_m"] == pytest.approx(200, abs=3)
++
++
++def should_bake_same_scene_as_bbox_when_rotation_is_zero(tmp_path, mbtiles, slope_dem, bbox):
++    gj = tmp_path / "z.geojson"
++    sq = [[127.1010, 37.3610], [127.1013, 37.3610], [127.1013, 37.3612], [127.1010, 37.3612], [127.1010, 37.3610]]
++    gj.write_text(json.dumps({"type": "FeatureCollection", "features": [
++        {"type": "Feature", "properties": {"height": 12}, "geometry": {"type": "Polygon", "coordinates": [sq]}}]}), encoding="utf-8")
++    a = _gen(tmp_path, mbtiles, slope_dem, "plain", bbox=bbox, gj=gj)
++    b = _gen(tmp_path, mbtiles, slope_dem, "zero", bbox=bbox, gj=gj, rect={**RECT, "rotation_deg": 0})
++    for k in ("bbox", "size_m", "origin", "enu_rect", "frame", "counts", "buildings", "terrain"):
++        assert a[k] == b[k], k
++    assert "rect" not in a and "rect" not in b and "rotation_deg" not in b
++    assert (tmp_path / "plain" / "thumbnail.png").read_bytes() == (tmp_path / "zero" / "thumbnail.png").read_bytes()
++    ga, gb = (trimesh.load(tmp_path / s / "scene.glb", force="scene") for s in ("plain", "zero"))
++    assert np.array_equal(np.vstack([x.vertices for x in ga.dump()]), np.vstack([x.vertices for x in gb.dump()]))
++
++
++def should_skip_overlay_outside_rotated_rect_when_baking(tmp_path, mbtiles, slope_dem):
++    rr = _rr()
++    # 감싸는 bbox 의 위쪽 모서리 근처(사각형 밖) 30 m 네모 이미지
++    c = np.asarray(_square(rr, 0, 100, 15.0))
++    ov_b = {"left": float(c[:, 0].min()), "right": float(c[:, 0].max()), "bottom": float(c[:, 1].min()), "top": float(c[:, 1].max())}
++    png = tmp_path / "ov.png"
++    Image.new("RGBA", (64, 64), (200, 40, 160, 255)).save(png)
++    b = rr.bbox()
++    assert b[0] < ov_b["left"] and ov_b["right"] < b[2] and b[1] < ov_b["bottom"] and ov_b["top"] < b[3]
++    sc = _gen(tmp_path, mbtiles, slope_dem, "o", rect=RECT, overlay_mode="composite",
++              overlays=[{"id": 9, "image_path": str(png), "bounds": ov_b}])
++    assert sc["overlays_baked"] == [] and any("영역 밖" in w for w in sc["warnings"])
++
++
++def should_reject_bad_rect_when_generating(tmp_path, mbtiles, slope_dem):
++    s = Settings(mbtiles_path=str(mbtiles), data_dir=str(tmp_path / "data"))
++    req = GenerateRequest(bbox=(127.1, 37.36, 127.104, 37.3632), dem_path=str(slope_dem), rect={**RECT, "width_m": -1})
++    with pytest.raises(GenerateError):
++        generate(req, s, tmp_path / "bad")
++    assert not (tmp_path / "bad" / "scene.json").exists()
++
++
++def should_ignore_height_overrides_outside_rect_and_reset_only_inside(tmp_path, mbtiles, slope_dem):
++    rr = _rr()
++    data = tmp_path / "data"
++    inside = {"uid": "in1", "center": [float(v) for v in rr.to_lonlat(0.0, 0.0)], "area_m2": 64,
++              "footprint": _square(rr, 0, 0, 4.0), "height": 33.0, "floors": None}
++    corner = {"uid": "out1", "center": [float(v) for v in rr.to_lonlat(0.0, 95.0)], "area_m2": 64,
++              "footprint": _square(rr, 0, 95, 4.0), "height": 21.0, "floors": None}
++    heights._put_item(data, rr.bbox(), inside)
++    heights._put_item(data, rr.bbox(), corner)
++    sc = _gen(tmp_path, mbtiles, slope_dem, "h", rect=RECT, gj=_user_geojson(tmp_path, rr))
++    assert sc["height_overrides"]["applied"] == 1 and sc["height_overrides"]["unmatched"] == []
++    assert any(b.get("manual", {}).get("uid") == "in1" for b in sc["buildings"])
++    heights.reset_all(data, tmp_path / "h")
++    left = [it["uid"] for p in heights._files(data) for it in heights._read(p)["items"]]
++    assert left == ["out1"]                      # 회전 사각형 밖(감싸는 bbox 모서리)은 다른 장면 것 — 남긴다
++
++
++# ---------------------------------------------------------------- 서버
++def should_accept_rect_and_find_scene_inside_rotated_rect_only(tmp_path, mbtiles):
++    c = TestClient(create_app(Settings(mbtiles_path=str(mbtiles), data_dir=str(tmp_path / "data"))))
++    jm = c.app.state.jobs
++    got = []
++
++    class _J:
++        def to_dict(self):
++            return {"id": "x", "status": "queued"}
++    jm.submit = lambda req: (got.append(req), _J())[1]
++    r = c.post("/api/jobs", json={"bbox": [127.1, 37.36, 127.101, 37.361], "rect": RECT, "enter_zoom": 17})
++    assert r.status_code == 202 and got[0].rect == RECT and got[0].bbox == _rr().bbox()
++    assert c.post("/api/jobs", json={"bbox": [127.1, 37.36, 127.101, 37.361], "rect": {**RECT, "width_m": 0}}).status_code == 400
++    assert c.post("/api/jobs", json={"bbox": [127.1, 37.36, 127.101, 37.361], "rect": {**RECT, "width_m": 9000}}).status_code == 400
++    r = c.post("/api/jobs", json={"bbox": [127.1, 37.36, 127.101, 37.361], "rect": {**RECT, "rotation_deg": 0}})
++    assert r.status_code == 202 and got[-1].bbox == (127.1, 37.36, 127.101, 37.361)   # 회전 0 = bbox 그대로
++    # 장면 찾기 — 회전 영역은 회전 사각형 안만
++    rr = _rr()
++    jobs = tmp_path / "data" / "jobs"
++    (jobs / "rot").mkdir(parents=True)
++    (jobs / "rot" / "scene.json").write_text(json.dumps({"created": "2026-10-19T00:00:00", "bbox": list(rr.bbox()),
++                                                         "rect": {**rr.to_json(), "corners": rr.corners()}}), encoding="utf-8")
++    lon, lat = (float(v) for v in rr.to_lonlat(90.0, 50.0))
++    hit = c.get("/api/scenes/at", params={"lon": lon, "lat": lat})
++    assert hit.status_code == 200 and hit.json()["id"] == "rot" and hit.json()["rect"]["rotation_deg"] == 45.0
++    b = rr.bbox()
++    assert c.get("/api/scenes/at", params={"lon": b[2] - 2e-5, "lat": b[3] - 2e-5}).status_code == 404
++    listed = c.get("/api/jobs").json()["scenes"][0]
++    assert listed["rect"]["corners"] == rr.corners()
++    assert scene_contains({"bbox": [1, 1, 2, 2]}, 1.5, 1.5) and not scene_contains({"bbox": [1, 1, 2, 2]}, 3, 1.5)
++
++
++# ---------------------------------------------------------------- 뷰어(node)
++def should_fit_rotated_area_and_rotate_model_when_viewer_checks():
++    node = shutil.which("node")
++    assert node, "node 가 없어 회전 영역 뷰어 시험(rotated_check.mjs)을 돌릴 수 없다"
++    r = subprocess.run([node, str(Path(__file__).with_name("rotated_check.mjs"))], capture_output=True, text=True, timeout=60)
++    assert r.returncode == 0, r.stdout + r.stderr

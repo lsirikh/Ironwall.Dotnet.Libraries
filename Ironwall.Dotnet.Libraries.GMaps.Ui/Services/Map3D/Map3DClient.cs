@@ -32,6 +32,9 @@ public sealed record Map3DScene(string Id, double[] Bbox)
 {
     /// <summary>그 영역의 3D 로 바뀌는 줌(scene.json enter_zoom) — 없으면 null(세팅값을 쓴다).</summary>
     public double? EnterZoom { get; init; }
+
+    /// <summary>회전 영역(scene.json rect, 2026-10-19) — 없으면 null(북쪽 정렬 bbox 영역 · 옛 장면). 안/밖은 <see cref="Map3DMath.SceneContains"/>.</summary>
+    public Map3DRotRect? Rect { get; init; }
 }
 
 /// <summary>구운 장면 목록 항목(GET /api/jobs 의 scenes) — 2D 지도 3D 영역 표시용. 모르는 값은 null.</summary>
@@ -45,6 +48,9 @@ public sealed record Map3DSceneInfo(string Id, string? Name, double[] Bbox, Date
 
     /// <summary>다시 굽기에서 다시 붙이지 못한 직접 입력 수(manual_unmatched) — 옛 서버면 0.</summary>
     public int ManualUnmatched { get; init; }
+
+    /// <summary>회전 영역(rect) — 없으면 null(북쪽 정렬 bbox 영역).</summary>
+    public Map3DRotRect? Rect { get; init; }
 }
 
 /// <summary>건물 높이 저장 · 되돌리기 응답 — Building = 서버가 고친 건물 줄(3D 에 그대로 보낸다), Pick = 그 해석.</summary>
@@ -86,10 +92,15 @@ public sealed class Map3DClient : IDisposable
         => StartBakeAsync(bbox, overlayMode, overlays, null, ct);
 
     /// <summary>굽기 시작 — 그 영역의 3D 로 바뀌는 줌(enter_zoom)도 함께 보낸다(map-3d 가 scene.json 에 기록).</summary>
+    public Task<Map3DJob> StartBakeAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double? enterZoom,
+                                         CancellationToken ct = default)
+        => StartBakeAsync(bbox, overlayMode, overlays, enterZoom, null, ct);
+
+    /// <summary>굽기 시작 — 회전 영역(rect)이면 그것도 보낸다(bbox 는 감싸는 상자, 옛 서버는 rect 를 모르고 bbox 로 굽는다).</summary>
     public async Task<Map3DJob> StartBakeAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double? enterZoom,
-                                               CancellationToken ct = default)
+                                               Map3DRotRect? rect, CancellationToken ct = default)
     {
-        var body = Map3DBake.BuildBody(bbox, overlayMode, overlays, enterZoom).ToString(Formatting.None);
+        var body = Map3DBake.BuildBody(bbox, overlayMode, overlays, enterZoom, rect).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, Map3DMath.JobsUrl(_server))
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -114,7 +125,7 @@ public sealed class Map3DClient : IDisposable
         string? id = o["id"]?.ToString();
         if (string.IsNullOrEmpty(id) || bbox == null || bbox.Length != 4)
             throw new Map3DRequestException(HttpStatusCode.OK, "장면 응답 형식이 올바르지 않습니다");
-        return new Map3DScene(id, bbox) { EnterZoom = ReadZoom(o["enter_zoom"]) };
+        return new Map3DScene(id, bbox) { EnterZoom = ReadZoom(o["enter_zoom"]), Rect = Map3DRotRect.Parse(o["rect"]) };
     }
 
     /// <summary>구운 장면 목록(GET /api/jobs 의 scenes).</summary>
@@ -176,6 +187,7 @@ public sealed class Map3DClient : IDisposable
                     EnterZoom = ReadZoom(o["enter_zoom"]),
                     ManualHeights = ReadCount(o["manual_heights"]),
                     ManualUnmatched = ReadCount(o["manual_unmatched"]),
+                    Rect = Map3DRotRect.Parse(o["rect"]),
                 });
         }
         return list;
