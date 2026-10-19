@@ -57,9 +57,19 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         catch (Exception ex) { _log?.Warning($"[Map3D] 영역 목록 실패: {ex.Message}"); }
     }
 
+    /// <summary>마지막으로 받은 서버 목록 — 굽기 시작 · 끝에 항목 메뉴(「만들기 취소」)를 다시 짠다.</summary>
+    private IReadOnlyList<Map3DSceneInfo>? _map3DLastAreaScenes;
+
+    /// <summary>마지막 서버 목록으로 영역 항목 · 배지를 다시 만든다(다시 만드는 영역의 「만들기 취소」 달기 · 떼기).</summary>
+    private void ReapplyMap3DAreas()
+    {
+        if (_map3DLastAreaScenes is { } scenes) ApplyMap3DAreas(scenes);
+    }
+
     private void ApplyMap3DAreas(IReadOnlyList<Map3DSceneInfo> scenes)
     {
         if (MainMap == null) return;
+        _map3DLastAreaScenes = scenes;
         foreach (var gone in Map3DAreas.Where(a => scenes.All(s => s.Id != a.Id)).ToList())
             RemoveMap3DArea(gone.Id);
 
@@ -69,7 +79,9 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             _map3DScenes.Add(new Map3DScene(scene.Id, scene.Bbox) { EnterZoom = scene.EnterZoom, Rect = scene.Rect });
 
             var item = new Map3DAreaItem(scene, Map3DAreaEnterZoom(scene.Id, scene.EnterZoom), ViewMap3DArea, OpenMap3DAreaZoomEditor,
-                                         area => _ = RequestResetMap3DHeightsAsync(area), RebakeMap3DArea, area => _ = RequestDeleteMap3DAreaAsync(area));
+                                         area => _ = RequestResetMap3DHeightsAsync(area), RebakeMap3DArea, area => _ = RequestDeleteMap3DAreaAsync(area),
+                                         // 이 영역을 다시 만드는 중이면 「만들기 취소」(진행 판 단추와 같은 동작)
+                                         _isMap3DBaking && _map3DBakeJob != null && scene.Id == _map3DBakeSourceId ? area => _ = CancelMap3DBakeAsync() : null);
             int index = Map3DAreas.ToList().FindIndex(a => a.Id == scene.Id);
             if (index >= 0) Map3DAreas[index] = item; else Map3DAreas.Add(item);
 
@@ -146,6 +158,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         if (_isMap3DBaking) { SetAimStatus("이미 3D 를 만드는 중입니다", autoHide: true); return; }
         _log?.Info($"[Map3D] 영역 다시 만들기 id={item.Id}");
         RequestMap3DBake(item.Area, item.EnterZoom);   // 회전 영역은 같은 회전 사각형으로   // 영역 그리기와 같은 만들기 패널(줌은 그 영역의 지금 줌)
+        _map3DBakeOptionsSourceId = item.Id;   // 만드는 동안 이 영역 항목에 「만들기 취소」 — 옛 장면은 새로 다 만들 때까지 그대로
     }
 
     /// <summary>

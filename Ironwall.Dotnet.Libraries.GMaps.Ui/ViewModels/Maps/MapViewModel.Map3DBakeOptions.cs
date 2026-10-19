@@ -100,6 +100,7 @@ public partial class MapViewModel
             overlays = new();
         }
         _map3DZoomEditArea = null;
+        _map3DBakeOptionsSourceId = null;   // 「다시 만들기」면 부른 쪽(RebakeMap3DArea)이 다시 정한다
         _map3DBakeOptionsArea = area;
         _map3DBakeOptionsOverlays = overlays;
         SetMap3DBakeMode(Map3DBake.DefaultMode(_map3DSettings.OverlayMode, overlays.Count));
