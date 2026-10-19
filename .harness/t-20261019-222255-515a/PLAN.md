@@ -25,7 +25,22 @@ map-3d 가 그 건물을 출처 "user" 로 우선 굽고 옥상 · 외벽을 사
 - [x] map3d.patch 저장(원본 map-3d 에 git apply --check 통과)
 - [x] 3D 「건물 높이」 판으로 직접 그린 건물을 올린 뒤 되돌리기 = 앞 높이로 다시 저장(자동으로 X) — MapViewModel.BuildingHeight 한 줄 + 시험
 
+## 추가 지시(형상 도구 · 「건물 만들기」 전용 판)
+- [x] 품질 지적 중복 → `GMapControls/HeightPanelControlBase.cs` 공용 바탕(건물 높이 · 건물 만들기 판 둘 다 상속)
+- [x] 상태 기계: 도구 4종(사각형 끌기/두 클릭 · Shift 정사각형 / 원 끌기/두 클릭 · 꼭짓점 수 8~128 기본 32 / 타원 끌기 · 세 클릭 / 다각형 · 처음 점 붙는 거리 10 px · Shift 직각 맞춤),
+      완성 뒤 공통 편집(꼭짓점 · 선분 가운데 · 지우기 · 몸통 끌기 · 회전 손잡이)
+- [x] 판: 도구 아이콘 줄(VectorRectangle · VectorCircle · VectorEllipse · VectorPolygon — dll 메타데이터로 실존 확인, 고른 도구 = 아래 막대 모양) · R/C/E/P · 지붕 모양 · 외벽 성격 · 원 꼭짓점 · 「적용」「취소」「지우기」
+      참조 스타일 키: PanelSecondaryButtonStyle · PanelPrimaryButtonStyle · PanelCloseButtonStyle · PanelHeaderHelpDisc · BuildingHeightSectionLabel · BuildingHeightInputBox · BuildingHeightStepButton · BuildingHeightHandleThumb · 토큰 PrimaryBrush · SurfaceBrush · BorderBrush · DividerBrush · TextMutedBrush · TextPrimaryBrush · StatusCriticalBrush · OnPrimaryFixedBrush
+- [x] map-3d: roof(flat · gable · cone · dome) · use(auto · commercial · industrial · residential) 저장 · 검증 · 굽기(원형 + 돔 = 탱크 규칙)
+- [x] 시험: 순수 32 · VM 시나리오(형상 · 지붕 · 키 · 회전 지도 · 이동/회전) · pytest 13
+- [x] 판에서 도구 쓰는 법 줄은 뺐다 — HelpContractTests(설명 문구는 "?" 로) 규약. 쓰는 법은 단추 풍선 · 판 "?"(MapsHelp)
+- [x] 원본 map-3d 가 다른 작업 커밋 2개(25cb147)로 앞서 나가 `artifacts/map3d` 를 최신 원본으로 다시 복제해 변경을 다시 얹음 — map3d.patch 는 25cb147 기준, git apply --check 통과
+- [x] 최종: map-3d 300 passed · node ok · GMaps.Ui 1645 · MapEdit 694 · PropertyPanel 436 · sln 종료 코드 0(logs/r3-* · r4-sln)
+      (r3 sln 에서 CameraPopup 의 50 ms 시간 예산 시험 1건이 부하로 넘침 — 손대지 않은 시험, r4 재실행 334 통과)
+- 주의: 이번 차례에 PowerShell 에서 .NET 작업 폴더가 달라 네 파일을 빈 파일로 쓴 사고가 있었고, 마지막 커밋본(git show HEAD)에서 되살린 뒤 수정을 다시 적용했다(시험 수 · 결과 동일).
+
 ## 남은 것
+- (있으면 좋음) 지도의 기존 선 · 도형 마커를 윤곽으로 쓰기 — 미룸(DECISIONS 11).
 - 실기(헤디드 · 실제 WebView2 3D 상자 · 실제 마우스) 미확인.
 
 ## 발견

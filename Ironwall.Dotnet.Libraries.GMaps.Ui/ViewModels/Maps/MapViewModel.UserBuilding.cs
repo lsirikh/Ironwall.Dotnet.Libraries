@@ -69,9 +69,72 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         DataContext = this,
         CloseCommand = ExitUserBuildingDrawCommand,
         Host = new UserBuildingPanelHost(this),
+        ToolCommand = SelectUserBuildingToolCommand,
     };
 
-    public string UserBuildingTitle => _ubEditing is { } e ? (e.Name is { } n ? $"건물 고치기 · {n}" : "건물 고치기") : "건물 그리기";
+    public string UserBuildingTitle => _ubEditing is { } e ? (e.Name is { } n ? $"건물 고치기 · {n}" : "건물 고치기") : "건물 만들기";
+
+    // ── 형상 도구 · 지붕 · 외벽 ──
+
+    private UbTool _ubTool;
+    private int _ubCircleSides;
+    private string? _ubRoof, _ubUse;
+    private bool _ubRoofChosen;
+
+    /// <summary>지금 형상 도구(다각형 · 사각형 · 원 · 타원).</summary>
+    public UbTool UserBuildingTool => _ubTool;
+    public bool IsUserBuildingToolRect => _ubTool == UbTool.Rect;
+    public bool IsUserBuildingToolCircle => _ubTool == UbTool.Circle;
+    public bool IsUserBuildingToolEllipse => _ubTool == UbTool.Ellipse;
+    public bool IsUserBuildingToolPolygon => _ubTool == UbTool.Polygon;
+    private int UbCircleSides => _ubCircleSides > 0 ? _ubCircleSides : Map3DUserBuilding.DefaultCircleSides;
+
+    /// <summary>원 · 타원 꼭짓점 수(8~128, 기본 32).</summary>
+    public string UserBuildingCircleSidesText
+    {
+        get => UbCircleSides.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        set
+        {
+            if (!int.TryParse(value, out var n) || n < Map3DUserBuilding.MinCircleSides || n > Map3DUserBuilding.MaxCircleSides)
+            {
+                SetUserBuildingError($"원 꼭짓점 수는 {Map3DUserBuilding.MinCircleSides} ~ {Map3DUserBuilding.MaxCircleSides} 사이로 넣어 주세요.");
+                NotifyOfPropertyChange();
+                return;
+            }
+            _ubCircleSides = n;
+            if (_ubDraft != null) _ubDraft.CircleSides = n;
+            SetUserBuildingError(null);
+            NotifyOfPropertyChange();
+        }
+    }
+
+    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingRoofs => Map3DUserBuilding.Roofs;
+    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingUses => Map3DUserBuilding.Uses;
+
+    /// <summary>지붕 모양(flat · gable · cone · dome) — 원으로 만들면 돔을 제안한다(고른 적 없을 때).</summary>
+    public string UserBuildingRoof
+    {
+        get => _ubRoof ?? Map3DUserBuilding.RoofFlat;
+        set { _ubRoof = value ?? Map3DUserBuilding.RoofFlat; _ubRoofChosen = true; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>외벽 성격(auto · commercial · industrial · residential).</summary>
+    public string UserBuildingUse
+    {
+        get => _ubUse ?? Map3DUserBuilding.UseAuto;
+        set { _ubUse = value ?? Map3DUserBuilding.UseAuto; NotifyOfPropertyChange(); }
+    }
+
+    private RelayCommand? _selectUserBuildingToolCommand;
+    /// <summary>형상 도구 고르기(매개변수 "Rect" · "Circle" · "Ellipse" · "Polygon") — 그리던 윤곽이 있으면 버리고 새로.</summary>
+    public RelayCommand SelectUserBuildingToolCommand => _selectUserBuildingToolCommand ??= new RelayCommand(p =>
+    {
+        if (!IsUserBuildingDrawing || !Enum.TryParse<UbTool>(p?.ToString(), out var tool)) return;
+        _ubTool = tool;
+        if (_ubDraft is { } d && !d.SetTool(tool)) ResetUserBuildingDraft(null);   // 그리던 윤곽 → 새 도구로 새로
+        _log?.Info($"[UserBuilding] 도구 {tool}");
+        RefreshUserBuildingPanel();
+    }, _ => IsUserBuildingDrawing);
     public string UserBuildingPointCountText => _ubDraft is { } d ? Map3DUserBuilding.PointCountText(d.Points.Count, d.IsClosed) : "";
     public string UserBuildingAreaText
         => _ubArea is not { } a ? ""
@@ -221,8 +284,13 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             geo => { var l = map.FromLatLngToLocal(new PointLatLng(geo.Y, geo.X)); return new UbPoint(l.X, l.Y); },
             s => { var g = map.FromLocalToLatLng((int)Math.Round(s.X), (int)Math.Round(s.Y)); return Map3DUserBuilding.Round(new UbPoint(g.Lng, g.Lat)); },
             geo => area.Area.Contains(geo.X, geo.Y));
+        _ubDraft.CircleSides = UbCircleSides;
+        if (edit == null) _ubDraft.SetTool(_ubTool);
         _ubDraft.Changed += OnUserBuildingDraftChanged;
         _ubEditing = edit;
+        _ubRoof = edit?.Roof ?? Map3DUserBuilding.RoofFlat;
+        _ubUse = edit?.Use ?? Map3DUserBuilding.UseAuto;
+        _ubRoofChosen = edit != null;
         _ubDragStart = null;
         _ubError = null;
         _ubInputError = false;
@@ -242,6 +310,9 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
 
     private void OnUserBuildingDraftChanged()
     {
+        // 원으로 만든 윤곽 — 지붕을 고른 적 없으면 돔 제안(탱크처럼, map-3d 의 둥근 윤곽 규칙)
+        if (_ubDraft is { IsClosed: true, CompletedBy: UbTool.Circle } && !_ubRoofChosen && UserBuildingRoof == Map3DUserBuilding.RoofFlat)
+            _ubRoof = Map3DUserBuilding.RoofDome;
         _ubAdorner?.InvalidateVisual();
         RefreshUserBuildingPanel();
     }
@@ -313,8 +384,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         d.PointerDown(screen);
     }
 
-    void IUserBuildingDrawHost.UserBuildingPointerMove(UbPoint screen) => _ubDraft?.PointerMove(screen);
-    void IUserBuildingDrawHost.UserBuildingPointerUp(UbPoint screen) => _ubDraft?.PointerUp(screen);
+    void IUserBuildingDrawHost.UserBuildingPointerMove(UbPoint screen, bool shift) => _ubDraft?.PointerMove(screen, shift);
+    void IUserBuildingDrawHost.UserBuildingPointerUp(UbPoint screen, bool shift) => _ubDraft?.PointerUp(screen, shift);
     void IUserBuildingDrawHost.UserBuildingRightClick(UbPoint screen) => _ubDraft?.RightClick(screen);
     void IUserBuildingDrawHost.UserBuildingPointerCancel() => _ubDraft?.PointerCancel();
 
@@ -392,6 +463,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(UserBuildingTitle), nameof(UserBuildingPointCountText), nameof(UserBuildingAreaText), nameof(UserBuildingHeight),
                      nameof(UserBuildingSummary), nameof(UserBuildingName), nameof(UserBuildingFloorsText), nameof(UserBuildingHeightText),
                      nameof(UserBuildingFloorHeightText), nameof(UserBuildingError), nameof(HasUserBuildingError),
+                     nameof(UserBuildingTool), nameof(IsUserBuildingToolRect), nameof(IsUserBuildingToolCircle), nameof(IsUserBuildingToolEllipse),
+                     nameof(IsUserBuildingToolPolygon), nameof(UserBuildingCircleSidesText), nameof(UserBuildingRoof), nameof(UserBuildingUse),
                  })
             NotifyOfPropertyChange(name);
         ApplyUserBuildingCommand.RaiseCanExecuteChanged();
@@ -433,9 +506,10 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         if (d.Validate() is { } why) { SetUserBuildingError(why); return; }
         string uid = _ubEditing?.Uid ?? Map3DUserBuilding.NewUid();
-        var before = _ubEditing is { } e ? new UserBuildingState(e.Outline, e.Height, e.Floors, e.Name) : null;
+        var before = _ubEditing is { } e ? StateOf(e) : null;
         int floors = Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight);
-        var after = new UserBuildingState(d.Points.ToList(), _ubHeight, floors, string.IsNullOrWhiteSpace(_ubName) ? null : _ubName);
+        var after = new UserBuildingState(d.Points.ToList(), _ubHeight, floors, string.IsNullOrWhiteSpace(_ubName) ? null : _ubName)
+                    { Roof = UserBuildingRoof, Use = UserBuildingUse };
         if (await SaveUserBuildingAsync(area.Id, uid, after))
         {
             _undoService?.Push(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} {(before == null ? "넣기" : "고치기")}", area.Id, uid, before, after,
@@ -452,11 +526,14 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (await SaveUserBuildingAsync(area.Id, e.Uid, null))
         {
             _undoService?.Push(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} 지우기", area.Id, e.Uid,
-                                                       new UserBuildingState(e.Outline, e.Height, e.Floors, e.Name), null, ApplyUserBuildingStateAsync));
+                                                       StateOf(e), null, ApplyUserBuildingStateAsync));
             SetAimStatus("건물을 지웠습니다 — 3D 를 다시 만들면 원래 건물로 돌아갑니다", autoHide: true);
             ResetUserBuildingDraft(null);
         }
     }
+
+    private static UserBuildingState StateOf(Map3DUserBuildingItem e)
+        => new(e.Outline, e.Height, e.Floors, e.Name) { Roof = e.Roof, Use = e.Use };
 
     /// <summary>되돌리기 — 윤곽 편집 칸이 있으면 그것, 없으면 GIS 편집 기록 맨 위가 이 기능 기록일 때만 그것.</summary>
     private async Task UndoUserBuildingAsync()
@@ -492,7 +569,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             if (state != null)
             {
-                var saved = await _map3DClient.PutUserBuildingAsync(job, uid, state.Outline, state.Height, state.Floors, state.Name);
+                var saved = await _map3DClient.PutUserBuildingAsync(job, uid, state.Outline, state.Height, state.Floors, state.Name, state.Roof, state.Use);
                 PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(uid, saved.Outline, saved.Height));
                 _log?.Info($"[UserBuilding] 저장 uid={uid} 점={saved.Outline.Count} 높이={saved.Height} job={job}");
             }

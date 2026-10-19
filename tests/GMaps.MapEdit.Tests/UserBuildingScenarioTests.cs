@@ -162,7 +162,7 @@ public class UserBuildingScenarioTests
         public UbPoint Geo(double eastM, double northM)
             => new(Center.Lng + eastM / (111320.0 * Math.Cos(Center.Lat * Math.PI / 180)), Center.Lat + northM / 110540.0);
 
-        public void Click(UbPoint s) { Host.UserBuildingPointerDown(s, 1); Host.UserBuildingPointerUp(s); }
+        public void Click(UbPoint s) { Host.UserBuildingPointerDown(s, 1); Host.UserBuildingPointerUp(s, false); }
         public void Click(double eastM, double northM) => Click(ScreenOf(eastM, northM));
 
         /// <summary>약 20 × 16 m 네모를 찍고 첫 점을 눌러 닫는다.</summary>
@@ -368,6 +368,137 @@ public class UserBuildingScenarioTests
         Assert.Equal(23.9, rig.Vm.UserBuildingHeight);
     });
 
+    // ─────────────── 2-1. 형상 도구 · 지붕 · 외벽 ───────────────
+
+    /// <summary>지도 표면 끌기(누르기 → 두 번 움직임 → 놓기).</summary>
+    private static void DragOnMap(Rig rig, UbPoint from, UbPoint to, bool shift = false)
+    {
+        rig.Host.UserBuildingPointerDown(from, 1);
+        rig.Host.UserBuildingPointerMove(new UbPoint((from.X + to.X) / 2, (from.Y + to.Y) / 2), shift);
+        rig.Host.UserBuildingPointerMove(to, shift);
+        rig.Host.UserBuildingPointerUp(to, shift);
+    }
+
+    [Fact]
+    public void should_draw_circle_suggest_dome_and_put_roof_and_use() => RunAsync(async rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        Assert.True(rig.Vm.IsUserBuildingToolPolygon);                       // 기본 도구 = 다각형
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Circle");
+        Assert.True(rig.Vm.IsUserBuildingToolCircle);
+        Assert.False(rig.Vm.IsUserBuildingToolPolygon);
+        rig.Vm.UserBuildingCircleSidesText = "24";
+        var c = rig.ScreenOf(0, 0);
+        DragOnMap(rig, c, rig.ScreenOf(12, 0));                               // 반지름 약 12 m
+        var d = rig.Vm.UserBuildingDraft!;
+        Assert.True(d.IsClosed);
+        Assert.Equal(24, d.Points.Count);
+        Assert.Equal(Map3DUserBuilding.RoofDome, rig.Vm.UserBuildingRoof);  // 원 → 돔 제안
+        rig.Vm.UserBuildingUse = Map3DUserBuilding.UseIndustrial;
+        await rig.Apply();
+        var put = rig.Writes.Single();
+        Assert.Equal(("dome", "industrial"), (put.Body!.Value<string>("roof"), put.Body.Value<string>("use")));
+        Assert.Equal(24, ((JArray)put.Body["outline"]!).Count);
+        // 다음 건물은 같은 도구 · 기본 지붕
+        Assert.True(rig.Vm.IsUserBuildingToolCircle);
+        Assert.Equal(Map3DUserBuilding.RoofFlat, rig.Vm.UserBuildingRoof);
+        rig.Vm.UserBuildingCircleSidesText = "3";                              // 범위 밖 → 이유 한 줄, 값 그대로
+        Assert.Equal("24", rig.Vm.UserBuildingCircleSidesText);
+        Assert.True(rig.Vm.HasUserBuildingError);
+    });
+
+    [Fact]
+    public void should_keep_user_chosen_roof_when_circle_completes() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Circle");
+        rig.Vm.UserBuildingRoof = Map3DUserBuilding.RoofGable;                // 먼저 고른 지붕은 덮지 않는다
+        DragOnMap(rig, rig.ScreenOf(0, 0), rig.ScreenOf(10, 0));
+        Assert.Equal(Map3DUserBuilding.RoofGable, rig.Vm.UserBuildingRoof);
+    });
+
+    [Fact]
+    public void should_draw_screen_aligned_rectangle_on_rotated_map_and_square_with_shift() => RunAsync(async rig =>
+    {
+        rig.W.Map.MapRotation = 30;
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Rect");
+        var a = rig.ScreenOf(-15, 10);
+        DragOnMap(rig, a, new UbPoint(a.X + 40, a.Y + 25), shift: true);      // Shift = 정사각형(40 px)
+        var d = rig.Vm.UserBuildingDraft!;
+        Assert.True(d.IsClosed);
+        var s = d.Points.Select(g => rig.W.Map.FromLatLngToLocal(new PointLatLng(g.Y, g.X))).ToList();
+        Assert.InRange(s[1].Y - s[0].Y, -1, 1);                              // 돌린 지도에서도 화면에 반듯(1 px 반올림 안)
+        Assert.InRange(s[1].X - s[0].X, 39, 41);
+        Assert.InRange(s[2].Y - s[1].Y, 39, 41);
+        await rig.Apply();
+        Assert.Equal(4, ((JArray)rig.Writes.Single().Body!["outline"]!).Count);
+    });
+
+    [Fact]
+    public void should_restart_with_new_tool_when_tool_changes_mid_drawing() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Click(-10, 8); rig.Click(10, 8);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Ellipse");
+        Assert.Empty(rig.Vm.UserBuildingDraft!.Points);                      // 그리던 다각형은 버리고
+        Assert.Equal(UbTool.Ellipse, rig.Vm.UserBuildingDraft.Tool);         // 새 도구로
+        rig.Click(0, 0); rig.Click(20, 0); rig.Click(0, 8);                    // 가운데 · 긴 축 · 짧은 축
+        Assert.True(rig.Vm.UserBuildingDraft.IsClosed);
+        Assert.Equal(UbTool.Ellipse, rig.Vm.UserBuildingDraft.CompletedBy);
+    });
+
+    [Fact]
+    public void should_pick_tools_with_r_c_e_p_keys_on_panel_but_not_in_text_box() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        var panel = rig.Vm.UserBuildingPanel;
+        Assert.Equal("Rect", UserBuildingPanelControl.ToolForKey(Key.R));
+        Assert.Null(UserBuildingPanelControl.ToolForKey(Key.X));
+        bool Press(Key key, object source)
+        {
+            var e = new KeyEventArgs(Keyboard.PrimaryDevice, new HeadlessSource { RootVisual = panel }, Environment.TickCount, key)
+                    { RoutedEvent = Keyboard.PreviewKeyDownEvent, Source = source };
+            panel.RaiseEvent(e);
+            return e.Handled;
+        }
+        Assert.True(Press(Key.C, panel));
+        Assert.True(rig.Vm.IsUserBuildingToolCircle);
+        Assert.True(Press(Key.E, panel));
+        Assert.True(rig.Vm.IsUserBuildingToolEllipse);
+        Assert.True(Press(Key.R, panel));
+        Assert.True(rig.Vm.IsUserBuildingToolRect);
+        Assert.False(Press(Key.P, new System.Windows.Controls.TextBox()));   // 입력칸 안 = 글자 그대로
+        Assert.True(rig.Vm.IsUserBuildingToolRect);
+        Assert.True(Press(Key.P, panel));
+        Assert.True(rig.Vm.IsUserBuildingToolPolygon);
+    });
+
+    private sealed class HeadlessSource : System.Windows.PresentationSource
+    {
+        private System.Windows.Media.Visual? _root;
+        public override System.Windows.Media.Visual RootVisual { get => _root!; set { var old = _root; _root = value; RootChanged(old!, value); } }
+        public override bool IsDisposed => false;
+        protected override System.Windows.Media.CompositionTarget GetCompositionTargetCore() => null!;
+    }
+
+    [Fact]
+    public void should_move_and_rotate_whole_outline_on_map() => Run(rig =>
+    {
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.DrawSquare();
+        var d = rig.Vm.UserBuildingDraft!;
+        var before = d.Points.ToArray();
+        var inside = rig.ScreenOf(0, 0);
+        DragOnMap(rig, inside, new UbPoint(inside.X + 20, inside.Y));         // 몸통 끌기 = 통째로
+        Assert.Equal(4, d.Points.Count);
+        Assert.All(d.Points.Zip(before), p => Assert.True(p.First.X > p.Second.X));
+        var rot = d.RotateHandleScreen()!.Value;
+        DragOnMap(rig, rot, new UbPoint(rot.X + 60, rot.Y + 60));            // 회전 손잡이
+        Assert.NotEqual(before.Select(p => Math.Round(p.Y, 6)), d.Points.Select(p => Math.Round(p.Y, 6)));
+        Assert.Null(d.Validate());
+    });
+
     // ─────────────── 3. 키 · Esc · 되돌리기 ───────────────
 
     [Fact]
@@ -401,7 +532,7 @@ public class UserBuildingScenarioTests
         var before = d.Points.ToArray();
         var a = rig.ScreenOf(10, 8);
         rig.Host.UserBuildingPointerDown(a, 1);
-        rig.Host.UserBuildingPointerMove(new UbPoint(a.X + 40, a.Y + 10));
+        rig.Host.UserBuildingPointerMove(new UbPoint(a.X + 40, a.Y + 10), false);
         Assert.True(d.IsDragging);
         Assert.True(rig.Key(Key.Escape));
         Assert.Equal(before, d.Points);
@@ -409,8 +540,8 @@ public class UserBuildingScenarioTests
         // 선분 가운데 손잡이 끌기 = 점 넣기, 오른쪽 클릭 = 지우기
         var mid = rig.ScreenOf(0, 8);
         rig.Host.UserBuildingPointerDown(mid, 1);
-        rig.Host.UserBuildingPointerMove(new UbPoint(mid.X, mid.Y - 20));
-        rig.Host.UserBuildingPointerUp(new UbPoint(mid.X, mid.Y - 20));
+        rig.Host.UserBuildingPointerMove(new UbPoint(mid.X, mid.Y - 20), false);
+        rig.Host.UserBuildingPointerUp(new UbPoint(mid.X, mid.Y - 20), false);
         Assert.Equal(5, d.Points.Count);
         rig.Host.UserBuildingRightClick(new UbPoint(mid.X, mid.Y - 20));
         Assert.Equal(4, d.Points.Count);
@@ -476,8 +607,8 @@ public class UserBuildingScenarioTests
         // 꼭짓점 끌기 → 저장 = 같은 uid
         var c = rig.ScreenOf(-10, -20);
         rig.Host.UserBuildingPointerDown(c, 1);
-        rig.Host.UserBuildingPointerMove(new UbPoint(c.X + 10, c.Y));
-        rig.Host.UserBuildingPointerUp(new UbPoint(c.X + 10, c.Y));
+        rig.Host.UserBuildingPointerMove(new UbPoint(c.X + 10, c.Y), false);
+        rig.Host.UserBuildingPointerUp(new UbPoint(c.X + 10, c.Y), false);
         rig.Vm.UserBuildingFloorsText = "6";
         await rig.Apply();
         var put = rig.Writes.Single();
@@ -589,7 +720,9 @@ public class UserBuildingScenarioTests
         var xaml = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Ironwall.Dotnet.Libraries.GMaps.Ui", "Themes", "UserBuildingPanelStyle.xaml"));
         foreach (var id in new[] { "Map.UserBuilding.PointCount", "Map.UserBuilding.Floors", "Map.UserBuilding.Height", "Map.UserBuilding.FloorHeight",
                                    "Map.UserBuilding.Apply", "Map.UserBuilding.Cancel", "Map.UserBuilding.Delete", "Map.UserBuilding.Handle",
-                                   "Map.UserBuilding.Name", "Map.UserBuilding.Undo", "Map.UserBuilding.Close", "Map.UserBuilding.Error" })
+                                   "Map.UserBuilding.Name", "Map.UserBuilding.Undo", "Map.UserBuilding.Close", "Map.UserBuilding.Error",
+                                   "Map.UserBuilding.Tool.Rect", "Map.UserBuilding.Tool.Circle", "Map.UserBuilding.Tool.Ellipse", "Map.UserBuilding.Tool.Polygon",
+                                   "Map.UserBuilding.Roof", "Map.UserBuilding.Use", "Map.UserBuilding.CircleSides" })
             Assert.Contains($"AutomationProperties.AutomationId=\"{id}\"", xaml);
         Assert.DoesNotContain("x:Name", xaml);
         Assert.DoesNotContain("#", xaml.Split("<Style TargetType")[1].Replace("✓", ""));   // 색은 토큰만(하드코딩 색 없음)

@@ -21,10 +21,19 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 public readonly record struct UbPoint(double X, double Y);
 
 /// <summary>서버에 저장된 직접 그린 건물 하나. BakedId = 지금 장면에 구워진 건물 id(아직 다시 만들지 않았으면 null).</summary>
-public sealed record Map3DUserBuildingItem(string Uid, IReadOnlyList<UbPoint> Outline, double Height, int? Floors, string? Name, int? BakedId);
+public sealed record Map3DUserBuildingItem(string Uid, IReadOnlyList<UbPoint> Outline, double Height, int? Floors, string? Name, int? BakedId)
+{
+    /// <summary>지붕 모양(flat · gable · cone · dome).</summary>
+    public string Roof { get; init; } = Map3DUserBuilding.RoofFlat;
+    /// <summary>외벽 성격(auto · commercial · industrial · residential).</summary>
+    public string Use { get; init; } = Map3DUserBuilding.UseAuto;
+}
 
-/// <summary>손잡이 종류 — 꼭짓점 · 선분 가운데(끌면 점이 생긴다).</summary>
-public enum UbHandleKind { None, Vertex, Midpoint }
+/// <summary>윤곽 그리기 도구 — 다각형(선 클릭) · 사각형 · 원 · 타원.</summary>
+public enum UbTool { Polygon, Rect, Circle, Ellipse }
+
+/// <summary>손잡이 종류 — 꼭짓점 · 선분 가운데(끌면 점이 생긴다) · 회전 손잡이 · 몸통(끌면 통째로 옮김).</summary>
+public enum UbHandleKind { None, Vertex, Midpoint, Rotate, Body }
 
 public readonly record struct UbHandleHit(UbHandleKind Kind, int Index);
 
@@ -40,6 +49,79 @@ public static class Map3DUserBuilding
     /// <summary>누름 → 뗌이 이만큼(px) 안이면 클릭, 넘으면 끌기.</summary>
     public const double DragDeadZonePx = 4.0;
     public const int MaxName = 60;
+    /// <summary>열린 다각형의 첫 점에 이만큼(px) 안을 누르면 닫힌다(붙는 거리).</summary>
+    public const double CloseSnapPx = 10.0;
+    /// <summary>회전 손잡이 — 윤곽 위쪽 끝에서 이만큼(px) 위.</summary>
+    public const double RotateHandleOffsetPx = 28.0;
+    /// <summary>원 · 타원 근사 꼭짓점 수(기본 · 범위).</summary>
+    public const int DefaultCircleSides = 32, MinCircleSides = 8, MaxCircleSides = 128;
+
+    public const string RoofFlat = "flat", RoofGable = "gable", RoofCone = "cone", RoofDome = "dome";
+    public const string UseAuto = "auto", UseCommercial = "commercial", UseIndustrial = "industrial", UseResidential = "residential";
+    /// <summary>판의 지붕 모양 고르기(값, 쉬운 말).</summary>
+    public static readonly IReadOnlyList<KeyValuePair<string, string>> Roofs = new[]
+    {
+        new KeyValuePair<string, string>(RoofFlat, "평지붕"), new(RoofGable, "박공(세모 지붕)"),
+        new(RoofCone, "원뿔(둥근 윤곽)"), new(RoofDome, "돔(둥근 윤곽 · 탱크)"),
+    };
+    /// <summary>판의 외벽 성격 고르기(값, 쉬운 말).</summary>
+    public static readonly IReadOnlyList<KeyValuePair<string, string>> Uses = new[]
+    {
+        new KeyValuePair<string, string>(UseAuto, "자동"), new(UseCommercial, "사무"), new(UseIndustrial, "공장"), new(UseResidential, "주거"),
+    };
+
+    // ── 형상(화면 좌표) ──
+
+    /// <summary>사각형(대각 두 점, 화면 기준) — square = 정사각형(긴 변에 맞춤). a → 가로 → b → 세로 순서.</summary>
+    public static IReadOnlyList<UbPoint> RectPoints(UbPoint a, UbPoint b, bool square = false)
+    {
+        if (square)
+        {
+            double s = Math.Max(Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y));
+            b = new UbPoint(a.X + (b.X >= a.X ? s : -s), a.Y + (b.Y >= a.Y ? s : -s));
+        }
+        return new[] { a, new UbPoint(b.X, a.Y), b, new UbPoint(a.X, b.Y) };
+    }
+
+    /// <summary>타원(가운데 · 가로 반지름 · 세로 반지름 · 회전 rad, 화면 기준)을 n 각형으로.</summary>
+    public static IReadOnlyList<UbPoint> EllipsePoints(UbPoint c, double rx, double ry, double angle, int n)
+    {
+        n = Math.Clamp(n, MinCircleSides, MaxCircleSides);
+        double ca = Math.Cos(angle), sa = Math.Sin(angle);
+        var pts = new UbPoint[n];
+        for (int i = 0; i < n; i++)
+        {
+            double t = 2 * Math.PI * i / n, x = rx * Math.Cos(t), y = ry * Math.Sin(t);
+            pts[i] = new UbPoint(c.X + x * ca - y * sa, c.Y + x * sa + y * ca);
+        }
+        return pts;
+    }
+
+    /// <summary>원(가운데 · 반지름)을 n 각형으로.</summary>
+    public static IReadOnlyList<UbPoint> CirclePoints(UbPoint c, double r, int n) => EllipsePoints(c, r, r, 0, n);
+
+    /// <summary>타원 세 번 클릭 — 가운데 · 긴 축 끝 · 짧은 축 쪽 점(긴 축 선까지의 거리 = 세로 반지름).</summary>
+    public static IReadOnlyList<UbPoint> EllipseFrom3(UbPoint c, UbPoint major, UbPoint minor, int n)
+    {
+        double rx = Dist(c, major), angle = Math.Atan2(major.Y - c.Y, major.X - c.X);
+        double ry = rx < 1e-9 ? 0 : Math.Abs((major.X - c.X) * (minor.Y - c.Y) - (major.Y - c.Y) * (minor.X - c.X)) / rx;
+        return EllipsePoints(c, rx, ry, angle, n);
+    }
+
+    /// <summary>
+    /// 직각 맞춤(Shift) — 다음 점을 앞 변 방향 기준 0 · 45 · 90 ° 단위 방향으로(길이는 그대로). 앞 변이 없으면(점 1개) 화면 가로 기준.
+    /// </summary>
+    public static UbPoint SnapAngle(UbPoint? prev, UbPoint last, UbPoint cand)
+    {
+        double len = Dist(last, cand);
+        if (len < 1e-9) return cand;
+        double baseAngle = prev is { } p ? Math.Atan2(last.Y - p.Y, last.X - p.X) : 0;
+        double a = Math.Atan2(cand.Y - last.Y, cand.X - last.X) - baseAngle;
+        double step = Math.PI / 4, snapped = baseAngle + Math.Round(a / step) * step;
+        return new UbPoint(last.X + len * Math.Cos(snapped), last.Y + len * Math.Sin(snapped));
+    }
+
+    internal static double Dist(UbPoint a, UbPoint b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
     /// <summary>되돌리기 기록 설명 앞머리 — 그리기 중 Ctrl+Z 가 GIS 편집 기록의 이 기록만 되돌린다.</summary>
     public const string UndoPrefix = "직접 그린 건물";
 
@@ -148,12 +230,18 @@ public static class Map3DUserBuilding
 
     /// <summary>PUT …/user-buildings/{uid} 본문 — {"outline":[[lon,lat]…],"height","floors","name"}(이름이 없으면 null).</summary>
     public static JObject PutBody(IReadOnlyList<UbPoint> outline, double height, int? floors, string? name)
+        => PutBody(outline, height, floors, name, RoofFlat, UseAuto);
+
+    /// <summary>PUT 본문 — 지붕 모양 · 외벽 성격까지(모르는 값은 평지붕 · 자동).</summary>
+    public static JObject PutBody(IReadOnlyList<UbPoint> outline, double height, int? floors, string? name, string roof, string use)
         => new()
         {
             ["outline"] = OutlineJson(outline),
             ["height"] = Map3DBuilding.ClampHeight(height),
             ["floors"] = floors is int f ? f : JValue.CreateNull(),
             ["name"] = string.IsNullOrWhiteSpace(name) ? JValue.CreateNull() : name.Trim().Length > MaxName ? name.Trim()[..MaxName] : name.Trim(),
+            ["roof"] = Roofs.Any(r => r.Key == roof) ? roof : RoofFlat,
+            ["use"] = Uses.Any(u => u.Key == use) ? use : UseAuto,
         };
 
     /// <summary>3D 상자 미리보기(다시 만들기 전) — 높이 null = 그 상자 지움.</summary>
@@ -184,7 +272,13 @@ public static class Map3DUserBuilding
         int? floors = o["floors"]?.Type == JTokenType.Integer && o.Value<long>("floors") is long f && f is > 0 and <= 10_000 ? (int)f : null;
         int? baked = o["baked_id"]?.Type == JTokenType.Integer && o.Value<long>("baked_id") is long b && b is > 0 and <= int.MaxValue ? (int)b : null;
         string? name = o["name"]?.Type == JTokenType.String && o.Value<string>("name") is { Length: > 0 } s ? s : null;
-        return new Map3DUserBuildingItem(uid, pts, h, floors, name, baked);
+        string? roof = o["roof"]?.Type == JTokenType.String ? o.Value<string>("roof") : null;
+        string? use = o["use"]?.Type == JTokenType.String ? o.Value<string>("use") : null;
+        return new Map3DUserBuildingItem(uid, pts, h, floors, name, baked)
+        {
+            Roof = Roofs.Any(r => r.Key == roof) ? roof! : RoofFlat,
+            Use = Uses.Any(u => u.Key == use) ? use! : UseAuto,
+        };
     }
 
     /// <summary>GET …/user-buildings 응답 {"items":[…]} — 형식이 틀린 항목은 뺀다.</summary>
@@ -217,8 +311,13 @@ public static class Map3DUserBuilding
         => $"건물을 저장했습니다 — {Map3DBuilding.FormatMeters(height)} m({floors}층). 3D 를 다시 만들면 사진으로 꾸며집니다";
 }
 
+
+
 /// <summary>
 /// 건물 윤곽 그리기 상태 기계 — ImageCropViewModel 의 편집 관용구(누르기 · 끌기 · 놓기 · 오른쪽 클릭 · 키 · 되돌리기)를 지도 위경도로.
+/// 형상 도구: 다각형(선 클릭 · 처음 점 붙는 거리 안 = 닫기 · Shift 직각 맞춤) · 사각형 · 원 · 타원(끌기 또는 클릭 두세 번).
+/// 형상은 화면 기준으로 만들고 꼭짓점마다 위경도로 바꾼다(회전된 지도에서도 화면에 보이는 모양 그대로).
+/// 완성 뒤에는 모두 같은 편집 — 꼭짓점 끌기 · 선분 가운데 손잡이 점 넣기 · 지우기 · 몸통 끌어 옮기기 · 회전 손잡이.
 /// toScreen · toGeo 는 지도가 준다(회전 · 디지털 줌 포함). inside 는 3D 영역 안 판정(밖 점은 받지 않는다).
 /// </summary>
 public sealed class Map3DUserBuildingDraft
@@ -233,6 +332,11 @@ public sealed class Map3DUserBuildingDraft
     private UbHandleHit _pressHit;
     private bool _dragging;
     private int _dragVertex = -1;
+    private UbPoint[]? _dragStart;               // 몸통 · 회전 끌기 시작 때 화면 꼭짓점
+    private readonly List<UbPoint> _anchors = new();   // 형상 도구 클릭(화면)
+    private List<UbPoint> _preview = new();       // 형상 도구 미리보기(위경도)
+    private bool _shapeDragging;
+    private int _circleSides = Map3DUserBuilding.DefaultCircleSides;
 
     public Map3DUserBuildingDraft(Func<UbPoint, UbPoint> toScreen, Func<UbPoint, UbPoint> toGeo, Func<UbPoint, bool>? inside = null)
     {
@@ -247,14 +351,44 @@ public sealed class Map3DUserBuildingDraft
     public IReadOnlyList<UbPoint> Points => _points;
     public bool IsClosed => _closed;
     public int SelectedVertex { get; private set; } = -1;
-    public bool IsDragging => _dragging;
+    public bool IsDragging => _dragging || _shapeDragging;
     public int DraggingVertex => _dragVertex;
-    /// <summary>마지막으로 막은 이유(밖 · 엇갈림 · 3점 미만) — 다음 성공한 편집에서 지운다.</summary>
+    /// <summary>마지막으로 막은 이유(밖 · 엇갈림 · 3점 미만 · 너무 작음) — 다음 성공한 편집에서 지운다.</summary>
     public string? LastError { get; private set; }
-    /// <summary>되돌릴 칸이 있나.</summary>
     public bool CanUndo => _undo.Count > 0;
     /// <summary>지금 커서(화면) — 열린 윤곽의 다음 선 미리보기.</summary>
     public UbPoint? Hover { get; private set; }
+    /// <summary>지금 도구(빈 윤곽에서만 바뀐다).</summary>
+    public UbTool Tool { get; private set; } = UbTool.Polygon;
+    /// <summary>윤곽을 만든 형상 도구(그린 · 불러온 윤곽은 null) — 원이면 돔 지붕을 제안한다.</summary>
+    public UbTool? CompletedBy { get; private set; }
+    /// <summary>형상 도구 미리보기(위경도) — 끄는 중 · 클릭 사이.</summary>
+    public IReadOnlyList<UbPoint> Preview => _preview;
+    /// <summary>형상 도구로 찍은 점(화면).</summary>
+    public IReadOnlyList<UbPoint> Anchors => _anchors;
+
+    /// <summary>원 · 타원 근사 꼭짓점 수(8~128).</summary>
+    public int CircleSides
+    {
+        get => _circleSides;
+        set => _circleSides = Math.Clamp(value, Map3DUserBuilding.MinCircleSides, Map3DUserBuilding.MaxCircleSides);
+    }
+
+    /// <summary>형상 도구로 그리는 중인가(빈 윤곽 + 다각형 아닌 도구).</summary>
+    private bool IsShapeTool => Tool != UbTool.Polygon && !_closed && _points.Count == 0;
+
+    /// <summary>도구 바꾸기 — 빈 윤곽에서만(찍던 형상 점은 버린다). 바꿨으면 true.</summary>
+    public bool SetTool(UbTool tool)
+    {
+        if (_points.Count > 0) return false;
+        Tool = tool;
+        _anchors.Clear();
+        _preview.Clear();
+        _shapeDragging = false;
+        LastError = null;
+        Changed?.Invoke();
+        return true;
+    }
 
     /// <summary>저장된 건물 고치기 — 닫힌 윤곽으로 연다(되돌리기 칸 비움).</summary>
     public void Load(IEnumerable<UbPoint> outline)
@@ -263,6 +397,7 @@ public sealed class Map3DUserBuildingDraft
         _closed = _points.Count >= Map3DUserBuilding.MinPoints;
         _undo.Clear();
         SelectedVertex = -1;
+        CompletedBy = null;
         LastError = null;
         Changed?.Invoke();
     }
@@ -275,9 +410,11 @@ public sealed class Map3DUserBuildingDraft
     public UbHandleHit HitTest(UbPoint screen)
     {
         for (int i = _points.Count - 1; i >= 0; i--)
-            if (Dist(_toScreen(_points[i]), screen) <= Map3DUserBuilding.HandleRadius) return new(UbHandleKind.Vertex, i);
+            if (Map3DUserBuilding.Dist(_toScreen(_points[i]), screen) <= Map3DUserBuilding.HandleRadius) return new(UbHandleKind.Vertex, i);
         foreach (var (index, mid) in MidpointsScreen())
-            if (Dist(mid, screen) <= Map3DUserBuilding.HandleRadius) return new(UbHandleKind.Midpoint, index);
+            if (Map3DUserBuilding.Dist(mid, screen) <= Map3DUserBuilding.HandleRadius) return new(UbHandleKind.Midpoint, index);
+        if (RotateHandleScreen() is { } r && Map3DUserBuilding.Dist(r, screen) <= Map3DUserBuilding.HandleRadius) return new(UbHandleKind.Rotate, -1);
+        if (_closed && Map3DUserBuilding.Contains(_points.Select(_toScreen).ToList(), screen)) return new(UbHandleKind.Body, -1);
         return new(UbHandleKind.None, -1);
     }
 
@@ -293,23 +430,45 @@ public sealed class Map3DUserBuildingDraft
         }
     }
 
-    private static double Dist(UbPoint a, UbPoint b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+    /// <summary>회전 손잡이(화면) — 닫힌 윤곽의 위쪽 끝(화면) 가운데에서 조금 위. 열린 윤곽이면 null.</summary>
+    public UbPoint? RotateHandleScreen()
+    {
+        if (!_closed || _points.Count == 0) return null;
+        var s = _points.Select(_toScreen).ToList();
+        return new UbPoint(s.Average(p => p.X), s.Min(p => p.Y) - Map3DUserBuilding.RotateHandleOffsetPx);
+    }
 
     // ── 누르기 · 끌기 · 놓기 ──
 
     public void PointerDown(UbPoint screen)
     {
         _press = screen;
-        _pressHit = HitTest(screen);
+        _pressHit = IsShapeTool ? new(UbHandleKind.None, -1) : HitTest(screen);
         _dragging = false;
         _dragVertex = -1;
         SelectedVertex = _pressHit.Kind == UbHandleKind.Vertex ? _pressHit.Index : -1;
         Changed?.Invoke();
     }
 
-    public void PointerMove(UbPoint screen)
+    /// <summary>움직임 — shift = 사각형 정사각형 · 타원 원.</summary>
+    public void PointerMove(UbPoint screen, bool shift = false)
     {
         Hover = screen;
+        if (IsShapeTool)
+        {
+            if (_press is { } p && _anchors.Count == 0 && (_shapeDragging || Map3DUserBuilding.Dist(p, screen) > Map3DUserBuilding.DragDeadZonePx))
+            {
+                _shapeDragging = true;
+                _preview = ShapeFromDrag(p, screen, shift).Select(_toGeo).ToList();
+                Changed?.Invoke();
+            }
+            else if (_anchors.Count > 0)
+            {
+                _preview = ShapeFromClicks(_anchors.Append(screen).ToList(), shift).Select(_toGeo).ToList();
+                Changed?.Invoke();
+            }
+            return;
+        }
         if (_press is not { } press)
         {
             if (!_closed && _points.Count > 0) Changed?.Invoke();   // 다음 선 미리보기
@@ -317,34 +476,57 @@ public sealed class Map3DUserBuildingDraft
         }
         if (!_dragging)
         {
-            if (Dist(press, screen) <= Map3DUserBuilding.DragDeadZonePx) return;
+            if (Map3DUserBuilding.Dist(press, screen) <= Map3DUserBuilding.DragDeadZonePx) return;
             if (_pressHit.Kind == UbHandleKind.None) return;   // 빈 곳 끌기는 아무것도 안 한다
             _dragging = true;
             Snapshot();
-            if (_pressHit.Kind == UbHandleKind.Vertex) _dragVertex = _pressHit.Index;
-            else
+            switch (_pressHit.Kind)
             {
-                _dragVertex = _pressHit.Index + 1;
-                _points.Insert(_dragVertex, _toGeo(screen));
+                case UbHandleKind.Vertex: _dragVertex = _pressHit.Index; break;
+                case UbHandleKind.Midpoint:
+                    _dragVertex = _pressHit.Index + 1;
+                    _points.Insert(_dragVertex, _toGeo(screen));
+                    break;
+                default: _dragStart = _points.Select(_toScreen).ToArray(); break;
             }
         }
-        _points[_dragVertex] = _toGeo(screen);
+        if (_dragVertex >= 0) _points[_dragVertex] = _toGeo(screen);
+        else if (_dragStart is { } start) _points = Transform(start, press, screen, _pressHit.Kind).Select(_toGeo).ToList();
         Changed?.Invoke();
     }
 
-    /// <summary>놓기 — 끌었으면 검사(엇갈림 · 밖이면 끌기 전으로), 아니면 클릭(첫 점 = 닫기 · 빈 곳 = 점 더하기).</summary>
-    public void PointerUp(UbPoint screen)
+    /// <summary>몸통 끌기 = 그대로 옮김, 회전 손잡이 = 가운데를 축으로 누른 자리 → 지금 자리 각만큼 돌림(화면 기준).</summary>
+    private static IEnumerable<UbPoint> Transform(UbPoint[] start, UbPoint press, UbPoint now, UbHandleKind kind)
     {
-        if (_press is null) return;
+        if (kind == UbHandleKind.Body) return start.Select(p => new UbPoint(p.X + now.X - press.X, p.Y + now.Y - press.Y));
+        var c = new UbPoint(start.Average(p => p.X), start.Average(p => p.Y));
+        double a = Math.Atan2(now.Y - c.Y, now.X - c.X) - Math.Atan2(press.Y - c.Y, press.X - c.X), ca = Math.Cos(a), sa = Math.Sin(a);
+        return start.Select(p => new UbPoint(c.X + (p.X - c.X) * ca - (p.Y - c.Y) * sa, c.Y + (p.X - c.X) * sa + (p.Y - c.Y) * ca));
+    }
+
+    /// <summary>놓기 — 형상 도구면 끌기 완성 · 클릭 점 쌓기, 끌었으면 검사(엇갈림 · 밖이면 끌기 전으로), 아니면 클릭(첫 점 붙는 거리 = 닫기 · 빈 곳 = 점 더하기).</summary>
+    public void PointerUp(UbPoint screen, bool shift = false)
+    {
+        if (_press is not { } press) return;
+        _press = null;
+        if (IsShapeTool)
+        {
+            if (_shapeDragging) { _shapeDragging = false; Finish(ShapeFromDrag(press, screen, shift)); return; }
+            _anchors.Add(screen);
+            if (_anchors.Count >= ClicksNeeded(Tool)) Finish(ShapeFromClicks(_anchors, shift));
+            else Changed?.Invoke();
+            return;
+        }
         var hit = _pressHit;
         bool dragged = _dragging;
-        _press = null;
         _dragging = false;
         int moved = _dragVertex;
         _dragVertex = -1;
+        _dragStart = null;
         if (dragged)
         {
-            string? why = _inside != null && !_inside(_points[moved]) ? Map3DUserBuilding.OutsideText
+            var check = moved >= 0 ? new[] { _points[moved] } : _points.ToArray();
+            string? why = _inside != null && check.Any(p => !_inside(p)) ? Map3DUserBuilding.OutsideText
                         : Map3DUserBuilding.IsSelfIntersecting(_points, _closed) ? Map3DUserBuilding.CrossText : null;
             if (why != null) { Restore(_undo.Pop()); LastError = why; }
             else LastError = null;
@@ -352,25 +534,66 @@ public sealed class Map3DUserBuildingDraft
             return;
         }
         if (_closed) { Changed?.Invoke(); return; }
-        if (hit.Kind == UbHandleKind.Vertex && hit.Index == 0 && _points.Count >= Map3DUserBuilding.MinPoints) { Close(); return; }
+        if (_points.Count >= Map3DUserBuilding.MinPoints
+            && Map3DUserBuilding.Dist(_toScreen(_points[0]), screen) <= Map3DUserBuilding.CloseSnapPx) { Close(); return; }
         if (hit.Kind == UbHandleKind.Vertex) return;   // 다른 꼭짓점 클릭 = 고르기만(Delete 대상)
-        AddPoint(_toGeo(screen));
+        var target = shift && _points.Count > 0
+            ? Map3DUserBuilding.SnapAngle(_points.Count >= 2 ? _toScreen(_points[^2]) : null, _toScreen(_points[^1]), screen)
+            : screen;
+        AddPoint(_toGeo(target));
+    }
+
+    private static int ClicksNeeded(UbTool tool) => tool == UbTool.Ellipse ? 3 : 2;
+
+    private IReadOnlyList<UbPoint> ShapeFromDrag(UbPoint a, UbPoint b, bool shift) => Tool switch
+    {
+        UbTool.Rect => Map3DUserBuilding.RectPoints(a, b, shift),
+        UbTool.Circle => Map3DUserBuilding.CirclePoints(a, Map3DUserBuilding.Dist(a, b), _circleSides),
+        _ => shift ? Map3DUserBuilding.CirclePoints(a, Map3DUserBuilding.Dist(a, b), _circleSides)
+                   : Map3DUserBuilding.EllipsePoints(a, Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y), 0, _circleSides),
+    };
+
+    /// <summary>클릭 점(마지막은 커서일 수 있다)으로 형상 — 사각형 2점 · 원 2점 · 타원 3점(2점이면 원으로 미리보기).</summary>
+    private IReadOnlyList<UbPoint> ShapeFromClicks(IReadOnlyList<UbPoint> c, bool shift) => Tool switch
+    {
+        UbTool.Rect => Map3DUserBuilding.RectPoints(c[0], c[1], shift),
+        UbTool.Circle => Map3DUserBuilding.CirclePoints(c[0], Map3DUserBuilding.Dist(c[0], c[1]), _circleSides),
+        _ => c.Count >= 3 ? Map3DUserBuilding.EllipseFrom3(c[0], c[1], c[2], _circleSides)
+                          : Map3DUserBuilding.CirclePoints(c[0], Map3DUserBuilding.Dist(c[0], c[1]), _circleSides),
+    };
+
+    /// <summary>형상 완성 — 검사(너무 작음 · 영역 밖) 뒤 닫힌 윤곽으로. 막히면 찍던 점을 버리고 이유를 남긴다.</summary>
+    private void Finish(IReadOnlyList<UbPoint> screen)
+    {
+        var geo = screen.Select(_toGeo).ToList();
+        _anchors.Clear();
+        _preview.Clear();
+        if (Map3DUserBuilding.Validate(geo, _inside) is { } why) { LastError = why; Changed?.Invoke(); return; }
+        Snapshot();
+        _points = geo;
+        _closed = true;
+        CompletedBy = Tool;
+        LastError = null;
+        Changed?.Invoke();
     }
 
     /// <summary>캡처를 잃었거나 끄는 중 Esc — 끌기 전으로. 끄는 중이었으면 true.</summary>
     public bool PointerCancel()
     {
-        bool was = _dragging;
+        bool was = _dragging, shape = _shapeDragging;
         _press = null;
         _dragging = false;
+        _shapeDragging = false;
         _dragVertex = -1;
+        _dragStart = null;
+        if (shape) { _preview.Clear(); Changed?.Invoke(); return true; }
         if (!was) return false;
         Restore(_undo.Pop());
         return true;
     }
 
-    /// <summary>두 번 누르기 = 닫기(첫 누르기가 이미 점을 놓았다).</summary>
-    public bool DoubleClick() => Close();
+    /// <summary>두 번 누르기 = 닫기(다각형 — 첫 누르기가 이미 점을 놓았다).</summary>
+    public bool DoubleClick() => Tool == UbTool.Polygon && Close();
 
     /// <summary>오른쪽 클릭 — 꼭짓점 위면 지운다. 지웠으면 true.</summary>
     public bool RightClick(UbPoint screen)
@@ -426,16 +649,27 @@ public sealed class Map3DUserBuildingDraft
         return true;
     }
 
-    /// <summary>Backspace — 그리는 중이면 마지막 점, 닫힌 윤곽이면 고른 점.</summary>
-    public bool RemoveLast() => RemoveVertex(_closed ? SelectedVertex : _points.Count - 1);
+    /// <summary>Backspace — 그리는 중이면 마지막 점(형상 도구면 마지막 클릭), 닫힌 윤곽이면 고른 점.</summary>
+    public bool RemoveLast()
+    {
+        if (IsShapeTool && _anchors.Count > 0) { _anchors.RemoveAt(_anchors.Count - 1); _preview.Clear(); Changed?.Invoke(); return true; }
+        return RemoveVertex(_closed ? SelectedVertex : _points.Count - 1);
+    }
 
     /// <summary>Delete — 고른 점.</summary>
     public bool RemoveSelected() => RemoveVertex(SelectedVertex);
 
-    /// <summary>Esc 두 단계 — 끄는 중이면 끌기 취소, 그리던(열린) 점이 있으면 지움, 아니면 그리기 끝내기.</summary>
+    /// <summary>Esc 두 단계 — 끄는 중이면 끌기 취소, 그리던(열린) 점 · 형상 클릭이 있으면 지움, 아니면 그리기 끝내기.</summary>
     public UbEscapeResult Escape()
     {
         if (PointerCancel()) return UbEscapeResult.CanceledDrag;
+        if (_anchors.Count > 0)
+        {
+            _anchors.Clear();
+            _preview.Clear();
+            Changed?.Invoke();
+            return UbEscapeResult.ClearedPoints;
+        }
         if (!_closed && _points.Count > 0)
         {
             Snapshot();
@@ -461,6 +695,7 @@ public sealed class Map3DUserBuildingDraft
     {
         _points = s.Points.ToList();
         _closed = s.Closed;
+        if (!_closed) CompletedBy = null;
         SelectedVertex = -1;
         LastError = null;
         Changed?.Invoke();

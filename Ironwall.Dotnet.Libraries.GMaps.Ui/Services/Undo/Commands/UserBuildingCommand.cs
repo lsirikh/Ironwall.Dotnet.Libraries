@@ -6,8 +6,12 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
 
-/// <summary>직접 그린 건물 한 채의 상태 — 윤곽(위경도) · 높이 · 층수 · 이름. null 이면 "없음"(지운 상태).</summary>
-public sealed record UserBuildingState(IReadOnlyList<UbPoint> Outline, double Height, int? Floors, string? Name);
+/// <summary>직접 그린 건물 한 채의 상태 — 윤곽(위경도) · 높이 · 층수 · 이름 · 지붕 모양 · 외벽 성격. null 이면 "없음"(지운 상태).</summary>
+public sealed record UserBuildingState(IReadOnlyList<UbPoint> Outline, double Height, int? Floors, string? Name)
+{
+    public string Roof { get; init; } = Map3DUserBuilding.RoofFlat;
+    public string Use { get; init; } = Map3DUserBuilding.UseAuto;
+}
 
 /****************************************************************************
    Purpose      : 직접 그린 건물 넣기 · 고치기 · 지우기 Undo 1단위 — map-3d 에 그 건물을 앞(before) · 뒤(after) 상태로 다시 저장한다

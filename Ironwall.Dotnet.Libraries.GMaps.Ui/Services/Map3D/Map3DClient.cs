@@ -275,10 +275,15 @@ public sealed class Map3DClient : IDisposable
     }
 
     /// <summary>넣기 · 고치기(PUT /api/jobs/{id}/user-buildings/{uid}) — 서버가 저장한 항목.</summary>
+    public Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
+                                                            string? name, CancellationToken ct = default)
+        => PutUserBuildingAsync(job, uid, outline, height, floors, name, Map3DUserBuilding.RoofFlat, Map3DUserBuilding.UseAuto, ct);
+
+    /// <summary>넣기 · 고치기 — 지붕 모양(flat · gable · cone · dome) · 외벽 성격(auto · commercial · industrial · residential)까지.</summary>
     public async Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
-                                                                  string? name, CancellationToken ct = default)
+                                                                  string? name, string roof, string use, CancellationToken ct = default)
     {
-        var body = Map3DUserBuilding.PutBody(outline, height, floors, name).ToString(Formatting.None);
+        var body = Map3DUserBuilding.PutBody(outline, height, floors, name, roof, use).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{UserBuildingsUrl(job)}/{Uri.EscapeDataString(uid)}")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),

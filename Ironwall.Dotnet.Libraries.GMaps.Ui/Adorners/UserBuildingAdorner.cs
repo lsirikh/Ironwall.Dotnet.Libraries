@@ -21,8 +21,9 @@ public interface IUserBuildingDrawHost
     /// <summary>고치는 중인 건물 uid(새로 그리면 null).</summary>
     string? UserBuildingEditingUid { get; }
     void UserBuildingPointerDown(UbPoint screen, int clickCount);
-    void UserBuildingPointerMove(UbPoint screen);
-    void UserBuildingPointerUp(UbPoint screen);
+    /// <summary>shift = 정사각형 · 원 · 직각 맞춤.</summary>
+    void UserBuildingPointerMove(UbPoint screen, bool shift);
+    void UserBuildingPointerUp(UbPoint screen, bool shift);
     void UserBuildingRightClick(UbPoint screen);
     void UserBuildingPointerCancel();
 }
@@ -81,14 +82,16 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        _host.UserBuildingPointerMove(At(e));
+        _host.UserBuildingPointerMove(At(e), Shift);
         e.Handled = true;
     }
+
+    private static bool Shift => (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         if (IsMouseCaptured) ReleaseMouseCapture();
-        _host.UserBuildingPointerUp(At(e));
+        _host.UserBuildingPointerUp(At(e), Shift);
         e.Handled = true;
     }
 
@@ -129,8 +132,17 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
             foreach (var it in _host.UserBuildingItems)
                 if (it.Uid != _host.UserBuildingEditingUid) DrawPolygon(dc, it.Outline, closed: true, fill: null, savedPen);
 
-            if (_host.UserBuildingDraft is not { } d || d.Points.Count == 0) return;
+            if (_host.UserBuildingDraft is not { } d) return;
             var line = new Pen(primary, 2.5) { LineJoin = PenLineJoin.Round }; line.Freeze();
+            // 형상 도구 미리보기(끄는 중 · 클릭 사이) — 점선 윤곽 + 찍은 점
+            if (d.Preview.Count >= 3)
+            {
+                var dashed = new Pen(primary, 2) { DashStyle = new DashStyle(new double[] { 5, 3 }, 0) }; dashed.Freeze();
+                DrawPolygon(dc, d.Preview, closed: true, fill, dashed);
+            }
+            var anchorPen = new Pen(primary, 2); anchorPen.Freeze();
+            foreach (var a in d.Anchors) dc.DrawEllipse(core, anchorPen, P(a), VertexRadius, VertexRadius);
+            if (d.Points.Count == 0) return;
             DrawPolygon(dc, d.Points, d.IsClosed, d.IsClosed ? fill : null, line);
 
             // 다음 선 미리보기(열린 윤곽) — 마지막 점 → 커서, 커서 → 첫 점(닫는 선)
@@ -143,6 +155,14 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
             // 선분 가운데 손잡이(닫힌 윤곽 — 끌면 점이 생긴다)
             var midPen = new Pen(primary, 1.2); midPen.Freeze();
             foreach (var (_, mid) in d.MidpointsScreen()) dc.DrawEllipse(core, midPen, P(mid), MidRadius, MidRadius);
+            // 회전 손잡이(닫힌 윤곽) — 윤곽 위 끝에서 줄로 이은 둥근 손잡이(꼭짓점보다 크게 — 모양으로 구별)
+            if (d.RotateHandleScreen() is { } rot)
+            {
+                double top = rot.Y + Map3DUserBuilding.RotateHandleOffsetPx;
+                dc.DrawLine(midPen, P(rot), new Point(rot.X, top));
+                dc.DrawEllipse(core, line, P(rot), VertexRadius + 1.5, VertexRadius + 1.5);
+                dc.DrawEllipse(primary, null, P(rot), 2.0, 2.0);
+            }
             // 꼭짓점 — 고른 · 끄는 점은 두껍게(색만이 아니라 두께로도), 첫 점은 닫기 자리라 크게
             for (int i = 0; i < d.Points.Count; i++)
             {

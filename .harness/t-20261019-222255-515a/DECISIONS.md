@@ -36,6 +36,30 @@
 - why: 꼭짓점 끌기가 팬 · 마커 고르기보다 먼저여야 하고, 측정 도구와 같은 규칙(그리는 동안 왼쪽 끌기 팬 없음).
 - effect: 그리는 중 화면 이동은 휠 줌 · 그리기 끝낸 뒤. 바꾸려면 UserBuildingAdorner 에서 빈 곳 끌기를 지도로 넘긴다.
 
+## 8. (추가 지시) 판 공용부 — 중복 대신 공용 바탕 클래스
+- options: 두 판 컨트롤에 같은 손잡이 · 키 · 닫기 코드 / 공용 바탕 HeightPanelControlBase 로 옮김
+- chosen: 공용 바탕(「건물 높이」 판도 그것을 상속 — 공개 멤버 Host · CloseCommand · CloseCommandProperty · CancelHandleDrag · IsDraggingHandle 은 상속으로 그대로 보인다)
+- why: 품질 검사가 지적한 중복. 판마다 다른 것은 손잡이 AutomationId 와 도구 단축키(HandleExtraKey)뿐이다.
+- effect: 「건물 높이」 시험 그대로 통과. ↑/↓ 는 AutomationId 가 ".Name" 으로 끝나는 입력칸(이름)에서는 판 높이를 바꾸지 않는다(건물 높이 판에는 그런 칸이 없어 영향 없음).
+
+## 9. (추가 지시) 그리던 윤곽이 있을 때 도구를 바꾸면
+- options: 바꾸지 못하게 막음 / 그리던 윤곽을 버리고 새 도구로 새로
+- chosen: 버리고 새로(빈 윤곽이면 그냥 바꿈)
+- why: 아이콘을 누르는 것이 곧 "이 모양으로 새로 그리겠다"는 뜻. 저장하지 않은 윤곽만 버리고, 저장된 건물은 그대로다.
+- effect: MapViewModel.SelectUserBuildingToolCommand 의 ResetUserBuildingDraft 를 빼면 막기가 된다.
+
+## 10. (추가 지시) 원뿔 · 돔 지붕은 둥근 윤곽에서만
+- options: 어떤 윤곽이든 원뿔 · 돔 / map-3d 의 탱크 규칙(buildings.is_round — 17각 이상 · 원형도 0.9 이상)에서만 둥근 지붕, 아니면 평지붕
+- chosen: 탱크 규칙 재사용(목표의 "원형+돔 = tank 모양 규칙 재사용")
+- why: 둥근 지붕 메시(round_roof)는 원기둥 벽(탱크 외벽)과 짝이다. 사각 윤곽에 돔을 고르면 평지붕으로 굽는다(도움말에 적음). 원 도구로 만들면 지붕을 고른 적이 없을 때 돔을 제안한다.
+- effect: 타원은 원형도가 낮아 돔이 평지붕이 된다 — 바꾸려면 buildings.build_building 의 둥근 지붕 판정을 넓힌다.
+
+## 11. (추가 지시) 지도의 기존 선 · 도형 마커를 골라 윤곽으로 쓰기("있으면 좋음")
+- options: 이번에 함께 / 미룸
+- chosen: 미룸
+- why: 마커 종류마다 위경도 꼭짓점을 꺼내는 경로가 달라(선 · 도형 · 이미지) 별도 작업이 크다. 형상 도구 4종 · 편집 · 지붕 · 외벽이 먼저.
+- effect: 후속 작업으로 Map3DUserBuildingDraft.Load(윤곽) 에 그 마커의 꼭짓점을 넘기면 된다(고치기와 같은 입구).
+
 ## 7. 저장 뒤 그리기 모드 유지
 - options: 저장하면 끝냄 / 빈 윤곽으로 이어서 그리기
 - chosen: 이어서 그리기(Esc 두 번 또는 ✕ 로 끝)

@@ -99,7 +99,7 @@ index 25f9393..98d0678 100644
          "warnings": warnings,
          "timings_s": {**timings, "total": round(time.time() - t_all, 2)},
 diff --git a/map3d/server.py b/map3d/server.py
-index 0d3c94a..042110a 100644
+index 0d3c94a..113012f 100644
 --- a/map3d/server.py
 +++ b/map3d/server.py
 @@ -13,7 +13,7 @@ from typing import Literal
@@ -111,7 +111,7 @@ index 0d3c94a..042110a 100644
  from .config import Settings, llm_key_present
  from .geo import bbox_side_lengths_m, parse_bbox, parse_rect, scene_contains
  from .jobs import ALLOWED_FILES, JobManager
-@@ -64,6 +64,15 @@ class HeightIn(BaseModel):
+@@ -64,6 +64,17 @@ class HeightIn(BaseModel):
      floors: int | None = Field(None, ge=1, le=200, strict=True)
  
  
@@ -122,12 +122,14 @@ index 0d3c94a..042110a 100644
 +    height: float = Field(..., ge=1, le=600, allow_inf_nan=False, strict=True)
 +    floors: int | None = Field(None, ge=1, le=200, strict=True)
 +    name: str | None = Field(None, max_length=60)
++    roof: Literal["flat", "gable", "cone", "dome"] = "flat"   # 지붕 모양(원뿔 · 돔은 둥근 윤곽에서)
++    use: Literal["auto", "commercial", "industrial", "residential"] = "auto"   # 외벽 성격
 +
 +
  class EditIn(BaseModel):
      instruction: str = Field(..., min_length=1, max_length=2000)
  
-@@ -267,6 +276,53 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+@@ -267,6 +278,53 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
          rows = heights.reset_all(settings.data_dir, job.dir)
          return {"reset": len(rows), "buildings": rows, "overrides": heights.summary(json.loads((job.dir / "scene.json").read_text(encoding="utf-8")))}
  
@@ -162,7 +164,7 @@ index 0d3c94a..042110a 100644
 +        """넣기 · 고치기 — 영역 파일에 남긴다. 3D 반영은 다시 만들기(그 전에는 뷰어 상자 미리보기)."""
 +        job = editable_job(job_id)
 +        item = user_call(lambda: userbuildings.put(settings.data_dir, scene_of(job), uid, body.outline, round(body.height, 1),
-+                                                   body.floors, body.name))
++                                                   body.floors, body.name, body.roof, body.use))
 +        return {"item": item, "count": user_list(job)["count"]}
 +
 +    @app.delete("/api/jobs/{job_id}/user-buildings/{uid}")
@@ -182,7 +184,7 @@ index 0d3c94a..042110a 100644
      def job_file(job_id: str, name: str):
          j = jm.get(job_id)
 diff --git a/map3d/static/view.js b/map3d/static/view.js
-index cf3f051..3580fc1 100644
+index b699d1c..4e4610b 100644
 --- a/map3d/static/view.js
 +++ b/map3d/static/view.js
 @@ -18,6 +18,7 @@ import { GpuTimer, lowerWhileMoving, movePixelRatio, PerfWindow, SETTLE_MS } fro
@@ -193,8 +195,8 @@ index cf3f051..3580fc1 100644
  
  const $ = (id) => document.getElementById(id);
  const qs = new URLSearchParams(location.search);
-@@ -848,6 +849,37 @@ function onBuildingMessage(m) {
-   indexGround();   // 보안 가림 상자 높이(buildingBoxes)가 새 높이를 따른다
+@@ -867,6 +868,37 @@ function onNavMessage(m) {
+   invalidate();
  }
  
 +// ------------------------------------------------------------ 직접 그린 건물 상자 미리보기(다시 만들기 전 — userbuilding.js)
@@ -231,7 +233,7 @@ index cf3f051..3580fc1 100644
  // 오버레이 메시지가 장면을 다 불러오기 전에 오면 모아 뒀다가 오버레이를 만든 뒤 차례대로 적용한다
  //   (아이콘 · 이미지 자료는 같은 key 를 한 번만 보내므로 버리면 다시 오지 않는다).
  const early = [];
-@@ -866,6 +898,12 @@ function onHostMessage(data) {
+@@ -885,6 +917,12 @@ function onHostMessage(data) {
      invalidate();
      return;
    }
@@ -244,7 +246,7 @@ index cf3f051..3580fc1 100644
    if (t.startsWith("overlay.") || t.startsWith("track.")) {
      if (!overlay) { if (early.length < 5000) early.push(data); return; }
      if (t.startsWith("track.")) overlay.applyTrack(data);
-@@ -887,6 +925,7 @@ try {
+@@ -907,6 +945,7 @@ try {
      bakedImages: bakedImageIds(sceneInfo),
      onSnapshotBuilt: (n) => { if (!renderedSent) { renderedSent = true; renderedPending = n; dirty = true; } } });
    for (const m of early.splice(0)) onHostMessage(m);
@@ -319,10 +321,10 @@ index 0000000..41cdd1d
 +}
 diff --git a/map3d/userbuildings.py b/map3d/userbuildings.py
 new file mode 100644
-index 0000000..6f5dd72
+index 0000000..74e77df
 --- /dev/null
 +++ b/map3d/userbuildings.py
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,224 @@
 +"""직접 그린 건물 — 운영자가 GIS 2D 지도에서 위에서 본 윤곽을 그리고 높이를 넣으면, 굽기가 그 건물을 출처 "user" 로 우선 만든다.
 +
 +저장: data/user-buildings/area-<영역 키>.json — 영역 키는 건물 높이 직접 입력(heights.area_file)과 같은 bbox 해시라
@@ -354,6 +356,8 @@ index 0000000..6f5dd72
 +MAX_NAME = 60
 +UID_RE = re.compile(r"^[0-9a-f]{12}$")
 +SOURCE = "drawn"             # BuildingSpec.source — scene.json origin 은 "user"(pipeline.ORIGIN)
++ROOFS = ("flat", "gable", "cone", "dome")   # 원뿔 · 돔은 둥근 윤곽(탱크 규칙 buildings.is_round)에서만 — 아니면 평지붕으로 굽는다
++USES = {"auto": None, "commercial": "commercial", "industrial": "industrial", "residential": "residential"}   # 외벽 성격(None = 자동)
 +
 +_lock = threading.Lock()
 +
@@ -435,17 +439,20 @@ index 0000000..6f5dd72
 +    return out
 +
 +
-+def put(data_dir, scene: dict, uid: str, outline, height: float, floors: int | None, name: str | None) -> dict:
++def put(data_dir, scene: dict, uid: str, outline, height: float, floors: int | None, name: str | None,
++        roof: str = "flat", use: str = "auto") -> dict:
 +    """새로 넣거나(uid 처음) 고친다(같은 uid — 만든 시각은 그대로). 중심이 장면 밖이면 400. 반환 = 저장한 항목."""
 +    if not UID_RE.match(uid or ""):
 +        raise UserBuildingError(400, "uid 는 소문자 16진수 12자여야 합니다")
++    if roof not in ROOFS or use not in USES:
++        raise UserBuildingError(400, f"roof 는 {ROOFS}, use 는 {tuple(USES)} 중 하나여야 합니다")
 +    pts = clean_outline(outline)
 +    c = center(pts)
 +    if not scene_contains(scene, c[0], c[1]):
 +        raise UserBuildingError(400, "윤곽이 이 3D 영역 밖에 있습니다")
 +    now = dt.datetime.now().astimezone().isoformat(timespec="seconds")
 +    item = {"uid": uid, "outline": pts, "height": round(float(height), 1), "floors": floors,
-+            "name": (name or "").strip()[:MAX_NAME] or None, "created": now, "updated": now}
++            "name": (name or "").strip()[:MAX_NAME] or None, "roof": roof, "use": use, "created": now, "updated": now}
 +    with _lock:
 +        for p in _files(data_dir):
 +            d = heights._read(p)
@@ -508,14 +515,17 @@ index 0000000..6f5dd72
 +# ---------------------------------------------------------------- 굽기(pipeline) 에서
 +
 +def specs_of(items: list[dict], level_h: float) -> list[BuildingSpec]:
-+    """직접 그린 건물 → 건물 사양(평지붕 · 높이 출처 user · 이름이 있으면 name 태그). id 는 굽기가 다시 매긴다."""
++    """직접 그린 건물 → 건물 사양(지붕 모양 · 외벽 성격은 그린 사람이 고른 것, 높이 출처 user · 이름이 있으면 name 태그).
++    원형 윤곽 + 돔/원뿔 = 탱크 규칙(buildings.is_round → 원기둥 벽 · 둥근 지붕 · 테두리). id 는 굽기가 다시 매긴다."""
 +    out = []
 +    for it in items:
 +        tags = {"building": "yes", **({"name": it["name"]} if it.get("name") else {})}
++        roof = it.get("roof") if it.get("roof") in ROOFS else "flat"
 +        out.append(BuildingSpec(id=0, source=SOURCE, source_id=f"{SOURCE}/{it['uid']}", footprint_ll=Polygon(it["outline"]),
 +                                tags=tags, height=float(it["height"]), height_source="user",
 +                                levels=int(it["floors"]) if it.get("floors") else max(1, round(float(it["height"]) / level_h)),
-+                                use=classify_use(tags)))
++                                roof_shape=roof, roof_source="user" if roof != "flat" else "default",
++                                use=USES.get(it.get("use")) or classify_use(tags)))
 +    return out
 +
 +
@@ -541,10 +551,10 @@ index 0000000..6f5dd72
 +    return kept + users, {"applied": len(users), "removed_auto": sum(removed.values()), "removed": removed}
 diff --git a/tests/test_userbuildings.py b/tests/test_userbuildings.py
 new file mode 100644
-index 0000000..218fb5a
+index 0000000..48bdc12
 --- /dev/null
 +++ b/tests/test_userbuildings.py
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,337 @@
 +"""직접 그린 건물(userbuildings.py · /api/jobs/{id}/user-buildings) — 저장 · 검증 · 굽기 우선 · 겹친 자동 건물 빼기 · 옥상 텍스처 ·
 +외벽 방식 · 회전 영역 · 외부 자료 0건 · 다시 만들기 유지 · 3D 「건물 높이」 판으로 높이 고치기 · 뷰어 상자 미리보기(node)."""
 +import json
@@ -848,6 +858,33 @@ index 0000000..218fb5a
 +    # 파일에서 지운 건물을 판으로 고치면 409(다시 만들기 안내)
 +    UB.delete(tmp_path / "data", UID)
 +    assert c.put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 22.0}).status_code == 409
++
++
++def should_bake_roof_shape_and_wall_use_chosen_by_user(tmp_path, mbtiles, slope_dem):
++    """지붕 모양 · 외벽 성격 — 원형(32각) + 돔 = 탱크 규칙(원기둥 벽 · 둥근 지붕), 사각 + 박공, 외벽 공장/주거, 사각 + 돔 = 평지붕으로."""
++    import math
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    cx, cy, r = 127.1030, 37.3605, 0.00012                       # 반지름 약 10 m
++    circle = [[cx + r * math.cos(2 * math.pi * k / 32) / 0.7944, cy + r * math.sin(2 * math.pi * k / 32)] for k in range(32)]
++    rect2 = [[x, y - 0.0003] for x, y in EMPTY]
++    rect3 = [[x - 0.0012, y - 0.0003] for x, y in EMPTY]
++    UB.put(tmp_path / "data", s1, "aaaaaaaaaaaa", circle, 12.0, None, "탱크", roof="dome")
++    UB.put(tmp_path / "data", s1, "bbbbbbbbbbbb", EMPTY, 9.0, None, None, roof="gable", use="industrial")
++    UB.put(tmp_path / "data", s1, "cccccccccccc", rect2, 9.0, None, None, roof="dome", use="residential")
++    UB.put(tmp_path / "data", s1, "dddddddddddd", rect3, 20.0, None, None, use="commercial")
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    by = {b["user_uid"]: b for b in s2["buildings"] if b.get("user_uid")}
++    assert by["aaaaaaaaaaaa"]["facade"] == "tank" and by["aaaaaaaaaaaa"]["roof_shape_built"] == "dome"
++    assert by["bbbbbbbbbbbb"]["roof_shape_built"] == "gable" and by["bbbbbbbbbbbb"]["facade"] == "ind" and by["bbbbbbbbbbbb"]["use"] == "industrial"
++    assert by["cccccccccccc"]["roof_shape_built"] == "flat" and by["cccccccccccc"]["facade"] == "res"   # 사각 + 돔 → 평지붕
++    assert by["dddddddddddd"]["facade"] == "com" and by["dddddddddddd"]["parapet"]
++    with pytest.raises(UB.UserBuildingError):
++        UB.put(tmp_path / "data", s1, "eeeeeeeeeeee", EMPTY, 9.0, None, None, roof="pyramid")
++    c = _client(tmp_path, mbtiles)
++    for bad in ({"roof": "pyramid"}, {"use": "factory"}, {"roof": 1}):
++        assert c.put(f"/api/jobs/j2/user-buildings/{UID}", json={"outline": EMPTY, "height": 10, **bad}).status_code == 422, bad
++    r = c.put(f"/api/jobs/j2/user-buildings/{UID}", json={"outline": EMPTY, "height": 10, "roof": "cone", "use": "residential"})
++    assert r.status_code == 200 and (r.json()["item"]["roof"], r.json()["item"]["use"]) == ("cone", "residential")
 +
 +
 +def should_preview_boxes_when_checked_with_node():

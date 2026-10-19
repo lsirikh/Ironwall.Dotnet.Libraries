@@ -188,8 +188,8 @@ public class Map3DUserBuildingTests
         var snap = d.Points.ToArray();
         d.PointerDown(new UbPoint(400, 300)); d.PointerMove(new UbPoint(402, 302)); d.PointerUp(new UbPoint(402, 302));
         Assert.Equal(snap, d.Points);
-        // 빈 곳 끌기는 아무것도 안 한다
-        Drag(d, new UbPoint(440, 360), new UbPoint(470, 380));
+        // 윤곽 밖 빈 곳 끌기는 아무것도 안 한다(윤곽 안 끌기 = 통째로 옮기기, 아래 시험)
+        Drag(d, new UbPoint(700, 700), new UbPoint(730, 720));
         Assert.Equal(snap, d.Points);
     }
 
@@ -285,6 +285,230 @@ public class Map3DUserBuildingTests
         Assert.Equal(p1.Y, ts(d.Points[1]).Y, 6);
     }
 
+    // ── 형상 도구 ──
+
+    private static Map3DUserBuildingDraft ToolDraft(UbTool tool, double rot = 0)
+    {
+        var d = Draft(rot);
+        Assert.True(d.SetTool(tool));
+        return d;
+    }
+
+    private static List<UbPoint> ScreenOf(Map3DUserBuildingDraft d, double rot = 0)
+    {
+        var (ts, _) = Projection(rot);
+        return d.Points.Select(ts).ToList();
+    }
+
+    [Fact]
+    public void should_make_rectangle_by_drag_and_square_with_shift_and_by_two_clicks()
+    {
+        var d = ToolDraft(UbTool.Rect);
+        d.PointerDown(new UbPoint(400, 300));
+        d.PointerMove(new UbPoint(450, 330));
+        Assert.True(d.IsDragging);
+        Assert.Equal(4, d.Preview.Count);                                 // 끄는 동안 미리보기만
+        Assert.Empty(d.Points);
+        d.PointerUp(new UbPoint(500, 340));
+        Assert.True(d.IsClosed);
+        Assert.Equal(UbTool.Rect, d.CompletedBy);
+        var s = ScreenOf(d);
+        Assert.Equal(new[] { (400.0, 300.0), (500.0, 300.0), (500.0, 340.0), (400.0, 340.0) },
+                     s.Select(p => (Math.Round(p.X, 6), Math.Round(p.Y, 6))));
+        Assert.Empty(d.Preview);
+
+        var sq = ToolDraft(UbTool.Rect);
+        sq.PointerDown(new UbPoint(400, 300));
+        sq.PointerMove(new UbPoint(420, 320), shift: true);
+        sq.PointerUp(new UbPoint(480, 320), shift: true);                  // Shift = 긴 변(80)에 맞춘 정사각형
+        var q = ScreenOf(sq);
+        Assert.Equal(80, q[1].X - q[0].X, 6);
+        Assert.Equal(80, q[2].Y - q[1].Y, 6);
+
+        var clicks = ToolDraft(UbTool.Rect);
+        Click(clicks, 400, 300);
+        Assert.Single(clicks.Anchors);
+        Assert.False(clicks.IsClosed);
+        clicks.PointerMove(new UbPoint(450, 380));
+        Assert.Equal(4, clicks.Preview.Count);                            // 두 번째 클릭 전 미리보기
+        Click(clicks, 460, 390);
+        Assert.True(clicks.IsClosed);
+        Assert.Empty(clicks.Anchors);
+    }
+
+    [Fact]
+    public void should_make_screen_aligned_rectangle_on_rotated_map()
+    {
+        var d = ToolDraft(UbTool.Rect, rot: 40);
+        Drag(d, new UbPoint(400, 300), new UbPoint(520, 380));
+        var s = ScreenOf(d, rot: 40);
+        Assert.Equal(s[0].Y, s[1].Y, 6);                                  // 화면에서 반듯(위경도로는 40° 돌아간 사각형)
+        Assert.Equal(s[1].X, s[2].X, 6);
+        var g = d.Points;
+        Assert.NotEqual(Math.Round(g[0].Y, 9), Math.Round(g[1].Y, 9));
+        Assert.Null(d.Validate());
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(8)]
+    [InlineData(128)]
+    public void should_approximate_circle_with_configured_vertex_count_and_radius(int sides)
+    {
+        var d = ToolDraft(UbTool.Circle);
+        d.CircleSides = sides;
+        Drag(d, new UbPoint(500, 400), new UbPoint(560, 400));
+        Assert.True(d.IsClosed);
+        Assert.Equal(sides, d.Points.Count);
+        Assert.Equal(UbTool.Circle, d.CompletedBy);
+        foreach (var p in ScreenOf(d)) Assert.Equal(60, Math.Sqrt((p.X - 500) * (p.X - 500) + (p.Y - 400) * (p.Y - 400)), 6);
+        var c = Draft();
+        c.CircleSides = 3;
+        Assert.Equal(Map3DUserBuilding.MinCircleSides, c.CircleSides);   // 범위로
+        c.CircleSides = 1000;
+        Assert.Equal(Map3DUserBuilding.MaxCircleSides, c.CircleSides);
+        // 두 번 클릭 = 가운데 · 가장자리
+        var two = ToolDraft(UbTool.Circle);
+        Click(two, 500, 400);
+        Click(two, 500, 450);
+        Assert.Equal(Map3DUserBuilding.DefaultCircleSides, two.Points.Count);
+        Assert.Equal(50, Math.Abs(ScreenOf(two)[0].X - 500), 6);
+    }
+
+    [Fact]
+    public void should_make_ellipse_by_drag_and_by_three_clicks_with_rotation()
+    {
+        var d = ToolDraft(UbTool.Ellipse);
+        Drag(d, new UbPoint(500, 400), new UbPoint(580, 430));            // 가로 80 · 세로 30
+        var s = ScreenOf(d);
+        Assert.Equal(80, s.Max(p => p.X) - 500, 6);
+        Assert.Equal(30, s.Max(p => p.Y) - 400, 6);
+
+        var three = ToolDraft(UbTool.Ellipse);
+        Click(three, 500, 400);                                           // 가운데
+        Click(three, 560, 460);                                           // 긴 축 끝(45°, 반지름 84.85)
+        Assert.False(three.IsClosed);
+        three.PointerMove(new UbPoint(480, 420));
+        Assert.NotEmpty(three.Preview);
+        Click(three, 480, 420);                                           // 짧은 축 쪽 — 긴 축 선에서 28.28 떨어짐
+        Assert.True(three.IsClosed);
+        var e = ScreenOf(three);
+        Assert.Equal(60, e[0].X - 500, 6);                                // 첫 꼭짓점 = 긴 축 끝
+        Assert.Equal(60, e[0].Y - 400, 6);
+        double minR = e.Min(p => Math.Sqrt((p.X - 500) * (p.X - 500) + (p.Y - 400) * (p.Y - 400)));
+        Assert.Equal(Math.Sqrt(800), minR, 1);
+        // Shift 끌기 = 원
+        var circle = ToolDraft(UbTool.Ellipse);
+        circle.PointerDown(new UbPoint(500, 400));
+        circle.PointerMove(new UbPoint(530, 400), shift: true);
+        circle.PointerUp(new UbPoint(540, 410), shift: true);
+        foreach (var p in ScreenOf(circle)) Assert.Equal(Math.Sqrt(1700), Math.Sqrt((p.X - 500) * (p.X - 500) + (p.Y - 400) * (p.Y - 400)), 6);
+    }
+
+    [Fact]
+    public void should_refuse_too_small_or_outside_shapes_and_cancel_shape_with_escape()
+    {
+        var tiny = ToolDraft(UbTool.Circle);
+        Click(tiny, 500, 400); Click(tiny, 501, 400);                     // 반지름 1 px(약 1 m) — 넓이 4 m² 미만
+        Assert.False(tiny.IsClosed);
+        Assert.Equal(Map3DUserBuilding.TooSmallText, tiny.LastError);
+        var (ts, tg) = Projection();
+        var outside = new Map3DUserBuildingDraft(ts, tg, g => g.X < 127.0005);
+        outside.SetTool(UbTool.Rect);
+        Drag(outside, new UbPoint(500, 300), new UbPoint(600, 400));
+        Assert.False(outside.IsClosed);
+        Assert.Equal(Map3DUserBuilding.OutsideText, outside.LastError);
+        var esc = ToolDraft(UbTool.Rect);
+        esc.PointerDown(new UbPoint(400, 300));
+        esc.PointerMove(new UbPoint(450, 350));
+        Assert.Equal(UbEscapeResult.CanceledDrag, esc.Escape());          // 끄는 중 → 미리보기 버림
+        Assert.Empty(esc.Preview);
+        Click(esc, 400, 300);
+        Assert.True(esc.RemoveLast());                                    // Backspace = 마지막 클릭
+        Assert.Empty(esc.Anchors);
+        Click(esc, 400, 300);
+        Assert.Equal(UbEscapeResult.ClearedPoints, esc.Escape());
+        Assert.Equal(UbEscapeResult.Exit, esc.Escape());
+    }
+
+    [Fact]
+    public void should_change_tool_only_on_empty_outline()
+    {
+        var d = Draft();
+        Click(d, 400, 300);
+        Assert.False(d.SetTool(UbTool.Circle));
+        Assert.Equal(UbTool.Polygon, d.Tool);
+        var c = ToolDraft(UbTool.Circle);
+        Assert.False(c.DoubleClick());                                    // 형상 도구는 두 번 누르기로 닫지 않는다
+    }
+
+    [Fact]
+    public void should_close_polygon_within_snap_distance_of_first_point()
+    {
+        var d = Square();
+        Click(d, 409, 300);                                               // 손잡이 반지름(7) 밖 · 붙는 거리(10) 안
+        Assert.True(d.IsClosed);
+        Assert.Equal(4, d.Points.Count);
+        var far = Square();
+        Click(far, 390, 290);                                             // 14 px — 닫지 않고 점을 더한다(엇갈림 없음)
+        Assert.False(far.IsClosed);
+        Assert.Equal(5, far.Points.Count);
+    }
+
+    [Fact]
+    public void should_snap_next_point_to_right_angle_with_shift()
+    {
+        var snapped = Map3DUserBuilding.SnapAngle(new UbPoint(400, 300), new UbPoint(500, 300), new UbPoint(506, 390));
+        Assert.Equal(500, snapped.X, 6);                                  // 앞 변(가로) 기준 90°
+        Assert.Equal(300 + Math.Sqrt(36 + 8100), snapped.Y, 6);           // 길이는 그대로
+        var diag = Map3DUserBuilding.SnapAngle(null, new UbPoint(0, 0), new UbPoint(50, 45));
+        Assert.Equal(diag.X, diag.Y, 6);                                  // 점 하나면 화면 가로 기준 45°
+        var tilted = Map3DUserBuilding.SnapAngle(new UbPoint(0, 0), new UbPoint(30, 40), new UbPoint(30 - 40 + 3, 40 + 30 + 1));
+        double dot = (30 - 0) * (tilted.X - 30) + (40 - 0) * (tilted.Y - 40);
+        Assert.Equal(0, dot, 6);                                          // 기울어진 앞 변에 직각
+        var d = Draft();
+        Click(d, 400, 300); Click(d, 500, 300);
+        d.PointerDown(new UbPoint(506, 390));
+        d.PointerUp(new UbPoint(506, 390), shift: true);
+        var (ts, _) = Projection();
+        Assert.Equal(500, ts(d.Points[2]).X, 6);
+    }
+
+    [Fact]
+    public void should_move_whole_outline_by_body_drag_and_rotate_by_handle()
+    {
+        var d = Square();
+        d.Close();
+        Assert.Equal(UbHandleKind.Body, d.HitTest(new UbPoint(450, 350)).Kind);
+        Drag(d, new UbPoint(450, 350), new UbPoint(470, 330));            // 통째로 (+20, −20)
+        var s = ScreenOf(d);
+        Assert.Equal(420, s[0].X, 6);
+        Assert.Equal(280, s[0].Y, 6);
+        var rot = d.RotateHandleScreen()!.Value;
+        Assert.Equal(470, rot.X, 6);                                      // 가운데 위
+        Assert.Equal(280 - Map3DUserBuilding.RotateHandleOffsetPx, rot.Y, 6);
+        Assert.Equal(UbHandleKind.Rotate, d.HitTest(rot).Kind);
+        // 가운데(470, 330) 기준 위(−90°) → 오른쪽(0°) = 시계 90°
+        Drag(d, rot, new UbPoint(470 + 80, 330));
+        var r = ScreenOf(d);
+        Assert.Equal(520, r[0].X, 6);                                     // (420,280) → (520,280)
+        Assert.Equal(280, r[0].Y, 6);
+        Assert.True(d.Undo());                                            // 회전 되돌림
+        Assert.Equal(420, ScreenOf(d)[0].X, 6);
+        Assert.Null(Draft().RotateHandleScreen());
+    }
+
+    [Fact]
+    public void should_restore_when_body_drag_leaves_area()
+    {
+        var d = Square(inside: g => g.X < 127.0005);
+        d.Close();
+        var before = d.Points.ToArray();
+        Drag(d, new UbPoint(450, 350), new UbPoint(560, 350));
+        Assert.Equal(before, d.Points);
+        Assert.Equal(Map3DUserBuilding.OutsideText, d.LastError);
+    }
+
     // ── 서버 · 3D 메시지 ──
 
     [Fact]
@@ -302,6 +526,11 @@ public class Map3DUserBuildingTests
         Assert.Equal(JTokenType.Null, noName["floors"]!.Type);
         Assert.Equal(JTokenType.Null, noName["name"]!.Type);
         Assert.Equal(60, Map3DUserBuilding.PutBody(outline, 9, null, new string('가', 80)).Value<string>("name")!.Length);
+        Assert.Equal(("flat", "auto"), (noName.Value<string>("roof"), noName.Value<string>("use")));
+        var dome = Map3DUserBuilding.PutBody(outline, 9, null, null, "dome", "industrial");
+        Assert.Equal(("dome", "industrial"), (dome.Value<string>("roof"), dome.Value<string>("use")));
+        var odd = Map3DUserBuilding.PutBody(outline, 9, null, null, "pyramid", "factory");
+        Assert.Equal(("flat", "auto"), (odd.Value<string>("roof"), odd.Value<string>("use")));   // 모르는 값은 기본
 
         var prev = JObject.Parse(Map3DUserBuilding.PreviewMessageJson("a1b2c3d4e5f6", outline, 18));
         Assert.Equal("userbuilding.preview", prev.Value<string>("type"));
@@ -320,7 +549,7 @@ public class Map3DUserBuildingTests
     public void should_parse_items_and_skip_broken_ones()
     {
         var list = Map3DUserBuilding.ParseList(@"{""items"":[
-            {""uid"":""a1b2c3d4e5f6"",""outline"":[[127,37.5],[127.0003,37.5],[127.0003,37.5002]],""height"":18,""floors"":6,""name"":""경비동"",""baked_id"":4},
+            {""uid"":""a1b2c3d4e5f6"",""outline"":[[127,37.5],[127.0003,37.5],[127.0003,37.5002]],""height"":18,""floors"":6,""name"":""경비동"",""baked_id"":4,""roof"":""dome"",""use"":""industrial""},
             {""uid"":""0123456789ab"",""outline"":[[127,37.5],[127.0003,37.5],[127.0003,37.5002]],""height"":9.5,""floors"":null,""name"":null,""baked_id"":null},
             {""uid"":""BAD"",""outline"":[[127,37.5],[127.0003,37.5],[127.0003,37.5002]],""height"":9},
             {""uid"":""abcdefabcdef"",""outline"":[[127,37.5],[127.0003,37.5]],""height"":9},
@@ -329,6 +558,8 @@ public class Map3DUserBuildingTests
         ],""count"":6}");
         Assert.Equal(2, list.Count);
         Assert.Equal(("a1b2c3d4e5f6", 18.0, 6, "경비동", (int?)4), (list[0].Uid, list[0].Height, list[0].Floors!.Value, list[0].Name!, list[0].BakedId));
+        Assert.Equal(("dome", "industrial"), (list[0].Roof, list[0].Use));
+        Assert.Equal(("flat", "auto"), (list[1].Roof, list[1].Use));        // 옛 서버 · 없음 = 기본
         Assert.Null(list[1].Floors);
         Assert.Null(list[1].BakedId);
         Assert.Null(list[1].Name);
@@ -379,7 +610,7 @@ public class Map3DUserBuildingTests
                              "DELETE /api/jobs/j1/user-buildings/a1b2c3d4e5f6", "DELETE /api/jobs/j1/user-buildings" },
                      fake.Requests.Select(r => $"{r.Method} {r.Path}"));
         var body = JObject.Parse(fake.Requests[1].Body!);
-        Assert.Equal(new[] { "outline", "height", "floors", "name" }, body.Properties().Select(p => p.Name));
+        Assert.Equal(new[] { "outline", "height", "floors", "name", "roof", "use" }, body.Properties().Select(p => p.Name));
 
         // 옛 서버(404) — 목록은 비고, 지우기는 false. 거절(400)은 서버 이유 그대로
         fake.Reply = _ => (HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}");
