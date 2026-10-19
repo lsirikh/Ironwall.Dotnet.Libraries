@@ -1,0 +1,36 @@
+tests/GMaps.MapEdit.Tests ['    오류 0개']
+tests/GMaps.MapLayer.Tests ['    오류 0개']
+실패 GMaps.MapEdit.Tests.Map3DEntryExitMoreScenarioTests.should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(mode: AnchorDraw) [434 ms]
+오류 메시지:
+    Assert.Equal() Failure: Strings differ
+실패 GMaps.MapEdit.Tests.Map3DEntryExitMoreScenarioTests.should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(mode: Measure) [151 ms]
+오류 메시지:
+    Assert.Equal() Failure: Strings differ
+실패 GMaps.MapEdit.Tests.Map3DEntryExitMoreScenarioTests.should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(mode: TargetAim) [143 ms]
+오류 메시지:
+    Assert.Equal() Failure: Strings differ
+실패 GMaps.MapEdit.Tests.Map3DEntryExitMoreScenarioTests.should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(mode: null) [145 ms]
+오류 메시지:
+    Assert.Equal() Failure: Strings differ
+실패 GMaps.MapEdit.Tests.Map3DEntryExitMoreScenarioTests.should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(mode: SymbolPlacement) [145 ms]
+오류 메시지:
+    Assert.Equal() Failure: Strings differ
+실패 GMaps.MapEdit.Tests.GroupRotationScenarioTests.should_restore_only_failed_members_and_undo_only_saved_when_rotation_save_fails(failCount: 1) [229 ms]
+오류 메시지:
+    Assert.Equal() Failure: Values are not within 9 decimal places
+실패 GMaps.MapEdit.Tests.GroupRotationScenarioTests.should_restore_only_failed_members_and_undo_only_saved_when_rotation_save_fails(failCount: 3) [230 ms]
+오류 메시지:
+    Assert.Equal() Failure: Values are not within 9 decimal places
+실패 GMaps.MapEdit.Tests.BuildingHeightScenarioTests.should_close_panel_and_cancel_preview_when_empty_ground_is_clicked_in_3d [152 ms]
+오류 메시지:
+    Assert.True() Failure
+실패!  - 실패:     8, 통과:     1, 건너뜀:     0, 전체:     9, 기간: 2 s - GMaps.MapEdit.Tests.dll (net8.0)
+실패 GMaps.MapLayer.Tests.MapRegistrationCommandScenarioTests.should_tell_edit_mode_needed_and_not_open_file_dialog_when_image_load_runs_outside_edit_mode [45 s]
+오류 메시지:
+    STA timeout
+실패!  - 실패:     1, 통과:     0, 건너뜀:     0, 전체:     1, 기간: 45 s - GMaps.MapLayer.Tests.dll (net8.0)
+복원:  .../Utils/Map3DGuide.cs                            | 17 +++++++----------
+ .../Utils/Map3DMath.cs                             | 22 ++--------------------
+ .../ViewModels/Maps/MapViewModel.Map3D.cs          | 18 ++++++++++++++++--
+ 3 files changed, 25 insertions(+), 32 deletions(-)
+

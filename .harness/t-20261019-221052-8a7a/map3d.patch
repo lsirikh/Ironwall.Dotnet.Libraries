@@ -1,0 +1,40 @@
+diff --git a/map3d/static/buildingedit.js b/map3d/static/buildingedit.js
+index 555cde7..6078919 100644
+--- a/map3d/static/buildingedit.js
++++ b/map3d/static/buildingedit.js
+@@ -2,6 +2,7 @@
+ //   늘이기 식은 서버 heights.py(wall_top · stretch_y)와 같다 — 판에서 본 미리보기와 「적용」 뒤 서버가 고친 GLB 가 같은 모양이다.
+ //   GIS ↔ 3D 메시지
+ //     보내는 것 {type:"building", id, origin, height, height_source, height_from, levels, area_m2, lon, lat, manual}
++//               {type:"building.none"}                     — 건물 아닌 땅을 눌렀다(GIS 는 판을 닫는다)
+ //     받는 것   {type:"building.preview", id, height|null}  — 그 건물만 그 높이로(null = 원래대로)
+ //               {type:"building.select", id|null}          — 윤곽 강조(null = 지움)
+ //               {type:"building.commit", id, building:{…}} — 서버가 저장한 건물 줄(그 높이를 새 원래 모양으로)
+diff --git a/map3d/static/view.js b/map3d/static/view.js
+index cf3f051..96f21ea 100644
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -419,7 +419,7 @@ renderer.domElement.addEventListener("pointerup", (ev) => {
+   if (embed && bnode) {
+     const msg = buildingMessage((sceneInfo.buildings || []).find((x) => x.id === bnode.userData.id) || bnode.userData, lonlatOf(h.point));
+     if (msg) post(msg);
+-  }
++  } else if (embed) post({ type: "building.none" });   // 건물 아닌 땅 — GIS 가 「건물 높이」 판을 닫는다(미리보기 취소)
+ });
+ 
+ // 고른 건물 윤곽 — 모서리 선을 맨 위 층(TOP_LAYER)에 검은 실선 + 흰 점선으로 겹쳐 그린다(색이 아니라 모양으로, 밝은 · 어두운 바탕 모두 보인다)
+diff --git a/tests/building_check.mjs b/tests/building_check.mjs
+index 63ebc3c..c6c3e7e 100644
+--- a/tests/building_check.mjs
++++ b/tests/building_check.mjs
+@@ -67,6 +67,10 @@ const near = (a, b, tol, what) => { if (!(Math.abs(a - b) <= tol)) fails.push(`$
+   const ov = up.indexOf("if (ov) {"), bm = up.indexOf("buildingMessage(");
+   if (!(ov > 0 && bm > ov && up.slice(ov, bm).includes("return;"))) fails.push("marker pick must return before building pick");
+   if (src.includes("new THREE.BoxHelper(node")) fails.push("old colour-only box highlight");
++  // 빈 땅(건물 아님) 클릭 — 윤곽만 지우지 말고 GIS 에 알린다(「건물 높이」 판 닫기, GIS 결정 2026-10-19). 빈 pick 은 건물 클릭에도 오므로 따로
++  const sb = up.indexOf("selectBuilding(bnode);"), none = up.indexOf('post({ type: "building.none" })');
++  if (!(sb > 0 && none > bm && /\} else if \(embed\) post\(\{ type: "building\.none" \}\)/.test(up.slice(bm, none + 40))))
++    fails.push("view.js: a non-building ground click must post {type:\"building.none\"} (embed) after the building branch");
+   const msg = src.slice(src.indexOf("function onHostMessage"));
+   if (msg.indexOf('t.startsWith("building.")') > msg.indexOf('t.startsWith("overlay.")')) fails.push("building messages must be read before overlay queue");
+ }
