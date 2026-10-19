@@ -3793,9 +3793,10 @@ public partial class MapViewModel : BasePanelViewModel,
             if (openFileDialog.ShowDialog() == true)
             {
                 var originalPath = openFileDialog.FileName;
-                // 이미지를 Images/Overlays/에 복사하고 상대 경로 획득
-                var filePath = _imageFileService.CopyImageToLocal(originalPath);
                 var title = System.IO.Path.GetFileNameWithoutExtension(originalPath);
+                // 「이미지 자르기」 판(다각형) → 이미지를 Images/Overlays/에 복사하고 상대 경로 획득(자르기 적용이면 자른 PNG, 취소면 추가 안 함)
+                var filePath = await CopyOverlayImageWithCropAsync(originalPath, title);
+                if (filePath == null) return;
                 // 항상 현재 지도 중심점 기준으로 배치
                 var currentPosition = MainMap.Position;
 
@@ -6990,6 +6991,29 @@ public partial class MapViewModel : BasePanelViewModel,
                 };
                 moveBottomItem.Click += (s, e) => { var zb = IsApplyingUndo ? null : CaptureZOrderPairs(); MoveMarkerToBottom(marker); if (zb != null) RecordZOrderDiff(zb); };   // V4 undo 기록
                 menu.Items.Add(moveBottomItem);
+
+                // ── 오버레이 이미지 다각형 자르기(2026-10-19) ──
+                if (marker is GMapImageMarker cropImage)
+                {
+                    menu.Items.Add(new Separator());
+                    var cropItem = new MenuItem
+                    {
+                        Header = "다각형으로 자르기…",
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.VectorPolygon, Width = 16, Height = 16 }
+                    };
+                    cropItem.Click += (s, e) => _ = RecropImageAsync(cropImage);
+                    menu.Items.Add(cropItem);
+                    if (IsCroppedImage(cropImage))
+                    {
+                        var uncropItem = new MenuItem
+                        {
+                            Header = "자르기 되돌리기",
+                            Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Undo, Width = 16, Height = 16 }
+                        };
+                        uncropItem.Click += (s, e) => _ = UncropImageAsync(cropImage);
+                        menu.Items.Add(uncropItem);
+                    }
+                }
             }
 
             if (menu.Items.Count > 0)

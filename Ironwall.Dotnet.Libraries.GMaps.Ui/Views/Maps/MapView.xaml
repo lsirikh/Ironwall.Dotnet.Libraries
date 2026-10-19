@@ -2011,6 +2011,14 @@
 					Content="{Binding BuildingHeightPanel}"
 					Visibility="{Binding IsBuildingHeightPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+				<!--  「이미지 자르기」 판(2026-10-19) — 오버레이 이미지를 처음 불러올 때 · 우클릭 「다각형으로 자르기」. 같은 크롬 · 머리 띠 끌기.  -->
+				<ContentPresenter
+					Canvas.Left="200"
+					Canvas.Top="60"
+					Panel.ZIndex="127"
+					Content="{Binding ImageCropPanel}"
+					Visibility="{Binding IsImageCropPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 				<!--  사이트 고정(맵 앵커) 설정 패널 (증분6, FR-B3) — OverlayWindow 패턴(Control+ControlTemplate, 헤더 드래그)  -->
 				<ContentPresenter
 					x:Name="MapAnchorPresenter"
