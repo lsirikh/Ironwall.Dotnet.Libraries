@@ -56,7 +56,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         /// <summary>그룹별 3D 렌더 on/off — TwoWay 바인딩(즉시 커밋).</summary>
         public bool Render3D { get => (bool)GetValue(Render3DProperty); set => SetValue(Render3DProperty, value); }
         public static readonly DependencyProperty Render3DProperty = DependencyProperty.Register(nameof(Render3D), typeof(bool), typeof(GMapPropertyPidsGroupControl),
-            new PropertyMetadata(true, (d, e) => ((GMapPropertyPidsGroupControl)d).OnFenceFieldChanged("Render3D", e, m => m.Render3D = (bool)e.NewValue)));
+            new PropertyMetadata(true, (d, e) => ((GMapPropertyPidsGroupControl)d).OnRender3DChanged(e)));
+
+        /// <summary>「3D」 체크 칸 표시값 — null=그룹 Pending(서로 다름, indeterminate). 칸을 누르면 Render3D 로 넘긴다.</summary>
+        public bool? Render3DState { get => (bool?)GetValue(Render3DStateProperty); set => SetValue(Render3DStateProperty, value); }
+        public static readonly DependencyProperty Render3DStateProperty = DependencyProperty.Register(nameof(Render3DState), typeof(bool?), typeof(GMapPropertyPidsGroupControl),
+            new PropertyMetadata(true, (d, e) => ((GMapPropertyPidsGroupControl)d).OnRender3DStateChanged(e)));
+
+        private bool _syncingRender3DState;
+
+        private void OnRender3DChanged(DependencyPropertyChangedEventArgs e)
+        {
+            SetRender3DState((bool)e.NewValue);
+            OnFenceFieldChanged("Render3D", e, m => m.Render3D = (bool)e.NewValue);
+        }
+
+        private void OnRender3DStateChanged(DependencyPropertyChangedEventArgs e)
+        {
+            if (_syncingRender3DState || e.NewValue is not bool b) return;
+            if (Render3D != b) Render3D = b;
+            // 그룹 Pending(서로 다름)에서 대표값과 같은 값을 고른 경우 — Render3D 는 안 바뀌지만 전원에 적용해야 한다
+            else if (CanWriteFence && IsGroupMode) OnMarkerPropertyChanged("Render3D", Render3D, b);
+        }
+
+        private void SetRender3DState(bool? value)
+        {
+            _syncingRender3DState = true;
+            try { Render3DState = value; }
+            finally { _syncingRender3DState = false; }
+        }
 
         /// <summary>철망 형태(기둥 간격/센서 장착) — TwoWay 바인딩(즉시 커밋).</summary>
         public EnumFenceMode FenceMode { get => (EnumFenceMode)GetValue(FenceModeProperty); set => SetValue(FenceModeProperty, value); }
@@ -85,12 +113,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public System.Windows.Input.ICommand ResetFenceHeightCommand { get; }
         public System.Windows.Input.ICommand SetPostSpacingPresetCommand { get; }
 
-        private bool CanWriteFence => !_isInitializing && !_isClearingBindings && !_syncingFence && !IsGroupEditing && SelectedMarker is IPidsGroupEditableMarker;
+        private bool CanWriteFence => !_isInitializing && !_isClearingBindings && !_syncingFence && SelectedMarker is IPidsGroupEditableMarker;
+
+        /// <summary>그룹 Pending 표기 — 철망 형태가 서로 다름(콤보 무선택).</summary>
+        internal static readonly EnumFenceMode MIXED_FENCE_MODE = (EnumFenceMode)(-1);
 
         private void OnFenceFieldChanged(string name, DependencyPropertyChangedEventArgs e, Action<IPidsGroupEditableMarker> apply)
         {
             if (!CanWriteFence || SelectedMarker is not IPidsGroupEditableMarker marker) return;
-            apply(marker);
+            if (e.NewValue is EnumFenceMode fm && !Enum.IsDefined(fm)) return;   // 그룹 Pending sentinel — 미전파
+            if (!IsGroupMode) apply(marker);   // 그룹=VM 이 전원(대표 포함) 일괄 적용
             OnMarkerPropertyChanged(name, e.OldValue, e.NewValue);
             UpdateFenceSummary();
         }
@@ -107,7 +139,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         {
             if (SelectedMarker is not IPidsGroupEditableMarker marker) return;
             object? before = name == "PostSpacingM" ? marker.PostSpacingM : marker.FenceHeightM;   // NULL(상속) → 값 전이도 undo 로 복원 가능
-            apply(marker);
+            if (!IsGroupMode) apply(marker);   // 그룹=VM 이 전원 일괄 적용(before 도 마커마다 VM 이 읽는다)
             OnMarkerPropertyChanged(name, before, last);
         }
 
@@ -116,9 +148,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private void ResetPostSpacing()
         {
-            if (SelectedMarker is not IPidsGroupEditableMarker marker || IsGroupEditing) return;
+            if (SelectedMarker is not IPidsGroupEditableMarker marker) return;
             _spacingCommit.Cancel();
             var before = marker.PostSpacingM;
+            if (IsGroupMode)
+            {
+                // 그룹: VM 이 전원을 NULL(전역 기본)로 되돌린다 — 패널은 기본값 · 「기본」 표시만
+                OnMarkerPropertyChanged("PostSpacingM", before, null);
+                SyncFence(() => { IsPostSpacingInherited = true; PostSpacingM = FencePostSpacingDefault; });
+                return;
+            }
             marker.PostSpacingM = null;
             OnMarkerPropertyChanged("PostSpacingM", before, null);
             SyncFenceFromMarker(marker);
@@ -126,12 +165,51 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private void ResetFenceHeight()
         {
-            if (SelectedMarker is not IPidsGroupEditableMarker marker || IsGroupEditing) return;
+            if (SelectedMarker is not IPidsGroupEditableMarker marker) return;
             _heightCommit.Cancel();
             var before = marker.FenceHeightM;
+            if (IsGroupMode)
+            {
+                OnMarkerPropertyChanged("FenceHeightM", before, null);
+                SyncFence(() => { IsFenceHeightInherited = true; FenceHeightM = FenceHeightDefault; });
+                return;
+            }
             marker.FenceHeightM = null;
             OnMarkerPropertyChanged("FenceHeightM", before, null);
             SyncFenceFromMarker(marker);
+        }
+
+        /// <summary>패널 값만 바꾼다(마커 · 이벤트로 되쓰지 않음).</summary>
+        private void SyncFence(Action set)
+        {
+            _syncingFence = true;
+            try { set(); }
+            finally { _syncingFence = false; }
+            UpdateFenceSummary();
+        }
+
+        /// <summary>그룹 Pending — 3D 철망 필드도 "전원 동일=값 / 다름=빈칸(—)" (기존 그룹 편집 관용구).
+        /// 기둥 간격 · 높이는 NULL(전역 기본 상속)도 하나의 값으로 비교한다 — 모두 NULL 이면 기본값 + 「기본」 표시.</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            base.ApplyGroupPendingSpecific();   // 라인 · 장비 그룹 = 대표값(기존 동작)
+            var g = GroupMarkers!.OfType<IPidsGroupEditableMarker>().ToList();
+            if (g.Count < 2) return;
+            bool AllEq<T>(Func<IPidsGroupEditableMarker, T> sel) => g.All(m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+
+            SyncFence(() =>
+            {
+                bool spacingSame = AllEq(m => m.PostSpacingM);
+                IsPostSpacingInherited = spacingSame && g[0].PostSpacingM is null;
+                PostSpacingM = spacingSame ? g[0].PostSpacingM ?? FencePostSpacingDefault : MIXED_DOUBLE;
+                bool heightSame = AllEq(m => m.FenceHeightM);
+                IsFenceHeightInherited = heightSame && g[0].FenceHeightM is null;
+                FenceHeightM = heightSame ? g[0].FenceHeightM ?? FenceHeightDefault : MIXED_DOUBLE;
+                FenceMode = AllEq(m => m.FenceMode) ? g[0].FenceMode : MIXED_FENCE_MODE;
+                bool render3DSame = AllEq(m => m.Render3D);
+                Render3D = g[0].Render3D;
+                SetRender3DState(render3DSame ? g[0].Render3D : (bool?)null);
+            });
         }
 
         /// <summary>모델 변경을 다시 읽어야 하는 3D 철망 절 필드 — 이름은 <see cref="GMapSymbols.GMapPidsGroupMarker"/> 의 통지명과 같다.</summary>
@@ -175,6 +253,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 IsFenceHeightInherited = marker.FenceHeightM is null;
                 FenceHeightM = marker.FenceHeightM ?? FenceHeightDefault;
                 Render3D = marker.Render3D;
+                SetRender3DState(marker.Render3D);
                 FenceMode = marker.FenceMode;
             }
             finally { _syncingFence = false; }
@@ -183,7 +262,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private void UpdateFenceSummary()
         {
-            if (SelectedMarker is not IPidsGroupEditableMarker marker || marker.RuntimePoints is not { Count: >= 2 } pts)
+            // 그룹 편집: 요약은 마커 하나의 선 모양에 딸린 값이라 비운다
+            if (IsGroupMode || SelectedMarker is not IPidsGroupEditableMarker marker || marker.RuntimePoints is not { Count: >= 2 } pts)
             { FenceLayoutSummary = string.Empty; return; }
             var local = Helpers.Fence.FenceLayout.ToLocalMeters(pts.Select(p => (p.Lat, p.Lng)).ToList());
             var result = Helpers.Fence.FenceLayout.Compute(local, PostSpacingM, FenceMode, marker.IsClosedPath);
