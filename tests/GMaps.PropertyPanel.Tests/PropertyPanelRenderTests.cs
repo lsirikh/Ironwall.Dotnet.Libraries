@@ -93,7 +93,7 @@ public class PropertyPanelRenderTests
     });
 
     [Fact]
-    public void should_hide_fence_block_when_symbol3d_disabled_or_group_editing() => AppHost.Run(() =>
+    public void should_hide_fence_block_when_symbol3d_disabled_but_show_it_in_group_editing() => AppHost.Run(() =>
     {
         var model = new PidsGroupSymbolModel { Latitude = 37.5, Longitude = 127.0 };
         model.LinePoints = new List<GeoPoint> { new(37.5, 127.0, 0), new(37.5, 127.001, 0) };
@@ -106,7 +106,10 @@ public class PropertyPanelRenderTests
         AppHost.Layout(panel, 300, 520);
         var section = Descendants(panel).First(e => AutomationProperties.GetAutomationId(e) == "GMaps.Property.FenceSection");
         Assert.Equal(Visibility.Collapsed, section.Visibility);
-        panel.Is3DFeatureEnabled = true; panel.IsGroupEditing = true; AppHost.Layout(panel, 300, 520);
-        Assert.Equal(Visibility.Collapsed, section.Visibility);
+        panel.IsGroupEditing = true; AppHost.Layout(panel, 300, 520);
+        Assert.Equal(Visibility.Collapsed, section.Visibility);   // 3D 기능 꺼짐 = 그룹 편집이어도 숨김
+        // 사용자 지시(2026-10-19): 철망 값은 공통 속성 → 그룹 편집(다중 선택)에서도 보인다(종전엔 숨김)
+        panel.Is3DFeatureEnabled = true; AppHost.Layout(panel, 300, 520);
+        Assert.Equal(Visibility.Visible, section.Visibility);
     });
 }

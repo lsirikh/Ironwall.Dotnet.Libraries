@@ -85,7 +85,11 @@ public sealed class Map3DAreaMarker : GMapMarker
         e.Handled = true;   // 지도 우클릭(마커 · 이미지 메뉴)으로 올라가지 않게
         var menu = new ContextMenu { PlacementTarget = _badge };
         foreach (var action in Item.Actions)
-            menu.Items.Add(new MenuItem { Header = action.Header, Command = action.Command });
+        {
+            var mi = new MenuItem { Header = action.Header, Command = action.Command };
+            if (action.AutomationId != null) AutomationProperties.SetAutomationId(mi, action.AutomationId);   // 「만들기 취소」
+            menu.Items.Add(mi);
+        }
         menu.IsOpen = true;
     }
 

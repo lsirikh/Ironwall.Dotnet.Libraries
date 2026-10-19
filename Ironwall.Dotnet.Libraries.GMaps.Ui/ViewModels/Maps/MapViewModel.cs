@@ -2994,6 +2994,7 @@ public partial class MapViewModel : BasePanelViewModel,
         RefreshCameraPopupPositions();
         if (MainMap != null) _customMapOverlayService?.RefreshVisibleTiles(MainMap);
         QueueRotationStateSave(snap.CanonicalBearing);
+        OnMap3DAreaBearingChanged(snap.CanonicalBearing);   // 3D 영역 테두리 · 배지도 회전을 따른다(MapViewModel.Map3DAreas)
     }
 
     // ── [회전 영속] 각도 저장 debounce — 휠 연속 회전 중 매 스텝 파일쓰기 방지(1초 정지 후 1회) ──
@@ -8997,7 +8998,8 @@ public partial class MapViewModel : BasePanelViewModel,
         if (targets.Count == 0) return;
 
         // Pending sentinel 방어 — 정상 경로에선 미발생(패널 초기화 중 이벤트 억제)이나 값 오염 백스톱.
-        if (e.NewValue is null) return;
+        // 단, 철망 기둥 간격 · 높이의 null 은 「기본」(전역 기본 상속)이라 정상 값이다.
+        if (e.NewValue is null && e.PropertyName is not ("PostSpacingM" or "FenceHeightM")) return;
         if (e.NewValue is double nd && double.IsNaN(nd)) return;
         if (e.NewValue is Ironwall.Dotnet.Libraries.Enums.EnumColorType nc && (int)nc < 0) return;
 

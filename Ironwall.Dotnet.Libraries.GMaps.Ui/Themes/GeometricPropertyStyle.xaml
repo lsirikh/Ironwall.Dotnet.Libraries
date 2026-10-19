@@ -52,11 +52,11 @@
 							Maximum="1"
 							Minimum="0"
 							TickFrequency="0.01"
-							Value="{Binding MarkerOpacity}" />
+							Value="{Binding MarkerOpacity, Converter={StaticResource NaNBlank}}" />
 						<TextBlock
 							Grid.Column="2"
 							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Text="{Binding MarkerOpacity, StringFormat='{}{0:P0}'}" />
+							Text="{Binding MarkerOpacity, Converter={StaticResource NaNDashPercent}}" />
 					</Grid>
 				</StackPanel>
 			</Setter.Value>
