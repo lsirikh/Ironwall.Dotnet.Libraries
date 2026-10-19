@@ -25,14 +25,16 @@ public sealed class Map3DAreaMarker : GMapMarker
     /// <summary>강조 고리(LocateRingMarker) 바로 밑 — 배지가 심볼에 가려지지 않게. 테두리는 입력을 받지 않으므로 위에 있어도 클릭을 막지 않는다.</summary>
     public const int AreaZIndex = int.MaxValue - 17;
 
-    private readonly Rectangle _outline;
+    private readonly Polygon _outline;
     private readonly Border _badge;
 
-    public Map3DAreaMarker(Map3DAreaItem item) : base(new PointLatLng(item.Bbox[3], item.Bbox[0]))
+    /// <summary>위치 = 영역 왼쪽 위 모서리(옛 영역 = bbox 북서, 회전 영역 = 사각형 로컬 왼쪽 위).</summary>
+    public Map3DAreaMarker(Map3DAreaItem item) : base(TopLeftOf(item))
     {
         Item = item;
 
-        _outline = new Rectangle { StrokeThickness = 1.5, Fill = null, IsHitTestVisible = false };
+        // 테두리 = 네 모서리 다각형(2026-10-19) — 회전 영역은 기울어진 네모, 지도가 돌아가 있어도 모서리마다 화면에 투영해 맞는다
+        _outline = new Polygon { StrokeThickness = 1.5, Fill = null, IsHitTestVisible = false };
         _outline.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "PrimaryBrush");
 
         var text = new TextBlock { Text = "3D", FontSize = 11, FontWeight = FontWeights.Bold, Margin = new Thickness(6, 1, 6, 2) };
@@ -59,17 +61,24 @@ public sealed class Map3DAreaMarker : GMapMarker
 
     public Map3DAreaItem Item { get; }
 
-    /// <summary>줌 · 표시 여부 반영 — 보일 때만 북서 · 남동 모서리를 화면에 투영해 테두리 크기를 맞춘다.</summary>
+    /// <summary>줌 · 표시 여부 반영 — 보일 때만 네 모서리를 화면에 투영해(마커 자리 기준) 테두리를 맞춘다.</summary>
     public void Refresh(GMapControl map, bool visible)
     {
         if (Shape is not UIElement shape) return;
         shape.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible) return;
-        var nw = map.FromLatLngToLocal(new PointLatLng(Item.Bbox[3], Item.Bbox[0]));
-        var se = map.FromLatLngToLocal(new PointLatLng(Item.Bbox[1], Item.Bbox[2]));
-        _outline.Width = System.Math.Max(2, se.X - nw.X);
-        _outline.Height = System.Math.Max(2, se.Y - nw.Y);
+        var origin = map.FromLatLngToLocal(Position);
+        var points = new PointCollection();
+        foreach (var (lat, lon) in Item.Area.Corners)
+        {
+            var p = map.FromLatLngToLocal(new PointLatLng(lat, lon));
+            points.Add(new Point(p.X - origin.X, p.Y - origin.Y));
+        }
+        _outline.Points = points;
     }
+
+    private static PointLatLng TopLeftOf(Map3DAreaItem item)
+        => item.Area.Corners is { Count: 4 } c ? new PointLatLng(c[0].Lat, c[0].Lon) : new PointLatLng(item.Bbox[3], item.Bbox[0]);
 
     private void OnBadgeRightButtonDown(object sender, MouseButtonEventArgs e)
     {

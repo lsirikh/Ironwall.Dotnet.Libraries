@@ -1042,6 +1042,10 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     public event System.Action<PointLatLng, PointLatLng>? AnchorAreaDrawn;
     /// <summary>앵커 영역 그리기 중 마퀴 옆 글(NW, SE → 글 · 경고) — 3D 영역 그리기의 크기 표시 · 2 km 경고. null 이면 글 없음.</summary>
     public System.Func<PointLatLng, PointLatLng, (string Text, bool IsWarning)>? AnchorDrawLabel { get; set; }
+    /// <summary>앵커 영역 그리기 중 마퀴 옆 글 — 화면 사각형 네 모서리(좌상 · 우상 · 우하 · 좌하) 위경도로(회전된 3D 영역의 실제 가로 · 세로). 있으면 <see cref="AnchorDrawLabel"/> 대신.</summary>
+    public System.Func<IReadOnlyList<PointLatLng>, (string Text, bool IsWarning)>? AnchorDrawCornersLabel { get; set; }
+    /// <summary>마지막 앵커 영역 드래그의 화면 사각형 네 모서리(좌상 · 우상 · 우하 · 좌하) 위경도 — <see cref="AnchorAreaDrawn"/> 직전에 채운다(회전된 3D 영역).</summary>
+    public IReadOnlyList<PointLatLng>? LastAnchorCorners { get; private set; }
     private static readonly Pen _rubberPen = CreateDashedPen(Color.FromArgb(210, 0, 170, 255), 1.5d);
     private static readonly Brush _rubberFill = CreateFrozenBrush(Color.FromArgb(40, 0, 170, 255));
     private static Brush CreateFrozenBrush(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
@@ -1340,6 +1344,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
                     if (ar.Width >= 4 && ar.Height >= 4)   // 최소 드래그(오클릭 방지)
                     {
                         IsAnchorDrawMode = false;                                    // 유효 드래그 → 모드 종료
+                        LastAnchorCorners = RubberRectCorners(ar);                   // 회전된 3D 영역은 화면 사각형 그대로
                         var (nw, se) = RubberRectToGeo(ar);                          // 정규화 북서 · 남동(R-28)
                         AnchorAreaDrawn?.Invoke(nw, se);                             // VM이 채우고 ExitAnchorDrawMode(커서 복원)
                     }
@@ -2824,6 +2829,12 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     {
         if (_rubberBandAdorner == null || !_rubberStart.HasValue || !_rubberCurrent.HasValue) return;
         var rect = new Rect(_rubberStart.Value, _rubberCurrent.Value);
+        if (_rubberForAnchor && AnchorDrawCornersLabel is { } cornersLabelOf && rect.Width >= 1 && rect.Height >= 1)
+        {
+            var (text, warn) = cornersLabelOf(RubberRectCorners(rect));
+            _rubberBandAdorner.Update(rect, text, warn);
+            return;
+        }
         if (_rubberForAnchor && AnchorDrawLabel is { } labelOf && rect.Width >= 1 && rect.Height >= 1)
         {
             var (nw, se) = RubberRectToGeo(rect);
@@ -2838,16 +2849,22 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     /// 정규화(HeightLat 음수·뒤틀린 저장 방지). 비회전에선 2코너와 같은 결과.</summary>
     private (PointLatLng Nw, PointLatLng Se) RubberRectToGeo(Rect ar)
     {
-        var g1 = FromLocalToLatLng((int)ar.Left, (int)ar.Top);
-        var g2 = FromLocalToLatLng((int)ar.Right, (int)ar.Top);
-        var g3 = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);
-        var g4 = FromLocalToLatLng((int)ar.Left, (int)ar.Bottom);
+        var c = RubberRectCorners(ar);
+        PointLatLng g1 = c[0], g2 = c[1], g3 = c[2], g4 = c[3];
         double north = Math.Max(Math.Max(g1.Lat, g2.Lat), Math.Max(g3.Lat, g4.Lat));
         double south = Math.Min(Math.Min(g1.Lat, g2.Lat), Math.Min(g3.Lat, g4.Lat));
         double west = Math.Min(Math.Min(g1.Lng, g2.Lng), Math.Min(g3.Lng, g4.Lng));
         double east = Math.Max(Math.Max(g1.Lng, g2.Lng), Math.Max(g3.Lng, g4.Lng));
         return (new PointLatLng(north, west), new PointLatLng(south, east));
     }
+
+    /// <summary>화면 사각형 네 모서리 위경도 — 좌상 · 우상 · 우하 · 좌하(회전 시 지리 방향과 다르다).</summary>
+    private PointLatLng[] RubberRectCorners(Rect ar)
+        => new[]
+        {
+            FromLocalToLatLng((int)ar.Left, (int)ar.Top), FromLocalToLatLng((int)ar.Right, (int)ar.Top),
+            FromLocalToLatLng((int)ar.Right, (int)ar.Bottom), FromLocalToLatLng((int)ar.Left, (int)ar.Bottom),
+        };
 
     /// <summary>러버밴드 마퀴 어도너 제거(종료/취소).</summary>
     private void HideRubberBand()

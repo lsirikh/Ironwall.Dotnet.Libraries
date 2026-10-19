@@ -117,9 +117,17 @@ public static class Map3DBake
     /// 장면 목록(GET /api/jobs)으로 돌려준다. 옛 서버는 모르는 키를 무시한다. 줌이 없거나 수가 아니면 넣지 않는다.
     /// </summary>
     public static JObject BuildBody(double[] bbox, string? mode, IEnumerable<Map3DBakeOverlay>? overlays, double? enterZoom)
+        => BuildBody(bbox, mode, overlays, enterZoom, null);
+
+    /// <summary>
+    /// 굽기 요청 본문 — 회전 영역(2026-10-19)이면 rect {lon, lat, width_m, height_m, rotation_deg} 도 넣는다(bbox 는 감싸는 상자 그대로 —
+    /// 옛 서버는 rect 를 모르고 bbox 로 굽는다). rect 가 없으면 예전 본문과 똑같다.
+    /// </summary>
+    public static JObject BuildBody(double[] bbox, string? mode, IEnumerable<Map3DBakeOverlay>? overlays, double? enterZoom, Map3DRotRect? rect)
     {
         var body = new JObject { ["bbox"] = new JArray(bbox.Cast<object>().ToArray()) };
         if (enterZoom is double z && double.IsFinite(z)) body["enter_zoom"] = z;
+        if (rect != null) body["rect"] = rect.ToJson();
         string m = NormalizeMode(mode);
         if (m == ModeTiles) return body;
         body["overlay_mode"] = ServerOverlayMode(m);

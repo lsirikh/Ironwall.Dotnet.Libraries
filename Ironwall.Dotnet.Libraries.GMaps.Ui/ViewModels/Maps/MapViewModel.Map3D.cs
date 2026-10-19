@@ -341,24 +341,30 @@ public partial class MapViewModel
         CloseMap3DBakeOptions();   // 열려 있던 굽기 방식 패널은 새 영역 그리기로 대신한다
         EnterAnchorDrawMode();   // 러버밴드 · 십자 커서 · ESC 후킹 · 포커스
         _isMap3DDrawMode = true;
-        // 그리는 중 마퀴 옆 크기 표시 — 한 변 2 km 를 넘으면 경고색(R6)
-        MainMap.AnchorDrawLabel = (nw, se) => Map3DGuide.AreaDrawLabel(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng), _map3DSettings.MaxAreaSideM);
+        // 그리는 중 마퀴 옆 크기 표시 — 한 변 2 km 를 넘으면 경고색(R6). 지도가 돌아가 있으면 화면 사각형의 실제 가로 · 세로(회전 영역, 2026-10-19)
+        MainMap.AnchorDrawCornersLabel = corners => Map3DGuide.AreaDrawLabel(Map3DAreaOf(corners), _map3DSettings.MaxAreaSideM);
         SetAimStatus("지도에서 드래그해 3D 로 만들 영역을 그리세요 (Enter = 지금 화면 · ESC = 취소)");
     }
+
+    /// <summary>화면 사각형 네 모서리(좌상 · 우상 · 우하 · 좌하) → 3D 영역 — 지도가 돌아가 있으면 그 사각형 그대로(회전 영역), 아니면 북쪽 정렬 bbox.</summary>
+    private Map3DArea Map3DAreaOf(IReadOnlyList<PointLatLng> corners)
+        => Map3DMath.AreaFromScreenCorners(corners.Select(c => (c.Lat, c.Lng)).ToList(), MainMap?.Bearing ?? 0d);
 
     /// <summary>앵커 그리기 완료가 3D 그리기였으면 굽기로 넘긴다(OnAnchorAreaDrawn 서두에서 호출).</summary>
     private bool TryTakeMap3DArea(PointLatLng nw, PointLatLng se)
     {
         if (!_isMap3DDrawMode) return false;
+        var corners = MainMap?.LastAnchorCorners;
         ExitAnchorDrawMode();
-        TakeMap3DArea(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng));
+        TakeMap3DArea(corners is { Count: 4 } ? Map3DAreaOf(corners) : new Map3DArea(Map3DMath.BuildBbox(nw.Lat, nw.Lng, se.Lat, se.Lng), null));
         return true;
     }
 
-    /// <summary>그린 영역(또는 Enter = 지금 화면) — 한 변 2 km 를 넘으면 이유를 알리고 다시 그리기 모드로, 아니면 굽는다.</summary>
-    private void TakeMap3DArea(double[] bbox)
+    /// <summary>그린 영역(또는 Enter = 지금 화면) — 한 변 2 km 를 넘으면 이유를 알리고 다시 그리기 모드로, 아니면 굽는다.
+    /// 크기는 회전 영역이면 회전 사각형의 실제 변 길이.</summary>
+    private void TakeMap3DArea(Map3DArea area)
     {
-        var (w, h) = Map3DGuide.AreaSizeMeters(bbox);
+        var (w, h) = area.SizeMeters;
         if (Map3DGuide.IsAreaTooLarge(w, h, _map3DSettings.MaxAreaSideM))
         {
             _log?.Info($"[Map3D] 영역이 너무 큼 {Map3DGuide.FormatAreaSize(w, h)} → 다시 그리기");
@@ -366,7 +372,7 @@ public partial class MapViewModel
             SetAimStatus(Map3DGuide.AreaTooLargeText(w, h, _map3DSettings.MaxAreaSideM));
             return;
         }
-        RequestMap3DBake(bbox);   // 만들기 패널 — 3D 줌 고르기(+ 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식, MapViewModel.Map3DBakeOptions)
+        RequestMap3DBake(area);   // 만들기 패널 — 3D 줌 고르기(+ 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식, MapViewModel.Map3DBakeOptions)
     }
 
     /// <summary>창 PreviewKeyDown(OnMapPreviewKeyDownForAim) 서두 — 3D 그리기 중 Enter = 지금 화면 전체, 3D 화면 중 ESC = 2D 복귀.</summary>
@@ -380,8 +386,12 @@ public partial class MapViewModel
             double s = MainMap.DigitalZoomScale;
             double cLat = v.Lat - v.HeightLat / 2.0, cLng = v.Lng + v.WidthLng / 2.0;
             double hLat = v.HeightLat / 2.0 / s, hLng = v.WidthLng / 2.0 / s;
+            // 지도가 돌아가 있으면 ViewArea 는 돌아간 화면을 감싸는 상자라 — 보이는 화면 네 모서리(디지털 줌 배율은 가운데 기준)를 그대로 영역으로
+            var area = Map3DMath.ToMap3DBearing(MainMap.Bearing) == 0d
+                ? new Map3DArea(Map3DMath.BuildBbox(cLat + hLat, cLng - hLng, cLat - hLat, cLng + hLng), null)
+                : Map3DAreaOf(VisibleScreenCorners(MainMap.ActualWidth, MainMap.ActualHeight, s));
             ExitAnchorDrawMode();
-            TakeMap3DArea(Map3DMath.BuildBbox(cLat + hLat, cLng - hLng, cLat - hLat, cLng + hLng));
+            TakeMap3DArea(area);
             e.Handled = true;
             return true;
         }
@@ -396,6 +406,14 @@ public partial class MapViewModel
             return true;
         }
         return false;
+    }
+
+    /// <summary>보이는 화면 네 모서리 위경도(좌상 · 우상 · 우하 · 좌하) — 디지털 줌은 컨트롤 가운데 기준 배율이라 로컬 좌표에서 그만큼 안쪽.</summary>
+    private IReadOnlyList<PointLatLng> VisibleScreenCorners(double width, double height, double digitalScale)
+    {
+        double hw = width / 2d / digitalScale, hh = height / 2d / digitalScale, cx = width / 2d, cy = height / 2d;
+        return new[] { (cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh), (cx - hw, cy + hh) }
+            .Select(p => MainMap!.FromLocalToLatLng((int)p.Item1, (int)p.Item2)).ToArray();
     }
 
     /// <summary>
@@ -435,15 +453,16 @@ public partial class MapViewModel
     // ── 굽기 ──
 
     /// <param name="enterZoom">그 영역의 3D 로 바뀌는 줌(만들기 패널에서 고른 값) — 굽기 요청 enter_zoom.</param>
-    private async Task BakeMap3DAsync(double[] bbox, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double enterZoom)
+    private async Task BakeMap3DAsync(Map3DArea area, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double enterZoom)
     {
         if (_map3DClient == null || _isMap3DBaking) return;
         _isMap3DBaking = true;
         DrawMap3DAreaCommand.RaiseCanExecuteChanged();
+        var bbox = area.Bbox;
         try
         {
-            _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] overlay={overlayMode} images={overlays?.Count ?? 0} enterZoom={enterZoom}");
-            var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays, enterZoom);
+            _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] rect={area.Rect?.ToJson().ToString(Newtonsoft.Json.Formatting.None) ?? "-"} overlay={overlayMode} images={overlays?.Count ?? 0} enterZoom={enterZoom}");
+            var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays, enterZoom, area.Rect);
             while (!job.IsDone && !job.IsError)
             {
                 SetAimStatus($"3D 만드는 중… {job.Progress:P0}{(string.IsNullOrEmpty(job.Message) ? "" : $" — {job.Message}")}");
@@ -462,7 +481,7 @@ public partial class MapViewModel
                 return;
             }
             _map3DScenes.RemoveAll(sc => sc.Id == job.Id);
-            _map3DScenes.Add(new Map3DScene(job.Id, bbox) { EnterZoom = enterZoom });
+            _map3DScenes.Add(new Map3DScene(job.Id, bbox) { EnterZoom = enterZoom, Rect = area.Rect });
             _map3DEntrySuppressed = false;
             SetAimStatus(Map3DMath.IsZoomEntry(_map3DSettings.EntryMode)
                 ? $"3D 준비됨 — 줌 {Map3DGuide.Zoom(Map3DAreaEnterZoom(job.Id, enterZoom))} 이상에서 3D"
@@ -531,7 +550,7 @@ public partial class MapViewModel
         if (MainMap == null || !_map3DSettings.IsEnabled || _map3DState == Map3DState.Shown) return;
         var center = MainMap.Position;
         double zoom = MainMap.EffectiveZoom;
-        var scene = _map3DScenes.Find(sc => Map3DMath.BboxContains(sc.Bbox, center.Lng, center.Lat));
+        var scene = FindMap3DSceneAt(center);
         // 굽는 동안은 3D 로 들어가지 않는다 — 영역을 그리고 나면 곧바로 옛 3D 로 들어가 굽기 진행 패널이 가려졌다(2026-10-17 실기 S1)
         var gate = Map3DGateFor(scene);   // 그 영역의 진입 · 이탈 · 미리 준비 줌(영역마다 3D 줌)
         // 이벤트 2D 비행 중에는 출발 자리에서 3D 로 다시 들어가지 않는다 — 끝난 자리에서 판정한다(마지막 프레임의 위치 변경이 게이트를 다시 부른다)
@@ -561,6 +580,9 @@ public partial class MapViewModel
             LoadMap3DScene(job);
         }
     }
+
+    /// <summary>지점(화면 가운데)을 덮는 만들어 둔 3D 영역 — 회전 영역은 회전 사각형 안, 옛 영역은 bbox 안(Map3DMath.SceneContains).</summary>
+    private Map3DScene? FindMap3DSceneAt(PointLatLng p) => _map3DScenes.Find(sc => Map3DMath.SceneContains(sc, p.Lng, p.Lat));
 
     /// <summary>로딩 중(Pending) 진입 취소 — 패널을 닫고 1×1 로 접는다(불러오던 장면은 그대로 둬 다음 진입에 쓴다).</summary>
     private void CancelMap3DPending()
@@ -676,7 +698,9 @@ public partial class MapViewModel
         Map3DHost.Reveal();
         Map3DHost.PostCamera(Current2DCamera(Map3DMath.DefaultPitchDeg), animate: true); // 0.6 s 동안 눕힌다
         // 모든 진입 — 영역 전체가 화면에 다 들어오는 비스듬한 시점으로(거리는 3D 가 화면 비율 · 시야각으로 셈한다). 옛 3D 서버는 모르는 메시지라 눕히기만 남는다.
-        Map3DHost.PostJson(Map3DMath.EnterViewMessageJson(Map3DMath.ToMap3DBearing(MainMap.Bearing)));
+        // 「이 영역 3D 로 보기」로 연 회전 영역은 그 회전각(사각형이 반듯하게) — 그 밖은 지금 2D 방위
+        var areaViewRect = _map3DAreaViewJob != null && _map3DAreaViewJob == _map3DJob ? _map3DScenes.Find(sc => sc.Id == _map3DJob)?.Rect : null;
+        Map3DHost.PostJson(Map3DMath.EnterViewMessageJson(Map3DMath.EnterBearing(MainMap.Bearing, areaViewRect)));
         HoldMap2DInput();                                                               // 3D 가 보이는 동안 2D 입력 막음(나올 때 RestoreMap2DInput)
         EnsureAimEscWindowHook();
         BeginMap3DWindows();                                                            // 카메라 상자 · 조립 카드가 3D 마커 자리를 따라간다(MapViewModel.Map3DWindows)
@@ -964,7 +988,7 @@ public partial class MapViewModel
     private bool Map3DStaysAt(PointLatLng center, double effectiveZoom)
     {
         var scene = _map3DScenes.Find(sc => sc.Id == _map3DJob);
-        bool inside = scene != null && Map3DMath.BboxContains(scene.Bbox, center.Lng, center.Lat);
+        bool inside = scene != null && Map3DMath.SceneContains(scene, center.Lng, center.Lat);
         return Map3DMath.ShouldStay3DAfterMove(effectiveZoom, inside, Map3DGateFor(scene).Exit);
     }
 

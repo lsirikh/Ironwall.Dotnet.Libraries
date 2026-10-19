@@ -209,6 +209,7 @@ public partial class MapViewModel
         }
         MainMap.IsAnchorDrawMode = true;
         MainMap.AnchorDrawLabel = null;   // 크기 표시는 3D 영역 그리기만(MapViewModel.Map3D 가 이 뒤에 켠다)
+        MainMap.AnchorDrawCornersLabel = null;
         SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로(MapViewModel.Map3D)
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         EnsureAimEscWindowHook();
@@ -224,6 +225,7 @@ public partial class MapViewModel
         {
             MainMap.IsAnchorDrawMode = false;
             MainMap.AnchorDrawLabel = null;
+            MainMap.AnchorDrawCornersLabel = null;
             // ⚠ 플래그만 끄면 취소가 취소가 되지 않는다(VF-17). 릴리스 핸들러는
             //   IsAnchorDrawMode 가 아니라 내부 _rubberForAnchor 로 분기하므로,
             //   ESC 를 눌러도 버튼을 떼는 순간 AnchorAreaDrawn 이 발화해 앵커 폼이 채워졌다.

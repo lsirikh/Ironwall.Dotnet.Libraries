@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
@@ -281,6 +283,37 @@ public static class Map3DMath
     /// <summary>bbox 가 지점을 덮는가(경계 포함).</summary>
     public static bool BboxContains(IReadOnlyList<double> bbox, double lon, double lat)
         => bbox.Count == 4 && lon >= bbox[0] && lat >= bbox[1] && lon <= bbox[2] && lat <= bbox[3];
+
+    // ── 회전 영역(2026-10-19) ──
+
+    /// <summary>
+    /// 그린 화면 사각형의 네 모서리(위도, 경도 — 좌상 · 우상 · 우하 · 좌하) → 3D 영역. 지도 방위가 0 이면 예전과 같은 북쪽 정렬 bbox(네 모서리의 최소 · 최대)만,
+    /// 돌아가 있으면 그 사각형 그대로 — 가운데 = 네 모서리 평균, 가로 = 위 · 아래 변 길이 평균, 세로 = 왼쪽 · 오른쪽 변 길이 평균, 회전각 = 지도 방위.
+    /// 모서리가 4개가 아니면 빈 영역.
+    /// </summary>
+    public static Map3DArea AreaFromScreenCorners(IReadOnlyList<(double Lat, double Lon)> corners, double gmapBearing)
+    {
+        if (corners.Count != 4) return new Map3DArea(Array.Empty<double>(), null);
+        var bbox = BuildBbox(corners.Max(c => c.Lat), corners.Min(c => c.Lon), corners.Min(c => c.Lat), corners.Max(c => c.Lon));
+        double rotation = ToMap3DBearing(gmapBearing);
+        if (rotation == 0d) return new Map3DArea(bbox, null);
+        double lat = corners.Average(c => c.Lat), lon = corners.Average(c => c.Lon);
+        var probe = new Map3DRotRect(lon, lat, 1d, 1d, rotation);   // 미터 환산(사각형 로컬)만 빌린다
+        var p = corners.Select(c => probe.ToLocal(c.Lon, c.Lat)).ToArray();
+        double Dist((double X, double Y) a, (double X, double Y) b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+        var rect = new Map3DRotRect(lon, lat, (Dist(p[0], p[1]) + Dist(p[3], p[2])) / 2d, (Dist(p[0], p[3]) + Dist(p[1], p[2])) / 2d, rotation);
+        return new Map3DArea(rect.Bbox(), rect);
+    }
+
+    /// <summary>장면이 지점을 덮는가 — 회전 영역이면 회전 사각형 안, 아니면 bbox 안(경계 포함).</summary>
+    public static bool SceneContains(Map3DScene scene, double lon, double lat)
+        => scene.Rect?.Contains(lon, lat) ?? BboxContains(scene.Bbox, lon, lat);
+
+    /// <summary>
+    /// 「이 영역 3D 로 보기」로 들어갈 때 3D 방위 — 회전 영역이면 그 회전각(사각형이 반듯하게 보이는 방위), 아니면 지금 2D 방위.
+    /// </summary>
+    public static double EnterBearing(double gmapBearing, Map3DRotRect? areaRect)
+        => areaRect is { } r ? ToMap3DBearing(r.RotationDeg) : ToMap3DBearing(gmapBearing);
 
     public static string JobsUrl(string server) => $"{server}/api/jobs";
 
