@@ -99,6 +99,7 @@ public sealed class Map3DViewHost : Grid
     public async Task LoadAsync(string job, string url)
     {
         EnsureWebView();
+        var web = _web;
         Park();
         _job = job;
         _url = url;
@@ -110,11 +111,13 @@ public sealed class Map3DViewHost : Grid
         }
         catch (Exception ex)
         {
+            // 기다리는 사이 네이티브 창으로 바뀌었다(SwitchToHwnd) — 버린 컨트롤의 실패다. 새 컨트롤의 불러오기가 자기 결과를 알린다
+            if (!ReferenceEquals(web, _web)) return;
             if (_job == job) _failed = true;
             LoadFailed?.Invoke($"3D 화면(WebView2)을 준비하지 못했습니다: {ex.Message}");
             return;
         }
-        if (_job != job || _web?.CoreWebView2 == null) return;   // 기다리는 사이 다른 장면 요청이 왔다
+        if (_job != job || !ReferenceEquals(web, _web) || _web?.CoreWebView2 == null) return;   // 기다리는 사이 다른 장면 요청이 왔거나 컨트롤이 바뀌었다
         _web.CoreWebView2.Navigate(url);
     }
 
@@ -125,8 +128,10 @@ public sealed class Map3DViewHost : Grid
     public async Task PrewarmAsync()
     {
         EnsureWebView();
+        var web = _web;
         try { await EnsureCoreAsync(); }
-        catch (Exception ex) { LoadFailed?.Invoke($"3D 화면(WebView2)을 미리 준비하지 못했습니다: {ex.Message}"); }
+        catch (Exception ex) when (ReferenceEquals(web, _web)) { LoadFailed?.Invoke($"3D 화면(WebView2)을 미리 준비하지 못했습니다: {ex.Message}"); }
+        catch (Exception) { }   // 버린 컨트롤(SwitchToHwnd)의 실패 — 새 컨트롤과 무관
     }
 
     /// <summary>WebView2 기동은 한 번만(미리 데우기 · 장면 열기가 같은 Task 를 기다린다). 끝나면 메시지 · 탐색 이벤트를 1회 붙인다.</summary>

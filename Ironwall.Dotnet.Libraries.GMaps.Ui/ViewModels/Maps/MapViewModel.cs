@@ -326,6 +326,10 @@ public partial class MapViewModel : BasePanelViewModel,
 
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
+            // 3D 정리 — 3D 접기 · 구독 · 타이머 · 정적 이벤트 해제(MapViewModel.Map3D, 누수 방지)
+            try { CleanupMap3D(close); }
+            catch (Exception ex) { _log?.Error($"[Map3D] 정리 실패(격리): {ex.Message}"); }
+
             // Adorner 시스템 정리
             CleanupAdornerIntegration();
 
@@ -1428,9 +1432,21 @@ public partial class MapViewModel : BasePanelViewModel,
 
     /// <summary>묶음 회전 확정 → 멤버별 DB 영속(그룹 이동과 같은 저장 경로) 후 저장된 멤버만 Undo 1단위. 권한 없으면 원위치.
     /// 저장 실패 멤버는 회전 전 자리로 되돌린다(화면 = DB, 2026-10-19 사용자 결정).</summary>
-    private async void OnGroupRotateCompleted(System.Collections.Generic.IReadOnlyList<GroupRotationSession.Original> changed, double angle)
+    private void OnGroupRotateCompleted(System.Collections.Generic.IReadOnlyList<GroupRotationSession.Original> changed, double angle)
+        => _groupRotateSaveTask = SaveGroupRotationAsync(changed, angle);
+
+    /// <summary>진행 중(또는 마지막) 묶음 회전 확정 저장 — Undo/Redo 는 확정 직후 이것을 기다려 Undo 기록 순서를 지킨다. 예외는 안에서 삼킨다.</summary>
+    private System.Threading.Tasks.Task? _groupRotateSaveTask;
+
+    private async System.Threading.Tasks.Task SaveGroupRotationAsync(System.Collections.Generic.IReadOnlyList<GroupRotationSession.Original> changed, double angle)
     {
         if (changed == null || changed.Count == 0) return;
+        try { await SaveGroupRotationCoreAsync(changed, angle); }
+        catch (Exception ex) { _log?.Error($"그룹 회전 확정 처리 실패: {ex.Message}"); }   // 판 갱신 · Undo 기록 예외가 디스패처로 새지 않게
+    }
+
+    private async System.Threading.Tasks.Task SaveGroupRotationCoreAsync(System.Collections.Generic.IReadOnlyList<GroupRotationSession.Original> changed, double angle)
+    {
         if (!CanEditMap())
         {
             foreach (var o in changed) GroupRotationSession.Restore(o);

@@ -1,0 +1,888 @@
+diff --git a/map3d/buildings.py b/map3d/buildings.py
+index 38b84d5..1338522 100644
+--- a/map3d/buildings.py
++++ b/map3d/buildings.py
+@@ -136,6 +136,7 @@ ROUND_RISE = {"dome": 0.2, "cone": 0.18}   # 지붕 솟음 ÷ 반지름(돔: 포
+ CHIMNEY_TAPER = 0.85                # 굴뚝 꼭대기 반지름 ÷ 바닥 반지름(위로 갈수록 살짝 가늘게)
+ RIM_M = 0.9                         # 탱크 · 굴뚝 꼭대기 테두리(난간 · 띠) 높이
+ RIM_OUT = 1.06                      # 꼭대기 테두리 반지름 ÷ 벽 꼭대기 반지름
++DRAWN = "drawn"                     # 직접 그린 건물 출처(userbuildings.SOURCE) — 둥근 지붕도 입력 높이 = 꼭대기
+ 
+ 
+ def floors_from_height(h: float, level_h: float = 3.0) -> int:
+@@ -301,13 +302,13 @@ def _flat_roof(poly: Polygon, z: float):
+     return tri_pos, np.arange(len(tri_pos)).reshape(-1, 3)
+ 
+ 
+-def round_roof(poly: Polygon, z: float, kind: str):
+-    """둥근 바닥(탱크) 지붕 — 원뿔(가장자리 → 꼭짓점) · 돔(포물면 고리 5 단). 솟음 = 반지름 × ROUND_RISE.
++def round_roof(poly: Polygon, z: float, kind: str, rise: float | None = None):
++    """둥근 바닥(탱크) 지붕 — 원뿔(가장자리 → 꼭짓점) · 돔(포물면 고리 5 단). 솟음 = 반지름 × ROUND_RISE(rise 를 주면 그 값).
+     반환: 삼각형마다 정점을 나눈 (정점[T*3, 3], 삼각형[T, 3]) — 평지붕(_flat_roof)과 같은 꼴."""
+     ring = np.asarray(orient(poly, 1.0).exterior.coords)[:-1, :2]     # 반시계 — 삼각형이 위를 보게
+     c = np.asarray(poly.centroid.coords[0])
+     R = float(np.sqrt(poly.area / math.pi))
+-    rise = R * ROUND_RISE[kind]
++    rise = R * ROUND_RISE[kind] if rise is None else rise
+     rho = np.array([1.0, 0.0]) if kind == "cone" else np.array([1.0, 0.8, 0.6, 0.4, 0.2, 0.0])
+     zs = z + rise * ((1 - rho) if kind == "cone" else (1 - rho ** 2))
+     tris = []
+@@ -395,9 +396,16 @@ def build_building(spec: BuildingSpec, frame, grid, ortho, roof_pitch_deg: float
+     roof = _Acc()
+     if shape == "flat":
+         top = gmin + H
+-        for ring in [poly.exterior, *poly.interiors]:
+-            _walls_for_ring(walls, ring.coords, base, lambda p: top, gmin, style, rows_for(H), top)
+         chimney = spec.tags.get("man_made") == "chimney"
++        round_kind = spec.roof_shape if style == "tank" and not chimney and spec.roof_shape in ROUND_ROOFS else None
++        if round_kind and spec.source == DRAWN:
++            # 직접 그린 건물: 입력 높이 = 꼭대기(박공과 같은 기준 — 벽 = 높이 − 지붕 솟음, 2.2 m 이상, 솟음 ≤ 높이 × 0.45).
++            # 사진 · 지도 탱크는 그대로(벽 높이 위에 솟음을 얹는다)
++            rise = min(math.sqrt(poly.area / math.pi) * ROUND_RISE[round_kind], H * 0.45)
++            top = gmin + max(H - rise, 2.2)
++            info["roof_height"] = round(rise, 2)          # heights.wall_top · 뷰어 wallTop 이 벽 꼭대기를 같은 식으로 찾는다
++        for ring in [poly.exterior, *poly.interiors]:
++            _walls_for_ring(walls, ring.coords, base, lambda p: top, gmin, style, rows_for(top - gmin), top)
+         c = np.asarray(poly.centroid.coords[0])
+         k_top = CHIMNEY_TAPER if chimney else 1.0
+         if chimney:                          # 위로 갈수록 가늘게: 벽 꼭짓점을 높이에 비례해 가운데로
+@@ -406,8 +414,8 @@ def build_building(spec: BuildingSpec, frame, grid, ortho, roof_pitch_deg: float
+             w[:, :2] = c + (w[:, :2] - c) * s[:, None]
+             walls.pos = [tuple(p) for p in w]
+         top_poly = affinity.scale(poly, k_top, k_top, origin=tuple(c)) if chimney else poly
+-        round_kind = spec.roof_shape if style == "tank" and not chimney and spec.roof_shape in ROUND_ROOFS else None
+-        rp, rt = round_roof(top_poly, top, round_kind) if round_kind else _flat_roof(top_poly, top)
++        rp, rt = (round_roof(top_poly, top, round_kind, info.get("roof_height")) if round_kind
++                  else _flat_roof(top_poly, top))
+         if len(rt):
+             roof.add([tuple(p) for p in rp], [(0.0, 0.0)] * len(rp), [tuple(t) for t in rt])
+         if style == "tank" and H >= 3.0:     # 꼭대기 테두리(탱크 난간 · 굴뚝 띠) — 벽 꼭대기 둘레 바깥으로 조금 나온 고리
+diff --git a/map3d/heights.py b/map3d/heights.py
+index b30101a..75fde05 100644
+--- a/map3d/heights.py
++++ b/map3d/heights.py
+@@ -11,6 +11,7 @@ from __future__ import annotations
+ import datetime as dt
+ import hashlib
+ import json
++import logging
+ import math
+ import os
+ import secrets
+@@ -21,8 +22,11 @@ from pathlib import Path
+ import numpy as np
+ from shapely.geometry import Point, Polygon
+ 
++from .buildings import floors_from_height
+ from .geo import scene_contains
+ 
++log = logging.getLogger("map3d.heights")
++
+ MATCH_IOU = 0.4          # 다시 붙이는 겹침 하한(바닥 윤곽 IoU) — 다시 굽기에서 윤곽이 조금 달라도(몇 m 밀림 · 꼭짓점 차이) 붙는다
+ MIN_H, MAX_H = 1.0, 600.0
+ MIN_FLOORS, MAX_FLOORS = 1, 200
+@@ -169,10 +173,26 @@ def area_file(data_dir, bbox) -> Path:
+ 
+ 
+ def _read(p: Path) -> dict:
++    """영역 파일 읽기 — 없으면 빈 목록. 깨졌으면(JSON · 형식) HeightError(500) — 빈 목록으로 읽어 다음 저장이 덮어쓰지 않게 파일은 그대로 둔다."""
+     try:
+         d = json.loads(p.read_text(encoding="utf-8"))
+-        return d if isinstance(d, dict) and isinstance(d.get("items"), list) else {"items": []}
+-    except (OSError, json.JSONDecodeError):
++    except FileNotFoundError:
++        return {"items": []}
++    except ValueError:                     # JSON · 글자(UTF-8) 깨짐
++        d = None
++    if not (isinstance(d, dict) and isinstance(d.get("items"), list)):
++        raise HeightError(500, f"저장 파일 {p.name} 이 깨져 있어 바꾸지 않았습니다 — 파일은 그대로 두었습니다(고치거나 다른 곳으로 옮긴 뒤 다시 하세요)")
++    return d
++
++
++def read_or_skip(p: Path, bad: list | None = None) -> dict:
++    """읽기만 하는 곳(굽기 · 목록) — 깨진 파일은 건너뛰고(빈 목록) 이름을 bad 에 남긴다. 쓰는 곳은 _read(거절)."""
++    try:
++        return _read(p)
++    except HeightError:
++        log.warning("깨진 저장 파일을 건너뜀: %s", p)
++        if bad is not None:
++            bad.append(p.name)
+         return {"items": []}
+ 
+ 
+@@ -188,11 +208,11 @@ def _files(data_dir):
+     return sorted(d.glob("area-*.json")) if d.exists() else []
+ 
+ 
+-def items_in(data_dir, bbox) -> list[dict]:
+-    """장면 범위에 중심이 든 모든 덮어쓰기(어느 영역 파일이든 — 다시 굽기 영역이 조금 달라도)."""
++def items_in(data_dir, bbox, bad: list | None = None) -> list[dict]:
++    """장면 범위에 중심이 든 모든 덮어쓰기(어느 영역 파일이든 — 다시 굽기 영역이 조금 달라도). 깨진 파일은 bad 에."""
+     out = []
+     for p in _files(data_dir):
+-        for it in _read(p)["items"]:
++        for it in read_or_skip(p, bad)["items"]:
+             c = it.get("center") or [None, None]
+             if c[0] is not None and bbox[0] <= c[0] <= bbox[2] and bbox[1] <= c[1] <= bbox[3]:
+                 out.append(it)
+@@ -301,55 +321,86 @@ def _reshape(job_dir: Path, scene: dict, b: dict, new_h: float):
+     b["height"] = round(new_h, 2)
+ 
+ 
++def _snapshot(job_dir: Path, scene: dict) -> dict:
++    """고치기 전 장면 파일(scene.json · GLB) 내용 — 중간에 실패하면 _restore 로 되돌린다."""
++    names = ("scene.json", "scene.glb", (scene.get("detail") or {}).get("glb") or "scene_detail.glb")
++    return {job_dir / n: (job_dir / n).read_bytes() for n in names if (job_dir / n).exists()}
++
++
++def _restore(snap: dict):
++    for p, data in snap.items():
++        if not p.exists() or p.read_bytes() != data:   # 바뀐 파일만(잠겨 못 바꾼 파일은 건드리지 않는다)
++            tmp = p.with_name(p.name + ".tmp")
++            tmp.write_bytes(data)
++            os.replace(tmp, p)
++
++
+ def set_height(data_dir, job_dir: Path, bid: int, height: float | None, floors: int | None = None) -> dict:
+-    """그 장면 건물 높이를 직접 입력(height) 또는 자동으로 되돌리기(None) — 덮어쓰기 파일 · GLB · scene.json. 반환 = 고친 건물 줄."""
++    """그 장면 건물 높이를 직접 입력(height) 또는 자동으로 되돌리기(None) — 덮어쓰기 파일 · GLB · scene.json. 반환 = 고친 건물 줄.
++    한꺼번에 — 장면 파일(GLB · scene.json)을 먼저 고치고 저장 파일(덮어쓰기 · 직접 그린 건물)은 맨 끝에 쓴다. 어디서든 실패하면
++    장면 파일을 되돌린다(저장 파일만 바뀌거나 GLB 만 늘어나 서로 어긋나지 않게)."""
+     with _lock:
+         scene = json.loads((job_dir / "scene.json").read_text(encoding="utf-8"))
+         b = next((x for x in scene.get("buildings", []) if x.get("id") == bid), None)
+         if b is None:
+             raise HeightError(404, f"건물 {bid} 이 이 장면에 없습니다")
+-        if b.get("user_uid"):
+-            # 직접 그린 건물 — 높이는 그 파일(userbuildings)이 갖는다. 자동 높이가 없어 되돌리기는 그대로
+-            if height is None:
+-                return b
+-            from . import userbuildings
+-            if userbuildings.set_height(data_dir, b["user_uid"], height, floors) is None:
+-                raise HeightError(409, "직접 그린 건물 자료가 지워졌습니다 — 다시 만들어 주세요")
+-            if floors:
+-                b["levels"] = floors
+-            _reshape(job_dir, scene, b, round(float(height), 1))
+-            _save_scene(job_dir, scene)
+-            return b
++        snap = _snapshot(job_dir, scene)
++        try:
++            return _set_height(data_dir, job_dir, scene, b, height, floors)
++        except BaseException:
++            _restore(snap)
++            raise
++
++
++def _set_height(data_dir, job_dir: Path, scene: dict, b: dict, height: float | None, floors: int | None) -> dict:
++    # 층수를 안 넣으면 다시 굽기처럼 높이 ÷ 층고(userbuildings.specs_of · build_building 과 같은 식)
++    level_h = float((scene.get("params") or {}).get("level_height") or 3.0)
++    if b.get("user_uid"):
++        # 직접 그린 건물 — 높이는 그 파일(userbuildings)이 갖는다. 자동 높이가 없어 되돌리기는 그대로
+         if height is None:
+-            if not b.get("manual"):
+-                return b
+-            uid = b["manual"]["uid"]
+-            _drop_items(data_dir, lambda it: it.get("uid") == uid)
+-            a = b.get("auto") or {}
+-            for k in ("height_source", "height_from", "levels", "estimated"):
+-                if k in a:
+-                    b[k] = a[k]
+-            _reshape(job_dir, scene, b, float(a.get("height", b["height"])))
+-            b.pop("manual", None)
+-            b.pop("auto", None)
+-        else:
+-            if not b.get("center"):
+-                raise HeightError(409, "이 장면은 건물 자리(중심)가 없어 직접 입력을 저장할 수 없습니다 — 다시 만들어 주세요")
+-            if "auto" not in b:
+-                b["auto"] = {k: b.get(k) for k in ("height", "height_source", "height_from", "levels", "estimated")}
+-            uid = (b.get("manual") or {}).get("uid") or secrets.token_hex(6)
+-            item = {"uid": uid, "center": b["center"], "area_m2": b.get("area_m2"), "footprint": b.get("footprint"),
+-                    "height": round(float(height), 1), "floors": floors,
+-                    "updated": dt.datetime.now().astimezone().isoformat(timespec="seconds")}
+-            _put_item(data_dir, scene["bbox"], item)
+-            b.update(height_source="manual", height_from="manual", estimated=False,
+-                     manual={"uid": uid, "height": item["height"], "floors": floors})
+-            if floors:
+-                b["levels"] = floors
+-            _reshape(job_dir, scene, b, item["height"])
+-        _recount(scene)
++            return b
++        from . import userbuildings
++        h = round(float(height), 1)
++        b["levels"] = floors or floors_from_height(h, level_h)
++        _reshape(job_dir, scene, b, h)
+         _save_scene(job_dir, scene)
++        if userbuildings.set_height(data_dir, b["user_uid"], height, floors) is None:
++            raise HeightError(409, "직접 그린 건물 자료가 지워졌습니다 — 다시 만들어 주세요")
+         return b
++    if height is None:
++        if not b.get("manual"):
++            return b
++        uid = b["manual"]["uid"]
++        a = b.get("auto") or {}
++        for k in ("height_source", "height_from", "levels", "estimated"):
++            if k in a:
++                b[k] = a[k]
++        _reshape(job_dir, scene, b, float(a.get("height", b["height"])))
++        b.pop("manual", None)
++        b.pop("auto", None)
++
++        def write():
++            _drop_items(data_dir, lambda it: it.get("uid") == uid)
++    else:
++        if not b.get("center"):
++            raise HeightError(409, "이 장면은 건물 자리(중심)가 없어 직접 입력을 저장할 수 없습니다 — 다시 만들어 주세요")
++        if "auto" not in b:
++            b["auto"] = {k: b.get(k) for k in ("height", "height_source", "height_from", "levels", "estimated")}
++        uid = (b.get("manual") or {}).get("uid") or secrets.token_hex(6)
++        item = {"uid": uid, "center": b["center"], "area_m2": b.get("area_m2"), "footprint": b.get("footprint"),
++                "height": round(float(height), 1), "floors": floors,
++                "updated": dt.datetime.now().astimezone().isoformat(timespec="seconds")}
++        b.update(height_source="manual", height_from="manual", estimated=False,
++                 manual={"uid": uid, "height": item["height"], "floors": floors})
++        b["levels"] = floors or floors_from_height(item["height"], level_h)
++        _reshape(job_dir, scene, b, item["height"])
++
++        def write():
++            _put_item(data_dir, scene["bbox"], item)
++    _recount(scene)
++    _save_scene(job_dir, scene)
++    write()
++    return b
+ 
+ 
+ def reset_all(data_dir, job_dir: Path) -> list[dict]:
+diff --git a/map3d/inpaint.py b/map3d/inpaint.py
+index bc15795..efb71c5 100644
+--- a/map3d/inpaint.py
++++ b/map3d/inpaint.py
+@@ -44,12 +44,16 @@ def _session(model_dir: Path):
+     p = Path(model_dir) / name
+     if not p.exists():
+         raise InpaintUnavailable(f"가중치 없음: {p} — python scripts/setup_models.py 로 한 번 받으세요")
+-    if _sha256(p) != digest:
+-        raise InpaintUnavailable(f"가중치 해시 불일치: {p}")
+-    opt = ort.SessionOptions()
+-    opt.log_severity_level = 3
+-    s = _SESSIONS[key] = ort.InferenceSession(str(p), opt, providers=["CPUExecutionProvider"])
+-    return s
++
++    def load():
++        if _sha256(p) != digest:
++            raise InpaintUnavailable(f"가중치 해시 불일치: {p}")
++        opt = ort.SessionOptions()
++        opt.log_severity_level = 3
++        s = _SESSIONS[key] = ort.InferenceSession(str(p), opt, providers=["CPUExecutionProvider"])
++        return s
++    # 첫 로드(해시 + 세션, 실기 약 15 초) 동안도 굽기 취소가 먹게 — 취소되면 로드는 뒤에서 끝내 캐시에 남긴다(다음 굽기가 바로 쓴다)
++    return cancel.run(load)
+ 
+ 
+ def _starts(n: int) -> list[int]:
+diff --git a/map3d/jobs.py b/map3d/jobs.py
+index c89ec3f..9bb5204 100644
+--- a/map3d/jobs.py
++++ b/map3d/jobs.py
+@@ -56,6 +56,7 @@ class JobManager:
+         self.jobs: dict[str, Job] = {}
+         self._lock = threading.Lock()
+         self._pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="map3d-job")
++        self._rows: dict[Path, tuple] = {}   # scene.json → ((mtime, 크기), 장면 목록 줄)
+         settings.jobs_dir.mkdir(parents=True, exist_ok=True)
+ 
+     # ------------------------------------------------------------ 조회
+@@ -80,27 +81,49 @@ class JobManager:
+                 return j
+         return None
+ 
+-    def list_scenes(self) -> list[dict]:
++    def _scene_row(self, d: Path) -> dict | None:
++        """장면 목록 한 줄 — scene.json 의 (mtime, 크기) 가 그대로면 지난번 읽은 줄(/api/scenes/at 가 매번 모든 장면을 읽지 않게).
++        새 장면 · 다 만듦(파일 생김) · 고침(enter_zoom · 높이 — 파일을 다시 씀) · 지움(폴더 없음)은 파일 기준이라 바로 반영된다."""
++        sj = d / "scene.json"
++        try:
++            st = sj.stat()
++        except OSError:
++            self._rows.pop(sj, None)
++            return None
++        key = (st.st_mtime_ns, st.st_size)
++        hit = self._rows.get(sj)
++        if hit and hit[0] == key:
++            return hit[1]
++        try:
++            s = json.loads(sj.read_text(encoding="utf-8"))
++        except (OSError, json.JSONDecodeError):
++            return None
++        row = {"id": d.name, "kind": "sample" if d.parent == self.settings.samples_dir else "job",
++               "created": s.get("created"), "bbox": s.get("bbox"), "counts": s.get("counts"),
++               "glb_bytes": s.get("files", {}).get("glb_bytes"), "warnings": len(s.get("warnings", [])),
++               **({"enter_zoom": s["enter_zoom"]} if "enter_zoom" in s else {}),
++               **({"rect": s["rect"]} if s.get("rect") else {}),   # 회전 영역(GIS 가 기울어진 네모로 그린다)
++               # 직접 입력한 건물 높이 수 · 다시 붙이지 못한 직접 입력 수(GIS 영역 목록 · 알림)
++               "manual_heights": int((s.get("height_overrides") or {}).get("applied") or 0),
++               "manual_unmatched": len((s.get("height_overrides") or {}).get("unmatched") or []),
++               "view_url": f"/view?job={d.name}"}
++        self._rows[sj] = (key, row)
++        return row
++
++    def list_scenes(self, with_users: bool = True) -> list[dict]:
+         out = []
++        seen = set()
+         for d in self._dirs():
+-            sj = d / "scene.json"
+-            if not sj.exists():
+-                continue
+-            try:
+-                s = json.loads(sj.read_text(encoding="utf-8"))
+-            except (OSError, json.JSONDecodeError):
++            row = self._scene_row(d)
++            if row is None:
+                 continue
+-            out.append({"id": d.name, "kind": "sample" if d.parent == self.settings.samples_dir else "job",
+-                        "created": s.get("created"), "bbox": s.get("bbox"), "counts": s.get("counts"),
+-                        "glb_bytes": s.get("files", {}).get("glb_bytes"), "warnings": len(s.get("warnings", [])),
+-                        **({"enter_zoom": s["enter_zoom"]} if "enter_zoom" in s else {}),
+-                        **({"rect": s["rect"]} if s.get("rect") else {}),   # 회전 영역(GIS 가 기울어진 네모로 그린다)
+-                        # 직접 입력한 건물 높이 수 · 다시 붙이지 못한 직접 입력 수(GIS 영역 목록 · 알림)
+-                        "manual_heights": int((s.get("height_overrides") or {}).get("applied") or 0),
+-                        "manual_unmatched": len((s.get("height_overrides") or {}).get("unmatched") or []),
+-                        # 직접 그린 건물 수(파일 기준 — 아직 다시 만들지 않은 것도 센다)
+-                        "user_buildings": len(userbuildings.items_in(self.settings.data_dir, s)),
+-                        "view_url": f"/view?job={d.name}"})
++            seen.add(d / "scene.json")
++            row = dict(row)
++            if with_users:   # 직접 그린 건물 수(파일 기준 — 아직 다시 만들지 않은 것도 센다). 장면 찾기(/api/scenes/at)는 안 센다
++                row["user_buildings"] = len(userbuildings.items_in(self.settings.data_dir, row))
++            out.append(row)
++        for k in [k for k in list(self._rows) if k not in seen]:   # 지운 장면(요청 스레드가 함께 고칠 수 있어 복사해 돈다)
++            self._rows.pop(k, None)
+         out.sort(key=lambda x: x.get("created") or "", reverse=True)
+         return out
+ 
+@@ -131,6 +154,8 @@ class JobManager:
+             return None, "sample"
+         if job.status in ("queued", "running"):
+             return None, "busy"
++        if not (job.dir / "scene.json").exists():   # 만들다 실패 · 취소해 장면이 없다(조정을 취소한 장면은 옛 장면이 있어 고칠 수 있다)
++            return None, "missing"
+         return job, "ok"
+ 
+     def delete(self, job_id: str) -> str:
+diff --git a/map3d/pipeline.py b/map3d/pipeline.py
+index 98d0678..66abbc1 100644
+--- a/map3d/pipeline.py
++++ b/map3d/pipeline.py
+@@ -431,7 +431,8 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+                 s.roof_color = "#%02x%02x%02x" % f.color
+     # 운영자가 GIS 에서 직접 그린 건물(userbuildings.py) — 자동 건물(지도 · 국가 · 사진)보다 우선, 겹치는 자동 건물은 뺀다
+     from . import userbuildings
+-    u_items = userbuildings.items_in(settings.data_dir, {"bbox": list(bbox), "rect": rr.to_json() if rr else None})
++    bad_files = []   # 깨진 저장 파일(직접 그린 건물 · 높이 직접 입력) — 건너뛰고 알린다(파일은 그대로)
++    u_items = userbuildings.items_in(settings.data_dir, {"bbox": list(bbox), "rect": rr.to_json() if rr else None}, bad_files)
+     user_info = {"applied": 0, "removed_auto": 0, "removed": {}}
+     if u_items:
+         specs, user_info = userbuildings.merge(specs, u_items, P.level_height)
+@@ -457,7 +458,9 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+             s.roof_color, s.wall_color = o.roof_color, o.wall_color
+     # 운영자가 GIS 에서 직접 넣은 건물 높이(heights.py) — 자리(바닥 윤곽)로 다시 붙인다. 못 붙인 것은 남겨 두고 알린다.
+     from . import heights
+-    h_items = heights.items_in(settings.data_dir, bbox)
++    h_items = heights.items_in(settings.data_dir, bbox, bad_files)
++    for name in bad_files:
++        warnings.append(f"저장 파일 {name} 이 깨져 읽지 못함(그 안의 직접 그린 건물 · 직접 입력 높이 빠짐) — 파일은 그대로 둠")
+     if rr:   # 감싸는 bbox 의 모서리(회전 사각형 밖) 항목은 이 장면 것이 아니다 — 못 붙인 것으로 세지 않는다
+         h_items = [it for it in h_items if rr.contains(*it["center"])]
+     # 직접 그린 건물은 높이를 그 파일이 갖는다 — 높이 직접 입력 항목이 그 자리에 붙지 않게 뺀다
+@@ -595,6 +598,9 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+             need.add("roof_ortho")
+         m = s.meta()
+         m.update(info)
++        if m["roof_shape_built"] != m["roof_shape"]:
++            # 고른 지붕을 못 지었다(박공 · 모임 · 외쪽 = 직사각형에 가까운 윤곽만, 원뿔 · 돔 = 둥근 윤곽만) — 실제 지은 모양을 적고 고른 것은 따로
++            m["roof_shape_requested"], m["roof_shape"] = m["roof_shape"], m["roof_shape_built"]
+         m["height"] = round(s.height, 2)
+         m["origin"] = ORIGIN.get(s.source, s.source)     # map(OSM · 사용자) | national(로컬 건물 자료) | photo(사진에서 찾음)
+         m["height_from"] = how.get(s.source_id, "default") if s.height_source == "overlay" else s.height_source
+diff --git a/map3d/sam.py b/map3d/sam.py
+index 7e40138..20643af 100644
+--- a/map3d/sam.py
++++ b/map3d/sam.py
+@@ -52,18 +52,24 @@ def _sessions(model_dir: Path):
+         import onnxruntime as ort
+     except ImportError as ex:
+         raise SamUnavailable("onnxruntime 이 설치되어 있지 않음") from ex
+-    for name, digest in MODEL_FILES.items():
++    for name in MODEL_FILES:
+         p = Path(model_dir) / name
+         if not p.exists():
+             raise SamUnavailable(f"가중치 없음: {p} — python scripts/setup_models.py 로 한 번 받으세요")
+-        if _sha256(p) != digest:
+-            raise SamUnavailable(f"가중치 해시 불일치: {p}")
+-    opt = ort.SessionOptions()
+-    opt.log_severity_level = 3
+-    s = tuple(ort.InferenceSession(str(Path(model_dir) / n), opt, providers=["CPUExecutionProvider"])
+-              for n in MODEL_FILES)
+-    _SESSIONS[key] = s
+-    return s
++
++    def load():
++        for name, digest in MODEL_FILES.items():
++            p = Path(model_dir) / name
++            if _sha256(p) != digest:
++                raise SamUnavailable(f"가중치 해시 불일치: {p}")
++        opt = ort.SessionOptions()
++        opt.log_severity_level = 3
++        s = tuple(ort.InferenceSession(str(Path(model_dir) / n), opt, providers=["CPUExecutionProvider"])
++                  for n in MODEL_FILES)
++        _SESSIONS[key] = s
++        return s
++    # 첫 로드 동안도 굽기 취소가 먹게(inpaint._session 과 같다) — 취소되면 로드는 뒤에서 끝내 캐시에 남긴다
++    return cancel.run(load)
+ 
+ 
+ @dataclass
+diff --git a/map3d/server.py b/map3d/server.py
+index 113012f..4888285 100644
+--- a/map3d/server.py
++++ b/map3d/server.py
+@@ -100,6 +100,11 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+ 
+     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+ 
++    # 저장 파일이 깨졌을 때(heights._read) — 직접 그린 건물 · 높이 직접 입력 어느 경로든 같은 {"detail"} 로 알린다
++    @app.exception_handler(heights.HeightError)
++    async def height_error(request, ex: heights.HeightError):
++        return JSONResponse({"detail": ex.detail}, status_code=ex.status)
++
+     # 화면 파일(HTML · JS · CSS)은 쓸 때마다 바뀌었는지 묻게 한다 — 캐시 지시가 없으면 WebView2 가 옛 JS 를 임의로 캐시해
+     # 고친 코드가 GIS 3D 화면에 실리지 않았다(실기 2026-10-17: JS 요청 0건). 바뀌지 않았으면 304 라 비용은 작다.
+     @app.middleware("http")
+@@ -184,7 +189,7 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+     @app.get("/api/scenes/at")
+     def scene_at(lon: float, lat: float):
+         """그 지점을 덮는 다 만든 장면 중 가장 최근 것 — GIS 가 줌 게이트에서 3D 로 바꿀지 판정한다(회전 영역은 회전 사각형 안)."""
+-        hits = [s for s in jm.list_scenes() if scene_contains(s, lon, lat)]
++        hits = [s for s in jm.list_scenes(with_users=False) if scene_contains(s, lon, lat)]
+         if not hits:
+             raise HTTPException(404, "이 지점을 덮는 장면이 없습니다")
+         best = max(hits, key=lambda s: s.get("created") or "")
+@@ -264,11 +269,16 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+         b = height_call(lambda: heights.set_height(settings.data_dir, job.dir, bid, None))
+         return {"building": b, "overrides": heights.summary(json.loads((job.dir / "scene.json").read_text(encoding="utf-8")))}
+ 
+-    @app.get("/api/jobs/{job_id}/height-overrides")
+-    def get_heights(job_id: str):
++    def scene_job(job_id: str):
++        """읽기 — 장면(scene.json)이 있는 작업. 만들다 실패 · 취소해 장면이 없으면 404."""
+         j = jm.get(job_id)
+-        if j is None:
++        if j is None or not (j.dir / "scene.json").exists():
+             raise HTTPException(404, "작업이 없습니다")
++        return j
++
++    @app.get("/api/jobs/{job_id}/height-overrides")
++    def get_heights(job_id: str):
++        j = scene_job(job_id)
+         return heights.summary(json.loads((j.dir / "scene.json").read_text(encoding="utf-8")))
+ 
+     @app.delete("/api/jobs/{job_id}/height-overrides")
+@@ -292,17 +302,17 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+ 
+     def user_list(job) -> dict:
+         scene = scene_of(job)
+-        baked = {b["user_uid"]: b["id"] for b in scene.get("buildings", []) if b.get("user_uid")}
+-        items = [{**it, "baked_id": baked.get(it["uid"])} for it in userbuildings.items_in(settings.data_dir, scene)]
++        baked = {b["user_uid"]: b for b in scene.get("buildings", []) if b.get("user_uid")}
++        # roof_built = 지금 장면에 실제로 지은 지붕(고른 roof 를 못 지으면 flat — 박공은 직사각형에 가까운 윤곽만), 안 구웠으면 null
++        items = [{**it, "baked_id": (baked.get(it["uid"]) or {}).get("id"),
++                  "roof_built": (baked.get(it["uid"]) or {}).get("roof_shape_built")}
++                 for it in userbuildings.items_in(settings.data_dir, scene)]
+         return {"items": items, "count": len(items)}
+ 
+     @app.get("/api/jobs/{job_id}/user-buildings")
+     def get_user_buildings(job_id: str):
+         """그 장면 범위의 직접 그린 건물(baked_id = 지금 장면에 구워진 건물 id, 아직 안 구웠으면 null — 뷰어가 상자로 미리 보인다)."""
+-        j = jm.get(job_id)
+-        if j is None:
+-            raise HTTPException(404, "작업이 없습니다")
+-        return user_list(j)
++        return user_list(scene_job(job_id))
+ 
+     @app.put("/api/jobs/{job_id}/user-buildings/{uid}")
+     def put_user_building(job_id: str, uid: str = UID, body: UserBuildingIn = ...):
+diff --git a/map3d/userbuildings.py b/map3d/userbuildings.py
+index 74e77df..fb4f167 100644
+--- a/map3d/userbuildings.py
++++ b/map3d/userbuildings.py
+@@ -98,11 +98,12 @@ def _files(data_dir):
+     return sorted(d.glob("area-*.json")) if d.exists() else []
+ 
+ 
+-def items_in(data_dir, scene: dict) -> list[dict]:
+-    """장면(bbox · 회전 영역 rect)에 중심이 든 직접 그린 건물(어느 영역 파일이든 — 다시 굽기 영역이 조금 달라도)."""
++def items_in(data_dir, scene: dict, bad: list | None = None) -> list[dict]:
++    """장면(bbox · 회전 영역 rect)에 중심이 든 직접 그린 건물(어느 영역 파일이든 — 다시 굽기 영역이 조금 달라도).
++    깨진 파일은 건너뛰고 이름을 bad 에(쓰기는 heights._read 가 거절)."""
+     out = []
+     for p in _files(data_dir):
+-        for it in heights._read(p)["items"]:
++        for it in heights.read_or_skip(p, bad)["items"]:
+             try:
+                 c = center(it["outline"])
+             except (KeyError, TypeError, ValueError):
+diff --git a/tests/test_followup_fixes.py b/tests/test_followup_fixes.py
+new file mode 100644
+index 0000000..02a928c
+--- /dev/null
++++ b/tests/test_followup_fixes.py
+@@ -0,0 +1,350 @@
++"""정적 검토 후속 결함 — 재현 시험(수정 전 실패 · 수정 후 통과).
++
++10 높이 판 저장: GLB 고치기 실패 시 저장 파일 · scene.json · GLB 가 어긋남, 층수 없이 높이만 바꾸면 levels 가 옛 값.
++11 만들다 실패 · 취소한 작업(scene.json 없음)에 고치기 · 목록 요청 → 500, /api/scenes/at 이 매번 모든 scene.json · 직접 그린 건물 파일을 읽음.
++12 깨진 저장 파일(JSON)을 빈 목록으로 읽어 다음 저장이 덮어씀.
++B1 LaMa · SAM 첫 로드(InferenceSession 생성) 동안 굽기 취소가 안 먹음.
++B2 직접 그린 원형 + 돔 · 원뿔 — 입력 높이 = 꼭대기(박공과 같은 기준).
++B3 고른 지붕을 못 지으면(ㄱ자 박공 · 사각 돔) scene.json roof_shape 가 실제 지은 모양과 어긋남.
++"""
++import json
++import math
++import shutil
++import sys
++import threading
++import time
++import types
++from pathlib import Path
++
++import numpy as np
++import pytest
++from fastapi.testclient import TestClient
++
++from map3d import cancel, heights, inpaint, jobs as jobs_mod, sam, userbuildings as UB
++from map3d.buildings import BuildingSpec, build_building
++from map3d.dem import DemSource, load_geotiff
++from map3d.geo import LocalFrame
++from map3d.jobs import Job
++from map3d.server import create_app
++from map3d.terrain import build_grid
++
++from test_heights import _all_ys, _bake, _flat, _settings
++from test_userbuildings import EMPTY, UID, UID2, _files
++
++from test_cancel import _in_cancellable_thread
++
++
++def _client(tmp_path, mbtiles):
++    return TestClient(create_app(_settings(tmp_path, mbtiles)), raise_server_exceptions=False)
++
++
++def _scene(tmp_path, job):
++    return json.loads((tmp_path / "data" / "jobs" / job / "scene.json").read_text(encoding="utf-8"))
++
++
++def _circle(cx, cy, r=0.00012, n=32):
++    """반지름 약 10 m 32각(경도 쪽은 위도 37.36° 에서 늘려 원으로)."""
++    return [[cx + r * math.cos(2 * math.pi * k / n) / 0.7944, cy + r * math.sin(2 * math.pi * k / n)] for k in range(n)]
++
++
++# ---------------------------------------------------------------- 10 높이 판 저장 — 한꺼번에(어긋나지 않게)
++def _fail_after_real_rewrite(monkeypatch):
++    """GLB 를 실제로 고친 뒤 실패(다른 프로그램이 파일을 잡고 있어 다음 파일 교체 실패를 흉내)."""
++    real = heights.restretch_glb
++
++    def boom(*a, **k):
++        real(*a, **k)
++        raise PermissionError("시험: GLB 파일 잠김")
++    monkeypatch.setattr(heights, "restretch_glb", boom)
++
++
++def should_leave_user_file_scene_and_glb_unchanged_when_glb_rewrite_fails_for_drawn_building(tmp_path, mbtiles, slope_dem, monkeypatch):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    UB.put(tmp_path / "data", s1, UID, EMPTY, 12.0, None, None)
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    u = next(b for b in s2["buildings"] if b.get("user_uid") == UID)
++    jd = tmp_path / "data" / "jobs" / "j2"
++    glb0, sj0, f0 = (jd / "scene.glb").read_bytes(), (jd / "scene.json").read_bytes(), _files(tmp_path)[0].read_bytes()
++    _fail_after_real_rewrite(monkeypatch)
++    r = _client(tmp_path, mbtiles).put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 21.0, "floors": 7})
++    assert r.status_code == 500
++    assert _files(tmp_path)[0].read_bytes() == f0, "직접 그린 건물 파일만 21 m 로 바뀌었다(scene.json 은 12 m)"
++    assert (jd / "scene.json").read_bytes() == sj0
++    assert (jd / "scene.glb").read_bytes() == glb0, "GLB 만 늘어나 scene.json 높이와 어긋났다"
++
++
++def should_leave_override_file_scene_and_glb_unchanged_when_glb_rewrite_fails_for_auto_building(tmp_path, mbtiles, slope_dem, monkeypatch):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    jd = tmp_path / "data" / "jobs" / "j1"
++    glb0, sj0 = (jd / "scene.glb").read_bytes(), (jd / "scene.json").read_bytes()
++    _fail_after_real_rewrite(monkeypatch)
++    r = _client(tmp_path, mbtiles).put(f"/api/jobs/j1/buildings/{_flat(s1)['id']}/height", json={"height": 30.0})
++    assert r.status_code == 500
++    assert not list((tmp_path / "data" / "overrides").glob("area-*.json")), "덮어쓰기 파일에만 30 m 가 남았다"
++    assert (jd / "scene.json").read_bytes() == sj0 and (jd / "scene.glb").read_bytes() == glb0
++
++
++def should_recount_levels_from_height_when_floors_omitted(tmp_path, mbtiles, slope_dem):
++    """층수 없이 높이만 바꾸면 다시 굽기는 높이 ÷ 층고로 층수를 셈한다 — 지금 장면 levels · GLB extras 도 같은 값."""
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    UB.put(tmp_path / "data", s1, UID, EMPTY, 12.0, None, None)
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    u = next(b for b in s2["buildings"] if b.get("user_uid") == UID)
++    c = _client(tmp_path, mbtiles)
++    assert c.put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 21.0, "floors": 7}).json()["building"]["levels"] == 7
++    b = c.put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 30.0}).json()["building"]
++    assert b["levels"] == 10, f"levels 가 옛 값 {b['levels']}(파일 floors 는 None → 다시 굽기 10)"
++    assert _all_ys(tmp_path / "data" / "jobs" / "j2" / "scene.glb", u["id"])[1]["levels"] == 10
++    s3 = _bake(tmp_path, mbtiles, slope_dem, job="j3")
++    assert next(x for x in s3["buildings"] if x.get("user_uid") == UID)["levels"] == 10
++    # 자동 건물(높이 직접 입력)도 같다
++    fid = _flat(s2)["id"]
++    assert c.put(f"/api/jobs/j2/buildings/{fid}/height", json={"height": 30.0, "floors": 9}).json()["building"]["levels"] == 9
++    assert c.put(f"/api/jobs/j2/buildings/{fid}/height", json={"height": 33.0}).json()["building"]["levels"] == 11
++    s4 = _bake(tmp_path, mbtiles, slope_dem, job="j4")
++    assert next(x for x in s4["buildings"] if x.get("manual"))["levels"] == 11
++
++
++# ---------------------------------------------------------------- 11 실패 · 취소 작업 · 장면 목록 캐시
++def should_answer_404_when_job_has_no_scene_after_error_or_cancel(tmp_path, mbtiles, slope_dem):
++    _bake(tmp_path, mbtiles, slope_dem)
++    c = _client(tmp_path, mbtiles)
++    jm = c.app.state.jobs
++    jobs_dir = tmp_path / "data" / "jobs"
++    (jobs_dir / "jerr").mkdir()
++    jm.jobs["jerr"] = Job(id="jerr", dir=jobs_dir / "jerr", status="error", error="RuntimeError: 시험")
++    jm.jobs["jcan"] = Job(id="jcan", dir=jobs_dir / "jcan", status="cancelled")        # 만들다 만 폴더는 지웠다
++    good = {"outline": EMPTY, "height": 10}
++    for jid in ("jerr", "jcan"):
++        calls = [("GET", f"/api/jobs/{jid}/user-buildings", None), ("PUT", f"/api/jobs/{jid}/user-buildings/{UID}", good),
++                 ("DELETE", f"/api/jobs/{jid}/user-buildings/{UID}", None), ("DELETE", f"/api/jobs/{jid}/user-buildings", None),
++                 ("PUT", f"/api/jobs/{jid}/buildings/1/height", {"height": 10}), ("DELETE", f"/api/jobs/{jid}/buildings/1/height", None),
++                 ("GET", f"/api/jobs/{jid}/height-overrides", None), ("DELETE", f"/api/jobs/{jid}/height-overrides", None)]
++        for m, url, body in calls:
++            r = c.request(m, url, json=body)
++            assert r.status_code == 404, f"{m} {url} → {r.status_code}"
++    assert c.get("/api/jobs/jerr").json()["status"] == "error"                      # 작업 상태 조회는 그대로
++    assert not (tmp_path / "data" / "user-buildings").exists()
++    # 조정(edit)을 취소한 작업은 옛 장면이 그대로 — 고칠 수 있다
++    jm.jobs["j1"] = Job(id="j1", dir=jobs_dir / "j1", status="cancelled", revision=1)
++    assert c.put(f"/api/jobs/j1/user-buildings/{UID}", json=good).status_code == 200
++
++
++class _CountingJson:
++    """jobs.json 대신 — scene.json 을 몇 번 읽었나 센다."""
++    JSONDecodeError = json.JSONDecodeError
++
++    def __init__(self):
++        self.loads_n = 0
++
++    def loads(self, s, *a, **k):
++        self.loads_n += 1
++        return json.loads(s, *a, **k)
++
++    def dumps(self, *a, **k):
++        return json.dumps(*a, **k)
++
++
++def should_not_reread_unchanged_scenes_and_refresh_on_new_changed_deleted_or_finished(tmp_path, mbtiles, slope_dem, monkeypatch):
++    from conftest import BBOX
++    _bake(tmp_path, mbtiles, slope_dem)
++    jobs_dir = tmp_path / "data" / "jobs"
++    c = _client(tmp_path, mbtiles)
++    spy = _CountingJson()
++    monkeypatch.setattr(jobs_mod, "json", spy)
++    ub_calls = []
++    real_items = UB.items_in
++    monkeypatch.setattr(UB, "items_in", lambda *a, **k: (ub_calls.append(1), real_items(*a, **k))[1])
++    at = {"lon": (BBOX[0] + BBOX[2]) / 2, "lat": (BBOX[1] + BBOX[3]) / 2}
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j1"
++    n1 = spy.loads_n
++    for _ in range(3):
++        assert c.get("/api/scenes/at", params=at).json()["id"] == "j1"
++    assert spy.loads_n == n1, f"바뀌지 않은 scene.json 을 다시 읽었다({spy.loads_n - n1}번)"
++    assert not ub_calls, "장면 찾기가 직접 그린 건물 파일을 읽었다"
++    # 새 장면(더 최근) → 그것
++    shutil.copytree(jobs_dir / "j1", jobs_dir / "j2")
++    s = json.loads((jobs_dir / "j2" / "scene.json").read_text(encoding="utf-8"))
++    s["created"] = "2099-01-01T00:00:00+09:00"
++    (jobs_dir / "j2" / "scene.json").write_text(json.dumps(s), encoding="utf-8")
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j2"
++    # 바뀜(enter_zoom) → 목록에 바로
++    assert c.patch("/api/jobs/j2", json={"enter_zoom": 17.5}).status_code == 200
++    assert next(x for x in c.get("/api/jobs").json()["scenes"] if x["id"] == "j2")["enter_zoom"] == 17.5
++    # 영역 바뀜(scene.json 다시 씀) → 그 지점을 더는 덮지 않는다
++    s["bbox"] = [128.0, 38.0, 128.001, 38.001]
++    (jobs_dir / "j2" / "scene.json").write_text(json.dumps(s), encoding="utf-8")
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j1"
++    s["bbox"] = list(BBOX)
++    (jobs_dir / "j2" / "scene.json").write_text(json.dumps(s), encoding="utf-8")
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j2"
++    # 지움 → 옛 것
++    assert c.delete("/api/jobs/j2").status_code == 204
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j1"
++    # 만드는 중(scene.json 없음) → 없음, 다 만듦(scene.json 생김) → 그것
++    (jobs_dir / "j3").mkdir()
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j1"
++    s["created"] = "2099-02-01T00:00:00+09:00"
++    (jobs_dir / "j3" / "scene.json").write_text(json.dumps(s), encoding="utf-8")
++    assert c.get("/api/scenes/at", params=at).json()["id"] == "j3"
++    # 직접 그린 건물 수(/api/jobs)는 파일 기준 그대로 바로 반영
++    assert c.put(f"/api/jobs/j1/user-buildings/{UID}", json={"outline": EMPTY, "height": 9}).status_code == 200
++    assert next(x for x in c.get("/api/jobs").json()["scenes"] if x["id"] == "j1")["user_buildings"] == 1
++
++
++# ---------------------------------------------------------------- 12 깨진 저장 파일
++def should_keep_corrupt_store_files_and_refuse_writes(tmp_path, mbtiles, slope_dem):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    c = _client(tmp_path, mbtiles)
++    assert c.put(f"/api/jobs/j1/user-buildings/{UID}", json={"outline": EMPTY, "height": 9}).status_code == 200
++    f = _files(tmp_path)[0]
++    broken = f.read_text(encoding="utf-8")[:-40]                                     # 끝이 잘린 파일(전원 끊김 등)
++    f.write_text(broken, encoding="utf-8")
++    moved = [[x, y - 0.0003] for x, y in EMPTY]
++    for m, url, body in (("PUT", f"/api/jobs/j1/user-buildings/{UID2}", {"outline": moved, "height": 9}),
++                         ("DELETE", f"/api/jobs/j1/user-buildings/{UID}", None), ("DELETE", "/api/jobs/j1/user-buildings", None)):
++        r = c.request(m, url, json=body)
++        assert r.status_code == 500 and f.name in r.json()["detail"], f"{m} {url} → {r.status_code}"
++        assert f.read_text(encoding="utf-8") == broken, f"{m} {url} 가 깨진 파일을 덮어썼다(옛 건물이 사라짐)"
++    assert c.get("/api/jobs/j1/user-buildings").status_code == 200                  # 읽기는 그 파일만 건너뛴다
++    assert c.get("/api/jobs").status_code == 200
++    # 높이 직접 입력 파일도 같다
++    fid = _flat(s1)["id"]
++    assert c.put(f"/api/jobs/j1/buildings/{fid}/height", json={"height": 30.0}).status_code == 200
++    hf = next((tmp_path / "data" / "overrides").glob("area-*.json"))
++    hf.write_text("{", encoding="utf-8")
++    sj0 = (tmp_path / "data" / "jobs" / "j1" / "scene.json").read_bytes()
++    for m, url, body in (("PUT", f"/api/jobs/j1/buildings/{fid}/height", {"height": 31.0}),
++                         ("DELETE", f"/api/jobs/j1/buildings/{fid}/height", None), ("DELETE", "/api/jobs/j1/height-overrides", None)):
++        r = c.request(m, url, json=body)
++        assert r.status_code == 500 and hf.name in r.json()["detail"], f"{m} {url} → {r.status_code}"
++        assert hf.read_text(encoding="utf-8") == "{"
++        assert (tmp_path / "data" / "jobs" / "j1" / "scene.json").read_bytes() == sj0
++    # 굽기는 깨진 파일을 건너뛰고 경고로 알린다
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    assert any(f.name in w for w in s2["warnings"]) and any(hf.name in w for w in s2["warnings"])
++
++
++# ---------------------------------------------------------------- B1 첫 로드 동안 취소
++def _fake_ort(monkeypatch, delay):
++    made = []
++
++    class SlowSession:
++        def __init__(self, path, opt=None, providers=None):
++            time.sleep(delay)
++            made.append(path)
++    fake = types.SimpleNamespace(InferenceSession=SlowSession, SessionOptions=lambda: types.SimpleNamespace())
++    monkeypatch.setitem(sys.modules, "onnxruntime", fake)
++    return made
++
++
++def should_cancel_quickly_while_lama_session_loads(tmp_path, monkeypatch):
++    made = _fake_ort(monkeypatch, 3.0)                       # 실기 첫 로드 15 초를 3 초로
++    (name, digest), = inpaint.MODEL_FILES.items()
++    (tmp_path / name).write_bytes(b"x")
++    monkeypatch.setattr(inpaint, "_sha256", lambda p: digest)
++    monkeypatch.setattr(inpaint, "_SESSIONS", {})
++    ex, late = _in_cancellable_thread(lambda: inpaint._session(tmp_path), 0.3)
++    assert isinstance(ex, cancel.Cancelled), f"취소가 안 먹었다(예외 {ex!r})"
++    assert late < 1.0, f"취소 뒤 {late:.1f}s 더 걸렸다"
++    for _ in range(50):                                      # 로드는 뒤에서 끝까지 — 다음 굽기가 바로 쓴다
++        if inpaint._SESSIONS:
++            break
++        time.sleep(0.1)
++    assert len(inpaint._SESSIONS) == 1 and len(made) == 1
++
++
++def should_cancel_quickly_while_sam_sessions_load(tmp_path, monkeypatch):
++    made = _fake_ort(monkeypatch, 2.0)
++    for name in sam.MODEL_FILES:
++        (tmp_path / name).write_bytes(b"x")
++    digests = {str(tmp_path / n): d for n, d in sam.MODEL_FILES.items()}
++    monkeypatch.setattr(sam, "_sha256", lambda p: digests[str(p)])
++    monkeypatch.setattr(sam, "_SESSIONS", {})
++    ex, late = _in_cancellable_thread(lambda: sam._sessions(tmp_path), 0.3)
++    assert isinstance(ex, cancel.Cancelled), f"취소가 안 먹었다(예외 {ex!r})"
++    assert late < 1.0, f"취소 뒤 {late:.1f}s 더 걸렸다"
++    for _ in range(80):                                      # 인코더 · 디코더 둘 다 뒤에서 끝까지(시험 정리 전에 기다린다)
++        if sam._SESSIONS:
++            break
++        time.sleep(0.1)
++    assert len(sam._SESSIONS) == 1 and len(made) == 2
++
++
++def should_load_sessions_normally_without_cancel(tmp_path, monkeypatch):
++    _fake_ort(monkeypatch, 0.0)
++    (name, digest), = inpaint.MODEL_FILES.items()
++    (tmp_path / name).write_bytes(b"x")
++    monkeypatch.setattr(inpaint, "_sha256", lambda p: digest)
++    monkeypatch.setattr(inpaint, "_SESSIONS", {})
++    s = inpaint._session(tmp_path)
++    assert inpaint._session(tmp_path) is s                   # 캐시
++    monkeypatch.setattr(inpaint, "_sha256", lambda p: "0" * 64)
++    monkeypatch.setattr(inpaint, "_SESSIONS", {})
++    with pytest.raises(inpaint.InpaintUnavailable):          # 해시 불일치는 예전처럼 Telea 로 떨어지는 예외
++        inpaint._session(tmp_path)
++
++
++# ---------------------------------------------------------------- B2 원형 + 돔 · 원뿔 = 꼭대기 높이
++@pytest.fixture
++def frame_grid(slope_dem, bbox):
++    dem = DemSource(load_geotiff(str(slope_dem), bbox))
++    frame = LocalFrame((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2, 100.0)
++    return frame, build_grid(frame, bbox, dem, spacing=2.0)
++
++
++@pytest.mark.parametrize("kind", ["dome", "cone"])
++def should_put_round_roof_top_at_input_height_only_for_drawn_buildings(frame_grid, kind):
++    from shapely.geometry import Polygon
++    frame, grid = frame_grid
++    poly = Polygon(_circle(127.1030, 37.3605))
++    top = {}
++    for src in ("drawn", "overlay", "osm"):
++        spec = BuildingSpec(1, src, f"{src}/1", poly, {}, height=12.0, roof_shape=kind)
++        wp, rp, info = build_building(spec, frame, grid, None)
++        assert info["roof_shape_built"] == kind and info["facade"] == "tank"
++        top[src] = info["top_z"] - info["ground_min"]
++        if src == "drawn":
++            rise = info["roof_height"]
++            assert rise > 1.0                                                    # 반지름 10 m × 0.2 · 0.18
++            assert wp.positions[:, 2].max() == pytest.approx(info["ground_min"] + 12.0 - rise + 0.9, abs=0.01)   # 벽 + 테두리
++    assert top["drawn"] == pytest.approx(12.0, abs=0.02), f"직접 그린 {kind}: 꼭대기 {top['drawn']:.2f} m(입력 12 m)"
++    assert top["overlay"] == pytest.approx(top["osm"]) and top["overlay"] > 13.0   # 사진 · 지도 탱크 규칙은 그대로(벽 높이 + 솟음)
++
++
++def should_keep_round_roof_top_at_new_height_when_3d_panel_changes_it(tmp_path, mbtiles, slope_dem):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    UB.put(tmp_path / "data", s1, UID, _circle(127.1030, 37.3605), 12.0, None, "탱크", roof="dome")
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    u = next(b for b in s2["buildings"] if b.get("user_uid") == UID)
++    assert u["roof_shape_built"] == "dome" and u["top_z"] - u["ground_min"] == pytest.approx(12.0, abs=0.02)
++    glb = tmp_path / "data" / "jobs" / "j2" / "scene.glb"
++    y0, _ = _all_ys(glb, u["id"])
++    b = _client(tmp_path, mbtiles).put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 20.0}).json()["building"]
++    y1, _ = _all_ys(glb, u["id"])
++    assert b["top_z"] - b["ground_min"] == pytest.approx(20.0, abs=0.02)
++    assert y1.max() - y0.max() == pytest.approx(8.0, abs=1e-3)                   # 돔은 그대로 올라가고 벽만 늘어난다
++
++
++# ---------------------------------------------------------------- B3 못 지은 지붕 = 실제 모양으로 기록
++L_SHAPE = [[127.1030, 37.3620], [127.1034, 37.3620], [127.1034, 37.3621], [127.1031, 37.3621], [127.1031, 37.3623], [127.1030, 37.3623]]
++
++
++def should_record_built_roof_shape_when_chosen_roof_cannot_be_built(tmp_path, mbtiles, slope_dem):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    rect2 = [[x, y - 0.0003] for x, y in EMPTY]
++    UB.put(tmp_path / "data", s1, UID, L_SHAPE, 9.0, None, None, roof="gable")      # ㄱ자 + 박공 → 평지붕
++    UB.put(tmp_path / "data", s1, UID2, rect2, 9.0, None, None, roof="dome")        # 사각 + 돔 → 평지붕
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    by = {b["user_uid"]: b for b in s2["buildings"] if b.get("user_uid")}
++    for uid, chosen in ((UID, "gable"), (UID2, "dome")):
++        b = by[uid]
++        assert b["roof_shape_built"] == "flat"
++        assert b["roof_shape"] == "flat", f"{chosen} 를 골라 평지붕으로 지었는데 roof_shape={b['roof_shape']}"
++        assert b["roof_shape_requested"] == chosen
++    assert by[UID]["roof_fallback"] is True
++    auto = next(b for b in s2["buildings"] if not b.get("user_uid") and b["roof_shape_built"] == "gable")
++    assert auto["roof_shape"] == "gable" and "roof_shape_requested" not in auto     # 지은 그대로면 덧붙이지 않는다
++    items = {it["uid"]: it for it in _client(tmp_path, mbtiles).get("/api/jobs/j2/user-buildings").json()["items"]}
++    assert (items[UID]["roof"], items[UID]["roof_built"]) == ("gable", "flat")       # 고른 것은 파일에 그대로, 지은 것은 따로
++    assert (items[UID2]["roof"], items[UID2]["roof_built"]) == ("dome", "flat")

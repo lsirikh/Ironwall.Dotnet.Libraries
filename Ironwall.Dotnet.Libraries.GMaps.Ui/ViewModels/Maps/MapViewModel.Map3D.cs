@@ -332,6 +332,36 @@ public partial class MapViewModel
         });
     }
 
+    /// <summary>
+    /// 지도 화면 비활성화(OnDeactivateAsync) — 3D 를 접고 구독 · 타이머를 푼다. 정적 이벤트(설정 저장 Map3DSaved · WPF 프레임 Rendering) ·
+    /// 로그인 구독이 남으면 닫은 VM 이 살아남아 계속 불린다. 다시 활성화되면 LoadMap3DFromSettings 가 다시 붙인다.
+    /// close 면 map-3d 창구도 닫는다(굽기 진행 조회도 끊는다).
+    /// </summary>
+    private void CleanupMap3D(bool close)
+    {
+        if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, "deactivate");
+        else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
+        _map3DEntrySuppressed = true;   // 위 복귀가 줄 세운 게이트가 곧바로 다시 들어가지 않게
+        SetMap3DBusy(null);             // 복귀 안내 패널 · 안내 타이머
+        System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
+        StopAllMap3DMoves();
+        _map3DLookupTimer?.Stop();
+        _map3DLookupCts?.Cancel();
+        MapSettingsHelper.Map3DSaved -= OnMap3DSettingsSaved;
+        if (_map3DLoginSubscribed && ResolveSessionLifecycle() is { } session) session.LoginSucceeded -= OnMap3DLoginSucceeded;
+        _map3DLoginSubscribed = false;
+        if (MainMap != null)
+        {
+            MainMap.OnPositionChanged -= OnMap3DPositionChanged;
+            MainMap.OnMapZoomChanged -= OnMap3DZoomChanged;
+            MainMap.DigitalZoomLevelChanged -= OnMap3DDigitalZoomChanged;
+        }
+        if (!close) return;
+        _map3DBakeCts?.Cancel();
+        _map3DClient?.Dispose();
+        _map3DClient = null;
+    }
+
     private void OnMap3DPositionChanged(PointLatLng _) => QueueMap3DGate();
     private void OnMap3DZoomChanged() => QueueMap3DGate();
     private void OnMap3DDigitalZoomChanged(int _) => QueueMap3DGate();
@@ -559,6 +589,7 @@ public partial class MapViewModel
         var bbox = area.Bbox;
         try
         {
+            if (await RefuseDuplicateMap3DBakeAsync(bbox)) return;   // 앞서 답을 못 받은 같은 영역 굽기를 서버가 하고 있거나 이미 끝냈다
             _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] rect={area.Rect?.ToJson().ToString(Newtonsoft.Json.Formatting.None) ?? "-"} overlay={overlayMode} images={overlays?.Count ?? 0} enterZoom={enterZoom}");
             var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays, enterZoom, area.Rect);
             _map3DBakeJob = job.Id;
@@ -601,6 +632,14 @@ public partial class MapViewModel
         {
             _log?.Info("[Map3D] 굽기 진행 조회 끊음(만들기 취소)");   // 알림 · 상태 정리는 취소 쪽(CancelMap3DBakeAsync)이 이미 했다
         }
+        catch (Map3DServerUnavailableException ex) when (ex.IsTimeout && _map3DBakeJob == null)
+        {
+            // 굽기 시작의 답을 못 받았다 — 서버는 이미 만들고 있을 수 있다. 같은 영역을 다시 만들면 서버 작업 목록을 먼저 본다(RefuseDuplicateMap3DBakeAsync)
+            _map3DBakeUnconfirmed = (bbox, _map3DScenes.Select(sc => sc.Id).ToHashSet());
+            _log?.Warning($"[Map3D] 굽기 시작 — 답 없음(시간 초과): {ex.Message}");
+            SetAimStatus(Map3DBakeNoAnswerText, autoHide: true);
+            _ = RefreshMap3DAreasAsync();
+        }
         catch (Map3DServerUnavailableException ex)
         {
             _log?.Warning($"[Map3D] 서버 닿지 않음: {ex.Message}");
@@ -620,6 +659,39 @@ public partial class MapViewModel
             // 취소한 뒤 곧바로 다시 만들기를 시작했으면 그 굽기 상태는 건드리지 않는다
             if (ReferenceEquals(_map3DBakeCts, cts)) EndMap3DBake();
             cts.Dispose();
+        }
+    }
+
+    private const string Map3DBakeNoAnswerText = "3D 만들기 요청의 답을 받지 못했습니다 — 서버가 이미 만들고 있을 수 있습니다. 잠시 뒤 영역 목록을 확인하세요";
+
+    /// <summary>시작 답을 못 받은(시간 초과) 굽기 — 그 영역과 그때 알던 장면 id. 같은 영역을 다시 만들기 전에 서버 작업 목록을 본다.</summary>
+    private (double[] Bbox, HashSet<string> KnownIds)? _map3DBakeUnconfirmed;
+
+    /// <summary>
+    /// 같은 영역의 앞 굽기가 시작 답 없이 끝났으면(시간 초과) 서버 작업 목록을 먼저 본다 — 그 영역 장면이 새로 생겼으면 이미 다 만든 것,
+    /// 만드는 중인 작업이 있으면 그 굽기일 수 있어 막는다(중복 굽기). map-3d 작업 목록에는 영역이 없어 "만드는 중인 작업이 있다"로 판단한다.
+    /// 목록을 못 받으면 막지 않는다(시작 요청이 사유를 알린다). 막았으면 true.
+    /// </summary>
+    private async Task<bool> RefuseDuplicateMap3DBakeAsync(double[] bbox)
+    {
+        static bool Same(double[] a, double[] b) => a.Length == b.Length && a.Zip(b).All(p => Math.Abs(p.First - p.Second) < 1e-6);
+        if (_map3DBakeUnconfirmed is not { } pending || !Same(pending.Bbox, bbox) || _map3DClient == null) return false;
+        try
+        {
+            var (scenes, running) = await _map3DClient.ListJobsAsync();
+            var done = scenes.FirstOrDefault(s => !pending.KnownIds.Contains(s.Id) && Same(s.Bbox, bbox));
+            if (done == null && running == 0) { _map3DBakeUnconfirmed = null; return false; }   // 서버가 받지 못했다 — 새로 만든다
+            if (done != null) _map3DBakeUnconfirmed = null;
+            _log?.Info($"[Map3D] 같은 영역 굽기 막음 — 앞 요청(답 없음) 만드는중={running} 다만듦={done?.Id ?? "-"}");
+            SetAimStatus(done != null ? "앞서 보낸 3D 만들기가 이미 끝났습니다 — 영역을 확인하세요"
+                                      : "앞서 보낸 3D 만들기를 서버가 아직 하고 있습니다 — 다 만들면 영역이 나타납니다", autoHide: true);
+            _ = RefreshMap3DAreasAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Map3D] 같은 영역 굽기 확인 — 작업 목록 실패(그대로 만든다): {ex.Message}");
+            return false;
         }
     }
 
@@ -829,6 +901,7 @@ public partial class MapViewModel
         SetMap3DState(Map3DState.Off);   // 지도가 없어도 상태는 내린다 — "3D"(「나가기」)로 남지 않게
         // 3D 화면을 접고 2D 입력을 먼저 되살린다 — 아래 단계가 예외를 던져도 "2D 인데 클릭 · 휠이 안 먹는" 지도로 남지 않게(2026-10-19 사용자 보고)
         if (MainMap != null) { Map3DHost.Park(); RestoreMap2DInput(); }
+        System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;   // 지도가 없어도 푼다(정적 이벤트 — 남으면 VM 이 매 프레임 불린다)
         CloseBuildingHeightPanel(clearUndo: true);   // 「건물 높이」 판 — 미리보기 원래대로 · 판 안 되돌리기 비움
         if (MainMap == null) return;
         _map3DAreaViewJob = null; _map3DReturn = null;   // 다음 진입은 다시 줌 게이트 또는 새 「영역 보기」
@@ -837,7 +910,6 @@ public partial class MapViewModel
         SetMap3DBusy(Map3DGuide.LeaveTitle, 100);
         RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.LeaveShow, timedBar: false);
         _map3DOverlay?.Pause();   // 페이지는 1×1 로 살아 있다 — 다시 펼칠 때 바뀐 것만 보낸다
-        System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
         if (cam is { } c) Apply3DCameraTo2D(c);
         CreateScaleBar();              // 축척 막대를 2D 값으로(줌이 그대로면 줌 변경 이벤트가 오지 않는다)
         CurrentAltitudeText = null;    // 좌표 칩 고도 줄은 3D 에서만

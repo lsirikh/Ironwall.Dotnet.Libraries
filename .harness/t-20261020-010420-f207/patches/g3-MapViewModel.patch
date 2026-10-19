@@ -1,0 +1,13 @@
+--- a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs
++++ b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs
+@@ -326,6 +326,10 @@
+ 
+             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
+ 
++            // 3D 정리 — 3D 접기 · 구독 · 타이머 · 정적 이벤트 해제(MapViewModel.Map3D, 누수 방지)
++            try { CleanupMap3D(close); }
++            catch (Exception ex) { _log?.Error($"[Map3D] 정리 실패(격리): {ex.Message}"); }
++
+             // Adorner 시스템 정리
+             CleanupAdornerIntegration();
+ 

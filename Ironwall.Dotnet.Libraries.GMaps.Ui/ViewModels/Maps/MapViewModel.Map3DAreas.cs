@@ -49,14 +49,24 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     private async Task RefreshMap3DAreasAsync()
     {
         if (_map3DClient == null || MainMap == null) return;
+        int seq = Interlocked.Increment(ref _map3DAreasRequestSeq);
         try
         {
             var scenes = await _map3DClient.ListScenesAsync().ConfigureAwait(false);
-            await OnUiAsync(() => ApplyMap3DAreas(scenes)).ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                // 늦게 보낸 요청의 목록을 이미 달았다 — 먼저 보낸 요청이 늦게 온 옛 목록이 새 영역을 "목록에서 빠짐"으로 내리지 않게 버린다
+                if (seq < _map3DAreasAppliedSeq) { _log?.Info($"[Map3D] 영역 목록 — 늦게 온 옛 응답 버림(요청 {seq} < 단 것 {_map3DAreasAppliedSeq})"); return; }
+                _map3DAreasAppliedSeq = seq;
+                ApplyMap3DAreas(scenes);
+            }).ConfigureAwait(false);
         }
         catch (Map3DServerUnavailableException ex) { _log?.Warning($"[Map3D] 영역 목록 — 서버 닿지 않음: {ex.Message}"); }
         catch (Exception ex) { _log?.Warning($"[Map3D] 영역 목록 실패: {ex.Message}"); }
     }
+
+    /// <summary>목록 요청 순번 · 마지막으로 단 응답의 순번 — 응답이 보낸 순서와 다르게 오면 늦게 온 옛 목록을 버린다.</summary>
+    private int _map3DAreasRequestSeq, _map3DAreasAppliedSeq;
 
     /// <summary>마지막으로 받은 서버 목록 — 굽기 시작 · 끝에 항목 메뉴(「만들기 취소」)를 다시 짠다.</summary>
     private IReadOnlyList<Map3DSceneInfo>? _map3DLastAreaScenes;

@@ -206,9 +206,18 @@ public partial class MapViewModel
     private static ImageCropState CaptureImageCropState(GMapImageMarker marker)
         => new(marker.FilePath ?? string.Empty, marker.ImageBounds, marker.Width, marker.Height);
 
-    /// <summary>자르기 상태 적용(실행 · Undo · Redo 공용) — 그림 파일 · 크기 · 경계 → DB · MapLayers 경로 · 화면.</summary>
+    /// <summary>
+    /// 자르기 상태 적용(Undo · Redo) — 그림 파일 · 크기 · 경계 → DB · MapLayers 경로 · 화면. 그림이 없으면(지워짐) 할 일 없음.
+    /// 저장 실패 = 화면 · 모델을 지금 상태(= DB)로 두고 예외 — 다른 Undo 적용과 같이 UndoService 가 그 칸을 스택에 남긴다(BUG-04).
+    /// </summary>
     internal Task ApplyImageCropStateAsync(int imageId, ImageCropState state, CancellationToken ct = default)
-        => TryApplyImageCropStateAsync(imageId, state, restoreOnFailure: null);
+        => RunOnUiAsync(async () =>
+        {
+            if (FindMarkerById(imageId, isImage: true) is not GMapImageMarker img) return;
+            if (await TryApplyImageCropStateAsync(imageId, state, CaptureImageCropState(img))) return;
+            SetAimStatus("저장하지 못해 그림을 바꾸지 않았습니다", autoHide: true);
+            throw new InvalidOperationException($"[ImageCrop] 자르기 상태 저장 실패 id={imageId}");
+        });
 
     /// <summary>
     /// 자르기 상태 적용 — 저장(DB)했으면 true. 저장에 실패하고 restoreOnFailure 가 있으면 화면 · 모델을 그 상태로 되돌린다

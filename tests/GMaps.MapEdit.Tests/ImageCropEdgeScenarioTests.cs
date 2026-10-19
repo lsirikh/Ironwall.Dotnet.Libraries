@@ -690,6 +690,52 @@ public class ImageCropEdgeScenarioTests
         rig.Done();
     });
 
+    // ─────────────── G1-1 Undo · Redo 저장 실패 ───────────────
+
+    [Fact]
+    [Trait("Scenario", "G1-1")]
+    public void should_keep_crop_on_undo_stack_and_screen_equal_db_when_undo_or_redo_save_fails() => Scenario.StaAsync(async () =>
+    {
+        // 자르기 Undo/Redo 의 DB 저장 실패를 성공으로 처리하면 화면(자르기 전) ≠ DB(자른 뒤) 인데 스택은 Redo 로 넘어간다.
+        // 다른 Undo 적용과 같이(BUG-04) 실패 = 그 칸을 그대로 두고 화면도 DB 와 같게.
+        var rig = new Rig();
+        var relative = rig.Files.CopyImageToLocal(rig.UserPng(200, 100));
+        var marker = rig.PlaceImage(relative, Placed, 30, 400, 200);
+        rig.W.Undo.Clear();
+        await rig.RecropAsync(marker, RightHalf);
+        var cropped = marker.FilePath;
+        var croppedBounds = marker.ImageBounds;
+        Assert.Equal("다각형으로 자르기", rig.W.Undo.NextUndoDescription);
+        rig.Updated.Clear();
+
+        rig.W.Db.Setup(d => d.UpdateImageAsync(It.IsAny<IImageModel>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("DB 끊김"));
+        Assert.False(await rig.W.Undo.UndoAsync(), "DB 저장 실패인데 Undo 가 성공으로 처리됐다");
+        Assert.Equal(cropped, marker.FilePath);                                // 화면 · 모델 = DB(자른 그림)
+        Assert.Equal(cropped, marker.ImageModel.FilePath);
+        SameBounds(croppedBounds, marker.ImageBounds);
+        Assert.Equal((200d, 200d), (marker.Width, marker.Height));
+        Assert.Equal("다각형으로 자르기", rig.W.Undo.NextUndoDescription);       // 그 칸은 Undo 스택에 남는다
+        Assert.False(rig.W.Undo.CanRedo);
+        Assert.Empty(rig.Updated);
+        Assert.Equal("저장하지 못해 그림을 바꾸지 않았습니다", rig.Vm.AimStatusMessage);
+
+        // 다시 저장되면 같은 칸을 되돌릴 수 있다
+        rig.W.Db.Setup(d => d.UpdateImageAsync(It.IsAny<IImageModel>(), It.IsAny<CancellationToken>())).ReturnsAsync((IImageModel m, CancellationToken _) => m);
+        Assert.True(await rig.W.Undo.UndoAsync());
+        Assert.Equal(relative, marker.FilePath);
+        SameBounds(Placed, marker.ImageBounds, 1e-9);
+
+        // Redo 저장 실패 — 자르기 전 그대로, Redo 칸 유지
+        rig.W.Db.Setup(d => d.UpdateImageAsync(It.IsAny<IImageModel>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("DB 끊김"));
+        Assert.False(await rig.W.Undo.RedoAsync(), "DB 저장 실패인데 Redo 가 성공으로 처리됐다");
+        Assert.Equal(relative, marker.FilePath);
+        SameBounds(Placed, marker.ImageBounds, 1e-9);
+        Assert.Equal((400d, 200d), (marker.Width, marker.Height));
+        Assert.Equal("다각형으로 자르기", rig.W.Undo.NextRedoDescription);
+        Assert.False(rig.W.Undo.CanUndo);
+        rig.Done("[ImageCrop] 저장 실패");
+    });
+
     // ─────────────── E-37 MapLayers 행 없음 ───────────────
 
     [Fact]

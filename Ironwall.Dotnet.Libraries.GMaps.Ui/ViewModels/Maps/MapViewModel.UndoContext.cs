@@ -49,6 +49,7 @@ public partial class MapViewModel : IUndoApplyContext
         UndoCommand = new AsyncRelayCommand(async () =>
         {
             _groupSelection?.EndRotation(commit: true);   // 열린 묶음 회전은 먼저 확정 → 이번 되돌리기가 그 회전을 되돌린다
+            if (_groupRotateSaveTask is { } rotateSave) await rotateSave;   // 확정 저장 · Undo 기록이 끝난 뒤에(느린 DB 에서 이전 편집이 되돌려지지 않게)
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.UndoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
@@ -57,6 +58,7 @@ public partial class MapViewModel : IUndoApplyContext
         RedoCommand = new AsyncRelayCommand(async () =>
         {
             _groupSelection?.EndRotation(commit: true);   // 열린 묶음 회전 먼저 확정(Undo 단위 섞임 방지)
+            if (_groupRotateSaveTask is { } rotateSave) await rotateSave;   // 확정 기록이 옛 Redo 를 지운 뒤에 Redo
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.RedoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }

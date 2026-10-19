@@ -606,4 +606,96 @@ public class GroupRotationEdgeScenarioTests
         Assert.InRange(screenTurn, g.Rotation.Angle - 1.5, g.Rotation.Angle + 1.5);
         Scenario.Call(adorner, "FinishRotationDrag", false);
     });
+
+    // ───────────── G1-2 · G1-9 : 확정 저장이 느릴 때 Undo/Redo 순서 · 확정 처리 예외 ─────────────
+
+    /// <summary>기하 저장이 delayMs 뒤에 끝난다(실제 DB 처럼 확정 처리기가 await 에서 멈춘다).</summary>
+    private static List<int> RecordSlowSaves(WiredMapRig rig, int delayMs)
+    {
+        var saves = new List<int>();
+        rig.Db.Setup(d => d.UpdateGeometrySymbolAsync(It.IsAny<IGeometricSymbolModel>(), It.IsAny<CancellationToken>()))
+              .Returns<IGeometricSymbolModel, CancellationToken>(async (m, _) => { await Task.Delay(delayMs); saves.Add(m.Id); return null; });
+        return saves;
+    }
+
+    [Fact]
+    [Trait("Scenario", "G1-2")]
+    public void should_undo_pending_rotation_not_earlier_edit_when_undo_is_pressed_while_confirm_save_is_slow() => Scenario.StaAsync(async () =>
+    {
+        var rig = WiredMapRig.Create();
+        RecordSlowSaves(rig, 40);
+        var (a, _) = Pair(rig, 4201, 4202, bearingA: 5);
+        Key(rig, K.OemCloseBrackets);
+        Key(rig, K.Enter);                                    // +1° 확정(이전 편집)
+        await Task.Delay(400);
+        Assert.Equal(6, a.Bearing, 9);
+        Assert.Equal("그룹 회전 2개", rig.Undo.NextUndoDescription);
+        var pa = a.Position;
+
+        Key(rig, K.OemOpenBrackets);                          // -1° 미리보기(확정 전)
+        rig.Vm.UndoCommand!.Execute(null);                      // 먼저 확정 → 그 회전(마지막 것)만 되돌린다
+        await Task.Delay(800);
+
+        Assert.False(Group(rig).IsRotating);
+        Assert.Equal(6, a.Bearing, 9);                          // 이전 편집(+1°)은 남아 있다
+        AssertAt(pa, a.Position);
+        Assert.True(rig.Undo.CanRedo);
+        Assert.Equal("그룹 회전 2개", rig.Undo.NextUndoDescription);   // 이전 +1° 칸이 그대로
+        Assert.True(await rig.Undo.UndoAsync());
+        await Task.Delay(300);
+        Assert.Equal(5, a.Bearing, 9);
+        Assert.False(rig.Undo.CanUndo);
+        Assert.Empty(rig.Errors);
+    });
+
+    [Fact]
+    [Trait("Scenario", "G1-2")]
+    public void should_confirm_preview_and_drop_old_redo_when_redo_is_pressed_while_confirm_save_is_slow() => Scenario.StaAsync(async () =>
+    {
+        var rig = WiredMapRig.Create();
+        RecordSlowSaves(rig, 40);
+        var (a, _) = Pair(rig, 4211, 4212);
+        Key(rig, K.OemCloseBrackets);
+        Key(rig, K.Enter);                                    // +1° 확정
+        await Task.Delay(400);
+        rig.Vm.UndoCommand!.Execute(null);                      // 되돌림 → Redo 가능
+        await Task.Delay(400);
+        Assert.Equal(0, a.Bearing, 9);
+        Assert.True(rig.Undo.CanRedo);
+
+        Key(rig, K.OemCloseBrackets);                         // 새 미리보기 +2°
+        Key(rig, K.OemCloseBrackets);
+        rig.Vm.RedoCommand!.Execute(null);                      // 먼저 확정(새 편집이 옛 Redo 를 무효화)
+        await Task.Delay(800);
+
+        Assert.False(Group(rig).IsRotating);
+        Assert.Equal(2, a.Bearing, 9);                          // 옛 +1° Redo 가 덮어쓰지 않는다
+        Assert.False(rig.Undo.CanRedo);
+        Assert.Equal("그룹 회전 2개", rig.Undo.NextUndoDescription);
+        Assert.True(await rig.Undo.UndoAsync());
+        await Task.Delay(300);
+        Assert.Equal(0, a.Bearing, 9);
+        Assert.Empty(rig.Errors);
+    });
+
+    [Fact]
+    [Trait("Scenario", "G1-9")]
+    public void should_log_and_not_crash_dispatcher_when_recording_rotation_undo_throws() => Scenario.StaAsync(async () =>
+    {
+        var rig = WiredMapRig.Create();
+        var saves = RecordSaves(rig);
+        var recorder = new Mock<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IEditRecorder>();
+        recorder.Setup(r => r.RecordTransform(It.IsAny<MarkerEditCompletedEventArgs>())).Throws(new InvalidOperationException("기록 실패"));
+        Scenario.SetField(rig.Vm, "_editRecorder", recorder.Object);
+        var (a, _) = Pair(rig, 4221, 4222);
+        Key(rig, K.OemCloseBrackets);
+        Key(rig, K.Enter);                                    // 확정 → 저장 뒤 Undo 기록에서 예외
+        await Task.Delay(100);
+        Scenario.Pump();
+
+        Assert.False(Group(rig).IsRotating);
+        Assert.Equal(1, a.Bearing, 9);                          // 저장은 됐다
+        Assert.Equal(new[] { 4221, 4222 }, saves.Distinct().OrderBy(x => x));
+        Assert.Contains(rig.Errors, e => e.StartsWith("그룹 회전 확정 처리 실패") && e.Contains("기록 실패"));
+    });
 }
