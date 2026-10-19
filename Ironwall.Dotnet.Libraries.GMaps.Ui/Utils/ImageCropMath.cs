@@ -23,7 +23,37 @@ public static class ImageCropMath
         if (polygon == null || polygon.Count < 3) return "꼭짓점이 3개 이상 있어야 자를 수 있습니다";
         if (IsSelfIntersecting(polygon)) return "선이 서로 겹칩니다 — 꼭짓점을 옮겨 주세요";   // 나비 모양은 넓이가 0 이라 먼저 본다
         if (Math.Abs(SignedArea(polygon)) < 0.5) return "다각형 넓이가 없습니다 — 꼭짓점을 벌려 주세요";
+        // 넓이는 있어도 픽셀 중심이 하나도 안에 들지 않으면(가는 띠 · 1px 삼각형) 완전 투명 그림이 된다
+        if (!HasAnyPixel(polygon)) return "남는 픽셀이 없습니다 — 다각형을 더 크게 그려 주세요";
         return null;
+    }
+
+    /// <summary>다각형 안에 중심 (x+0.5, y+0.5) 가 드는 픽셀이 하나라도 있는가 — <see cref="MaskAndCrop"/> 와 같은 판정(행마다 교차점 사이만 본다).</summary>
+    public static bool HasAnyPixel(IReadOnlyList<Point> polygon)
+    {
+        if (polygon == null || polygon.Count < 3) return false;
+        double minY = double.MaxValue, maxY = double.MinValue;
+        foreach (var p in polygon) { minY = Math.Min(minY, p.Y); maxY = Math.Max(maxY, p.Y); }
+        var xs = new List<double>();
+        for (int y = Math.Max(0, (int)Math.Floor(minY)); y + 0.5 <= maxY; y++)
+        {
+            double cy = y + 0.5;
+            xs.Clear();
+            for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+            {
+                var a = polygon[i];
+                var b = polygon[j];
+                if ((a.Y > cy) != (b.Y > cy)) xs.Add((b.X - a.X) * (cy - a.Y) / (b.Y - a.Y) + a.X);
+            }
+            xs.Sort();
+            for (int k = 0; k + 1 < xs.Count; k += 2)
+            {
+                // 이 구간에 드는 픽셀 중심 — 경계 반올림은 Contains 로 다시 확인(넓은 구간은 첫 점에서 끝난다)
+                for (double cx = Math.Max(0, Math.Ceiling(xs[k] - 0.5)) + 0.5; cx <= xs[k + 1] + 0.5; cx++)
+                    if (Contains(polygon, cx, cy)) return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>닫힌 다각형의 부호 있는 넓이(신발끈 공식).</summary>

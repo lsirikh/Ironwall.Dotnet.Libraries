@@ -180,6 +180,16 @@ public partial class MapViewModel
             SetAimStatus("돌릴 수 있는 항목이 없습니다(잠기지 않은 것이 있어야 합니다).", autoHide: true);
     }
 
+    /// <summary>
+    /// 열린 그룹 속성 판(2개 이상)의 칸을 지금 마커 값으로 다시 채운다(EnterGroupMode 재사용) — 판은 열릴 때 한 번만 채우므로
+    /// 묶음 회전 확정 · Undo/Redo 뒤 회전(MarkerBearing) · 감시 방향(DetectionBearing) 칸이 낡지 않게.
+    /// </summary>
+    private void RefreshGroupPropertyPanelValues()
+    {
+        if (PropertyPanel is { IsGroupEditing: true, GroupMarkers: { Count: >= 2 } group } panel)
+            panel.EnterGroupMode(group);
+    }
+
     private void SetGroupRotationInputError(string? error)
     {
         _groupRotationInputError = error;

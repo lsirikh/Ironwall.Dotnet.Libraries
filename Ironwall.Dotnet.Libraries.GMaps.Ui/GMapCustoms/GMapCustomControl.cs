@@ -1008,7 +1008,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
         if (_isImageDrag) gates.Add("imageDrag");
         if (_isRubberBanding) gates.Add("rubberBand");
         if (_panSuppress.IsSuppressing) gates.Add("panSuppress");
-        if (IsDragging) gates.Add("coreDrag");
+        if (IsDragging || IsCoreDragging) gates.Add("coreDrag");
         if (IsTargetAimMode) gates.Add("aim");
         if (IsSymbolPlacementMode) gates.Add("symbolPlacement");
         if (IsHomePlacementMode) gates.Add("homePlacement");
@@ -1019,7 +1019,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     }
 
     /// <summary>
-    /// 3D 를 나올 때 — 3D 가 보이는 동안 뗌을 못 받아 남았을 수 있는 일시 제스처 상태(이미지 끌기 · 마퀴 · 선 눌림 · 팬 억제 · 지도 캡처)를 비운다.
+    /// 3D 를 나올 때 — 3D 가 보이는 동안 뗌을 못 받아 남았을 수 있는 일시 제스처 상태(이미지 끌기 · 마퀴 · 선 눌림 · 팬 억제 · 벤더 지도 끌기 · 지도 캡처)를 비운다.
     /// 그리기 · 측정 같은 모드는 건드리지 않는다(3D 는 그 모드 중에 열리지 않는다). 비운 것 목록 — 없으면 빈 문자열.
     /// </summary>
     internal string ResetTransientInput()
@@ -1029,6 +1029,8 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
         if (_isRubberBanding && !IsAnchorDrawMode) { _isRubberBanding = false; _rubberStart = null; _rubberCurrent = null; HideRubberBand(); cleared.Add("rubberBand"); }
         if (_linePress.HasValue && !IsLineDrawing) { _linePress = null; _lineDragging = false; cleared.Add("linePress"); }
         if (_panSuppress.IsSuppressing) { _panSuppress.OnButtonDown(); cleared.Add("panSuppress"); }
+        // 벤더 지도 끌기(팬) — 3D 를 펼칠 때 끌던 중이면 뗌을 3D 화면이 받아 남는다(남으면 정수 줌 · 위치 이동 · 벤더 휠 줌이 먹지 않는다)
+        if (IsDragging || IsCoreDragging) { EndCoreDrag(); cleared.Add("coreDrag"); }
         if (IsMouseCaptured) { ReleaseMouseCapture(); cleared.Add("capture"); }
         return string.Join(",", cleared);
     }

@@ -98,17 +98,31 @@ public partial class MapViewModel : IHandle<CallReassignLinkedDeviceProcessMessa
                 return;
             }
 
+            // 이미 중복된 자료(같은 장비를 마커 여럿이 가짐)면 다른 소유 마커를 모두 비운다 — 첫 마커만 비우면 남은 마커가 여전히 중복이다.
+            var holders = OtherDeviceHolders(target, device);
+            if (!holders.Contains(holder)) holders.Insert(0, holder);
+
             _deviceLinkSyncDepth++;
             try
             {
-                SetDeviceLinkSilently(holder, null);
-                try { await DbUpdateProcess(holder); }
-                catch (Exception ex)
+                var cleared = new List<GMapPidsMarker>();
+                foreach (var h in holders)
                 {
-                    SetDeviceLinkSilently(holder, device);
-                    _log?.Error($"[장비 재할당] '{MarkerName(holder)}' 비움 저장 실패 — 바꾸지 않음: {ex.Message}");
-                    SetAimStatus("장비 재할당을 저장하지 못했습니다.", autoHide: true);
-                    return;
+                    SetDeviceLinkSilently(h, null);
+                    try { await DbUpdateProcess(h); cleared.Add(h); }
+                    catch (Exception ex)
+                    {
+                        SetDeviceLinkSilently(h, device);
+                        foreach (var c in cleared)   // 앞에서 비운 마커도 원래대로(저장도 되돌림)
+                        {
+                            SetDeviceLinkSilently(c, device);
+                            try { await DbUpdateProcess(c); }
+                            catch (Exception ex2) { _log?.Error($"[장비 재할당] '{MarkerName(c)}' 원복 저장 실패: {ex2.Message}"); }
+                        }
+                        _log?.Error($"[장비 재할당] '{MarkerName(h)}' 비움 저장 실패 — 바꾸지 않음: {ex.Message}");
+                        SetAimStatus("장비 재할당을 저장하지 못했습니다.", autoHide: true);
+                        return;
+                    }
                 }
 
                 SetDeviceLinkSilently(target, device);
@@ -116,9 +130,12 @@ public partial class MapViewModel : IHandle<CallReassignLinkedDeviceProcessMessa
                 catch (Exception ex)
                 {
                     SetDeviceLinkSilently(target, before);
-                    SetDeviceLinkSilently(holder, device);
-                    try { await DbUpdateProcess(holder); }
-                    catch (Exception ex2) { _log?.Error($"[장비 재할당] '{MarkerName(holder)}' 원복 저장 실패: {ex2.Message}"); }
+                    foreach (var h in holders)
+                    {
+                        SetDeviceLinkSilently(h, device);
+                        try { await DbUpdateProcess(h); }
+                        catch (Exception ex2) { _log?.Error($"[장비 재할당] '{MarkerName(h)}' 원복 저장 실패: {ex2.Message}"); }
+                    }
                     _log?.Error($"[장비 재할당] '{MarkerName(target)}' 연결 저장 실패 — 둘 다 원래대로: {ex.Message}");
                     SetAimStatus("장비 재할당을 저장하지 못했습니다.", autoHide: true);
                     return;
@@ -128,11 +145,11 @@ public partial class MapViewModel : IHandle<CallReassignLinkedDeviceProcessMessa
 
             using (_editRecorder?.BeginBatch($"장비 재할당: {device.DeviceName}"))
             {
-                _editRecorder?.RecordPropertyChange(holder, "LinkedDevice", device, null);
+                foreach (var h in holders) _editRecorder?.RecordPropertyChange(h, "LinkedDevice", device, null);
                 _editRecorder?.RecordPropertyChange(target, "LinkedDevice", before, device);
             }
 
-            holder.ResetLiveState();                                     // 이제 이 장비의 이벤트를 받지 않는다
+            foreach (var h in holders) h.ResetLiveState();               // 이제 이 장비의 이벤트를 받지 않는다
             SymbolLifecycle.RegisterDevice(device, target.Model);         // 조회표를 새 마커로
             SymbolLifecycle.ReconcileDevice(device.Id, device.DeviceType);
             RefreshDeviceAssignmentNotes();

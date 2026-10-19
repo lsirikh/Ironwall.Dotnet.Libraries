@@ -36,7 +36,11 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private string _bhHeightText = "";
     private string _bhFloorHeightText = Map3DBuilding.FormatMeters(Map3DBuilding.DefaultFloorHeight);
     private string? _bhError;
+    /// <summary>지금 오류 줄이 입력칸의 잘못된 값 때문인가 — 그동안은 [적용] 을 막는다(앞 미리보기 값이 저장되지 않게). 저장 실패 줄은 다시 [적용] 할 수 있다.</summary>
+    private bool _bhInputError;
     private bool _bhBusy;
+    /// <summary>3D 세션 번호 — 3D 를 나갈 때(되돌리기 칸 비움) 하나 오른다. 나간 뒤 도착한 저장 응답은 칸에 쌓지 않는다.</summary>
+    private int _bhSession;
     private double? _bhDragStart;
     private List<BuildingHeightUndoStep>? _bhUndoSteps;
     /// <summary>판 안 되돌리기 칸들(늦게 만든다 — 생성자 없이 만든 VM(시험 장치)에서도 3D 나가기가 깨지지 않게).</summary>
@@ -89,7 +93,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         {
             _bhFloorsText = value ?? "";
             if (!IsBuildingHeightEditable) { NotifyOfPropertyChange(); return; }
-            if (!Map3DBuilding.TryParseFloors(value, out var floors, out var err)) { SetBuildingHeightError(err); NotifyOfPropertyChange(); return; }
+            if (!Map3DBuilding.TryParseFloors(value, out var floors, out var err)) { SetBuildingHeightInputError(err); NotifyOfPropertyChange(); return; }
             SetBuildingHeightPreview(Map3DBuilding.HeightFromFloors(floors, BhFloorHeight));
         }
     }
@@ -102,7 +106,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         {
             _bhHeightText = value ?? "";
             if (!IsBuildingHeightEditable) { NotifyOfPropertyChange(); return; }
-            if (!Map3DBuilding.TryParseHeight(value, out var h, out var err)) { SetBuildingHeightError(err); NotifyOfPropertyChange(); return; }
+            if (!Map3DBuilding.TryParseHeight(value, out var h, out var err)) { SetBuildingHeightInputError(err); NotifyOfPropertyChange(); return; }
             SetBuildingHeightPreview(h);
         }
     }
@@ -114,9 +118,10 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         set
         {
             _bhFloorHeightText = value ?? "";
-            if (!Map3DBuilding.TryParseFloorHeight(value, out var fh, out var err)) { SetBuildingHeightError(err); NotifyOfPropertyChange(); return; }
+            if (!Map3DBuilding.TryParseFloorHeight(value, out var fh, out var err)) { SetBuildingHeightInputError(err); NotifyOfPropertyChange(); return; }
             BhFloorHeight = fh;
             _bhError = null;
+            _bhInputError = false;
             RefreshBuildingHeightPanel();
         }
     }
@@ -135,7 +140,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private RelayCommand? _applyBuildingHeightCommand;
     /// <summary>「적용」 — map-3d 에 저장.</summary>
     public RelayCommand ApplyBuildingHeightCommand => _applyBuildingHeightCommand ??= new RelayCommand(
-        _ => _ = ApplyBuildingHeightAsync(), _ => IsBuildingHeightEditable && IsBuildingHeightChanged);
+        _ => _ = ApplyBuildingHeightAsync(), _ => IsBuildingHeightEditable && IsBuildingHeightChanged && !_bhInputError);
 
     private RelayCommand? _cancelBuildingHeightCommand;
     /// <summary>「취소」 · 닫기(✕) · Esc — 미리보기를 원래대로 하고 판을 닫는다.</summary>
@@ -157,6 +162,15 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private void OnMap3DBuildingPicked(Map3DBuildingPick pick)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
+        if (Map3DHost.HostMode == "hwnd")
+        {
+            // 네이티브 창 3D 는 WPF 판을 덮는다 — 안 보이는 판이 첫 Esc 를 가로채 3D 를 못 나가게 되므로 열지 않고 알린다(3D 가 그린 윤곽은 지운다)
+            _log?.Info($"[Map3D] 건물 고름 — 네이티브 창 3D 라 「건물 높이」 판을 열지 않음 id={pick.Id} job={_map3DJob}");
+            try { PostBuilding3D(Map3DBuilding.SelectMessageJson(null)); }
+            catch (Exception ex) { _log?.Error($"[Map3D] 건물 윤곽 지우기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
+            SetAimStatus("네이티브 창 3D 에서는 건물 높이 판을 쓸 수 없습니다", autoHide: true);
+            return;
+        }
         if (_bhBuilding is { } old)
         {
             if (old.Id == pick.Id && _bhJob == _map3DJob) return;   // 같은 건물 — 넣던 값 그대로
@@ -167,6 +181,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhJob = _map3DJob;
         _bhPreview = pick.Height;
         _bhError = null;
+        _bhInputError = false;
         _log?.Info($"[Map3D] 건물 고름 id={pick.Id} 높이={pick.Height} 출처={pick.HeightFrom ?? "-"} job={_map3DJob}");
         RefreshBuildingHeightPanel();
     }
@@ -174,7 +189,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     /// <summary>판 닫기 — 미리보기 원래대로 · 강조 지움. clearUndo = 3D 를 나갈 때(판 안 되돌리기 비움).</summary>
     private void CloseBuildingHeightPanel(bool clearUndo)
     {
-        if (clearUndo) BhUndo.Clear();
+        if (clearUndo) { BhUndo.Clear(); _bhSession++; }   // 3D 세션이 바뀐다 — 그 뒤 도착한 저장 응답은 칸에 쌓지 않는다
         if (_bhBuilding is not { } b) return;
         // 3D 로 보내기(WebView2)가 실패해도 판은 닫는다 — 3D 나가기 도중 예외로 나머지 복귀가 끊기지 않게
         try
@@ -186,6 +201,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhBuilding = null;
         _bhDragStart = null;
         _bhError = null;
+        _bhInputError = false;
         RefreshBuildingHeightPanel();
     }
 
@@ -194,6 +210,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         if (_bhBuilding is not { } b) return;
         double h = Map3DBuilding.ClampHeight(height);
         _bhError = null;
+        _bhInputError = false;
         if (Math.Abs(h - _bhPreview) > 1e-9)
         {
             _bhPreview = h;
@@ -207,6 +224,14 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhError = error;
         NotifyOfPropertyChange(nameof(BuildingHeightError));
         NotifyOfPropertyChange(nameof(HasBuildingHeightError));
+    }
+
+    /// <summary>입력칸 값이 잘못됐다 — 오류 줄 + [적용] 막기(바른 값이 들어오거나 판을 닫을 때까지).</summary>
+    private void SetBuildingHeightInputError(string? error)
+    {
+        _bhInputError = true;
+        SetBuildingHeightError(error);
+        ApplyBuildingHeightCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>입력칸 글을 미리보기 값으로 덮고 판 전체를 다시 알린다.</summary>
@@ -240,6 +265,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private async Task ApplyBuildingHeightAsync()
     {
         if (_bhBuilding is not { } b || _bhJob is not { } job || _bhBusy || !IsBuildingHeightChanged) return;
+        if (_bhInputError) return;   // 잘못된 입력이 남았다 — 앞 미리보기 값을 저장하지 않는다(오류 줄 그대로)
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         double target = _bhPreview;
         int floors = Map3DBuilding.FloorsFromHeight(target, BhFloorHeight);
@@ -263,8 +289,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         if (index < 0) return;
         var step = BhUndo[index];
         BhUndo.RemoveAt(index);
+        int session = _bhSession;
         bool ok = await SaveBuildingHeightAsync(step.Job, step.Id, step.Before, step.BeforeFloors, null, () => "되돌렸습니다");
-        if (!ok) BhUndo.Insert(Math.Min(index, BhUndo.Count), step);   // 실패면 다시 할 수 있게 남긴다
+        if (!ok && session == _bhSession) BhUndo.Insert(Math.Min(index, BhUndo.Count), step);   // 실패면 다시 할 수 있게 남긴다(그 사이 3D 를 나갔으면 비운 채로)
         RefreshBuildingHeightPanel();
     }
 
@@ -276,13 +303,17 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     {
         if (_map3DClient == null) return false;
         _bhError = null;   // 앞 실패의 이유 줄은 새 시도에서 지운다
+        _bhInputError = false;
+        int session = _bhSession;
         SetBuildingHeightBusy(true);
         try
         {
             var saved = height is double h
                 ? await _map3DClient.SetBuildingHeightAsync(job, id, h, floors)
                 : await _map3DClient.ResetBuildingHeightAsync(job, id);
-            if (undo != null) BhUndo.Add(undo);
+            // 응답 전에 3D 를 나갔으면(칸을 비웠다) 쌓지 않는다 — 다음 3D 에서 앞 세션 저장을 되돌리지 않게. 서버 저장 · 3D commit 은 그대로
+            if (undo != null && session == _bhSession) BhUndo.Add(undo);
+            else if (undo != null) _log?.Info($"[Map3D] 건물 높이 저장 응답이 3D 를 나간 뒤 도착 — 되돌리기 칸에 쌓지 않음 id={id} job={job}");
             OnBuildingHeightSaved(job, saved);
             _log?.Info($"[Map3D] 건물 높이 저장 id={id} → {saved.Pick.Height} ({saved.Pick.HeightFrom ?? "-"}) job={job}");
             SetAimStatus(done(), autoHide: true);

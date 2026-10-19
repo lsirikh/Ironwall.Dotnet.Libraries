@@ -39,7 +39,7 @@ public class Map3DExitInputScenarioTests
     }
 
     /// <summary>「3D 로 보기」 → 펼침(재사용 장면). 3D 동안 2D 지도는 누름을 받지 않는다.</summary>
-    private static void Enter(Rig rig)
+    internal static void Enter(Rig rig)
     {
         if (!rig.Vm.Map3DAreas.Any())
         {
@@ -57,17 +57,17 @@ public class Map3DExitInputScenarioTests
     }
 
     /// <summary>3D 가 보낸 카메라(사용자 조작) — 앱 로그 17:40 처럼 2D 가 3D 카메라(줌 · 방위)를 따라간다.</summary>
-    private static void Camera3D(Rig rig, double bearing, double zoom)
+    internal static void Camera3D(Rig rig, double bearing, double zoom)
         => Scenario.Call(rig.Vm, "OnMap3DMessage", Map3DMath.ParseMessage(
                new JObject { ["type"] = "camera", ["reason"] = "user", ["lon"] = rig.Center.Lng, ["lat"] = rig.Center.Lat, ["zoom"] = zoom, ["bearing"] = bearing, ["pitch"] = 55 }.ToString()));
 
-    private static void From3D(Rig rig, JObject msg) => Scenario.Call(rig.Vm, "OnMap3DMessage", Map3DMath.ParseMessage(msg.ToString()));
+    internal static void From3D(Rig rig, JObject msg) => Scenario.Call(rig.Vm, "OnMap3DMessage", Map3DMath.ParseMessage(msg.ToString()));
 
     /// <summary>
     /// 나간 직후 2D 입력이 살아 있다 — 조건(누름 판정 · 사용 가능 · 조상 · 3D 화면 접힘 · 일찍 끝내는 상태 없음) +
     /// 휠(줌 바뀜) · 드래그(위치 바뀜) · 클릭(OnMapClicked) 처리기 실제 동작.
     /// </summary>
-    private static void AssertMap2DInputAlive(Rig rig, string when)
+    internal static void AssertMap2DInputAlive(Rig rig, string when)
     {
         var map = rig.W.Map;
         Assert.False(rig.Shown, $"{when}: 2D 로 돌아왔다");

@@ -38,7 +38,7 @@ public sealed class Map3DAreaItem
                          Action<Map3DAreaItem>? resetHeights, Action<Map3DAreaItem> rebake, Action<Map3DAreaItem> delete)
         : this(scene, enterZoom, view, changeZoom, resetHeights, rebake, delete, null) { }
 
-    /// <param name="cancelBake">이 영역을 다시 만드는 중이면 「만들기 취소」(맨 위, 「다시 만들기」 대신). null 이면 만드는 중이 아니다.</param>
+    /// <param name="cancelBake">이 영역을 다시 만드는 중이면 「만들기 취소」(맨 위, 「다시 만들기」 · 「지우기…」 대신). null 이면 만드는 중이 아니다.</param>
     public Map3DAreaItem(Map3DSceneInfo scene, double enterZoom, Action<Map3DAreaItem> view, Action<Map3DAreaItem>? changeZoom,
                          Action<Map3DAreaItem>? resetHeights, Action<Map3DAreaItem> rebake, Action<Map3DAreaItem> delete,
                          Action<Map3DAreaItem>? cancelBake)
@@ -53,7 +53,8 @@ public sealed class Map3DAreaItem
         if (resetHeights != null && scene.ManualHeights > 0)
             actions.Add(new($"{Map3DBuilding.ManualCountText(scene.ManualHeights)} — 모두 자동으로…", new RelayCommand(() => resetHeights(this))));
         if (cancelBake == null) actions.Add(new("다시 만들기", new RelayCommand(() => rebake(this))));
-        actions.Add(new("지우기…", new RelayCommand(() => delete(this))));
+        // 다시 만드는 중엔 지우기도 뺀다 — 지운 뒤 굽기가 끝나면 새 장면으로 영역이 되살아났다(2026-10-19 D1). 「만들기 취소」 뒤 지운다
+        if (cancelBake == null) actions.Add(new("지우기…", new RelayCommand(() => delete(this))));
         Actions = actions;
     }
 

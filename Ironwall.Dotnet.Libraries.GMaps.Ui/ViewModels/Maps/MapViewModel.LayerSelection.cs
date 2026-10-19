@@ -34,7 +34,9 @@ public partial class MapViewModel
         if (MainMap == null || _layerTreeNodes == null) return;
         var ids = new HashSet<(bool isImage, int id)>();
         foreach (var leaf in LayerSelection.SelectedLeaves(_layerTreeNodes))
-            if (FindMarkerForLayerLeaf(leaf) is { } m && !m.IsLocked && m.IsLayerEnabled && m.Id > 0)
+            if (FindMarkerForLayerLeaf(leaf) is { } m && !m.IsLocked && m.IsLayerEnabled && m.Id > 0
+                // 줌으로 안 보이는 심볼도 뺀다(Ctrl+A 와 같은 규칙). 오버레이 이미지 행은 그대로 넣는다(이미지 제외 규칙은 여기 쓰지 않음).
+                && (m is GMapImageMarker || Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap.EffectiveZoom, m.Zoom)))
                 ids.Add((m is GMapImageMarker, m.Id));
 
         _isApplyingLayerSelection = true;
