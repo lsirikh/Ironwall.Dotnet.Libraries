@@ -290,15 +290,6 @@ public sealed class ImageCropViewModel : PropertyChangedBase
         RaisePolygon();
     }
 
-    /// <summary>선분 edgeIndex(꼭짓점 edgeIndex → +1) 사이에 점 넣기.</summary>
-    public void InsertVertex(int edgeIndex, Point image)
-    {
-        if (edgeIndex < 0 || edgeIndex >= _points.Count) return;
-        Snapshot();
-        _points.Insert(edgeIndex + 1, ClampToImage(image));
-        RaisePolygon();
-    }
-
     public void RemoveVertex(int index)
     {
         if (index < 0 || index >= _points.Count) return;
