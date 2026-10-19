@@ -84,7 +84,9 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             var item = new Map3DAreaItem(scene, Map3DAreaEnterZoom(scene.Id, scene.EnterZoom), ViewMap3DArea, OpenMap3DAreaZoomEditor,
                                          area => _ = RequestResetMap3DHeightsAsync(area), RebakeMap3DArea, area => _ = RequestDeleteMap3DAreaAsync(area),
                                          // 이 영역을 다시 만드는 중이면 「만들기 취소」(진행 판 단추와 같은 동작)
-                                         _isMap3DBaking && _map3DBakeJob != null && scene.Id == _map3DBakeSourceId ? area => _ = CancelMap3DBakeAsync() : null);
+                                         _isMap3DBaking && _map3DBakeJob != null && scene.Id == _map3DBakeSourceId ? area => _ = CancelMap3DBakeAsync() : null,
+                                         // 직접 그린 건물(MapViewModel.UserBuilding) — 「건물 그리기」 · 「직접 그린 건물 n개 — 모두 지우기…」
+                                         StartUserBuildingDraw, area => _ = RequestClearUserBuildingsAsync(area));
             int index = Map3DAreas.ToList().FindIndex(a => a.Id == scene.Id);
             if (index >= 0) Map3DAreas[index] = item; else Map3DAreas.Add(item);
 
@@ -142,6 +144,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
             _bhJob = null;
         }
         BhUndo.RemoveAll(u => u.Job == job);   // 판 안 되돌리기 — 없는 장면에 PUT 하지 않게
+        if (_ubArea?.Id == job) ExitUserBuildingDraw(cause);   // 그 영역에서 건물을 그리던 중
         if (_map3DHost?.Job == job)
         {
             _map3DHost.Unload();

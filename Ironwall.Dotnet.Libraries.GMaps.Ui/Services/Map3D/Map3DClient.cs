@@ -66,6 +66,9 @@ public sealed record Map3DSceneInfo(string Id, string? Name, double[] Bbox, Date
 
     /// <summary>회전 영역(rect) — 없으면 null(북쪽 정렬 bbox 영역).</summary>
     public Map3DRotRect? Rect { get; init; }
+
+    /// <summary>직접 그린 건물 수(user_buildings — 아직 다시 만들지 않은 것 포함) — 옛 서버면 0.</summary>
+    public int UserBuildings { get; init; }
 }
 
 /// <summary>건물 높이 저장 · 되돌리기 응답 — Building = 서버가 고친 건물 줄(3D 에 그대로 보낸다), Pick = 그 해석.</summary>
@@ -222,6 +225,7 @@ public sealed class Map3DClient : IDisposable
                     ManualHeights = ReadCount(o["manual_heights"]),
                     ManualUnmatched = ReadCount(o["manual_unmatched"]),
                     Rect = Map3DRotRect.Parse(o["rect"]),
+                    UserBuildings = ReadCount(o["user_buildings"]),
                 });
         }
         return list;
@@ -260,6 +264,47 @@ public sealed class Map3DClient : IDisposable
                 if (Map3DBuilding.Parse(row) is { } pick) list.Add(new Map3DBuildingSaved(row, pick));
         return list;
     }
+
+    // ── 직접 그린 건물(map-3d userbuildings.py) ──
+
+    /// <summary>그 장면 범위의 직접 그린 건물(GET /api/jobs/{id}/user-buildings) — 옛 서버(404)면 빈 목록.</summary>
+    public async Task<IReadOnlyList<Map3DUserBuildingItem>> ListUserBuildingsAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, UserBuildingsUrl(job)), allowNotFound: true, ct).ConfigureAwait(false);
+        return json == null ? Array.Empty<Map3DUserBuildingItem>() : Map3DUserBuilding.ParseList(json);
+    }
+
+    /// <summary>넣기 · 고치기(PUT /api/jobs/{id}/user-buildings/{uid}) — 서버가 저장한 항목.</summary>
+    public Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
+                                                            string? name, CancellationToken ct = default)
+        => PutUserBuildingAsync(job, uid, outline, height, floors, name, Map3DUserBuilding.RoofFlat, Map3DUserBuilding.UseAuto, ct);
+
+    /// <summary>넣기 · 고치기 — 지붕 모양(flat · gable · cone · dome) · 외벽 성격(auto · commercial · industrial · residential)까지.</summary>
+    public async Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
+                                                                  string? name, string roof, string use, CancellationToken ct = default)
+    {
+        var body = Map3DUserBuilding.PutBody(outline, height, floors, name, roof, use).ToString(Formatting.None);
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{UserBuildingsUrl(job)}/{Uri.EscapeDataString(uid)}")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return Map3DUserBuilding.ParseItem(JObject.Parse(json!)["item"] as JObject)
+               ?? throw new Map3DRequestException(HttpStatusCode.OK, "건물 응답 형식이 올바르지 않습니다");
+    }
+
+    /// <summary>하나 지우기(DELETE …/user-buildings/{uid}) — 지웠으면 true, 이미 없으면(404) false.</summary>
+    public async Task<bool> DeleteUserBuildingAsync(string job, string uid, CancellationToken ct = default)
+        => await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{UserBuildingsUrl(job)}/{Uri.EscapeDataString(uid)}"), allowNotFound: true, ct)
+               .ConfigureAwait(false) != null;
+
+    /// <summary>「모두 지우기」(DELETE …/user-buildings) — 지운 수.</summary>
+    public async Task<int> DeleteAllUserBuildingsAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, UserBuildingsUrl(job)), allowNotFound: false, ct).ConfigureAwait(false);
+        return JObject.Parse(json!)["deleted"]?.Type == JTokenType.Integer ? JObject.Parse(json!).Value<int>("deleted") : 0;
+    }
+
+    private string UserBuildingsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/user-buildings";
 
     private string BuildingHeightUrl(string job, int buildingId)
         => $"{Map3DMath.JobUrl(_server, job)}/buildings/{buildingId.ToString(CultureInfo.InvariantCulture)}/height";

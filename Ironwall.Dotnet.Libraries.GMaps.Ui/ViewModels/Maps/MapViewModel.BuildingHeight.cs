@@ -269,7 +269,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         double target = _bhPreview;
         int floors = Map3DBuilding.FloorsFromHeight(target, BhFloorHeight);
-        await SaveBuildingHeightAsync(job, b.Id, target, floors, new BuildingHeightUndoStep(job, b.Id, b.Manual ? b.Height : null, b.Manual ? b.Levels : null),
+        // 직접 그린 건물(origin user)은 자동 높이가 없다 — 되돌리기는 "자동으로"가 아니라 앞 높이로 다시 저장
+        bool keep = b.Manual || b.Origin == "user";
+        await SaveBuildingHeightAsync(job, b.Id, target, floors, new BuildingHeightUndoStep(job, b.Id, keep ? b.Height : null, keep ? b.Levels : null),
                                       () => Map3DBuilding.SavedText(target, floors));
     }
 
