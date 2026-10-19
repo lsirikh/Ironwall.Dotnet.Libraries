@@ -246,6 +246,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         if (item.IsBaking) { SetAimStatus("이 영역은 다시 만드는 중입니다 — 다 만든 뒤 그리세요", autoHide: true); return; }
         if (IsUserBuildingDrawing) ExitUserBuildingDraw("switch");
+        _groupSelection?.EndRotation(commit: true);   // 다른 조작 = 열린 묶음 회전 먼저 확정(뒤의 Esc 가 그리기 대신 회전을 되돌리지 않게)
         CancelConflictingModesForMeasure();
         if (MainMap.IsMeasuring) MainMap.StopMeasure();
         _ubArea = item;
