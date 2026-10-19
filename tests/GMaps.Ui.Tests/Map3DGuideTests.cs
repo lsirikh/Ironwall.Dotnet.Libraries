@@ -182,16 +182,4 @@ public class Map3DGuideTests
     [Fact]
     public void should_show_dash_when_tooltip_values_unknown()
         => Assert.Equal("a1\n만든 날짜: -\n건물: -", Map3DGuide.AreaToolTip("a1", null, null));
-
-    // ── R7 창 열 때 2D 복귀(카메라 더블클릭 → 카메라 상자) ──
-
-    [Theory]
-    [InlineData("camera-popup", "composition", true)]    // 3D 카메라 더블클릭 → 2D 로 돌아와 상자를 연다
-    [InlineData("camera-popup", "hwnd", true)]
-    [InlineData("camera-stream", "composition", true)]
-    [InlineData("component-card", "composition", true)]
-    [InlineData("symbol-detail", "composition", false)]  // 상세 창은 WPF 안 3D 위에 그대로 보인다
-    [InlineData("symbol-detail", "hwnd", true)]
-    public void should_leave_3d_when_panel_needs_2d_symbol_position(string cause, string hostMode, bool expected)
-        => Assert.Equal(expected, Map3DGuide.ShouldLeave3DForPanel(cause, hostMode));
 }

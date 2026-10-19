@@ -90,6 +90,31 @@ public class MapRegistrationCommandScenarioTests
         Assert.Equal(0, f.Map.Markers.Count);                         // 아무것도 올라가지 않는다
     });
 
+    // 2026-10-19 사용자 결정 — 이미지 불러오기는 편집 모드에서만. 단추 · Ctrl+I 는 같은 명령이라 실행 첫머리에서 함께 막는다(파일창 안 뜸).
+    [Trait("Scenario", "MAP-075")]
+    [Fact]
+    public void should_tell_edit_mode_needed_and_not_open_file_dialog_when_image_load_runs_outside_edit_mode() => Scenario.Sta(() =>
+    {
+        var f = WithFileCommands(canEdit: true);
+        Assert.False(f.Vm.IsEditModeEnabled);                          // 운영 모드
+
+        f.Vm.LoadImageOverlayCommand!.Execute(null);                  // Ctrl+I(단추와 같은 명령)
+
+        Assert.Equal("편집 모드에서 쓸 수 있습니다", f.Vm.AimStatusMessage);
+        Assert.DoesNotContain(f.Log.Lines, l => l.Contains("이미지 오버레이 불러오기 시작"));   // 파일창 단계에 들어가지 않았다
+        Assert.Empty(f.Of<OpenInfoPopupMessageModel>());
+        Assert.Equal(0, f.Map.Markers.Count);
+        Assert.Null(f.Vm.ImageCrop);                                   // 자르기 판도 안 뜬다
+
+        // 편집 모드면 이 가드를 지나 파일창으로 간다(파일창은 모달이라 소스 순서로 본다 — 권한 → 편집 모드 → 판 가드 → 파일창)
+        var src = File.ReadAllText(Path.Combine(RepoRoot(), "Ironwall.Dotnet.Libraries.GMaps.Ui", "ViewModels", "Maps", "MapViewModel.cs"));
+        int start = src.IndexOf("private async void ExecuteLoadImageOverlay(object obj)", StringComparison.Ordinal);
+        int perm = src.IndexOf("CanEditMap()", start, StringComparison.Ordinal);
+        int edit = src.IndexOf("if (!IsEditModeEnabled)", start, StringComparison.Ordinal);
+        int dialog = src.IndexOf("new Microsoft.Win32.OpenFileDialog", start, StringComparison.Ordinal);
+        Assert.True(start > 0 && perm > start && edit > perm && edit < dialog, "편집 모드 가드가 권한 확인 뒤 · 파일창 앞에 없다");
+    });
+
     [Trait("Scenario", "MAP-075")]
     [Fact]
     public void should_disable_load_image_when_there_is_no_map_yet() => Scenario.Sta(() =>

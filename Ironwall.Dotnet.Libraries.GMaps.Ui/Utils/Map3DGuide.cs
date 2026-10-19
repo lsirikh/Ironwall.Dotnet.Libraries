@@ -45,14 +45,19 @@ public static class Map3DGuide
         "ready" => "3D 화면 준비됨",
         "rendering" => "3D 화면을 그리는 중…",
         "login" => "지금 3D 지도를 보고 있습니다 (줌 16.5 밑 · ESC = 2D)",
-        // 3D 위에 뜨는 로그인 직후 안내 — 3D 는 줌으로 나가지 않으므로 줌 표기 없이(2026-10-18)
-        "shown" => "지금 3D 지도를 보고 있습니다 (나가기 · ESC = 2D)",
+        // 3D 위에 뜨는 로그인 직후 안내 — 3D 는 줌으로 나가지 않으므로 줌 표기 없이(2026-10-18).
+        // WPF 안 3D 는 Esc 로 나가지 않으므로 「나가기」 단추만 말한다(2026-10-19 사용자 결정 — 네이티브 창 3D 는 ShownText)
+        "shown" => "지금 3D 지도를 보고 있습니다 (「나가기」 = 2D)",
         _ => "3D 화면을 여는 중…",
     };
 
     /// <summary>안내 패널 단계 글 — "login" 글의 이탈 줌을 설정(Map3DModel.ExitZoom)에서 받는다.</summary>
     public static string StageText(string? stage, double exitZoom)
         => stage == "login" ? $"지금 3D 지도를 보고 있습니다 (줌 {Zoom(exitZoom)} 밑 · ESC = 2D)" : StageText(stage);
+
+    /// <summary>로그인 직후 3D 위 안내 — Esc 로 3D 를 나가는 네이티브 창 3D(hwnd)만 Esc 를 함께 말한다(<see cref="EscExitsMap3D"/>).</summary>
+    public static string ShownText(string hostMode)
+        => EscExitsMap3D(hostMode) ? "지금 3D 지도를 보고 있습니다 (나가기 · ESC = 2D)" : StageText("shown");
 
     /// <summary>줌 글 — 17 · 16.5.</summary>
     public static string Zoom(double zoom) => zoom.ToString("0.##", CultureInfo.InvariantCulture);
@@ -258,17 +263,9 @@ public static class Map3DGuide
     // ── ④ 창 열기 ──
 
     /// <summary>
-    /// 3D 위에서 창(카메라 상자 · 조립 카드 · 상세 창)을 열 때 2D 로 돌아올까. 상세 창(symbol-detail)은 WPF 안 3D(composition)면
-    /// 3D 위에 그대로 보이므로 돌아오지 않는다. 카메라 상자 · 카드는 2D 심볼 화면 위치에 붙으므로 늘 돌아온다.
-    /// </summary>
-    public static bool ShouldLeave3DForPanel(string cause, string hostMode)
-        => !(cause == "symbol-detail" && hostMode == "composition");
-
-    /// <summary>
     /// 3D 위에서 창(카메라 상자 · 조립 카드 · 상세 창)을 열 때 2D 로 돌아올까(2026-10-18 — 3D 화면 자리 따라가기).
     /// WPF 안 3D(composition)면 창이 3D 위에 그대로 보이고, 카메라 상자 · 카드는 3D 가 알려 주는 마커 화면 자리(overlay.screen)를
     /// 따라가므로 돌아오지 않는다. 네이티브 창 3D(hwnd)는 WPF 창을 덮으므로(공역) 늘 돌아온다.
-    /// <see cref="ShouldLeave3DForPanel"/> 은 화면 자리를 받기 전의 옛 규칙이다.
     /// </summary>
     public static bool ShouldLeave3DForWindow(string hostMode) => hostMode != "composition";
 

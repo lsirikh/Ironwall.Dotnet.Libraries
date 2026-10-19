@@ -203,7 +203,7 @@ public partial class MapViewModel
             if (!Map3DGuide.ShouldGuideAfterLogin(_map3DRevealedBehindLogin, _map3DState == Map3DState.Shown)) return;
             _map3DRevealedBehindLogin = false;
             _log?.Info("[Map3D] 로그인 직후 3D 안내");
-            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.StageText("shown"));   // 3D 위 안내 — 줌 표기 없이
+            SetMap3DBusy(Map3DGuide.EnterTitle, 100, Map3DGuide.ShownText(Map3DHost.HostMode));   // 3D 위 안내 — 줌 표기 없이 · Esc 는 네이티브 창 3D 만
             RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.AfterLoginShow, timedBar: false);
         });
     }
@@ -998,6 +998,15 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
+        if (msg.Type == "building.none")
+        {
+            // 3D 빈 땅(건물 · 마커 아님) 클릭 — 3D 는 윤곽을 지웠다. 판도 닫는다(미리보기 중이면 원래 높이로 = 취소, 2026-10-19 사용자 결정)
+            if (_map3DState != Map3DState.Shown || !IsBuildingHeightPanelOpen) return;
+            _log?.Info("[Map3D] 빈 땅 클릭 → 「건물 높이」 판 닫기");
+            try { CloseBuildingHeightPanel(clearUndo: false); }
+            catch (Exception ex) { _log?.Error($"[Map3D] 빈 땅 클릭 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
         if (msg.Pick is { } pick)
         {
             try { OnMap3DPick(pick); }
@@ -1073,7 +1082,12 @@ public partial class MapViewModel
     {
         if (MainMap == null) return;
         if (!IsMap3DBlockedByInputMode()) { QueueMap3DGate(); return; }
-        if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, "input-mode");
+        if (_map3DState == Map3DState.Shown)
+        {
+            // 모드를 끝낸 그 자리에서 곧바로 다시 3D 로 들어가지 않는다 — 「나가기」와 같은 진입 보류(지도를 움직여 진입 줌 · 영역을 새로 만족할 때까지, 2026-10-19 사용자 결정)
+            _map3DEntrySuppressed = true;
+            Leave3D(Map3DExitCamera, "input-mode");
+        }
         else if (_map3DState == Map3DState.Pending)
         {
             _log?.Info("[Map3D] 로딩 중 입력 모드 시작 → 취소");
