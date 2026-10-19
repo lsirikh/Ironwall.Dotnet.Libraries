@@ -74,6 +74,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             }
         }
 
+        /// <summary>그룹 Pending — 이 종류의 칸도 "전원 동일=값 / 다름=빈칸(—)"(같은 종류 다중 선택 = 단일 선택 칸 전부, 2026-10-19).</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            base.ApplyGroupPendingSpecific();
+            var g = System.Linq.Enumerable.ToList(System.Linq.Enumerable.OfType<IGeoEditableMarker>(GroupMarkers!));
+            if (g.Count < 2) return;
+            bool AllEq<T>(Func<IGeoEditableMarker, T> sel) => System.Linq.Enumerable.All(g, m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+            MarkerOpacity = AllEq(m => m.Opacity) ? g[0].Opacity : MIXED_DOUBLE;
+        }
+
         public override Type GetSupportedMarkerType()
         {
             return typeof(GMapPropertyGeometricControl);
@@ -102,7 +112,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
                     if (!control._isInitializing && !control._isClearingBindings)
                     {
-                        geoMarker.Opacity = (double)e.NewValue;
+                        if (!control.IsGroupMode) geoMarker.Opacity = (double)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                         control.OnMarkerPropertyChanged("MarkerOpacity", e.OldValue, e.NewValue);
                         //System.Diagnostics.Debug.WriteLine($"마커 Opacity 업데이트 완료: {geoMarker.Opacity}");
                     }

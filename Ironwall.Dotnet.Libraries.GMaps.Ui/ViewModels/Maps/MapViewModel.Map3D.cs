@@ -804,7 +804,7 @@ public partial class MapViewModel
         // 「이 영역 3D 로 보기」로 연 회전 영역은 그 회전각(사각형이 반듯하게) — 그 밖은 지금 2D 방위
         var areaViewRect = _map3DAreaViewJob != null && _map3DAreaViewJob == _map3DJob ? _map3DScenes.Find(sc => sc.Id == _map3DJob)?.Rect : null;
         Map3DHost.PostJson(Map3DMath.EnterViewMessageJson(Map3DMath.EnterBearing(MainMap.Bearing, areaViewRect)));
-        MainMap.IsHitTestVisible = false;                                               // 3D 가 보이는 동안 2D 입력 막음
+        HoldMap2DInput();                                                               // 3D 가 보이는 동안 2D 입력 막음(나올 때 RestoreMap2DInput)
         EnsureAimEscWindowHook();
         BeginMap3DWindows();                                                            // 카메라 상자 · 조립 카드가 3D 마커 자리를 따라간다(MapViewModel.Map3DWindows)
         _map3DWpfFrames.Reset(); _map3DSync2D.Reset();                                  // 계측 — 3D 의 perf.stats 가 올 때 WPF 프레임 간격과 함께 한 줄([Map3D][perf])
@@ -818,6 +818,8 @@ public partial class MapViewModel
     private void Leave3D(Map3DCamera? cam, string cause)
     {
         SetMap3DState(Map3DState.Off);   // 지도가 없어도 상태는 내린다 — "3D"(「나가기」)로 남지 않게
+        // 3D 화면을 접고 2D 입력을 먼저 되살린다 — 아래 단계가 예외를 던져도 "2D 인데 클릭 · 휠이 안 먹는" 지도로 남지 않게(2026-10-19 사용자 보고)
+        if (MainMap != null) { Map3DHost.Park(); RestoreMap2DInput(); }
         CloseBuildingHeightPanel(clearUndo: true);   // 「건물 높이」 판 — 미리보기 원래대로 · 판 안 되돌리기 비움
         if (MainMap == null) return;
         _map3DAreaViewJob = null; _map3DReturn = null;   // 다음 진입은 다시 줌 게이트 또는 새 「영역 보기」
@@ -827,15 +829,84 @@ public partial class MapViewModel
         RunMap3DGuideTimer(Map3DGuideMode.HideWhenDue, Map3DGuide.LeaveShow, timedBar: false);
         _map3DOverlay?.Pause();   // 페이지는 1×1 로 살아 있다 — 다시 펼칠 때 바뀐 것만 보낸다
         System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
-        Map3DHost.Park();
-        MainMap.IsHitTestVisible = true;
         if (cam is { } c) Apply3DCameraTo2D(c);
         CreateScaleBar();              // 축척 막대를 2D 값으로(줌이 그대로면 줌 변경 이벤트가 오지 않는다)
         CurrentAltitudeText = null;    // 좌표 칩 고도 줄은 3D 에서만
         EndMap3DWindows();   // 열린 창은 닫지 않고 같은 마커의 2D 자리로(MapViewModel.Map3DWindows)
         MainMap.Focus();
         _log?.Info($"[Map3D] 2D 복귀({cause}) zoom={MainMap.EffectiveZoom:F1} bearing={MainMap.Bearing:F1}");
+        LogMap2DInputState(cause);
         QueueMap3DGate();
+    }
+
+    // ── 2D 입력 막기 · 되살리기(2026-10-19 "3D 들어갔다 나왔더니 좌 · 우 클릭 · 휠이 다 안 먹는다") ──
+
+    /// <summary>3D 를 펼치며 막기 직전 지도 IsHitTestVisible 의 로컬 값(없었으면 UnsetValue). 막고 있지 않으면 null — 두 번 펼쳐도 처음 값만 적는다.</summary>
+    private object? _map3DHeldHitTest;
+
+    /// <summary>3D 가 보이는 동안 2D 지도 입력을 막는다 — 막기 전 값을 적어 둔다(RestoreMap2DInput 이 되돌린다).</summary>
+    private void HoldMap2DInput()
+    {
+        _map3DHeldHitTest ??= MainMap!.ReadLocalValue(UIElement.IsHitTestVisibleProperty);
+        MainMap!.IsHitTestVisible = false;
+    }
+
+    /// <summary>
+    /// 3D 동안 막은 2D 입력을 막기 전 값으로 되돌린다(3D 중 다른 코드가 바꿨어도). 3D 화면 안에 남은 마우스 캡처도 푼다 —
+    /// 캡처가 접힌 3D 화면에 남으면 지도 누름 · 휠이 그쪽으로 간다.
+    /// </summary>
+    private void RestoreMap2DInput()
+    {
+        var map = MainMap!;
+        if (_map3DHeldHitTest is bool held) map.IsHitTestVisible = held;
+        else map.ClearValue(UIElement.IsHitTestVisibleProperty);   // 원래 로컬 값 없음 = 기본(누름 받음)
+        _map3DHeldHitTest = null;
+        if (System.Windows.Input.Mouse.Captured is System.Windows.Media.Visual captured && Map3DHost.IsAncestorOf(captured))
+            System.Windows.Input.Mouse.Capture(null);
+        // 3D 동안 뗌을 못 받아 남은 일시 제스처(이미지 끌기 · 마퀴 · 팬 억제 등) — 사용자 증언(줌 단추를 누르니 풀렸다)의 줌 변경 정리와 같은 것을 나갈 때 한다
+        var cleared = map.ResetTransientInput();
+        if (cleared.Length > 0) _log?.Warning($"[Map3D] 나가며 남은 2D 입력 상태 정리: {cleared}");
+    }
+
+    /// <summary>나간 직후와 한가해진 뒤 2D 입력 상태 한 줄씩 — 「나가기 뒤 지도가 입력을 안 받는다」 원인 판별용(무엇이 막는지 이름으로).</summary>
+    private void LogMap2DInputState(string cause)
+    {
+        if (_log == null || MainMap == null) return;
+        _log.Info(Map2DInputStateText(cause, "now"));
+        MainMap.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        {
+            try { if (MainMap != null) _log?.Info(Map2DInputStateText(cause, "idle")); }
+            catch (Exception ex) { _log?.Warning($"[Map3D] 2D 입력 상태 기록 실패(격리): {ex.Message}"); }
+        }));
+    }
+
+    /// <summary>
+    /// 2D 지도 입력 상태 — 누름 판정 · 사용 가능 · 보임, 막는 조상(첫 하나), 지도 가운데를 실제로 누르면 받는 요소(지도 밖이면 덮은 것),
+    /// 마우스 캡처 · 키보드 포커스, 3D 화면 펼침, 지도 처리기를 일찍 끝내는 상태(GMapCustomControl.InputGateText).
+    /// </summary>
+    private string Map2DInputStateText(string cause, string when)
+    {
+        var map = MainMap!;
+        string? blocker = null;
+        for (var d = System.Windows.Media.VisualTreeHelper.GetParent(map); d != null && blocker == null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+            if (d is UIElement u && (!u.IsHitTestVisible || !u.IsEnabled)) blocker = DescribeInput(u);
+        string center = "창 밖";
+        if (PresentationSource.FromVisual(map)?.RootVisual is UIElement root)
+        {
+            var hit = root.InputHitTest(map.TranslatePoint(new Point(map.ActualWidth / 2, map.ActualHeight / 2), root)) as DependencyObject;
+            center = hit == null ? "없음" : hit is System.Windows.Media.Visual v && (ReferenceEquals(v, map) || map.IsAncestorOf(v)) ? "지도" : DescribeInput(hit);
+        }
+        return $"[Map3D] 2D 입력 상태({cause} · {when}) hit={map.IsHitTestVisible} enabled={map.IsEnabled} visible={map.IsVisible} 막는조상={blocker ?? "없음"} " +
+               $"가운데={center} 캡처={DescribeInput(System.Windows.Input.Mouse.Captured as DependencyObject)} 포커스={DescribeInput(System.Windows.Input.Keyboard.FocusedElement as DependencyObject)} " +
+               $"마우스아래={DescribeInput(System.Windows.Input.Mouse.DirectlyOver as DependencyObject)} 3D펼침={Map3DHost.IsRevealed} 비행={_flyAnimation != null} " +
+               $"줌={map.EffectiveZoom:F1}(tile={map.Zoom:F0},dzl={map.DigitalZoomLevel}) 변환={map.RenderTransform?.Value.ToString() ?? "없음"} 회전={map.MapRotation:F1} 지도상태={map.InputGateText()}";
+    }
+
+    private static string DescribeInput(DependencyObject? d)
+    {
+        if (d == null) return "없음";
+        var id = System.Windows.Automation.AutomationProperties.GetAutomationId(d);
+        return string.IsNullOrEmpty(id) ? d.GetType().Name : $"{d.GetType().Name}#{id}";
     }
 
     private void Apply3DCameraTo2D(Map3DCamera c)

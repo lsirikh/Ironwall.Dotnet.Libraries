@@ -85,6 +85,16 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "FloorCount": if (m is IInfraEditableMarker floors) floors.FloorCount = ToI(v); break;
             case "BasementFloorCount": if (m is IInfraEditableMarker basement) basement.BasementFloorCount = ToI(v); break;
             case "BuildingArea": if (m is IInfraEditableMarker area) area.BuildingArea = ToD(v); break;
+            // 같은 종류 다중 선택 = 단일 선택 칸 전부(2026-10-19) — 그룹 일괄 적용 · undo 가 빠져 있던 공통 칸
+            case "MarkerOpacity": if (m is IGeoEditableMarker geoOp) geoOp.Opacity = ToD(v); break;
+            case "MaintainAspectRatio": if (m is IImageEditableMarker imAr) imAr.MaintainAspectRatio = ToB(v); break;
+            case "Affiliation": if (m is IMilitarySymbolEditableMarker msAf) msAf.Affiliation = ToEnum<EnumMilitaryAffiliation>(v); break;
+            case "BattleDimension": if (m is IMilitarySymbolEditableMarker msBd) msBd.BattleDimension = ToEnum<EnumMilitaryBattleDimension>(v); break;
+            case "StandardIdentity": if (m is IMilitarySymbolEditableMarker msSi) msSi.StandardIdentity = ToEnum<EnumMilitaryStandardIdentity>(v); break;
+            case "UnitType": if (m is IMilitarySymbolEditableMarker msUt) msUt.UnitType = ToEnum<EnumMilitaryUnitType>(v); break;
+            case "UnitSize": if (m is IMilitarySymbolEditableMarker msUs) msUs.UnitSize = ToEnum<EnumMilitaryUnitSize>(v); break;
+            case "HigherFormation": if (m is IMilitarySymbolEditableMarker msHf) msHf.HigherFormation = v as string; break;
+            case "CountryCode": if (m is IMilitarySymbolEditableMarker msCc) msCc.CountryCode = v as string; break;
         }
     }
 
@@ -141,6 +151,15 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "FloorCount" => (m as IInfraEditableMarker)?.FloorCount,
         "BasementFloorCount" => (m as IInfraEditableMarker)?.BasementFloorCount,
         "BuildingArea" => (m as IInfraEditableMarker)?.BuildingArea,
+        "MarkerOpacity" => (m as IGeoEditableMarker)?.Opacity,
+        "MaintainAspectRatio" => (m as IImageEditableMarker)?.MaintainAspectRatio,
+        "Affiliation" => (m as IMilitarySymbolEditableMarker)?.Affiliation,
+        "BattleDimension" => (m as IMilitarySymbolEditableMarker)?.BattleDimension,
+        "StandardIdentity" => (m as IMilitarySymbolEditableMarker)?.StandardIdentity,
+        "UnitType" => (m as IMilitarySymbolEditableMarker)?.UnitType,
+        "UnitSize" => (m as IMilitarySymbolEditableMarker)?.UnitSize,
+        "HigherFormation" => (m as IMilitarySymbolEditableMarker)?.HigherFormation,
+        "CountryCode" => (m as IMilitarySymbolEditableMarker)?.CountryCode,
         _ => null,
     };
 
@@ -158,7 +177,9 @@ public abstract class UndoableCommandBase : IUndoableCommand
         or "GateWidthM" or "OpenOnContactOn"
         or "PostSpacingM" or "FenceHeightM" or "FenceMode" or "Render3D" or "ReverseSensorOrder"
         or "LinkedDeviceGroup" or "LinePattern" or "LineOpacity" or "IsClosedPath"
-        or "Altitude" or "BuildingType" or "BuildingUsage" or "FloorCount" or "BasementFloorCount" or "BuildingArea" => true,
+        or "Altitude" or "BuildingType" or "BuildingUsage" or "FloorCount" or "BasementFloorCount" or "BuildingArea"
+        or "MarkerOpacity" or "MaintainAspectRatio"
+        or "Affiliation" or "BattleDimension" or "StandardIdentity" or "UnitType" or "UnitSize" or "HigherFormation" or "CountryCode" => true,
         _ => false,
     };
 
