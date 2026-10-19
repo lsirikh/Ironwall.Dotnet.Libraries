@@ -97,9 +97,16 @@ public static class Map3DBuilding
     public static double ClampHeight(double height)
         => double.IsFinite(height) ? Math.Clamp(Math.Round(height, 1, MidpointRounding.AwayFromZero), MinHeight, MaxHeight) + 0.0 : MinHeight;
 
-    /// <summary>±1층(단추) — 지금 높이의 층수에 delta 를 더한(1~200) 층수 × 층고.</summary>
+    /// <summary>
+    /// ±1층(단추) — 지금 높이의 층수에 delta 를 더한(1~200) 층수 × 층고.
+    /// 내리기는 지금보다 높아지지 않고(1층보다 낮은 건물 −1층 = 제자리), 올리기는 지금보다 낮아지지 않는다(200층 상한을 넘는 건물 +1층 = 제자리).
+    /// </summary>
     public static double StepFloors(double height, double floorHeight, int delta)
-        => HeightFromFloors(Math.Clamp(FloorsFromHeight(height, floorHeight) + delta, MinFloors, MaxFloors), floorHeight);
+    {
+        double next = HeightFromFloors(Math.Clamp(FloorsFromHeight(height, floorHeight) + delta, MinFloors, MaxFloors), floorHeight);
+        if (delta < 0 && next > height || delta > 0 && next < height) return ClampHeight(height);
+        return next;
+    }
 
     /// <summary>키 한 칸 — ↑/↓ = ±1층, Shift 와 함께면 ±0.1 m.</summary>
     public static double KeyStep(double height, double floorHeight, bool up, bool shift)

@@ -2807,6 +2807,21 @@ namespace GMap.NET.WindowsPresentation
         /// <summary>core 시작(OnMapOpen) 완료 여부 — 부팅 재동기 준비 판정용 seam.</summary>
         public bool IsCoreStarted => _core.IsStarted;
 
+        /// <summary>core 끌기(팬) 중인가 — 뗌을 다른 화면(3D)이 받아 남은 끌기 판정용 seam. 끌기 중 core 는 정수 줌 · 위치 이동을 받지 않는다.</summary>
+        public bool IsCoreDragging => _core.IsDragging;
+
+        /// <summary>남은 끌기를 끝낸다 — OnMouseUp 의 끌기 끝과 같은 정리(끌기 표시 · 커서 · core EndDrag). 끌기 중이 아니면 아무것도 하지 않는다.</summary>
+        public void EndCoreDrag()
+        {
+            if (!_core.IsDragging && !IsDragging) return;
+            if (IsDragging)
+            {
+                IsDragging = false;
+                Cursor = _cursorBefore;
+            }
+            _core.EndDrag();
+        }
+
         // [Rotation_Full_Sync FR-19] 부팅 재동기 seam — 부팅 복원처럼 레이아웃/코어 시작 '이전'에
         // Bearing이 설정되면 회전 행렬 중심(ActualWidth/2)과 코어 크기·RenderOffset이 stale로 남아
         // ViewArea가 퇴화(위도폭 0)하고 오버레이 타일세트가 좁게 굳는다(수동 줌/패닝 시 자가치유).

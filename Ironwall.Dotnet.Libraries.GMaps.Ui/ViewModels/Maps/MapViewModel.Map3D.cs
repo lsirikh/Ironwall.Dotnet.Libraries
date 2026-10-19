@@ -537,6 +537,8 @@ public partial class MapViewModel
         DrawMap3DAreaCommand.RaiseCanExecuteChanged();
         NotifyMap3DCancelBake();
         if (hadSource) ReapplyMap3DAreas();
+        // 만드는 동안 막았던 게이트를 다시 판정 — 취소 · 실패로 끝나도 지도를 움직이기 전에 지금 자리의 옛 영역으로 들어간다(자동)
+        QueueMap3DGate();
     }
 
     /// <param name="enterZoom">그 영역의 3D 로 바뀌는 줌(만들기 패널에서 고른 값) — 굽기 요청 enter_zoom.</param>

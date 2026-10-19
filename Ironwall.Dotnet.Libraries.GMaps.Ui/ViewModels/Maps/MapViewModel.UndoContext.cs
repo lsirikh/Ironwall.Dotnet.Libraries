@@ -52,6 +52,7 @@ public partial class MapViewModel : IUndoApplyContext
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.UndoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
+            RefreshGroupPropertyPanelValues();   // 열린 그룹 속성 판이 되돌린 값을 보이게(판은 열릴 때 한 번만 채움)
         }, () => CanUndo);
         RedoCommand = new AsyncRelayCommand(async () =>
         {
@@ -59,6 +60,7 @@ public partial class MapViewModel : IUndoApplyContext
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.RedoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
+            RefreshGroupPropertyPanelValues();
         }, () => CanRedo);
 
         _undoService.StateChanged += OnUndoStateChanged;

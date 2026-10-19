@@ -58,12 +58,39 @@ public partial class MapViewModel
         NotifyOfPropertyChange(nameof(IsImageCropPanelOpen));
     }
 
+    /// <summary>판이 떠 있으면 또 불러오지 않는다 — 안내하고 true(파일 고르기 창도 열지 않는다).</summary>
+    private bool RejectWhileImageCropPanelOpen()
+    {
+        if (!IsImageCropPanelOpen) return false;
+        _log?.Info("[ImageCrop] 자르기 판이 떠 있어 이미지 불러오기 막음");
+        SetAimStatus("자르기 판을 먼저 닫으세요", autoHide: true);
+        return true;
+    }
+
+    /// <summary>열린 판을 취소로 닫는다(편집 모드 끄기) — 처음 불러오기 판이면 추가하지 않는다.</summary>
+    private void CancelImageCropPanel()
+    {
+        if (_imageCrop is not { } crop) return;
+        _log?.Info("[ImageCrop] 편집 모드가 꺼져 자르기 판 취소");
+        crop.CancelCommand.Execute(null);
+    }
+
+    /// <summary>키가 「이미지 자르기」 판 안(포커스 또는 키 원본)에서 왔는가 — 지도 키 처리기(Delete · Ctrl+Z/Y · 방향키)가 손대지 않게.</summary>
+    private bool IsImageCropPanelKey(System.Windows.Input.KeyEventArgs e)
+        => _imageCropPanel is { } panel
+           && (IsInImageCropPanel(panel, System.Windows.Input.Keyboard.FocusedElement) || IsInImageCropPanel(panel, e.OriginalSource));
+
+    private static bool IsInImageCropPanel(System.Windows.Media.Visual panel, object? element)
+        => element is System.Windows.DependencyObject d
+           && (ReferenceEquals(panel, d) || ((d is System.Windows.Media.Visual || d is System.Windows.Media.Media3D.Visual3D) && panel.IsAncestorOf(d)));
+
     /// <summary>
     /// 오버레이 이미지 추가 — 고른 파일로 「이미지 자르기」 판을 띄우고, 취소가 아니면 저장 폴더에 복사한다.
     /// 돌려주는 값 = 지도에 놓을 그림의 저장 경로(자르기 적용이면 자른 PNG), 취소면 null.
     /// </summary>
     internal async Task<string?> CopyOverlayImageWithCropAsync(string originalPath, string title)
     {
+        if (RejectWhileImageCropPanelOpen()) return null;
         BitmapSource? source = null;
         try { source = ImageCropStore.Load(originalPath); }
         catch (Exception ex) { _log?.Warning($"[ImageCrop] 그림을 읽지 못해 자르기 없이 추가: {ex.Message}"); }
@@ -77,13 +104,23 @@ public partial class MapViewModel
             return null;
         }
 
-        var copied = _imageFileService.CopyImageToLocal(originalPath);
-        if (outcome != ImageCropOutcome.Apply || source == null || crop == null) return copied;
+        try
+        {
+            var copied = _imageFileService.CopyImageToLocal(originalPath);
+            if (outcome != ImageCropOutcome.Apply || source == null || crop == null) return copied;
 
-        var (image, box) = ImageCropMath.Crop(source, crop.Points.ToList());
-        var cropped = ImageCropStore.Save(ResolveImagePath, copied, image, box, source.PixelWidth, source.PixelHeight);
-        _log?.Info($"[ImageCrop] 처음 불러올 때 자름: {copied} → {cropped} 상자=({box.X},{box.Y},{box.Width}x{box.Height}) 꼭짓점={crop.PointCount}");
-        return cropped;
+            var (image, box) = ImageCropMath.Crop(source, crop.Points.ToList());
+            var cropped = ImageCropStore.Save(ResolveImagePath, copied, image, box, source.PixelWidth, source.PixelHeight);
+            _log?.Info($"[ImageCrop] 처음 불러올 때 자름: {copied} → {cropped} 상자=({box.X},{box.Y},{box.Width}x{box.Height}) 꼭짓점={crop.PointCount}");
+            return cropped;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 원본이 사라졌거나 저장 폴더에 쓸 수 없음 — 추가하지 않고 알린다(예외를 위로 올리지 않는다)
+            _log?.Error($"[ImageCrop] 저장 폴더에 쓰지 못해 추가 안 함: {ex.Message}");
+            SetAimStatus("그림을 저장하지 못해 추가하지 않았습니다 — 저장 폴더를 확인하세요", autoHide: true);
+            return null;
+        }
     }
 
     /// <summary>우클릭 「다각형으로 자르기」 — 이미 놓인 그림을 잘라 같은 자리에 둔다(Undo 1단위).</summary>
@@ -103,14 +140,32 @@ public partial class MapViewModel
 
         var (outcome, crop) = await PromptImageCropAsync(source, $"다각형으로 자르기 — {marker.Title}", allowSkip: false);
         if (outcome != ImageCropOutcome.Apply || marker.IsDisposed) return;
+        // 판이 떠 있는 동안 그림이 바뀜(이전 자르기 Undo 등) — 연 때의 그림 · 크기와 지금 경계가 섞이지 않게 적용하지 않는다
+        if (!string.Equals(marker.FilePath, path, StringComparison.Ordinal))
+        {
+            _log?.Info($"[ImageCrop] 판이 떠 있는 동안 그림이 바뀌어 자르기 취소 id={marker.Id} {path} → {marker.FilePath}");
+            SetAimStatus("그림이 바뀌어 자르기를 취소했습니다", autoHide: true);
+            return;
+        }
 
         int w = source.PixelWidth, h = source.PixelHeight;
         var (image, box) = ImageCropMath.Crop(source, crop.Points.ToList());
-        var newPath = ImageCropStore.Save(ResolveImagePath, path, image, box, w, h);
+        string newPath;
+        try { newPath = ImageCropStore.Save(ResolveImagePath, path, image, box, w, h); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log?.Error($"[ImageCrop] 자른 그림 저장 실패 id={marker.Id}: {ex.Message}");
+            SetAimStatus("자른 그림을 저장하지 못했습니다 — 저장 폴더를 확인하세요", autoHide: true);
+            return;
+        }
         var before = CaptureImageCropState(marker);
         var after = new ImageCropState(newPath, ImageCropMath.CropBounds(marker.ImageBounds, marker.Bearing, w, h, box),
                                        marker.Width * box.Width / w, marker.Height * box.Height / h);
-        await ApplyImageCropStateAsync(marker.Id, after);
+        if (!await TryApplyImageCropStateAsync(marker.Id, after, before))
+        {
+            SetAimStatus("저장하지 못해 자르지 않았습니다", autoHide: true);
+            return;
+        }
         _undoService?.Push(new ImageCropCommand("다각형으로 자르기", marker.Id, before, after, ApplyImageCropStateAsync));
         _log?.Info($"[ImageCrop] 다시 자름 id={marker.Id} {path} → {newPath} 상자=({box.X},{box.Y},{box.Width}x{box.Height}) 회전={marker.Bearing:F1}");
         SetAimStatus("잘랐습니다 — 되돌리려면 Ctrl+Z 또는 우클릭 「자르기 되돌리기」", autoHide: true);
@@ -138,7 +193,11 @@ public partial class MapViewModel
         var after = new ImageCropState(record.Source,
                                        ImageCropMath.UncropBounds(marker.ImageBounds, marker.Bearing, record.SourceWidth, record.SourceHeight, box),
                                        marker.Width * record.SourceWidth / box.Width, marker.Height * record.SourceHeight / box.Height);
-        await ApplyImageCropStateAsync(marker.Id, after);
+        if (!await TryApplyImageCropStateAsync(marker.Id, after, before))
+        {
+            SetAimStatus("저장하지 못해 되돌리지 않았습니다", autoHide: true);
+            return;
+        }
         _undoService?.Push(new ImageCropCommand("자르기 되돌리기", marker.Id, before, after, ApplyImageCropStateAsync));
         _log?.Info($"[ImageCrop] 자르기 되돌림 id={marker.Id} {marker.FilePath} ← {record.Source}");
         SetAimStatus("자르기 전 그림으로 되돌렸습니다", autoHide: true);
@@ -149,28 +208,45 @@ public partial class MapViewModel
 
     /// <summary>자르기 상태 적용(실행 · Undo · Redo 공용) — 그림 파일 · 크기 · 경계 → DB · MapLayers 경로 · 화면.</summary>
     internal Task ApplyImageCropStateAsync(int imageId, ImageCropState state, CancellationToken ct = default)
+        => TryApplyImageCropStateAsync(imageId, state, restoreOnFailure: null);
+
+    /// <summary>
+    /// 자르기 상태 적용 — 저장(DB)했으면 true. 저장에 실패하고 restoreOnFailure 가 있으면 화면 · 모델을 그 상태로 되돌린다
+    /// (DB 는 바뀌지 않았으므로 — 자르기 · 되돌리기는 Undo 를 쌓지 않는다).
+    /// </summary>
+    private Task<bool> TryApplyImageCropStateAsync(int imageId, ImageCropState state, ImageCropState? restoreOnFailure)
         => RunOnUiAsync(async () =>
         {
-            if (FindMarkerById(imageId, isImage: true) is not GMapImageMarker img) return;
+            if (FindMarkerById(imageId, isImage: true) is not GMapImageMarker img) return false;
             var oldPath = img.FilePath;
-            img.SuppressBoundsUpdate = true;   // 크기(px)만 바꾸고 경계는 아래에서 직접
-            try { img.Width = state.Width; img.Height = state.Height; }
-            finally { img.SuppressBoundsUpdate = false; }
-            img.FilePath = state.FilePath;
-            img.ImageBounds = state.Bounds;
-            try
+            SetImageCropState(img, state);
+            bool saved;
+            try { await DbUpdateProcess(img); saved = true; }
+            catch (Exception ex) { saved = false; _log?.Error($"[ImageCrop] 저장 실패 id={imageId}: {ex.Message}"); }
+            if (saved)
             {
-                await DbUpdateProcess(img);
-                await UpdateOverlayImageLayerPathAsync(oldPath, state.FilePath);
+                // 그림 행은 저장됐다 — MapLayers 경로만 실패하면 로그만(그림은 바뀐 것)
+                try { await UpdateOverlayImageLayerPathAsync(oldPath, state.FilePath); }
+                catch (Exception ex) { _log?.Error($"[ImageCrop] 저장 실패 id={imageId}: {ex.Message}"); }
             }
-            catch (Exception ex) { _log?.Error($"[ImageCrop] 저장 실패 id={imageId}: {ex.Message}"); }
+            else if (restoreOnFailure is { } back) SetImageCropState(img, back);
             if (MainMap != null)
             {
                 img.UpdateScreenPosition(MainMap);
                 img.ForceUpdateLocalPosition(MainMap);
                 MainMap.InvalidateVisual();
             }
+            return saved;
         });
+
+    private static void SetImageCropState(GMapImageMarker img, ImageCropState state)
+    {
+        img.SuppressBoundsUpdate = true;   // 크기(px)만 바꾸고 경계는 아래에서 직접
+        try { img.Width = state.Width; img.Height = state.Height; }
+        finally { img.SuppressBoundsUpdate = false; }
+        img.FilePath = state.FilePath;
+        img.ImageBounds = state.Bounds;
+    }
 
     /// <summary>MapLayers(OverlayImage) 의 그림 경로를 바꾼다(레이어 패널은 경로로 그림을 찾는다).</summary>
     private async Task UpdateOverlayImageLayerPathAsync(string? oldPath, string newPath)

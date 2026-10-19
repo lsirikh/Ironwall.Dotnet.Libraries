@@ -1,0 +1,197 @@
+diff --git a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs
+index 80b90e4a..71cccf60 100644
+--- a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs
++++ b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs
+@@ -1443,6 +1443,7 @@ public partial class MapViewModel : BasePanelViewModel,
+             }
+         }
+         _groupSelection?.RefreshAdorner();
++        RefreshGroupPropertyPanelValues();   // 열린 그룹 속성 판의 회전 · 감시 방향 칸을 새 값으로
+         int saved = 0;
+         foreach (var o in changed)
+         {
+@@ -1606,6 +1607,8 @@ public partial class MapViewModel : BasePanelViewModel,
+     {
+         if (_groupSelection == null || !_groupSelection.HasSelection) return;
+         if (!CanEditMap()) { SetAimStatus("잠금 변경 권한이 없습니다.", true); return; }
++        // 잠금 = 다른 조작 → 열린 묶음 회전 먼저 확정. 안 하면 아래 저장이 미리보기 위치를 DB 에 쓰고, 뒤의 Esc 는 화면만 되돌린다.
++        _groupSelection.EndRotation(commit: true);
+         int n = 0;
+         var lockChanges = new System.Collections.Generic.List<(IEditableMarker m, bool before)>();
+         foreach (var m in _groupSelection.Selection.ToList())
+@@ -9012,8 +9015,10 @@ public partial class MapViewModel : BasePanelViewModel,
+                 //   before=마커 실값(ReadProperty) → 적용(ApplyProperty) → DB → 배치 record. Pending(빈칸) 필드도 undo 무결.
+                 var before = Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ReadProperty(m, e.PropertyName);
+                 Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ApplyProperty(m, e.PropertyName, e.NewValue);
+-                try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"그룹 속성 영속 실패: {ex.Message}"); }
+-                _editRecorder?.RecordPropertyChange(m, e.PropertyName, before, e.NewValue);   // 배치 합류(1 매크로)
++                bool saved = true;
++                try { await DbUpdateProcess(m); } catch (System.Exception ex) { saved = false; _log?.Error($"그룹 속성 영속 실패: {ex.Message}"); }
++                // 단일 경로와 같게 — 저장 못 한 값은 Undo 에 남기지 않는다(되돌리기가 또 저장을 시도하지 않게)
++                if (saved) _editRecorder?.RecordPropertyChange(m, e.PropertyName, before, e.NewValue);   // 배치 합류(1 매크로)
+                 if (e.PropertyName == "Title") titleChanged = true;
+                 if (e.PropertyName is "Zoom" or "IsLayerEnabled") MainMap?.RefreshMarkerVisibility(m);
+             }
+@@ -9035,12 +9040,17 @@ public partial class MapViewModel : BasePanelViewModel,
+             if (!CanEditMap()) { _log?.Warning($"[RBAC] 맵 편집 권한 없음 — 속성 저장 차단: {e.PropertyName}"); ShowNoMapEditPermissionInfo(); return; }
+             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
+ 
++            // 속성 변경 = 다른 조작 → 열린 묶음 회전을 저장 전에 먼저 확정. 안 하면 아래 저장이 미리보기 위치를 DB 에 쓰고 Esc 는 화면만 되돌린다.
++            bool rotationCommitted = _groupSelection?.IsRotating == true;
++            if (rotationCommitted) _groupSelection!.EndRotation(commit: true);
++
+             // 그룹 선택(≥2) + 공통 속성창 변경 → 선택된 전 마커에 반영 + 배치 Undo(1 매크로). (기능 ②-2)
+             var groupSelForProp = _groupSelection?.Selection;
+             if (groupSelForProp != null && groupSelForProp.Count >= 2
+                 && Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.IsReplayableProperty(e.PropertyName))
+             {
+                 await ApplyGroupPropertyChangeAsync(groupSelForProp, e);
++                if (rotationCommitted) RefreshGroupPropertyPanelValues();   // 확정이 판을 회전 값으로 다시 채운 뒤 이번 변경까지 반영
+                 return;
+             }
+ 
+@@ -10222,6 +10232,7 @@ public partial class MapViewModel : BasePanelViewModel,
+         try
+         {
+             if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 잠금 변경 차단(UI 비활성 백스톱)"); return; }
++            _groupSelection?.EndRotation(commit: true);   // 잠금 = 다른 조작 → 열린 묶음 회전 먼저 확정(잠긴 멤버가 계속 돌지 않게)
+             var marker = MainMap?.Markers
+                 .OfType<GMapSymbols.IEditableMarker>()
+                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
+@@ -10247,6 +10258,7 @@ public partial class MapViewModel : BasePanelViewModel,
+         try
+         {
+             if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 잠금 변경 차단(UI 비활성 백스톱)"); return; }
++            _groupSelection?.EndRotation(commit: true);   // 잠금 = 다른 조작 → 열린 묶음 회전 먼저 확정(심볼 잠금과 같은 규칙)
+             if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
+             {
+                 var marker = FindImageMarkerByFilePath(e.Layer.FilePath);
+diff --git a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.GroupRotation.cs b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.GroupRotation.cs
+index c5c2e814..c9fb26cd 100644
+--- a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.GroupRotation.cs
++++ b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.GroupRotation.cs
+@@ -180,6 +180,16 @@ public partial class MapViewModel
+             SetAimStatus("돌릴 수 있는 항목이 없습니다(잠기지 않은 것이 있어야 합니다).", autoHide: true);
+     }
+ 
++    /// <summary>
++    /// 열린 그룹 속성 판(2개 이상)의 칸을 지금 마커 값으로 다시 채운다(EnterGroupMode 재사용) — 판은 열릴 때 한 번만 채우므로
++    /// 묶음 회전 확정 · Undo/Redo 뒤 회전(MarkerBearing) · 감시 방향(DetectionBearing) 칸이 낡지 않게.
++    /// </summary>
++    private void RefreshGroupPropertyPanelValues()
++    {
++        if (PropertyPanel is { IsGroupEditing: true, GroupMarkers: { Count: >= 2 } group } panel)
++            panel.EnterGroupMode(group);
++    }
++
+     private void SetGroupRotationInputError(string? error)
+     {
+         _groupRotationInputError = error;
+diff --git a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.UndoContext.cs b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.UndoContext.cs
+index 63c8a02d..df92b3ad 100644
+--- a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.UndoContext.cs
++++ b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.UndoContext.cs
+@@ -52,6 +52,7 @@ public partial class MapViewModel : IUndoApplyContext
+             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
+             try { await _undoService.UndoAsync(); }
+             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
++            RefreshGroupPropertyPanelValues();   // 열린 그룹 속성 판이 되돌린 값을 보이게(판은 열릴 때 한 번만 채움)
+         }, () => CanUndo);
+         RedoCommand = new AsyncRelayCommand(async () =>
+         {
+@@ -59,6 +60,7 @@ public partial class MapViewModel : IUndoApplyContext
+             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
+             try { await _undoService.RedoAsync(); }
+             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
++            RefreshGroupPropertyPanelValues();
+         }, () => CanRedo);
+ 
+         _undoService.StateChanged += OnUndoStateChanged;
+diff --git a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.LayerSelection.cs b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.LayerSelection.cs
+index 225de02a..113afa55 100644
+--- a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.LayerSelection.cs
++++ b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.LayerSelection.cs
+@@ -34,7 +34,9 @@ public partial class MapViewModel
+         if (MainMap == null || _layerTreeNodes == null) return;
+         var ids = new HashSet<(bool isImage, int id)>();
+         foreach (var leaf in LayerSelection.SelectedLeaves(_layerTreeNodes))
+-            if (FindMarkerForLayerLeaf(leaf) is { } m && !m.IsLocked && m.IsLayerEnabled && m.Id > 0)
++            if (FindMarkerForLayerLeaf(leaf) is { } m && !m.IsLocked && m.IsLayerEnabled && m.Id > 0
++                // 줌으로 안 보이는 심볼도 뺀다(Ctrl+A 와 같은 규칙). 오버레이 이미지 행은 그대로 넣는다(이미지 제외 규칙은 여기 쓰지 않음).
++                && (m is GMapImageMarker || Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap.EffectiveZoom, m.Zoom)))
+                 ids.Add((m is GMapImageMarker, m.Id));
+ 
+         _isApplyingLayerSelection = true;
+diff --git a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.DeviceReassign.cs b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.DeviceReassign.cs
+index 45bd5d95..009d269a 100644
+--- a/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.DeviceReassign.cs
++++ b/Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.DeviceReassign.cs
+@@ -98,17 +98,31 @@ public partial class MapViewModel : IHandle<CallReassignLinkedDeviceProcessMessa
+                 return;
+             }
+ 
++            // 이미 중복된 자료(같은 장비를 마커 여럿이 가짐)면 다른 소유 마커를 모두 비운다 — 첫 마커만 비우면 남은 마커가 여전히 중복이다.
++            var holders = OtherDeviceHolders(target, device);
++            if (!holders.Contains(holder)) holders.Insert(0, holder);
++
+             _deviceLinkSyncDepth++;
+             try
+             {
+-                SetDeviceLinkSilently(holder, null);
+-                try { await DbUpdateProcess(holder); }
+-                catch (Exception ex)
++                var cleared = new List<GMapPidsMarker>();
++                foreach (var h in holders)
+                 {
+-                    SetDeviceLinkSilently(holder, device);
+-                    _log?.Error($"[장비 재할당] '{MarkerName(holder)}' 비움 저장 실패 — 바꾸지 않음: {ex.Message}");
+-                    SetAimStatus("장비 재할당을 저장하지 못했습니다.", autoHide: true);
+-                    return;
++                    SetDeviceLinkSilently(h, null);
++                    try { await DbUpdateProcess(h); cleared.Add(h); }
++                    catch (Exception ex)
++                    {
++                        SetDeviceLinkSilently(h, device);
++                        foreach (var c in cleared)   // 앞에서 비운 마커도 원래대로(저장도 되돌림)
++                        {
++                            SetDeviceLinkSilently(c, device);
++                            try { await DbUpdateProcess(c); }
++                            catch (Exception ex2) { _log?.Error($"[장비 재할당] '{MarkerName(c)}' 원복 저장 실패: {ex2.Message}"); }
++                        }
++                        _log?.Error($"[장비 재할당] '{MarkerName(h)}' 비움 저장 실패 — 바꾸지 않음: {ex.Message}");
++                        SetAimStatus("장비 재할당을 저장하지 못했습니다.", autoHide: true);
++                        return;
++                    }
+                 }
+ 
+                 SetDeviceLinkSilently(target, device);
+@@ -116,9 +130,12 @@ public partial class MapViewModel : IHandle<CallReassignLinkedDeviceProcessMessa
+                 catch (Exception ex)
+                 {
+                     SetDeviceLinkSilently(target, before);
+-                    SetDeviceLinkSilently(holder, device);
+-                    try { await DbUpdateProcess(holder); }
+-                    catch (Exception ex2) { _log?.Error($"[장비 재할당] '{MarkerName(holder)}' 원복 저장 실패: {ex2.Message}"); }
++                    foreach (var h in holders)
++                    {
++                        SetDeviceLinkSilently(h, device);
++                        try { await DbUpdateProcess(h); }
++                        catch (Exception ex2) { _log?.Error($"[장비 재할당] '{MarkerName(h)}' 원복 저장 실패: {ex2.Message}"); }
++                    }
+                     _log?.Error($"[장비 재할당] '{MarkerName(target)}' 연결 저장 실패 — 둘 다 원래대로: {ex.Message}");
+                     SetAimStatus("장비 재할당을 저장하지 못했습니다.", autoHide: true);
+                     return;
+@@ -128,11 +145,11 @@ public partial class MapViewModel : IHandle<CallReassignLinkedDeviceProcessMessa
+ 
+             using (_editRecorder?.BeginBatch($"장비 재할당: {device.DeviceName}"))
+             {
+-                _editRecorder?.RecordPropertyChange(holder, "LinkedDevice", device, null);
++                foreach (var h in holders) _editRecorder?.RecordPropertyChange(h, "LinkedDevice", device, null);
+                 _editRecorder?.RecordPropertyChange(target, "LinkedDevice", before, device);
+             }
+ 
+-            holder.ResetLiveState();                                     // 이제 이 장비의 이벤트를 받지 않는다
++            foreach (var h in holders) h.ResetLiveState();               // 이제 이 장비의 이벤트를 받지 않는다
+             SymbolLifecycle.RegisterDevice(device, target.Model);         // 조회표를 새 마커로
+             SymbolLifecycle.ReconcileDevice(device.Id, device.DeviceType);
+             RefreshDeviceAssignmentNotes();

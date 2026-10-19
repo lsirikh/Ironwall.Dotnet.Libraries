@@ -1254,6 +1254,9 @@ public partial class MapViewModel : BasePanelViewModel,
         if (focused is System.Windows.DependencyObject fd && _groupRotationPanel != null && _groupRotationPanel.IsAncestorOf(fd)
             && e.Key != System.Windows.Input.Key.Escape) return;
 
+        // 「이미지 자르기」 판 안에서 온 키는 판 것 — Delete(꼭짓점) · Ctrl+Z/Y(판 안 되돌리기) · 방향키가 선택 그림 삭제 · 전역 Undo · 그림 이동으로 새지 않게.
+        if (IsImageCropPanelKey(e)) return;
+
         // [C10] 드로잉 중에는 Ctrl+Z = 마지막 점 제거, Delete/방향키/Redo = 무시 — 전역 Undo·선택 삭제·격자 이동보다 먼저 판정.
         //   윈도우 터널이라 포커스와 무관하게 여기가 가장 먼저 도달한다(그룹 후킹은 초기화 시 구독).
         if (TryRouteDrawingKey(e)) return;
@@ -1443,6 +1446,7 @@ public partial class MapViewModel : BasePanelViewModel,
             }
         }
         _groupSelection?.RefreshAdorner();
+        RefreshGroupPropertyPanelValues();   // 열린 그룹 속성 판의 회전 · 감시 방향 칸을 새 값으로
         int saved = 0;
         foreach (var o in changed)
         {
@@ -1606,6 +1610,8 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
         if (!CanEditMap()) { SetAimStatus("잠금 변경 권한이 없습니다.", true); return; }
+        // 잠금 = 다른 조작 → 열린 묶음 회전 먼저 확정. 안 하면 아래 저장이 미리보기 위치를 DB 에 쓰고, 뒤의 Esc 는 화면만 되돌린다.
+        _groupSelection.EndRotation(commit: true);
         int n = 0;
         var lockChanges = new System.Collections.Generic.List<(IEditableMarker m, bool before)>();
         foreach (var m in _groupSelection.Selection.ToList())
@@ -3788,6 +3794,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void ExecuteLoadImageOverlay(object obj)
     {
         if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 오버레이 추가 차단"); ShowNoMapEditPermissionInfo(); return; }
+        if (RejectWhileImageCropPanelOpen()) return;   // 자르기 판이 떠 있으면 파일 고르기 창을 열지 않는다(단축키 무반응 대신 안내)
         try
         {
             _log?.Info("이미지 오버레이 불러오기 시작");
@@ -7011,6 +7018,7 @@ public partial class MapViewModel : BasePanelViewModel,
                         Header = "다각형으로 자르기…",
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.VectorPolygon, Width = 16, Height = 16 }
                     };
+                    System.Windows.Automation.AutomationProperties.SetAutomationId(cropItem, "GMaps.Symbol.ContextMenu.ImageCrop");
                     cropItem.Click += (s, e) => _ = RecropImageAsync(cropImage);
                     menu.Items.Add(cropItem);
                     if (IsCroppedImage(cropImage))
@@ -7020,6 +7028,7 @@ public partial class MapViewModel : BasePanelViewModel,
                             Header = "자르기 되돌리기",
                             Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Undo, Width = 16, Height = 16 }
                         };
+                        System.Windows.Automation.AutomationProperties.SetAutomationId(uncropItem, "GMaps.Symbol.ContextMenu.ImageUncrop");
                         uncropItem.Click += (s, e) => _ = UncropImageAsync(cropImage);
                         menu.Items.Add(uncropItem);
                     }
@@ -8637,6 +8646,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     ClearAllSelections();
                     IsSymbolPaletteVisible = false;
                     ExitSymbolPlacementMode();
+                    CancelImageCropPanel();   // 열린 「이미지 자르기」 판 = 취소(편집 모드가 꺼진 채 DB 를 고치지 않게)
 
                     // 진행 중인 라인/구역/PIDS그룹 드로잉도 취소 — 편집 모드 해제 시
                     // 드로잉 HUD·클릭 라우팅·Cross 커서·VM 상태가 orphan으로 잔존하던 버그 수정.
@@ -9012,8 +9022,10 @@ public partial class MapViewModel : BasePanelViewModel,
                 //   before=마커 실값(ReadProperty) → 적용(ApplyProperty) → DB → 배치 record. Pending(빈칸) 필드도 undo 무결.
                 var before = Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ReadProperty(m, e.PropertyName);
                 Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ApplyProperty(m, e.PropertyName, e.NewValue);
-                try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"그룹 속성 영속 실패: {ex.Message}"); }
-                _editRecorder?.RecordPropertyChange(m, e.PropertyName, before, e.NewValue);   // 배치 합류(1 매크로)
+                bool saved = true;
+                try { await DbUpdateProcess(m); } catch (System.Exception ex) { saved = false; _log?.Error($"그룹 속성 영속 실패: {ex.Message}"); }
+                // 단일 경로와 같게 — 저장 못 한 값은 Undo 에 남기지 않는다(되돌리기가 또 저장을 시도하지 않게)
+                if (saved) _editRecorder?.RecordPropertyChange(m, e.PropertyName, before, e.NewValue);   // 배치 합류(1 매크로)
                 if (e.PropertyName == "Title") titleChanged = true;
                 if (e.PropertyName is "Zoom" or "IsLayerEnabled") MainMap?.RefreshMarkerVisibility(m);
             }
@@ -9035,12 +9047,17 @@ public partial class MapViewModel : BasePanelViewModel,
             if (!CanEditMap()) { _log?.Warning($"[RBAC] 맵 편집 권한 없음 — 속성 저장 차단: {e.PropertyName}"); ShowNoMapEditPermissionInfo(); return; }
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
 
+            // 속성 변경 = 다른 조작 → 열린 묶음 회전을 저장 전에 먼저 확정. 안 하면 아래 저장이 미리보기 위치를 DB 에 쓰고 Esc 는 화면만 되돌린다.
+            bool rotationCommitted = _groupSelection?.IsRotating == true;
+            if (rotationCommitted) _groupSelection!.EndRotation(commit: true);
+
             // 그룹 선택(≥2) + 공통 속성창 변경 → 선택된 전 마커에 반영 + 배치 Undo(1 매크로). (기능 ②-2)
             var groupSelForProp = _groupSelection?.Selection;
             if (groupSelForProp != null && groupSelForProp.Count >= 2
                 && Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.IsReplayableProperty(e.PropertyName))
             {
                 await ApplyGroupPropertyChangeAsync(groupSelForProp, e);
+                if (rotationCommitted) RefreshGroupPropertyPanelValues();   // 확정이 판을 회전 값으로 다시 채운 뒤 이번 변경까지 반영
                 return;
             }
 
@@ -10222,6 +10239,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 잠금 변경 차단(UI 비활성 백스톱)"); return; }
+            _groupSelection?.EndRotation(commit: true);   // 잠금 = 다른 조작 → 열린 묶음 회전 먼저 확정(잠긴 멤버가 계속 돌지 않게)
             var marker = MainMap?.Markers
                 .OfType<GMapSymbols.IEditableMarker>()
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
@@ -10247,6 +10265,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 잠금 변경 차단(UI 비활성 백스톱)"); return; }
+            _groupSelection?.EndRotation(commit: true);   // 잠금 = 다른 조작 → 열린 묶음 회전 먼저 확정(심볼 잠금과 같은 규칙)
             if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
             {
                 var marker = FindImageMarkerByFilePath(e.Layer.FilePath);

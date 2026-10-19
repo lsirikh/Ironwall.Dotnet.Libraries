@@ -1,0 +1,9 @@
+﻿== merge3 2026-10-19T20:47:06
+sln EXIT=0
+GMaps.Ui.Tests EXIT=0
+GMaps.MapEdit.Tests EXIT=0
+GMaps.MapNav.Tests EXIT=0
+GMaps.Housing.Tests EXIT=0
+GMaps.MapAux.Tests EXIT=0
+GMaps.PropertyPanel.Tests EXIT=0
+GMaps.MapLayer.Tests EXIT=0

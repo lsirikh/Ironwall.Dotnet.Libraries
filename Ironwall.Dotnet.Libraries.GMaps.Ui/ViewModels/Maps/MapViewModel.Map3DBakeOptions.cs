@@ -74,6 +74,7 @@ public partial class MapViewModel
     public RelayCommand CancelMap3DBakeOptionsCommand => _cancelMap3DBakeOptionsCommand ??= new RelayCommand(_ =>
     {
         _log?.Info("[Map3D] 굽기 방식 고르기 취소");
+        _map3DBakeReplaces = null; _map3DBakeOptionsSourceId = null;   // 「다시 만들기」 표지도 버린다(다음 굽기로 새지 않게)
         CloseMap3DBakeOptions();
     });
 

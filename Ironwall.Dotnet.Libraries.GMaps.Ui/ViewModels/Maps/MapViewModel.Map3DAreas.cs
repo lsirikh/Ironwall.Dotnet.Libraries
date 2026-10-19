@@ -196,8 +196,8 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     private void ViewMap3DArea(Map3DAreaItem item)
     {
         if (MainMap == null) return;
-        // 이미 3D 중이면 처음 들어오기 전 자리를 그대로 둔다(3D 를 따라 움직인 2D 자리가 아니라)
-        var before = _map3DState == Map3DState.Shown ? _map3DReturn : null;
+        // 이미 3D 중(또는 준비 중)이면 처음 들어오기 전 자리를 그대로 둔다(3D 를 따라 움직인 2D 자리 · 앞 「영역 보기」가 옮긴 자리가 아니라)
+        var before = _map3DState != Map3DState.Off ? _map3DReturn : null;
         if (_map3DState == Map3DState.Shown) Leave3D(null, "area-view");
         else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
 
@@ -212,7 +212,12 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         MainMap.SetEffectiveZoom(viewZoom);
         _log?.Info($"[Map3D] 영역 보기 id={item.Id} → ({lat:F6},{lon:F6}) zoom={viewZoom}");
         // 줌 게이트에 기대지 않고 바로 들어간다(수동(단추)이면 줌으로는 들어가지 않는다). 목록에 장면이 아직 없으면 게이트가 찾아 들어간다(자동).
-        if (_map3DScenes.Find(sc => sc.Id == item.Id) is { } scene) EnterMap3DDirect(scene, "area-view");
+        if (_map3DScenes.Find(sc => sc.Id == item.Id) is { } scene)
+        {
+            EnterMap3DDirect(scene, "area-view");
+            // 거절(편집 · 그리기 · 만드는 중 등) — 이 누름이 잡은 돌아갈 자리 · 영역 보기 표지를 지운다(남으면 다음 진입이 이 자리로 돌아갔다)
+            if (_map3DState == Map3DState.Off) { _map3DReturn = null; _map3DAreaViewJob = null; }
+        }
         QueueMap3DGate();
     }
 
@@ -290,6 +295,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     /// <summary>「지우기」 — 표준 확인 팝업(EventAggregator). "확인" → HandleAsync(CallDeleteMap3DAreaProcessMessageModel).</summary>
     private async Task RequestDeleteMap3DAreaAsync(Map3DAreaItem item)
     {
+        if (RefuseDeleteWhileRebaking(item)) return;   // 굽기 전에 연 메뉴 — 확인 창도 띄우지 않는다
         try
         {
             _pendingMap3DAreaDelete = item;
@@ -303,6 +309,18 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         catch (Exception ex) { _log?.Error($"[Map3D] 영역 지우기 확인 창 실패: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// 다시 만드는 중인 그 영역은 지우지 않는다(안내만) — 지우면 굽기가 끝난 뒤 새 장면이 그 자리에 들어가 지운 영역이 되살아났다(2026-10-19 D1).
+    /// 메뉴에서는 이미 빠지지만(Map3DAreaItem) 굽기 전에 연 메뉴 · 확인 창으로 와도 막는다. 막았으면 true.
+    /// </summary>
+    private bool RefuseDeleteWhileRebaking(Map3DAreaItem item)
+    {
+        if (!_isMap3DBaking || item.Id != _map3DBakeSourceId) return false;
+        _log?.Info($"[Map3D] 다시 만드는 중 — 영역 지우기 막음 id={item.Id}");
+        SetAimStatus("만드는 중에는 지울 수 없습니다 — 「만들기 취소」 뒤 지우세요", autoHide: true);
+        return true;
+    }
+
     /// <summary>지우기 확인 콜백 — 보고 있던 영역이면 먼저 2D 로, 서버에서 지우고 표시를 뺀다.</summary>
     public async Task HandleAsync(CallDeleteMap3DAreaProcessMessageModel message, CancellationToken cancellationToken)
     {
@@ -311,6 +329,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         try
         {
             if (item == null || _map3DClient == null) return;
+            if (RefuseDeleteWhileRebaking(item)) return;
             if (_map3DJob == item.Id)
             {
                 if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, "area-delete");

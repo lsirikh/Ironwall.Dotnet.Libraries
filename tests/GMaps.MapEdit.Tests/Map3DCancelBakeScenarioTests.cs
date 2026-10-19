@@ -366,6 +366,99 @@ public class Map3DCancelBakeScenarioTests
             rig.Server.Status = "done";
             Assert.True(await Rig.Until(() => !rig.Baking, 4));
         });
+
+    // ─────────────── 영역 B 전수 시나리오(2026-10-19) — 취소 결과 · 경쟁 ───────────────
+
+    /// <summary>B-45 — 취소 결과 "already"(막 끝남) → 진행 조회를 그대로 두고 취소 안내 없음, done 이면 "3D 준비됨".</summary>
+    [Fact]
+    public void should_keep_polling_without_cancel_notice_when_cancel_result_already()
+        => RunAsync(async rig =>
+        {
+            rig.Server.CancelResult = "already";
+            rig.BakeNewArea();
+            Assert.True(await Rig.Until(() => rig.Vm.IsMap3DCancelBakeVisible));
+            rig.Vm.CancelMap3DBakeCommand.Execute(null);
+            Assert.True(await Rig.Until(() => rig.Server.Count(HttpMethod.Post, "/cancel") == 1, 2));
+            await Task.Delay(300);
+            Assert.True(rig.Baking);
+            Assert.NotEqual(Map3DGuide.CancelledBakeText, rig.Status);
+            int polls = rig.Server.Count(HttpMethod.Get, "/" + NewJob);
+            Assert.True(await Rig.Until(() => rig.Server.Count(HttpMethod.Get, "/" + NewJob) > polls, 3), "진행 조회가 멈춤");
+            rig.Server.Status = "done";
+            Assert.True(await Rig.Until(() => !rig.Baking, 4));
+            Assert.Contains("3D 준비됨", rig.Status);
+            Assert.Contains(Scenario.GetField<List<Map3DScene>>(rig.Vm, "_map3DScenes"), s => s.Id == NewJob);
+        });
+
+    /// <summary>B-46 — 취소 결과 "missing"(서버가 그 작업을 모름) → 취소로 처리(진행 조회 끊음 · 만들기 전 상태).</summary>
+    [Fact]
+    public void should_treat_as_cancelled_when_cancel_result_missing()
+        => RunAsync(async rig =>
+        {
+            rig.Server.CancelResult = "missing";
+            rig.BakeNewArea();
+            Assert.True(await Rig.Until(() => rig.Vm.IsMap3DCancelBakeVisible));
+            rig.Vm.CancelMap3DBakeCommand.Execute(null);
+            Assert.True(await Rig.Until(() => !rig.Baking, 2));
+            Assert.Equal(Map3DGuide.CancelledBakeText, rig.Status);
+            Assert.False(rig.Vm.IsMap3DBusy);
+            Assert.True(rig.Vm.DrawMap3DAreaCommand.CanExecute(null));
+            int polls = rig.Server.Count(HttpMethod.Get, "/" + NewJob);
+            await Task.Delay(1300);
+            Assert.Equal(polls, rig.Server.Count(HttpMethod.Get, "/" + NewJob));
+            Assert.DoesNotContain(Scenario.GetField<List<Map3DScene>>(rig.Vm, "_map3DScenes"), s => s.Id == NewJob);
+        });
+
+    /// <summary>B-49 — 다시 만들기 취소 뒤 옛 장면이 그대로이고 그 영역 3D 로 들어간다(「3D 로 보기」 → 옛 장면).</summary>
+    [Fact]
+    public void should_enter_old_scene_after_rebake_cancelled()
+        => RunAsync(async rig =>
+        {
+            rig.OldAreaExists();
+            rig.Rebake(OldArea);
+            Assert.True(await Rig.Until(() => rig.Area(OldArea).IsBaking));
+            rig.Vm.CancelMap3DBakeCommand.Execute(null);                    // 진행 판 「만들기 취소」
+            Assert.True(await Rig.Until(() => !rig.Baking, 2));
+            Assert.Equal(0, rig.Server.Count(HttpMethod.Delete, "/api/jobs/" + OldArea));
+
+            var host = rig.Vm.Map3DHost;   // 옛 장면을 열어 둔 상태(재사용 경로 — WebView2 없음)
+            foreach (var (name, value) in new (string, object?)[] { ("_job", OldArea), ("_ready", true), ("_rendered", true), ("_failed", false),
+                                                                      ("<ReadyAt>k__BackingField", (DateTime?)DateTime.UtcNow.AddSeconds(-10)) })
+                typeof(Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls.Map3DViewHost).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host, value);
+            Scenario.Call(rig.Vm, "EvaluateMap3DGate");
+            Scenario.Call(rig.Vm, "UpdateMap3DAreaDisplay");
+            Assert.True(rig.Vm.IsMap3DEnterButtonVisible);
+            rig.Vm.EnterMap3DCommand.Execute(null);
+            Scenario.Call(rig.Vm, "OnMap3DGuideTick");
+            Assert.Equal("3D", rig.Vm.Map3DStatusText);
+            Assert.Equal(OldArea, Scenario.GetField<string?>(rig.Vm, "_map3DJob"));
+            rig.Vm.ExitMap3DCommand.Execute(null);
+        });
+
+    /// <summary>B-54 — 취소 응답을 기다리는 사이 진행 조회가 done → 새 장면 등록 · "3D 준비됨", 늦게 온 취소 응답이 덮지 않는다.</summary>
+    [Fact]
+    public void should_register_new_scene_and_ignore_late_cancel_answer_when_done_arrives_first()
+        => RunAsync(async rig =>
+        {
+            rig.Server.StatusAfterCancel = null;
+            rig.BakeNewArea();
+            Assert.True(await Rig.Until(() => rig.Vm.IsMap3DCancelBakeVisible));
+            rig.Server.CancelGate = new TaskCompletionSource();
+            rig.Vm.CancelMap3DBakeCommand.Execute(null);
+            Assert.True(await Rig.Until(() => rig.Server.Count(HttpMethod.Post, "/cancel") == 1, 2));
+            rig.Server.Status = "done";                                     // 서버는 이미 다 만들었다
+            Assert.True(await Rig.Until(() => !rig.Baking, 4), "취소 응답을 기다리느라 진행 조회 결과를 놓침");
+            Assert.Contains("3D 준비됨", rig.Status);
+            Assert.Contains(Scenario.GetField<List<Map3DScene>>(rig.Vm, "_map3DScenes"), s => s.Id == NewJob);
+
+            rig.Server.CancelGate.SetResult();                              // 늦은 취소 응답("requested")
+            await Task.Delay(200);
+            Assert.Contains("3D 준비됨", rig.Status);
+            Assert.NotEqual(Map3DGuide.CancelledBakeText, rig.Status);
+            Assert.Contains(Scenario.GetField<List<Map3DScene>>(rig.Vm, "_map3DScenes"), s => s.Id == NewJob);
+            Assert.False(rig.Baking);
+            Assert.True(rig.Vm.DrawMap3DAreaCommand.CanExecute(null));
+        });
 }
 
 /// <summary>서버 목록 JSON → 장면 항목(Map3DClient 의 해석 그대로).</summary>
