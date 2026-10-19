@@ -111,6 +111,9 @@ public partial class MapViewModel : IUndoApplyContext
             try
             {
                 await DbUpdateProcess(marker);
+                // 연결 장비 재할당 Undo/Redo — 되돌려 받은 마커가 다시 이벤트를 받게 조회표를 그 마커로 맞춘다(장비 1개 = 마커 1개).
+                if (marker is GMapPidsMarker { LinkedDevice: { } relinked } relinkedMarker)
+                    _symbolLifecycle?.RegisterDevice(relinked, relinkedMarker.Model);
                 // 이미지 마커: undo/redo로 ImageBounds(크기)가 바뀌어도 Shape 컨트롤의 화면 픽셀크기는
                 // 어도너 드래그 경로만 갱신함 → 프로그램적 변경(undo)에선 컨트롤이 stale로 남아 화면상 이미지가 "튐".
                 // 줌 리프레시와 동일 경로(RefreshFromMarker→UpdateGeometryFromBounds)로 바운즈 기준 재계산해 동기화.

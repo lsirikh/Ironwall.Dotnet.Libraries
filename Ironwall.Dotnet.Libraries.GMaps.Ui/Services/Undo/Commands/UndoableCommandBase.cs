@@ -61,6 +61,8 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "DetectionAngle": if (m is IPidsEditableMarker pDa) pDa.DetectionAngle = ToD(v); break;
             case "DetectionBearing": if (m is IPidsEditableMarker pDb) pDb.DetectionBearing = ToD(v); break;
             case "ModelVariant": if (m is GMapPidsMarker pVariant) pVariant.ModelVariant = v as string; break;
+            // 연결 장비(장비 1개 = 마커 1개 재할당 Undo) — null = 연결 안 됨(LinkedDeviceId 0)
+            case "LinkedDevice": if (m is IPidsEditableMarker pLd) pLd.LinkedDevice = v as Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel; break;
             // 통문·함체 개폐(FR-12) — DoorState 는 런타임 형태 축이라 undo 대상이 아니다
             case "GateWidthM": if (m is IPidsEditableMarker pGw) pGw.GateWidthM = v is null ? null : ToD(v); break;
             case "OpenOnContactOn": if (m is IPidsEditableMarker pOc) pOc.OpenOnContactOn = ToB(v); break;
@@ -121,6 +123,7 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "DetectionAngle" => m is IPidsEditableMarker pDa ? pDa.DetectionAngle : null,
         "DetectionBearing" => m is IPidsEditableMarker pDb ? pDb.DetectionBearing : null,
         "ModelVariant" => (m as GMapPidsMarker)?.ModelVariant,
+        "LinkedDevice" => (m as IPidsEditableMarker)?.LinkedDevice,
         "GateWidthM" => (m as IPidsEditableMarker)?.GateWidthM,
         "OpenOnContactOn" => (m as IPidsEditableMarker)?.OpenOnContactOn,
         "PostSpacingM" => (m as IPidsGroupEditableMarker)?.PostSpacingM,
@@ -150,7 +153,7 @@ public abstract class UndoableCommandBase : IUndoableCommand
         or "Opacity" or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
         or "StrokeColor" or "OperationState"
         or "TitleColor" or "TitleBackground" or "TitleFontFamily" or "TitleBold" or "TitleItalic" or "TitleMaxWidth"
-        or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" or "ModelVariant"
+        or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" or "ModelVariant" or "LinkedDevice"
         or "DetectionRange" or "DetectionAngle" or "DetectionBearing"
         or "GateWidthM" or "OpenOnContactOn"
         or "PostSpacingM" or "FenceHeightM" or "FenceMode" or "Render3D" or "ReverseSensorOrder"

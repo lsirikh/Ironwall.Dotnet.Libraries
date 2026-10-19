@@ -41,3 +41,7 @@ public class CallDeleteMap3DAreaProcessMessageModel : IMessageModel { }
 /// <summary>3D 영역 직접 입력 건물 높이 「모두 자동으로」 확인 콜백(2026-10-19). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
 /// 대기 대상(_pendingMap3DHeightsReset)의 직접 입력을 map-3d 에서 지운다(DELETE /api/jobs/{id}/height-overrides).</summary>
 public class CallResetMap3DHeightsProcessMessageModel : IMessageModel { }
+
+/// <summary>연결 장비 재할당 확인 콜백(장비 1개 = 마커 1개, 2026-10-19). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
+/// 대기 대상(_pendingDeviceReassign)의 기존 마커 연결을 비우고 고른 마커에 연결한다(두 건 저장 · 실패 시 둘 다 원복 · Undo 1단위).</summary>
+public class CallReassignLinkedDeviceProcessMessageModel : IMessageModel { }

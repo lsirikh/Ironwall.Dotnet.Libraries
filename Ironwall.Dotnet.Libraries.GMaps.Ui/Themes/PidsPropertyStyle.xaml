@@ -28,6 +28,7 @@
 		Format="P0" />
 
 	<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+	<utils:DeviceAssignmentNoteConverter x:Key="DeviceAssignmentNote" />
 
 	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsControl}">
 
@@ -231,10 +232,25 @@
 							Text="연결디바이스" />
 						<ComboBox
 							Grid.Column="1"
-							DisplayMemberPath="DeviceName"
 							ItemsSource="{Binding FilteredDeviceList}"
 							SelectedItem="{Binding LinkedDevice, Mode=TwoWay}"
 							ToolTipService.ShowOnDisabled="True">
+							<!--  장비 이름 + 다른 마커에 할당됨(흐린 글) — 장비 1개 = 마커 1개  -->
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Text="{Binding DeviceName}" />
+										<TextBlock Margin="4,0,0,0" Opacity="0.55">
+											<TextBlock.Text>
+												<MultiBinding Converter="{StaticResource DeviceAssignmentNote}">
+													<Binding />
+													<Binding Path="DeviceAssignmentNotes" RelativeSource="{RelativeSource AncestorType={x:Type properties:GMapPropertyPidsControl}}" />
+												</MultiBinding>
+											</TextBlock.Text>
+										</TextBlock>
+									</StackPanel>
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
 							<ComboBox.Style>
 								<Style BasedOn="{StaticResource CompactComboBox}" TargetType="ComboBox">
 									<Style.Triggers>
@@ -248,6 +264,22 @@
 							</ComboBox.Style>
 						</ComboBox>
 					</Grid>
+					<!--  이미 중복된 자료: 이 장비가 다른 마커에도 연결됨(상태 알림)  -->
+					<TextBlock
+						Margin="80,0,0,4"
+						Foreground="{DynamicResource StatusWarningBrush}"
+						Text="{Binding LinkedDeviceSharedWarning}"
+						TextWrapping="Wrap">
+						<TextBlock.Style>
+							<Style TargetType="TextBlock">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding LinkedDeviceSharedWarning}" Value="{x:Null}">
+										<Setter Property="Visibility" Value="Collapsed" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
 
 					<!--  현재위치 적용 — 콤보박스 폭에 맞춘 네모 버튼(앱 기본 원형 Button 스타일 opt-out)  -->
 					<Grid Margin="0,2,0,6">
