@@ -109,6 +109,7 @@ public partial class MapViewModel
     private void SetMap3DBusy(string? text, double? percent = null, string detail = "")
     {
         _map3DBusyForBake = false;
+        NotifyMap3DCancelBake();   // 「만들기 취소」는 굽기 진행을 보일 때만
         if (text == null) { StopMap3DGuideTimer(); IsMap3DBusy = false; return; }
         if (!IsMap3DBusy || text != Map3DBusyText) _map3DBusyShownAt = DateTime.UtcNow;
         Map3DBusyText = text;
@@ -452,18 +453,110 @@ public partial class MapViewModel
 
     // ── 굽기 ──
 
+    // ── 만들기 취소(2026-10-19) — 진행 판 「만들기 취소」 · 다시 만드는 영역의 배지 우클릭 · 3D 영역 목록 ──
+    /// <summary>굽는 작업 id(시작 응답 뒤) — 취소 요청 대상.</summary>
+    private string? _map3DBakeJob;
+    /// <summary>「다시 만들기」면 그 영역(옛 장면) id — 그 영역 항목에 「만들기 취소」를 단다.</summary>
+    private string? _map3DBakeSourceId;
+    /// <summary>만들기 판을 연 「다시 만들기」 영역 id(판 [만들기] 때 굽기로 넘긴다).</summary>
+    private string? _map3DBakeOptionsSourceId;
+    /// <summary>취소 요청을 보내는 중(연타 막기).</summary>
+    private bool _map3DBakeCancelling;
+    /// <summary>이번 굽기에서 서버가 취소를 모른다고 했다(옛 map-3d) — 단추를 숨긴다.</summary>
+    private bool _map3DBakeCancelUnsupported;
+    /// <summary>이번 굽기의 진행 조회를 끊는다(취소 요청이 받아지면) — 이 굽기가 아직 지금 것인지도 이것으로 가린다.</summary>
+    private CancellationTokenSource? _map3DBakeCts;
+
+    /// <summary>진행 판 「만들기 취소」 보임 — 굽기 진행을 보이는 중이고 작업 id 를 받았을 때(보내는 중 · 옛 서버면 숨김).</summary>
+    public bool IsMap3DCancelBakeVisible => Map3DGuide.IsCancelBakeVisible(_isMap3DBaking, _map3DBakeJob != null, _map3DBusyForBake,
+                                                                            _map3DBakeCancelling, _map3DBakeCancelUnsupported);
+
+    private RelayCommand? _cancelMap3DBakeCommand;
+    /// <summary>「만들기 취소」 — 확인 없이 바로 서버에 취소 요청(되돌릴 것이 없다).</summary>
+    public RelayCommand CancelMap3DBakeCommand => _cancelMap3DBakeCommand ??= new RelayCommand(_ => _ = CancelMap3DBakeAsync());
+
+    private void NotifyMap3DCancelBake() => NotifyOfPropertyChange(nameof(IsMap3DCancelBakeVisible));
+
+    /// <summary>
+    /// 만들기 취소 — 서버가 받으면(cancelled · requested · missing) 진행 조회를 끊고 곧바로 "취소함" 알림 · 만들기 전 상태로(다시 「만들기」 가능).
+    /// 서버는 1~2초 안에 멈추고 만들다 만 폴더를 지운다 — 같은 영역의 이전 장면은 그대로. 옛 서버(취소 모름)면 안내하고 단추를 숨긴다.
+    /// 거의 다 만든 경우(too_late) · 이미 끝난 경우(already)는 진행 조회를 그대로 둬 실제 결과(완료 · 실패)를 보인다.
+    /// </summary>
+    private async Task CancelMap3DBakeAsync()
+    {
+        if (!_isMap3DBaking || _map3DBakeJob is not { } job || _map3DClient == null || _map3DBakeCancelling) return;
+        var cts = _map3DBakeCts;
+        _map3DBakeCancelling = true;
+        NotifyMap3DCancelBake();
+        _log?.Info($"[Map3D] 만들기 취소 요청 job={job}");
+        try
+        {
+            var r = await _map3DClient.CancelJobAsync(job);
+            _log?.Info($"[Map3D] 만들기 취소 응답 job={job} result={r.Result}");
+            if (!ReferenceEquals(cts, _map3DBakeCts)) return;   // 그 사이 굽기가 끝났다
+            if (r.IsUnsupported)
+            {
+                _map3DBakeCancelUnsupported = true;
+                SetAimStatus(Map3DGuide.CancelBakeUnsupportedText, autoHide: true);
+                return;
+            }
+            if (r.IsTooLate) { SetAimStatus(Map3DGuide.CancelBakeTooLateText, autoHide: true); return; }
+            if (r.Result == "already") return;   // 막 끝났다 — 진행 조회가 결과를 보인다
+            cts?.Cancel();
+            EndMap3DBake();
+            SetAimStatus(Map3DGuide.CancelledBakeText, autoHide: true);
+        }
+        catch (Map3DServerUnavailableException ex)
+        {
+            _log?.Warning($"[Map3D] 만들기 취소 — 서버 닿지 않음: {ex.Message}");
+            SetAimStatus(Map3DUnavailableText, autoHide: true);
+        }
+        catch (Map3DRequestException ex) { SetAimStatus($"3D 만들기를 취소할 수 없습니다: {ex.Message}", autoHide: true); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[Map3D] 만들기 취소 실패: {ex.Message}");
+            SetAimStatus("3D 만들기 취소에 실패했습니다.", autoHide: true);
+        }
+        finally
+        {
+            _map3DBakeCancelling = false;
+            NotifyMap3DCancelBake();
+        }
+    }
+
+    /// <summary>굽기 끝(완료 · 실패 · 취소) — 진행 판을 닫고 만들기 전 상태로. 다시 만들던 영역이면 그 항목의 「만들기 취소」를 뗀다.</summary>
+    private void EndMap3DBake()
+    {
+        if (_map3DBusyForBake) SetMap3DBusy(null);   // 굽기 패널만 닫는다(전환 안내는 그대로)
+        bool hadSource = _map3DBakeSourceId != null;
+        _isMap3DBaking = false;
+        _map3DBakeJob = null;
+        _map3DBakeSourceId = null;
+        _map3DBakeCts = null;
+        DrawMap3DAreaCommand.RaiseCanExecuteChanged();
+        NotifyMap3DCancelBake();
+        if (hadSource) ReapplyMap3DAreas();
+    }
+
     /// <param name="enterZoom">그 영역의 3D 로 바뀌는 줌(만들기 패널에서 고른 값) — 굽기 요청 enter_zoom.</param>
     private async Task BakeMap3DAsync(Map3DArea area, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double enterZoom)
     {
         if (_map3DClient == null || _isMap3DBaking) return;
         _isMap3DBaking = true;
+        var cts = new CancellationTokenSource();
+        _map3DBakeCts = cts;
+        _map3DBakeSourceId = _map3DBakeOptionsSourceId;
+        _map3DBakeOptionsSourceId = null;
+        _map3DBakeCancelUnsupported = false;
         DrawMap3DAreaCommand.RaiseCanExecuteChanged();
         var bbox = area.Bbox;
         try
         {
             _log?.Info($"[Map3D] 굽기 요청 bbox=[{string.Join(", ", bbox)}] rect={area.Rect?.ToJson().ToString(Newtonsoft.Json.Formatting.None) ?? "-"} overlay={overlayMode} images={overlays?.Count ?? 0} enterZoom={enterZoom}");
             var job = await _map3DClient.StartBakeAsync(bbox, overlayMode, overlays, enterZoom, area.Rect);
-            while (!job.IsDone && !job.IsError)
+            _map3DBakeJob = job.Id;
+            if (_map3DBakeSourceId != null) ReapplyMap3DAreas();   // 다시 만드는 영역 항목에 「만들기 취소」
+            while (!job.IsDone && !job.IsError && !job.IsCancelled)
             {
                 SetAimStatus($"3D 만드는 중… {job.Progress:P0}{(string.IsNullOrEmpty(job.Message) ? "" : $" — {job.Message}")}");
                 if (_map3DState == Map3DState.Off && _map3DGuideMode == Map3DGuideMode.None)   // 전환 안내를 덮지 않는다
@@ -471,10 +564,16 @@ public partial class MapViewModel
                     SetMap3DBusy(Map3DGuide.WithPercent("3D 를 만드는 중…", job.Progress * 100), job.Progress * 100, job.Message ?? "");
                     _map3DBusyForBake = true;
                 }
-                await Task.Delay(1000);
-                job = await _map3DClient.GetJobAsync(job.Id);
+                NotifyMap3DCancelBake();
+                await Task.Delay(1000, cts.Token);
+                job = await _map3DClient.GetJobAsync(job.Id, cts.Token);
             }
             _isMap3DBaking = false;   // 아래 QueueMap3DGate 가 새 영역으로 들어갈 수 있게(finally 보다 먼저)
+            if (job.IsCancelled)   // 다른 곳(map-3d 화면 등)에서 취소됨 — 이전 장면은 그대로
+            {
+                SetAimStatus(Map3DGuide.CancelledBakeText, autoHide: true);
+                return;
+            }
             if (job.IsError)
             {
                 SetAimStatus($"3D 만들기 실패: {job.Message ?? "알 수 없는 오류"}", autoHide: true);
@@ -488,6 +587,10 @@ public partial class MapViewModel
                 : "3D 준비됨 — 지도 왼쪽 위 「3D 로 보기」로 들어갑니다", autoHide: true);
             QueueMap3DGate();
             _ = RefreshMap3DAreasAsync();   // 새 영역 테두리 · 배지(만든 날짜 · 건물 수는 서버 목록에서)
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            _log?.Info("[Map3D] 굽기 진행 조회 끊음(만들기 취소)");   // 알림 · 상태 정리는 취소 쪽(CancelMap3DBakeAsync)이 이미 했다
         }
         catch (Map3DServerUnavailableException ex)
         {
@@ -505,9 +608,9 @@ public partial class MapViewModel
         }
         finally
         {
-            if (_map3DBusyForBake) SetMap3DBusy(null);   // 굽기 패널만 닫는다(전환 안내는 그대로)
-            _isMap3DBaking = false;
-            DrawMap3DAreaCommand.RaiseCanExecuteChanged();
+            // 취소한 뒤 곧바로 다시 만들기를 시작했으면 그 굽기 상태는 건드리지 않는다
+            if (ReferenceEquals(_map3DBakeCts, cts)) EndMap3DBake();
+            cts.Dispose();
         }
     }
 

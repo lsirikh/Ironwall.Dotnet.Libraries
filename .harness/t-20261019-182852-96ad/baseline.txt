@@ -1,0 +1,10 @@
+  GMaps.Ui.Tests -> C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-182852-96ad\tests\GMaps.Ui.Tests\bin\Debug\net8.0\GMaps.Ui.Tests.dll
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-182852-96ad\tests\GMaps.Ui.Tests\bin\Debug\net8.0\GMaps.Ui.Tests.dll(.NETCoreApp,Version=v8.0)에 대한 테스트 실행
+지정된 패턴과 일치한 총 테스트 파일 수는 1개입니다.
+
+통과!  - 실패:     0, 통과:  1524, 건너뜀:     0, 전체:  1524, 기간: 691 ms - GMaps.Ui.Tests.dll (net8.0)
+  GMaps.MapEdit.Tests -> C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-182852-96ad\tests\GMaps.MapEdit.Tests\bin\Debug\net8.0-windows\GMaps.MapEdit.Tests.dll
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-182852-96ad\tests\GMaps.MapEdit.Tests\bin\Debug\net8.0-windows\GMaps.MapEdit.Tests.dll(.NETCoreApp,Version=v8.0)에 대한 테스트 실행
+지정된 패턴과 일치한 총 테스트 파일 수는 1개입니다.
+
+통과!  - 실패:     0, 통과:   451, 건너뜀:     0, 전체:   451, 기간: 52 s - GMaps.MapEdit.Tests.dll (net8.0)

@@ -20,11 +20,26 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D;
    Created On   : 2026-10-16 · Sensorway Co., Ltd.
 ****************************************************************************/
 
-/// <summary>굽기 작업 상태. Status = "queued" | "running" | "done" | "error", Progress 0~1.</summary>
+/// <summary>굽기 작업 상태. Status = "queued" | "running" | "done" | "error" | "cancelled", Progress 0~1.</summary>
 public sealed record Map3DJob(string Id, string Status, double Progress, string? Message)
 {
     public bool IsDone => Status == "done";
     public bool IsError => Status == "error";
+    /// <summary>취소로 끝남(map-3d 「만들기 취소」, 2026-10-19).</summary>
+    public bool IsCancelled => Status == "cancelled";
+}
+
+/// <summary>
+/// 굽기 취소 요청 결과(POST /api/jobs/{id}/cancel). Result = "cancelled" | "requested"(곧 멈춤) | "too_late"(GLB 쓰는 중 — 곧 다 만든다)
+/// | "already" | "missing", 서버가 취소를 모르면(옛 판, 404 · 405) "unsupported".
+/// </summary>
+public sealed record Map3DCancelResult(string Result)
+{
+    public const string Unsupported = "unsupported", TooLate = "too_late";
+    /// <summary>옛 서버 — 취소 API 가 없다.</summary>
+    public bool IsUnsupported => Result == Unsupported;
+    /// <summary>거의 다 만들어(GLB 쓰는 중) 취소하지 않았다 — 곧 끝난다.</summary>
+    public bool IsTooLate => Result == TooLate;
 }
 
 /// <summary>구운 장면. Id 는 3D 화면 주소의 job 값으로 쓴다. Bbox = [minLon, minLat, maxLon, maxLat].</summary>
@@ -113,6 +128,25 @@ public sealed class Map3DClient : IDisposable
     {
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, Map3DMath.JobUrl(_server, id)), allowNotFound: false, ct).ConfigureAwait(false);
         return ParseJob(json!);
+    }
+
+    /// <summary>
+    /// 굽기 취소(POST /api/jobs/{id}/cancel) — 서버는 늘 200(없는 작업 · 이미 끝난 작업도 무해한 응답)이라
+    /// 404 · 405 는 그 기능이 없는 옛 서버로 본다(<see cref="Map3DCancelResult.Unsupported"/>). 그 밖의 거절은 Map3DRequestException.
+    /// </summary>
+    public async Task<Map3DCancelResult> CancelJobAsync(string id, CancellationToken ct = default)
+    {
+        string? json;
+        try
+        {
+            json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"{Map3DMath.JobUrl(_server, id)}/cancel"), allowNotFound: true, ct).ConfigureAwait(false);
+        }
+        catch (Map3DRequestException ex) when (ex.StatusCode == HttpStatusCode.MethodNotAllowed) { json = null; }
+        if (json == null) return new Map3DCancelResult(Map3DCancelResult.Unsupported);
+        string? result = null;
+        try { if (JObject.Parse(json)["result"] is JValue { Type: JTokenType.String } v) result = v.ToString(); }
+        catch (JsonException) { }
+        return new Map3DCancelResult(string.IsNullOrEmpty(result) ? "requested" : result);
     }
 
     /// <summary>지점을 덮는 장면(GET /api/scenes/at) — 없으면(404) null.</summary>
