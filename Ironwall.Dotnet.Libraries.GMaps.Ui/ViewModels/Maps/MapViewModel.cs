@@ -323,7 +323,6 @@ public partial class MapViewModel : BasePanelViewModel,
                 _rotationSaveTimer.Stop();
                 await SaveMapRotationState();
             }
-            await FlushPendingTiltSaveAsync();   // [map-tilt-25d FR-07] 각도 debounce 대기분 플러시(파셜)
 
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
@@ -585,6 +584,7 @@ public partial class MapViewModel : BasePanelViewModel,
             _groupSelection.GroupZOrderRequested += OnGroupZOrderRequested;
             _groupSelection.GroupRotateCompleted += OnGroupRotateCompleted;   // 묶음 회전 확정 → 영속 + Undo 1단위
             _groupSelection.RotationChanged += OnGroupRotationChanged;        // 회전 세션 → 컨트롤러 판(MapViewModel.GroupRotation)
+            _groupSelection.SelectionChanged += OnGroupSelectionChanged;      // 묶음 선택 → 레이어 패널 잎 선택(MapViewModel.LayerSelection)
 
             // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
             _labelService = new LabelAdornerService(MainMap, _log);
@@ -672,6 +672,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 _groupSelection.GroupZOrderRequested -= OnGroupZOrderRequested;
                 _groupSelection.GroupRotateCompleted -= OnGroupRotateCompleted;
                 _groupSelection.RotationChanged -= OnGroupRotationChanged;
+                _groupSelection.SelectionChanged -= OnGroupSelectionChanged;
                 _groupSelection.Dispose();
                 _groupSelection = null;
             }
@@ -1259,6 +1260,9 @@ public partial class MapViewModel : BasePanelViewModel,
 
         // 묶음 회전 키(]/[ · Enter · Esc) — 열린 회전이 있으면 다른 키보다 먼저(ESC 가 선택 해제로 새지 않게).
         if (TryRouteGroupRotationKey(e)) return;
+
+        // 레이어 패널에 초점이 있으면 선택 키(↑/↓ · Space · Ctrl+A · Esc)는 패널 몫 — 지도 방향키 이동 · 전체 선택으로 새지 않게.
+        if (LayerPanel is { IsKeyboardFocusWithin: true } && LayerPanelControl.IsSelectionKey(e.Key, System.Windows.Input.Keyboard.Modifiers)) return;
 
         // Delete = 선택 심볼/이미지 삭제(단일·그룹) — 단일 진입점 ExecuteDeleteSelected(확인팝업 경유)로 통일.
         //   그룹 선택 시 내부에서 ExecuteGroupDelete로 위임. 단일 Delete 키 경로는 원래 부재(어도너 스텁=no-op)였어 신규 배선(FR-05).
@@ -3799,9 +3803,10 @@ public partial class MapViewModel : BasePanelViewModel,
             if (openFileDialog.ShowDialog() == true)
             {
                 var originalPath = openFileDialog.FileName;
-                // 이미지를 Images/Overlays/에 복사하고 상대 경로 획득
-                var filePath = _imageFileService.CopyImageToLocal(originalPath);
                 var title = System.IO.Path.GetFileNameWithoutExtension(originalPath);
+                // 「이미지 자르기」 판(다각형) → 이미지를 Images/Overlays/에 복사하고 상대 경로 획득(자르기 적용이면 자른 PNG, 취소면 추가 안 함)
+                var filePath = await CopyOverlayImageWithCropAsync(originalPath, title);
+                if (filePath == null) return;
                 // 항상 현재 지도 중심점 기준으로 배치
                 var currentPosition = MainMap.Position;
 
@@ -5421,7 +5426,6 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         SetInitialHomePosition();
-        LoadMapTiltFromSettings();      // [map-tilt-25d FR-07] 틸트 kill-switch/각도 복원(파셜, 홈 줌 적용 뒤 Flush, 저장 억제 내장)
         LoadMap3DFromSettings();        // [map-3d POC] 3D 게이트 설정 · 줌/위치 구독(파셜)
         LoadMapCompassFromSettings();   // [Compass FR-08] 나침반 위치/설정 복원(파셜, 저장 억제 내장)
         InitializeInstruments();        // [Map_Instruments] 강풍/탐지장애 EQM 구독+가시성 복원(파셜)
@@ -6996,6 +7000,29 @@ public partial class MapViewModel : BasePanelViewModel,
                 };
                 moveBottomItem.Click += (s, e) => { var zb = IsApplyingUndo ? null : CaptureZOrderPairs(); MoveMarkerToBottom(marker); if (zb != null) RecordZOrderDiff(zb); };   // V4 undo 기록
                 menu.Items.Add(moveBottomItem);
+
+                // ── 오버레이 이미지 다각형 자르기(2026-10-19) ──
+                if (marker is GMapImageMarker cropImage)
+                {
+                    menu.Items.Add(new Separator());
+                    var cropItem = new MenuItem
+                    {
+                        Header = "다각형으로 자르기…",
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.VectorPolygon, Width = 16, Height = 16 }
+                    };
+                    cropItem.Click += (s, e) => _ = RecropImageAsync(cropImage);
+                    menu.Items.Add(cropItem);
+                    if (IsCroppedImage(cropImage))
+                    {
+                        var uncropItem = new MenuItem
+                        {
+                            Header = "자르기 되돌리기",
+                            Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Undo, Width = 16, Height = 16 }
+                        };
+                        uncropItem.Click += (s, e) => _ = UncropImageAsync(cropImage);
+                        menu.Items.Add(uncropItem);
+                    }
+                }
             }
 
             if (menu.Items.Count > 0)
@@ -8628,6 +8655,9 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (PropertyPanel != null)
                     PropertyPanel.IsEditModeEnabled = value;
                 SyncMap3DWithInputModes();   // 켜짐 = 3D 중이면 먼저 2D 로 · 꺼짐 = 3D 게이트 다시 판정(MapViewModel.Map3D)
+                // 켜짐 = 레이어 패널에서 고른 것을 지도 편집 선택으로 이어 간다. 꺼짐 = 지도 선택만 풀리고 패널 선택은 패널 안에 남는다.
+                if (value && _layerTreeNodes != null && LayerSelection.SelectedLeaves(_layerTreeNodes).Count > 0)
+                    PushLayerSelectionToMap();
                 _log?.Info($"편집 모드: {(value ? "활성화" : "비활성화")}");
             }
         }
@@ -8706,6 +8736,7 @@ public partial class MapViewModel : BasePanelViewModel,
             NotifyOfPropertyChange(nameof(SelectedMarker));
             NotifyOfPropertyChange(nameof(HasSelectedItem));
             NotifyOfPropertyChange(nameof(IsEditModeEnabled));
+            SyncLayerSelectionFromMap(reveal: true);   // 단일 선택 → 레이어 패널 잎 선택(편집 모드, MapViewModel.LayerSelection)
         }
     }
     /// <summary>
@@ -10062,6 +10093,7 @@ public partial class MapViewModel : BasePanelViewModel,
         LayerPanel.SymbolLockChanged += OnSymbolLockChanged;               // 심볼 잠금(FR-03)
         LayerPanel.LayerLockChanged += OnLayerLockChanged;                 // 이미지 잠금(FR-03)
         LayerPanel.PanelSizeCommitted += OnPanelSizeCommitted;             // FR-05/06 리사이즈 크기(세션 기억)
+        LayerPanel.LayerSelectionChanged += OnLayerSelectionChanged;       // 패널 다중 선택 → 편집 모드 지도 선택(MapViewModel.LayerSelection)
         if (_lastPanelSize.HasValue)
             LayerPanel.SetPanelSize(_lastPanelSize.Value.Width, _lastPanelSize.Value.Height);
         LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
@@ -10091,6 +10123,7 @@ public partial class MapViewModel : BasePanelViewModel,
             LayerPanel.SymbolLockChanged -= OnSymbolLockChanged;
             LayerPanel.LayerLockChanged -= OnLayerLockChanged;
             LayerPanel.PanelSizeCommitted -= OnPanelSizeCommitted;
+            LayerPanel.LayerSelectionChanged -= OnLayerSelectionChanged;
             LayerPanel.UnsubscribeLeaves();   // leaf 구독·델리게이트 해제(닫힌 컨트롤 누수 방지)
             LayerPanel = null;
         }
@@ -10246,6 +10279,10 @@ public partial class MapViewModel : BasePanelViewModel,
             var expandedNames = _layerTreeNodes == null
                 ? new System.Collections.Generic.HashSet<string>()
                 : LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsExpanded).Select(n => n.Name).ToHashSet();
+            // 레이어 패널 선택도 같은 항목(심볼 Id · 레이어 Id)으로 이어 간다 — 삭제된 항목은 새 트리에 없어 빠진다.
+            var selectedLayerKeys = _layerTreeNodes == null
+                ? new System.Collections.Generic.HashSet<string>()
+                : LayerSelection.SelectedLeaves(_layerTreeNodes).Select(LayerSelection.KeyOf).OfType<string>().ToHashSet();
 
             // 개별 심볼(_symbolProvider) 전달 → 카테고리 아래 개별 심볼 자식 노드 생성(FR-02)
             _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>(), _symbolProvider);
@@ -10275,6 +10312,8 @@ public partial class MapViewModel : BasePanelViewModel,
             if (expandedNames.Count > 0)
                 foreach (var node in LayerTreeBuilder.Flatten(_layerTreeNodes))
                     if (expandedNames.Contains(node.Name)) node.IsExpanded = true;
+
+            RestoreLayerSelection(selectedLayerKeys);
 
             if (LayerPanel != null)
                 LayerPanel.TreeNodes = _layerTreeNodes;
