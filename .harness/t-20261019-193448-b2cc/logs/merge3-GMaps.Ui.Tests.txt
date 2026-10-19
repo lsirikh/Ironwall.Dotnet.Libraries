@@ -1,4 +1,0 @@
-﻿C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-193448-b2cc\tests\GMaps.Ui.Tests\bin\Debug\net8.0\GMaps.Ui.Tests.dll(.NETCoreApp,Version=v8.0)에 대한 테스트 실행
-지정된 패턴과 일치한 총 테스트 파일 수는 1개입니다.
-
-통과!  - 실패:     0, 통과:  1613, 건너뜀:     0, 전체:  1613, 기간: 200 ms - GMaps.Ui.Tests.dll (net8.0)
