@@ -80,6 +80,8 @@ public class MapsHelpTests
     [InlineData("Map.Map3D.Enter", "[나가기]")]
     [InlineData("Map.Map3D.EnterZoom", "자동(줌)일 때")]
     [InlineData("Map.Map3D.EnterZoom", "3D 로 들어가는 줌")]
+    [InlineData("Map.Map3D.CancelBake", "[만들기 취소]")]
+    [InlineData("Map.Map3D.CancelBake", "이전에 만든 3D 는 그대로 남습니다")]
     public void should_keep_the_moved_explanation_in_the_callout_body_when_it_left_the_screen(string key, string phrase)
     {
         RuntimeHelpers.RunModuleConstructor(typeof(MapsHelp).Module.ModuleHandle);

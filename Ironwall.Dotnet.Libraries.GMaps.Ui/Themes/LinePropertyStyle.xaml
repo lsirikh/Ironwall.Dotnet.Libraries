@@ -127,11 +127,11 @@
 										Maximum="1"
 										Minimum="0"
 										TickFrequency="0.01"
-										Value="{Binding LineOpacity, Mode=TwoWay}" />
+										Value="{Binding LineOpacity, Mode=TwoWay, Converter={StaticResource NaNBlank}}" />
 									<TextBlock
 										Margin="5,0,0,0"
 										VerticalAlignment="Center"
-										Text="{Binding LineOpacity, StringFormat='{}{0:P0}'}" />
+										Text="{Binding LineOpacity, Converter={StaticResource NaNDashPercent}}" />
 								</StackPanel>
 							</Grid>
 						</StackPanel>

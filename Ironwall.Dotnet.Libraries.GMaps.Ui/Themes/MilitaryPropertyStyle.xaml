@@ -142,8 +142,20 @@
 									Text="부대 지시자" />
 								<TextBox
 									Grid.Column="1"
-									Style="{StaticResource CompactTextBox}"
-									Text="{Binding UnitDesignator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									ToolTipService.ShowOnDisabled="True"
+									Text="{Binding UnitDesignator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+									<!--  그룹 편집: 부대 지시자 는 심볼마다 하나뿐인 값 → 대표값 표시 + 비활성  -->
+									<TextBox.Style>
+										<Style BasedOn="{StaticResource CompactTextBox}" TargetType="TextBox">
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+													<Setter Property="IsEnabled" Value="False" />
+													<Setter Property="ToolTip" Value="그룹 편집에서는 부대 지시자 를 바꿀 수 없습니다 (심볼별 고유)" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBox.Style>
+								</TextBox>
 							</Grid>
 
 							<!--  상급 부대명  -->
@@ -176,8 +188,20 @@
 									Text="콜사인" />
 								<TextBox
 									Grid.Column="1"
-									Style="{StaticResource CompactTextBox}"
-									Text="{Binding CallSign, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									ToolTipService.ShowOnDisabled="True"
+									Text="{Binding CallSign, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+									<!--  그룹 편집: 콜사인 는 심볼마다 하나뿐인 값 → 대표값 표시 + 비활성  -->
+									<TextBox.Style>
+										<Style BasedOn="{StaticResource CompactTextBox}" TargetType="TextBox">
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+													<Setter Property="IsEnabled" Value="False" />
+													<Setter Property="ToolTip" Value="그룹 편집에서는 콜사인 를 바꿀 수 없습니다 (심볼별 고유)" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBox.Style>
+								</TextBox>
 							</Grid>
 
 							<!--  국가 코드  -->

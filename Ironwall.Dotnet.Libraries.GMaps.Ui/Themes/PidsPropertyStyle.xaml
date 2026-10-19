@@ -27,6 +27,14 @@
 		BlankText="—"
 		Format="P0" />
 
+	<!--  통문 폭 그룹 Pending(NaN): 글 "—", 슬라이더는 최소값 파킹  -->
+	<utils:DoubleNaNToBlankConverter
+		x:Key="NaNDashGateM"
+		BlankText="—"
+		Format="0.0"
+		Suffix=" m" />
+	<utils:DoubleNaNToBlankConverter x:Key="NaNParkGate" ParkValue="1" />
+
 	<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 	<utils:DeviceAssignmentNoteConverter x:Key="DeviceAssignmentNote" />
 
@@ -46,9 +54,6 @@
 									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
 										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
-									</DataTrigger>
 								</Style.Triggers>
 							</Style>
 						</Grid.Style>
@@ -60,7 +65,19 @@
 						<TextBlock Text="색상 강도" Style="{StaticResource PropertyLabel}"/>
 						<!--  첨부 속성 경로는 Path= 로 적는다 — 위치 인자({Binding 경로})는 Binding(string) 생성자가 접두사(house:)를 풀지 못한 PropertyPath 를 만들어
 						      PathError(경로 인자 0개)로 슬라이더가 안 먹었다(결함 P3D-D1 · MAP-122)  -->
-						<Slider Grid.Column="1" Minimum="0" Maximum="1" IsSnapToTickEnabled="True" TickFrequency="0.01" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="1" IsSnapToTickEnabled="True" TickFrequency="0.01" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}" ToolTipService.ShowOnDisabled="True" AutomationProperties.AutomationId="GMaps.Property.TintStrength">
+							<!--  그룹 편집: 색상 강도는 저장되지 않는 화면 값(대표 심볼 그림에만 붙음) → 대표값 표시 + 비활성  -->
+							<Slider.Style>
+								<Style TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+											<Setter Property="IsEnabled" Value="False"/>
+											<Setter Property="ToolTip" Value="그룹 편집에서는 색상 강도를 바꿀 수 없습니다 (저장되지 않는 화면 값)"/>
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Slider.Style>
+						</Slider>
 						<!--  3D 하우징 "?"(help-callout H-4) — 색상 강도 · 설치 높이 · 모델 변형의 뜻. 이 줄들은 3D 일 때만 보인다.  -->
 						<help:HelpTip Grid.Column="2" Margin="6,0,0,0" HelpKey="Map.Property.Housing"/>
 					</Grid>
@@ -72,9 +89,6 @@
 									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
 										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
-									</DataTrigger>
 								</Style.Triggers>
 							</Style>
 						</Grid.Style>
@@ -83,7 +97,7 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="설치 높이" Style="{StaticResource PropertyLabel}"/>
-						<Slider Grid.Column="1" Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="설치 높이 (0~100, 정수)"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding MarkerAltitude, Mode=TwoWay, Converter={StaticResource NaNBlank}}" ToolTip="설치 높이 (0~100, 정수)" AutomationProperties.AutomationId="GMaps.Property.Altitude"/>
 					</Grid>
 					<Grid Margin="0,5">
 						<Grid.Style>
@@ -94,12 +108,10 @@
 										<MultiDataTrigger.Conditions>
 											<Condition Binding="{Binding SelectedMarker.DeviceType}" Value="IpCamera"/>
 											<Condition Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False"/>
+											<Condition Binding="{Binding IsMixedDeviceType}" Value="False"/>
 										</MultiDataTrigger.Conditions>
 										<Setter Property="Visibility" Value="Visible"/>
 									</MultiDataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
-									</DataTrigger>
 								</Style.Triggers>
 							</Style>
 						</Grid.Style>
@@ -108,7 +120,7 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="모델 변형" Style="{StaticResource PropertyLabel}"/>
-						<ComboBox Grid.Column="1" ItemsSource="{Binding ModelVariants}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding ModelVariant, Mode=TwoWay}" Style="{StaticResource CompactComboBox}"/>
+						<ComboBox Grid.Column="1" ItemsSource="{Binding ModelVariants}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding ModelVariant, Mode=TwoWay}" Style="{StaticResource CompactComboBox}" AutomationProperties.AutomationId="GMaps.Property.ModelVariant"/>
 					</Grid>
 
 					<!--  통문 개폐 (FR-12/18) — DeviceType=Gate: 폭 슬라이더 / 통문·함체 공통: 접점 해석  -->
@@ -120,9 +132,6 @@
 									<DataTrigger Binding="{Binding IsGate}" Value="True">
 										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
-									</DataTrigger>
 								</Style.Triggers>
 							</Style>
 						</Grid.Style>
@@ -132,8 +141,8 @@
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="통문 폭" Style="{StaticResource PropertyLabel}"/>
 						<StackPanel Grid.Column="1" Orientation="Horizontal">
-							<Slider Width="100" Minimum="1" Maximum="8" TickFrequency="0.5" IsSnapToTickEnabled="True" Value="{Binding GateWidthM, Mode=TwoWay}" ToolTip="통문 폭 1~8 m (0.5 m 단위)" AutomationProperties.AutomationId="GMaps.Property.GateWidth"/>
-							<TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="{Binding GateWidthM, StringFormat='{}{0:0.0} m'}"/>
+							<Slider Width="100" Minimum="1" Maximum="8" TickFrequency="0.5" IsSnapToTickEnabled="True" Value="{Binding GateWidthM, Mode=TwoWay, Converter={StaticResource NaNParkGate}}" ToolTip="통문 폭 1~8 m (0.5 m 단위)" AutomationProperties.AutomationId="GMaps.Property.GateWidth"/>
+							<TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="{Binding GateWidthM, Converter={StaticResource NaNDashGateM}}"/>
 							<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="10" Opacity="0.75" Text="(기본)" Visibility="{Binding IsGateWidthInherited, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 							<Button Content="기본" Padding="6,1" Margin="6,0,0,0" Command="{Binding ResetGateWidthCommand}" AutomationProperties.AutomationId="GMaps.Property.GateWidthReset"/>
 						</StackPanel>
@@ -145,9 +154,6 @@
 								<Style.Triggers>
 									<DataTrigger Binding="{Binding HasDoor}" Value="True">
 										<Setter Property="Visibility" Value="Visible"/>
-									</DataTrigger>
-									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
-										<Setter Property="Visibility" Value="Collapsed"/>
 									</DataTrigger>
 								</Style.Triggers>
 							</Style>

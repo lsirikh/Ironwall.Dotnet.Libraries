@@ -16,6 +16,7 @@
 	<!--  그룹(멀티셀렉트) Pending: NaN=값 서로 다름 → 텍스트 빈칸/—, 슬라이더 0 파킹. 단일 모드엔 영향 없음  -->
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlank" />
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlankF0" Format="F0" />
+	<utils:DoubleNaNToBlankConverter x:Key="NaNDashPercent" BlankText="—" Format="P0" />
 	<!--  숫자 칸 명세(map-property-numeric-precision) — 표시는 그 칸 자리수로, 입력은 범위 · 단위로 잘라 넘긴다  -->
 	<utils:DoubleNaNToBlankConverter x:Key="NumTitleSize" Spec="{x:Static numerics:MapNumericFields.TitleSize}" />
 	<utils:DoubleNaNToBlankConverter x:Key="NumMarkerWidth" Spec="{x:Static numerics:MapNumericFields.MarkerWidth}" />
@@ -188,8 +189,21 @@
 											Text="제목" />
 										<TextBox
 											Grid.Column="1"
-											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=800}" />
+											AutomationProperties.AutomationId="GMaps.Property.Title"
+											ToolTipService.ShowOnDisabled="True"
+											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=800}">
+											<TextBox.Style>
+												<Style BasedOn="{StaticResource CompactTextBox}" TargetType="TextBox">
+													<Style.Triggers>
+														<!--  그룹 편집: 제목은 심볼마다 하나뿐인 값 → 일괄 변경 금지(2026-10-19 사용자 지시 "제목처럼 하나뿐이어야 하는 값")  -->
+														<DataTrigger Binding="{Binding IsGroupEditing, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+															<Setter Property="IsEnabled" Value="False" />
+															<Setter Property="ToolTip" Value="그룹 편집에서는 제목을 바꿀 수 없습니다 (심볼별 고유)" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</TextBox.Style>
+										</TextBox>
 									</Grid>
 
 									<!--  제목크기  -->

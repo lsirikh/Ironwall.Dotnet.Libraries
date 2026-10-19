@@ -278,6 +278,7 @@
 									<Style BasedOn="{StaticResource MaterialDesignMenuItem}" TargetType="MenuItem">
 										<Setter Property="Header" Value="{Binding Header}" />
 										<Setter Property="Command" Value="{Binding Command}" />
+										<Setter Property="AutomationProperties.AutomationId" Value="{Binding AutomationId, TargetNullValue=''}" />
 									</Style>
 								</Setter.Value>
 							</Setter>
@@ -1177,7 +1178,8 @@
 				Content="{Binding Map3DHost}"
 				Focusable="False" />
 
-			<!--  3D 전환 · 굽기 진행 패널 — 지도 가운데. 원(끝 모를 때 돈다) + 막대(%) + 단계 문구. 입력은 막지 않는다(IsHitTestVisible=False).
+			<!--  3D 전환 · 굽기 진행 패널 — 지도 가운데. 원(끝 모를 때 돈다) + 막대(%) + 단계 문구. 입력은 막지 않는다(IsHitTestVisible=False) —
+			      굽는 중에만 「만들기 취소」 단추를 누를 수 있게 판이 입력을 받는다(IsMap3DCancelBakeVisible).
 			      지도 HUD 와 같은 MapFloatingPanelStyle · 토큰(DynamicResource).  -->
 			<Border
 				Panel.ZIndex="160"
@@ -1185,7 +1187,7 @@
 				HorizontalAlignment="Center"
 				VerticalAlignment="Center"
 				AutomationProperties.AutomationId="GMaps.Map3D.Progress"
-				IsHitTestVisible="False"
+				IsHitTestVisible="{Binding IsMap3DCancelBakeVisible}"
 				Style="{StaticResource MapFloatingPanelStyle}"
 				Visibility="{Binding IsMap3DBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
 				<StackPanel Margin="8,6">
@@ -1231,6 +1233,25 @@
 						IsIndeterminate="{Binding Map3DBusyIndeterminate}"
 						Maximum="100"
 						Value="{Binding Map3DBusyPercent, Mode=OneWay}" />
+					<!--  굽는 중 「만들기 취소」 — 확인 없이 바로(되돌릴 것이 없다). 같은 동작이 영역 배지 우클릭 · 3D 영역 목록에도.  -->
+					<StackPanel
+						Margin="0,8,0,0"
+						HorizontalAlignment="Right"
+						Orientation="Horizontal"
+						Visibility="{Binding IsMap3DCancelBakeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<Button
+							Height="26"
+							Padding="12,0"
+							AutomationProperties.AutomationId="GMaps.Map3D.CancelBake"
+							Command="{Binding CancelMap3DBakeCommand}"
+							Content="만들기 취소"
+							Style="{StaticResource MaterialDesignOutlinedButton}" />
+						<help:HelpTip
+							Margin="6,0,0,0"
+							VerticalAlignment="Center"
+							HelpKey="Map.Map3D.CancelBake"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
+					</StackPanel>
 				</StackPanel>
 			</Border>
 

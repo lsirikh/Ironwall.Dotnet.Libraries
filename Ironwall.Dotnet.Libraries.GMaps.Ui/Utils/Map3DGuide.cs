@@ -109,6 +109,21 @@ public static class Map3DGuide
     /// <summary>로그인 직후 3D 안내를 한 번 보일까 — 로그인 화면 뒤에서 3D 를 펼쳤고 지금도 3D 가 보일 때.</summary>
     public static bool ShouldGuideAfterLogin(bool revealedBehindLogin, bool isShown) => revealedBehindLogin && isShown;
 
+    // ── 만들기 취소(2026-10-19) ──
+
+    /// <summary>진행 판 「만들기 취소」 보임 — 만드는 중 · 작업 id 를 받음 · 판이 굽기 진행을 보이는 중, 그리고 취소를 보내는 중이 아니고 서버가 취소를 안다.</summary>
+    public static bool IsCancelBakeVisible(bool baking, bool hasJob, bool panelShowsBake, bool cancelling, bool unsupported)
+        => baking && hasJob && panelShowsBake && !cancelling && !unsupported;
+
+    /// <summary>취소함 알림 — 같은 영역의 이전 3D 는 그대로.</summary>
+    public const string CancelledBakeText = "3D 만들기를 취소했습니다 — 이전에 만든 3D 는 그대로입니다";
+
+    /// <summary>옛 map-3d(취소 API 없음).</summary>
+    public const string CancelBakeUnsupportedText = "이 3D 서버는 취소를 지원하지 않습니다 — 다 만들 때까지 기다려 주세요";
+
+    /// <summary>GLB 쓰는 중(거의 다 만듦) — 취소하지 않고 곧 끝난다.</summary>
+    public const string CancelBakeTooLateText = "거의 다 만들어 취소하지 않습니다 — 곧 끝납니다";
+
     // ── ② 영역 크기 ──
 
     /// <summary>3D 로 만들 수 있는 영역 한 변 최대(m) — map-3d 서버 제한과 같다.</summary>

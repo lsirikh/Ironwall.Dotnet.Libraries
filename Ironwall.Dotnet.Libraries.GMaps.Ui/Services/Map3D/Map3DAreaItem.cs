@@ -12,7 +12,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D;
 ****************************************************************************/
 
 /// <summary>영역 메뉴 한 줄(글 + 명령).</summary>
-public sealed record Map3DAreaAction(string Header, ICommand Command);
+public sealed record Map3DAreaAction(string Header, ICommand Command)
+{
+    /// <summary>자동화 식별자(배지 우클릭 메뉴 · 3D 영역 목록 항목) — 없으면 null.</summary>
+    public string? AutomationId { get; init; }
+}
 
 public sealed class Map3DAreaItem
 {
@@ -32,17 +36,32 @@ public sealed class Map3DAreaItem
     /// <param name="resetHeights">「직접 입력한 건물 높이 모두 자동으로…」(확인 뒤 서버 DELETE). 직접 입력이 없거나 null 이면 메뉴에 넣지 않는다.</param>
     public Map3DAreaItem(Map3DSceneInfo scene, double enterZoom, Action<Map3DAreaItem> view, Action<Map3DAreaItem>? changeZoom,
                          Action<Map3DAreaItem>? resetHeights, Action<Map3DAreaItem> rebake, Action<Map3DAreaItem> delete)
+        : this(scene, enterZoom, view, changeZoom, resetHeights, rebake, delete, null) { }
+
+    /// <param name="cancelBake">이 영역을 다시 만드는 중이면 「만들기 취소」(맨 위, 「다시 만들기」 대신). null 이면 만드는 중이 아니다.</param>
+    public Map3DAreaItem(Map3DSceneInfo scene, double enterZoom, Action<Map3DAreaItem> view, Action<Map3DAreaItem>? changeZoom,
+                         Action<Map3DAreaItem>? resetHeights, Action<Map3DAreaItem> rebake, Action<Map3DAreaItem> delete,
+                         Action<Map3DAreaItem>? cancelBake)
     {
         Scene = scene;
         EnterZoom = enterZoom;
-        var actions = new List<Map3DAreaAction> { new("이 영역 3D 로 보기", new RelayCommand(() => view(this))) };
+        IsBaking = cancelBake != null;
+        var actions = new List<Map3DAreaAction>();
+        if (cancelBake != null) actions.Add(new(CancelBakeHeader, new RelayCommand(() => cancelBake(this))) { AutomationId = CancelBakeAutomationId });
+        actions.Add(new("이 영역 3D 로 보기", new RelayCommand(() => view(this))));
         if (changeZoom != null) actions.Add(new("3D 줌 바꾸기…", new RelayCommand(() => changeZoom(this))));
         if (resetHeights != null && scene.ManualHeights > 0)
             actions.Add(new($"{Map3DBuilding.ManualCountText(scene.ManualHeights)} — 모두 자동으로…", new RelayCommand(() => resetHeights(this))));
-        actions.Add(new("다시 만들기", new RelayCommand(() => rebake(this))));
+        if (cancelBake == null) actions.Add(new("다시 만들기", new RelayCommand(() => rebake(this))));
         actions.Add(new("지우기…", new RelayCommand(() => delete(this))));
         Actions = actions;
     }
+
+    /// <summary>「만들기 취소」 글 · 자동화 식별자(진행 판 단추와 같은 id).</summary>
+    public const string CancelBakeHeader = "만들기 취소", CancelBakeAutomationId = "GMaps.Map3D.CancelBake";
+
+    /// <summary>이 영역을 다시 만드는 중인가(메뉴 맨 위 「만들기 취소」 · 목록 줄 "만드는 중").</summary>
+    public bool IsBaking { get; }
 
     public Map3DSceneInfo Scene { get; }
     public string Id => Scene.Id;
@@ -53,7 +72,8 @@ public sealed class Map3DAreaItem
     public double EnterZoom { get; }
     public string Title => Map3DGuide.AreaTitle(Scene.Id, Scene.Name);
     /// <summary>지도 메뉴 「3D 영역 목록」 한 줄 — "이름 · 줌 17 이상"(직접 입력한 높이가 있으면 " · 직접 입력한 건물 높이 n개").</summary>
-    public string MenuHeader => Map3DGuide.AreaMenuHeader(Title, EnterZoom) + (Scene.ManualHeights > 0 ? $" · {Map3DBuilding.ManualCountText(Scene.ManualHeights)}" : "");
+    public string MenuHeader => Map3DGuide.AreaMenuHeader(Title, EnterZoom) + (Scene.ManualHeights > 0 ? $" · {Map3DBuilding.ManualCountText(Scene.ManualHeights)}" : "")
+                                + (IsBaking ? " · 다시 만드는 중" : "");
     public string ToolTip => Map3DGuide.AreaToolTip(Title, Scene.Created, Scene.Buildings, EnterZoom)
                              + (Scene.ManualHeights > 0 ? $"\n{Map3DBuilding.ManualCountText(Scene.ManualHeights)}" : "")
                              + (Scene.ManualUnmatched > 0 ? $"\n다시 붙이지 못한 직접 입력 {Scene.ManualUnmatched}개" : "");

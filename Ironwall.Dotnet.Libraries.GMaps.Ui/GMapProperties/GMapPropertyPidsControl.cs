@@ -25,8 +25,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             nameof(ModelVariant), typeof(string), typeof(GMapPropertyPidsControl), new PropertyMetadata(null, (d, e) =>
             {
                 var control = (GMapPropertyPidsControl)d;
-                if (control._isInitializing || control._isClearingBindings || control.IsGroupMode || control.SelectedMarker is not GMapPidsMarker marker) return;
-                marker.ModelVariant = (string?)e.NewValue;
+                if (control._isInitializing || control._isClearingBindings || control.SelectedMarker is not GMapPidsMarker marker) return;
+                if (control.IsGroupMode && e.NewValue is null) return;   // 그룹 Pending(서로 다름=무선택) — 미전파
+                if (!control.IsGroupMode) marker.ModelVariant = (string?)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                 control.OnMarkerPropertyChanged(nameof(ModelVariant), e.OldValue, e.NewValue);
             }));
         public string? ModelVariant { get => (string?)GetValue(ModelVariantProperty); set => SetValue(ModelVariantProperty, value); }
@@ -49,7 +50,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             {
                 if (SelectedMarker is not IPidsEditableMarker marker) return;
                 var before = marker.GateWidthM;
-                marker.GateWidthM = last;
+                if (!IsGroupMode) marker.GateWidthM = last;   // 그룹=VM 이 전원 일괄 적용
                 OnMarkerPropertyChanged("GateWidthM", before, last);
             });
             ResetGateWidthCommand = new PanelCommand(_ => ResetGateWidth());
@@ -69,7 +70,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             new PropertyMetadata(Helpers.Fence.FenceDefaults.GateWidthM, (d, e) =>
             {
                 var control = (GMapPropertyPidsControl)d;
-                if (control._isInitializing || control._isClearingBindings || control._syncingGate || control.IsGroupMode || control.SelectedMarker is not IPidsEditableMarker) return;
+                if (control._isInitializing || control._isClearingBindings || control._syncingGate || control.SelectedMarker is not IPidsEditableMarker) return;
                 control.IsGateWidthInherited = false;
                 control._gateWidthCommit.Touch((double)e.OldValue, (double)e.NewValue);
             }, Helpers.Numerics.MapNumericFields.GateWidthM.Coerce));
@@ -92,6 +93,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public bool IsGate { get => (bool)GetValue(IsGateProperty); set => SetValue(IsGateProperty, value); }
         public static readonly DependencyProperty IsGateProperty = DependencyProperty.Register(nameof(IsGate), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
         public System.Windows.Input.ICommand ResetGateWidthCommand { get; }
+
+        /// <summary>그룹 편집에서 장비 종류(DeviceType)가 섞임 — 종류 전용 칸(모델 변형 등)을 감춘다.</summary>
+        public bool IsMixedDeviceType { get => (bool)GetValue(IsMixedDeviceTypeProperty); set => SetValue(IsMixedDeviceTypeProperty, value); }
+        public static readonly DependencyProperty IsMixedDeviceTypeProperty = DependencyProperty.Register(nameof(IsMixedDeviceType), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
 
         #region - 문 개폐 제어(FR-02~08) -
         private readonly Helpers.Door.DoorCommandGate _doorGate = new();
@@ -202,7 +207,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             bool linked = marker is not null && marker.LinkedDeviceId > 0;
             bool permitted = CanControlDevice?.Invoke() ?? false;
             bool wired = DoorCommandSender is not null;
-            bool baseOk = linked && permitted && wired && _doorGate.CanSend;
+            bool baseOk = linked && permitted && wired && _doorGate.CanSend && !IsGroupMode;   // 그룹: 개폐는 장비별 명령(심볼별 고유) → 대표 상태만 표시
 
             CanOpenDoor = baseOk && _doorGate.ReportedState != Helpers.Door.DoorUiState.Open;
             CanCloseDoor = baseOk && _doorGate.ReportedState != Helpers.Door.DoorUiState.Closed;
@@ -291,9 +296,18 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private void ResetGateWidth()
         {
-            if (SelectedMarker is not IPidsEditableMarker marker || IsGroupMode) return;
+            if (SelectedMarker is not IPidsEditableMarker marker) return;
             _gateWidthCommit.Cancel();
             var before = marker.GateWidthM;
+            if (IsGroupMode)
+            {
+                // 그룹: VM 이 전원을 NULL(기본)로 — 패널은 기본값 · (기본) 표시만
+                OnMarkerPropertyChanged("GateWidthM", before, null);
+                _syncingGate = true;
+                try { IsGateWidthInherited = true; GateWidthM = Helpers.Fence.FenceDefaults.GateWidthM; }
+                finally { _syncingGate = false; }
+                return;
+            }
             marker.GateWidthM = null;
             OnMarkerPropertyChanged("GateWidthM", before, null);
             SyncGateFromMarker(marker);
@@ -439,6 +453,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             DetectionRange = AllEq(pids, p => p.DetectionRange) ? rep.DetectionRange : MIXED_DOUBLE;
             DetectionAngle = AllEq(pids, p => p.DetectionAngle) ? rep.DetectionAngle : MIXED_DOUBLE;
             DetectionBearing = AllEq(pids, p => p.DetectionBearing) ? rep.DetectionBearing : MIXED_DOUBLE;
+
+            // 같은 종류 다중 선택 = 단일 선택 칸 전부(2026-10-19): 장비 종류가 섞이면 종류 전용 칸(모델 변형 · 통문 · 문)은 감춘다
+            IsMixedDeviceType = !AllEq(pids, p => p.DeviceType);
+            ModelVariant = AllEq(pids, p => (p as GMapPidsMarker)?.ModelVariant) ? (rep as GMapPidsMarker)?.ModelVariant : null;
+            _syncingGate = true;
+            try
+            {
+                IsGate = pids.All(p => p.DeviceType == EnumDeviceType.Gate);
+                HasDoor = pids.All(p => Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.HasDoor(p.DeviceType));
+                bool gateSame = AllEq(pids, p => p.GateWidthM);
+                IsGateWidthInherited = gateSame && rep.GateWidthM is null;
+                GateWidthM = gateSame ? rep.GateWidthM ?? Helpers.Fence.FenceDefaults.GateWidthM : MIXED_DOUBLE;
+            }
+            finally { _syncingGate = false; }
+            RefreshDoorUi();
 
             static bool AllEq<T>(List<IPidsEditableMarker> list, Func<IPidsEditableMarker, T> sel)
             {
