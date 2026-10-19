@@ -12,6 +12,18 @@
 - why: 과제 문구 "들어갈 때 기록하고 나올 때 되돌림 — 중간에 다른 코드가 바꾼 경우까지". 제품에서 이 값을 바꾸는 곳은 3D 뿐이라 결과는 사실상 true 와 같다.
 - effect: RestoreMap2DInput 한 곳. 늘 true 로 바꾸려면 그 메서드의 첫 두 줄을 `map.IsHitTestVisible = true;` 로.
 
+## 4. 줌 단추 증언("눌렀더니 풀렸다")을 어떻게 반영할지
+- options: (a) 나갈 때 줌을 한 단계 바꿨다 되돌리기(증언 흉내) (b) 줌 변경이 비우는 것 중 입력을 막는 일시 상태(이미지 끌기 · 팬 억제 · 마퀴 · 선 눌림 · 지도 캡처)를 나갈 때 직접 비우기 + 진단 줄에 줌/변환/마우스아래 추가
+- chosen: (b)
+- why: (a)는 화면이 깜빡이고 무엇이 풀었는지 남지 않는다. (b)는 정리한 것이 있으면 Warning 로 이름이 남아 다음 발생 때 원인 확정이 된다. 모드(그리기 · 측정)는 3D 중에 열리지 않으므로 건드리지 않는다.
+- effect: GMapCustomControl.ResetTransientInput 한 곳. 다른 상태가 원인으로 확인되면 그 메서드에 한 줄 추가.
+
+## 5. 이벤트 패널 가설
+- options: 패널 열림 경로를 고침 / 고치지 않음
+- chosen: 고치지 않음(메인 앱 변경 없음 · host.patch 없음)
+- why: 메인 앱 OpenEventPanel 은 셸 속성만 바꾸고, 사용자가 새 빌드에서 "3D 중 패널 열고 나가기"를 해도 정상이라고 확인(18:1x) — 가설 기각.
+- effect: 없음.
+
 ## 3. 「건물 높이」 판 닫기 중 3D 로 보내기 예외를 어떻게 다룰지
 - options: (a) Leave3D 에서 try/catch (b) CloseBuildingHeightPanel 안에서 보내기만 격리(판 상태는 늘 비움)
 - chosen: (b)

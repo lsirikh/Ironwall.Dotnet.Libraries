@@ -1,11 +1,9 @@
 ﻿
-통과!  - 실패:     0, 통과:    22, 건너뜀:     0, 전체:    22, 기간: 158 ms - Ironwall.Dotnet.Libraries.SystemResources.dll (net8.0)
-통과!  - 실패:     0, 통과:   496, 건너뜀:     0, 전체:   496, 기간: 378 ms - Ironwall.Dotnet.Libraries.Messages.dll (net8.0)
-통과!  - 실패:     0, 통과:    15, 건너뜀:     0, 전체:    15, 기간: 647 ms - Ironwall.Dotnet.Libraries.Watchdog.Tests.dll (net8.0)
-통과!  - 실패:     0, 통과:   208, 건너뜀:     0, 전체:   208, 기간: 1 s - Ironwall.Dotnet.Monitoring.Models.dll (net8.0)
-통과!  - 실패:     0, 통과:   259, 건너뜀:     0, 전체:   259, 기간: 2 s - Ironwall.Dotnet.Libraries.Accounts.Api.dll (net8.0)
-통과!  - 실패:     0, 통과:   106, 건너뜀:     0, 전체:   106, 기간: 1 s - Ironwall.Dotnet.Libraries.Sso.dll (net8.0)
-통과!  - 실패:     0, 통과:   886, 건너뜀:     0, 전체:   886, 기간: 18 s - Ironwall.Dotnet.Libraries.Utils.Tests.dll (net8.0)
+통과!  - 실패:     0, 통과:    22, 건너뜀:     0, 전체:    22, 기간: 68 ms - Ironwall.Dotnet.Libraries.SystemResources.dll (net8.0)
+통과!  - 실패:     0, 통과:   496, 건너뜀:     0, 전체:   496, 기간: 332 ms - Ironwall.Dotnet.Libraries.Messages.dll (net8.0)
+통과!  - 실패:     0, 통과:    15, 건너뜀:     0, 전체:    15, 기간: 173 ms - Ironwall.Dotnet.Libraries.Watchdog.Tests.dll (net8.0)
+통과!  - 실패:     0, 통과:   208, 건너뜀:     0, 전체:   208, 기간: 2 s - Ironwall.Dotnet.Monitoring.Models.dll (net8.0)
+통과!  - 실패:     0, 통과:   259, 건너뜀:     0, 전체:   259, 기간: 1 s - Ironwall.Dotnet.Libraries.Accounts.Api.dll (net8.0)
+통과!  - 실패:     0, 통과:   106, 건너뜀:     0, 전체:   106, 기간: 492 ms - Ironwall.Dotnet.Libraries.Sso.dll (net8.0)
+통과!  - 실패:     0, 통과:   886, 건너뜀:     0, 전체:   886, 기간: 17 s - Ironwall.Dotnet.Libraries.Utils.Tests.dll (net8.0)
 통과!  - 실패:     0, 통과:   365, 건너뜀:     0, 전체:   365, 기간: 8 s - Ironwall.Dotnet.Libraries.Reports.Ui.dll (net8.0)
-통과!  - 실패:     0, 통과:   197, 건너뜀:     0, 전체:   197, 기간: 20 s - Ironwall.Dotnet.Libraries.CameraPopup.Host.Tests.dll (ne
-t8.0)

@@ -1017,6 +1017,21 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
         if (IsLineDrawing) gates.Add("lineDrawing");
         return gates.Count == 0 ? "없음" : string.Join(",", gates);
     }
+
+    /// <summary>
+    /// 3D 를 나올 때 — 3D 가 보이는 동안 뗌을 못 받아 남았을 수 있는 일시 제스처 상태(이미지 끌기 · 마퀴 · 선 눌림 · 팬 억제 · 지도 캡처)를 비운다.
+    /// 그리기 · 측정 같은 모드는 건드리지 않는다(3D 는 그 모드 중에 열리지 않는다). 비운 것 목록 — 없으면 빈 문자열.
+    /// </summary>
+    internal string ResetTransientInput()
+    {
+        var cleared = new List<string>();
+        if (_isImageDrag || _isDragging) { ResetDragState(); cleared.Add("imageDrag"); }   // 줌 변경 백스톱(GMapCustomControl_OnMapZoomChanged)과 같은 정리
+        if (_isRubberBanding && !IsAnchorDrawMode) { _isRubberBanding = false; _rubberStart = null; _rubberCurrent = null; HideRubberBand(); cleared.Add("rubberBand"); }
+        if (_linePress.HasValue && !IsLineDrawing) { _linePress = null; _lineDragging = false; cleared.Add("linePress"); }
+        if (_panSuppress.IsSuppressing) { _panSuppress.OnButtonDown(); cleared.Add("panSuppress"); }
+        if (IsMouseCaptured) { ReleaseMouseCapture(); cleared.Add("capture"); }
+        return string.Join(",", cleared);
+    }
     private Point? _rubberStart;
     private Point? _rubberCurrent;
     // [앵커 그리기] 사이트 고정 영역을 지도에서 드래그로 그리는 모드 — 러버밴드 마퀴 재사용, 릴리스 시 NW/SE 통지. (FR-B3)

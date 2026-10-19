@@ -295,6 +295,38 @@ public class Map3DExitInputScenarioTests
             }
         });
 
+    /// <summary>
+    /// ★ 사용자 증언(17:55) "줌 단추를 눌러서 풀었다" — 줌 변경은 남은 이미지 끌기(휠 차단 게이트)를 비운다(ResetDragState 백스톱).
+    /// 3D 가 보이는 동안 뗌을 못 받아 일시 제스처 상태가 남은 채 나가면 옛 코드는 휠이 계속 막혔다(줌 단추 전까지). 나가기가 같은 정리를 한다.
+    /// </summary>
+    public enum Stuck { ImageDrag, PanSuppress, RubberBand, LinePress }
+
+    [Theory]
+    [InlineData(Stuck.ImageDrag)]
+    [InlineData(Stuck.PanSuppress)]
+    [InlineData(Stuck.RubberBand)]
+    [InlineData(Stuck.LinePress)]
+    public void should_clear_stuck_gesture_and_accept_input_when_exited_after_release_was_missed_in_3d(Stuck stuck)
+        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        {
+            var warnings = new List<string>();
+            rig.W.Log.Setup(l => l.Warning(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+               .Callback<string, string, string, int>((m, _, _, _) => warnings.Add(m));
+            Enter(rig);
+            var map = rig.W.Map;
+            switch (stuck)
+            {
+                case Stuck.ImageDrag: Scenario.SetField(map, "_isImageDrag", true); Scenario.SetField(map, "_isDragging", true); break;
+                case Stuck.PanSuppress: Scenario.GetField<Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.PanSuppressGate>(map, "_panSuppress").OnStrokeCancelled(true); break;
+                case Stuck.RubberBand: Scenario.SetField(map, "_isRubberBanding", true); break;
+                case Stuck.LinePress: Scenario.SetField(map, "_linePress", (Point?)new Point(10, 10)); break;
+            }
+            Assert.NotEqual("없음", Scenario.Call(map, "InputGateText"));
+            rig.PressExit();
+            AssertMap2DInputAlive(rig, $"남은 {stuck}");
+            Assert.Contains(warnings, w => w.StartsWith("[Map3D] 나가며 남은 2D 입력 상태 정리:", StringComparison.Ordinal));
+        });
+
     // ─────────────── 5. 진단 줄 ───────────────
 
     [Fact]

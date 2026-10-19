@@ -736,6 +736,9 @@ public partial class MapViewModel
         _map3DHeldHitTest = null;
         if (System.Windows.Input.Mouse.Captured is System.Windows.Media.Visual captured && Map3DHost.IsAncestorOf(captured))
             System.Windows.Input.Mouse.Capture(null);
+        // 3D 동안 뗌을 못 받아 남은 일시 제스처(이미지 끌기 · 마퀴 · 팬 억제 등) — 사용자 증언(줌 단추를 누르니 풀렸다)의 줌 변경 정리와 같은 것을 나갈 때 한다
+        var cleared = map.ResetTransientInput();
+        if (cleared.Length > 0) _log?.Warning($"[Map3D] 나가며 남은 2D 입력 상태 정리: {cleared}");
     }
 
     /// <summary>나간 직후와 한가해진 뒤 2D 입력 상태 한 줄씩 — 「나가기 뒤 지도가 입력을 안 받는다」 원인 판별용(무엇이 막는지 이름으로).</summary>
@@ -768,7 +771,8 @@ public partial class MapViewModel
         }
         return $"[Map3D] 2D 입력 상태({cause} · {when}) hit={map.IsHitTestVisible} enabled={map.IsEnabled} visible={map.IsVisible} 막는조상={blocker ?? "없음"} " +
                $"가운데={center} 캡처={DescribeInput(System.Windows.Input.Mouse.Captured as DependencyObject)} 포커스={DescribeInput(System.Windows.Input.Keyboard.FocusedElement as DependencyObject)} " +
-               $"3D펼침={Map3DHost.IsRevealed} 지도상태={map.InputGateText()}";
+               $"마우스아래={DescribeInput(System.Windows.Input.Mouse.DirectlyOver as DependencyObject)} 3D펼침={Map3DHost.IsRevealed} 비행={_flyAnimation != null} " +
+               $"줌={map.EffectiveZoom:F1}(tile={map.Zoom:F0},dzl={map.DigitalZoomLevel}) 변환={map.RenderTransform?.Value.ToString() ?? "없음"} 회전={map.MapRotation:F1} 지도상태={map.InputGateText()}";
     }
 
     private static string DescribeInput(DependencyObject? d)
