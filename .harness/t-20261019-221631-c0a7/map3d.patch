@@ -1,0 +1,204 @@
+diff --git a/map3d/static/camsync.js b/map3d/static/camsync.js
+index f73281b..b4bd789 100644
+--- a/map3d/static/camsync.js
++++ b/map3d/static/camsync.js
+@@ -192,3 +192,42 @@ export function qualityFor({ low, renderer } = {}) {
+   if (/swiftshader|basic render|llvmpipe|software|warp/i.test(renderer || "")) return { low: true, reason: "software-gl" };
+   return { low: false, reason: null };
+ }
++
++// GIS 방향 링 · 이동 단추(camera.nudge · camera.preset, 2026-10-19) — 지금 자세(view)에서 다음 자세를 셈한다.
++//   bearingDelta · pitchDelta = 도, forward · right = 카메라 거리(distance) 비율(바라보는 방향 기준 지면 이동 — 멀리서 보면 멀리 간다),
++//   zoom = 줌 단계(+ 확대). 기울기는 0~85(cameraFromMap 한계), 바라볼 점은 장면 영역 안(clampToArea). 거리 한계는 궤도 조작이 맞춘다.
++export const NAV_MAX_PITCH = 85;
++export function nudgeView(view, m, { distance = 0, area = null } = {}) {
++  const num = (v) => (Number.isFinite(v) ? v : 0);
++  const bearing = ((((view.bearing ?? 0) + num(m.bearingDelta)) % 360) + 360) % 360;
++  const pitch = Math.max(0, Math.min(NAV_MAX_PITCH, (view.pitch ?? 0) + num(m.pitchDelta)));
++  const b = bearing * D2R, f = num(m.forward) * distance, r = num(m.right) * distance;
++  // 화면 위쪽 = 방위 b 쪽(동 = sin b · 북 = cos b), 오른쪽 = 그에 90° 시계
++  const east = f * Math.sin(b) + r * Math.cos(b), north = f * Math.cos(b) - r * Math.sin(b);
++  let ll = lonLatOf({ lon: view.lon, lat: view.lat }, east, -north);
++  if (area) ll = clampToArea(area, ll.lon, ll.lat);
++  return { lon: ll.lon, lat: ll.lat, zoom: view.zoom + num(m.zoom), bearing, pitch };
++}
++// 정해 둔 시점 — north = 정북(방위 0), top = 위에서 보기(기울기 0), default = 처음 진입 기울기(defaultPitch). 나머지는 그대로. 모르는 이름은 null.
++export function presetView(view, name, defaultPitch = 60) {
++  if (name === "north") return { ...view, bearing: 0 };
++  if (name === "top") return { ...view, pitch: 0 };
++  if (name === "default") return { ...view, pitch: defaultPitch };
++  return null;
++}
++// 점을 영역(bbox 또는 회전 영역 rect) 안으로 — 영역 축(회전각)에서 가장 가까운 안쪽 점.
++export function clampToArea(area, lon, lat) {
++  const { c, corners, rotation } = areaOf(area);
++  const t = rotation * D2R, cos = Math.cos(t), sin = Math.sin(t);
++  // 영역 축 좌표(map3d.geo.RotRect 와 같은 규약): 동 = u cos + v sin, 북 = −u sin + v cos (장면 z = −북)
++  const toUV = (e) => ({ u: e.x * cos + e.z * sin, v: e.x * sin - e.z * cos });
++  let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
++  for (const [lo, la] of corners) {
++    const q = toUV(enuOf(c, lo, la));
++    uMin = Math.min(uMin, q.u); uMax = Math.max(uMax, q.u); vMin = Math.min(vMin, q.v); vMax = Math.max(vMax, q.v);
++  }
++  const p = toUV(enuOf(c, lon, lat));
++  const u = Math.max(uMin, Math.min(uMax, p.u)), v = Math.max(vMin, Math.min(vMax, p.v));
++  if (u === p.u && v === p.v) return { lon, lat };
++  return lonLatOf(c, u * cos + v * sin, u * sin - v * cos);
++}
+diff --git a/map3d/static/view.js b/map3d/static/view.js
+index cf3f051..b718ebe 100644
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -7,7 +7,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+ import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+-import { cameraFromMap, clampZoomSteps, cursorDelay, cursorMessage, enuOf, fitAreaView, flyDurationMs, FrameTimes, lerpView, lonLatOf, mapFromCamera, maxOrbitDistance, mouseButtonsFor, moveMode, qualityFor, sceneYaw, zoomAboutPoint } from "./camsync.js";
++import { cameraFromMap, clampZoomSteps, cursorDelay, cursorMessage, enuOf, fitAreaView, flyDurationMs, FrameTimes, lerpView, lonLatOf, mapFromCamera, maxOrbitDistance, mouseButtonsFor, moveMode, nudgeView, presetView, qualityFor, sceneYaw, zoomAboutPoint } from "./camsync.js";
+ import { GROUND_LAYER, Overlay3D, OVERLAY_LAYER, TOP_LAYER } from "./overlay3d.js";
+ import { bakedImageIds } from "./overlay-store.js";
+ import { clickStep, DBLCLICK_MS } from "./overlay-pick.js";
+@@ -715,14 +715,14 @@ function placeCamera(view) {
+   applying = false;
+   refreshOverlayZoom();
+ }
+-function applyMapView(view, onDone) {
++function applyMapView(view, onDone, durationMs) {
+   tween = null;
+   // 저사양이거나 최근 프레임이 무거우면 애니메이션 없이 바로 간다 — 한 번만 그리므로 부하가 없다
+   if (!view.animate || moveMode({ low: quality.low, frameMs: frameTimes.avg(performance.now()) }) === "jump") { placeCamera(view); if (onDone) onDone(); return; }
+   // 지금 자세에서 목표까지 0.6~1.5 s — 펼칠 때(같은 자리 · 기울기만)는 눕히기, 3D 표시 중 탐지 이동(GIS FlyTo 뒤)은 그 자리로 날아간다.
+   //   화면이 아직 접혀 있으면 높이로 셈하는 지금 줌이 틀리므로 예전처럼 위에서 내려다본 같은 축척에서 시작한다.
+   const from = host.clientHeight >= MIN_CAMERA_HEIGHT_PX ? currentMapView() : { ...view, pitch: 0 };
+-  const ms = flyDurationMs(from, view, host.clientHeight), t0 = performance.now();
++  const ms = durationMs ?? flyDurationMs(from, view, host.clientHeight), t0 = performance.now();
+   tween = (now) => {
+     const k = Math.min(1, (now - t0) / ms), e = k * k * (3 - 2 * k);
+     placeCamera(lerpView(from, view, e));
+@@ -848,6 +848,25 @@ function onBuildingMessage(m) {
+   indexGround();   // 보안 가림 상자 높이(buildingBoxes)가 새 높이를 따른다
+ }
+ 
++// ------------------------------------------------------------ GIS 방향 링 · 이동 단추(2026-10-19)
++// 받는 것 {type:"camera.nudge", bearingDelta, pitchDelta, forward, right, zoom} · {type:"camera.preset", name:"north"|"top"|"default"}
++//   지금 자세(앞 조작을 옮기는 중이면 그 목표)에서 다음 자세로 짧게 옮기고(조금씩 0.15 s · 정한 시점 0.4 s) 끝나면 카메라를 알린다(GIS 링이 따라간다).
++//   한계는 그대로 — 기울기 0~85 · 거리는 궤도 조작 min/maxDistance(placeCamera 의 controls.update) · 바라볼 점은 장면 영역 안(camsync.nudgeView).
++const NUDGE_MS = 150, PRESET_MS = 400;
++let navGoal = null;
++function onNavMessage(m) {
++  if (!sceneInfo || host.clientHeight < MIN_CAMERA_HEIGHT_PX) return;
++  const from = tween && navGoal ? navGoal : currentMapView();
++  const next = m.type === "camera.preset" ? presetView(from, m.name, HOME_PITCH)
++    : nudgeView(from, m, { distance: camera.position.distanceTo(controls.target), area: sceneInfo.rect || sceneInfo.bbox });
++  if (!next) return;
++  navGoal = next;
++  lastMoveAt = performance.now();
++  applyMapView({ ...next, animate: true }, () => { navGoal = null; post({ type: "camera", reason: "user", ...currentMapView() }); },
++    m.type === "camera.preset" ? PRESET_MS : NUDGE_MS);
++  invalidate();
++}
++
+ // 오버레이 메시지가 장면을 다 불러오기 전에 오면 모아 뒀다가 오버레이를 만든 뒤 차례대로 적용한다
+ //   (아이콘 · 이미지 자료는 같은 key 를 한 번만 보내므로 버리면 다시 오지 않는다).
+ const early = [];
+@@ -873,6 +892,7 @@ function onHostMessage(data) {
+     invalidate();
+     return;
+   }
++  if (t === "camera.nudge" || t === "camera.preset") { onNavMessage(data); return; }
+   if (data && data.type === "home") { homeView({ bearing: data.bearing, pitch: data.pitch, animate: !!data.animate }); return; }
+   if (!data || data.type !== "camera" || !sceneInfo) return;
+   if (![data.lon, data.lat, data.zoom].every(Number.isFinite)) return;
+diff --git a/tests/test_server.py b/tests/test_server.py
+index 8399109..3460836 100644
+--- a/tests/test_server.py
++++ b/tests/test_server.py
+@@ -200,3 +200,16 @@ def should_record_and_patch_enter_zoom_when_gis_sets_it(tmp_path, mbtiles):
+     busy.dir.mkdir()
+     c.app.state.jobs.jobs["b2"] = busy
+     assert c.patch("/api/jobs/b2", json={"enter_zoom": 15}).status_code == 409
++
++
++def should_turn_tilt_and_move_camera_within_limits_when_gis_nav_messages_arrive():
++    """GIS 방향 링 · 이동 단추(camera.nudge · camera.preset) — 방위 감기 · 기울기 0~85 · 바라보는 방향 기준 이동 · 장면(회전) 영역 안 · 정해 둔 시점."""
++    import shutil
++    import subprocess
++    from pathlib import Path
++    import pytest
++    node = shutil.which("node")
++    if not node:
++        pytest.skip("node 없음")
++    r = subprocess.run([node, str(Path(__file__).with_name("nav_check.mjs"))], capture_output=True, text=True, timeout=60)
++    assert r.returncode == 0, r.stdout + r.stderr
+diff --git a/tests/nav_check.mjs b/tests/nav_check.mjs
+new file mode 100644
+index 0000000..ba3d7b8
+--- /dev/null
++++ b/tests/nav_check.mjs
+@@ -0,0 +1,66 @@
++// GIS 방향 링 · 이동 단추(camera.nudge · camera.preset) 순수 함수 시험 — pytest(test_server.py)가 node 로 부른다.
++import { readFileSync } from "node:fs";
++import { areaOf, clampToArea, enuOf, nudgeView, presetView, NAV_MAX_PITCH } from "../map3d/static/camsync.js";
++
++const fails = [];
++const near = (a, b, tol, what) => { if (!(Math.abs(a - b) <= tol)) fails.push(`${what}: ${a} != ${b}`); };
++const base = { lon: 127.1084, lat: 37.367, zoom: 18, bearing: 0, pitch: 60 };
++const moved = (v) => enuOf(base, v.lon, v.lat);   // x = 동, z = −북
++
++// 방위 · 기울기 — 더하고 0~360 감기 · 기울기 0~85 고정
++near(nudgeView(base, { bearingDelta: 30 }).bearing, 30, 1e-9, "bearing +30");
++near(nudgeView({ ...base, bearing: 350 }, { bearingDelta: 20 }).bearing, 10, 1e-9, "bearing wrap 370→10");
++near(nudgeView({ ...base, bearing: 10 }, { bearingDelta: -20 }).bearing, 350, 1e-9, "bearing wrap -10→350");
++near(nudgeView(base, { pitchDelta: 100 }).pitch, NAV_MAX_PITCH, 1e-9, "pitch max");
++near(nudgeView(base, { pitchDelta: -100 }).pitch, 0, 1e-9, "pitch min");
++near(nudgeView(base, { zoom: 0.5 }).zoom, 18.5, 1e-9, "zoom +0.5");
++// 숫자가 아닌 값은 0
++{ const v = nudgeView(base, { bearingDelta: "x", forward: null }); near(v.bearing, 0, 1e-9, "nan bearing"); near(v.lat, base.lat, 1e-12, "nan forward"); }
++
++// 전진 = 바라보는 방향(방위) 쪽으로 거리 × 비율
++{ const e = moved(nudgeView(base, { forward: 0.5 }, { distance: 200 })); near(-e.z, 100, 1e-6, "forward north 100 m"); near(e.x, 0, 1e-6, "forward north no east"); }
++{ const e = moved(nudgeView({ ...base, bearing: 90 }, { forward: 0.5 }, { distance: 200 })); near(e.x, 100, 1e-6, "bearing 90 forward = east"); near(e.z, 0, 1e-6, "bearing 90 no north"); }
++{ const e = moved(nudgeView(base, { forward: -0.25 }, { distance: 200 })); near(-e.z, -50, 1e-6, "back = south"); }
++// 오른쪽 = 바라보는 방향에서 시계 90°
++{ const e = moved(nudgeView(base, { right: 0.5 }, { distance: 200 })); near(e.x, 100, 1e-6, "right at north = east"); }
++{ const e = moved(nudgeView({ ...base, bearing: 90 }, { right: 0.5 }, { distance: 200 })); near(-e.z, -100, 1e-6, "right at east = south"); }
++{ const e = moved(nudgeView({ ...base, bearing: 0 }, { right: -0.5 }, { distance: 200 })); near(e.x, -100, 1e-6, "left at north = west"); }
++
++// 장면 영역 밖으로 나가지 않는다 — bbox
++const bbox = [127.105, 37.364, 127.111, 37.370];
++{
++  const v = nudgeView({ ...base, lat: 37.3695 }, { forward: 10 }, { distance: 500, area: bbox });
++  near(v.lat, 37.370, 1e-9, "clamp bbox north edge"); near(v.lon, base.lon, 1e-9, "clamp keeps lon");
++}
++{ const p = clampToArea(bbox, 127.108, 37.366); near(p.lon, 127.108, 0, "inside unchanged lon"); near(p.lat, 37.366, 0, "inside unchanged lat"); }
++// 회전 영역(30°) — 축 방향으로 멀리 가도 사각형 안쪽 가장자리에 멈춘다
++{
++  const D2R = Math.PI / 180, c = { lon: 127.108, lat: 37.367 }, rot = 30, w = 400, h = 200;
++  const k = { x: enuOf(c, c.lon + 1, c.lat).x, y: -enuOf(c, c.lon, c.lat + 1).z }, b = rot * D2R;
++  const ll = (x, y) => [c.lon + (x * Math.cos(b) + y * Math.sin(b)) / k.x, c.lat + (-x * Math.sin(b) + y * Math.cos(b)) / k.y];
++  const rect = { lon: c.lon, lat: c.lat, rotation_deg: rot, corners: [ll(-w / 2, -h / 2), ll(w / 2, -h / 2), ll(w / 2, h / 2), ll(-w / 2, h / 2)] };
++  if (areaOf(rect).rotation !== rot) fails.push("rect rotation");
++  // 영역 축 x 방향으로 1 km 밖 → x = 200(가장자리), y = 0
++  const out = ll(1000, 0), p = clampToArea(rect, out[0], out[1]), edge = ll(200, 0);
++  near(p.lon, edge[0], 1e-8, "rot clamp lon"); near(p.lat, edge[1], 1e-8, "rot clamp lat");
++  // 영역 축 안쪽(x=150, y=80)은 그대로 — 북쪽 정렬 bbox 로 셈했으면 이 점이 바뀌거나 밖의 점이 통과한다
++  const inn = ll(150, 80), q = clampToArea(rect, inn[0], inn[1]);
++  near(q.lon, inn[0], 1e-10, "rot inside lon"); near(q.lat, inn[1], 1e-10, "rot inside lat");
++  const out2 = ll(0, 150), r = clampToArea(rect, out2[0], out2[1]), e2 = ll(0, 100);
++  near(r.lon, e2[0], 1e-8, "rot clamp y lon"); near(r.lat, e2[1], 1e-8, "rot clamp y lat");
++}
++
++// 정해 둔 시점
++near(presetView({ ...base, bearing: 123 }, "north").bearing, 0, 0, "preset north");
++near(presetView(base, "top").pitch, 0, 0, "preset top");
++near(presetView({ ...base, pitch: 10 }, "default", 60).pitch, 60, 0, "preset default");
++if (presetView(base, "front") !== null) fails.push("unknown preset should be null");
++{ const v = presetView({ ...base, bearing: 77 }, "top"); near(v.bearing, 77, 0, "top keeps bearing"); near(v.lon, base.lon, 0, "top keeps lon"); }
++
++// view.js 가 두 메시지를 받아 처리한다(배선)
++const src = readFileSync(new URL("../map3d/static/view.js", import.meta.url), "utf8");
++for (const needle of ['t === "camera.nudge" || t === "camera.preset"', "nudgeView(from, m,", "presetView(from, m.name, HOME_PITCH)", 'post({ type: "camera", reason: "user"'])
++  if (!src.includes(needle)) fails.push(`view.js missing: ${needle}`);
++
++if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
++console.log("nav ok");
