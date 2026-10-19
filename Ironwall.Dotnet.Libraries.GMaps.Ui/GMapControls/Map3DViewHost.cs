@@ -181,6 +181,21 @@ public sealed class Map3DViewHost : Grid
         IsRevealed = false;
     }
 
+    /// <summary>
+    /// 지금 장면을 내려놓는다 — 지워진 장면을 재사용(ready) · 미리 불러오기 · 네이티브 창 전환 때 다시 열기로 다시 부르지 않게(2026-10-19 지운 job 의 scene.json 404).
+    /// 페이지는 빈 화면으로 바꾸고 1×1 로 접는다. WebView2 는 그대로 둔다(다음 장면에 재사용).
+    /// </summary>
+    public void Unload()
+    {
+        _job = null;
+        _url = null;
+        _ready = _rendered = _failed = false;
+        ReadyAt = RenderedAt = null;
+        Park();
+        try { _web?.CoreWebView2?.Navigate("about:blank"); }
+        catch (Exception) { }   // WebView2 가 이미 닫혔다 — 내려놓기만 하면 된다
+    }
+
     /// <summary>카메라 메시지 보내기(ready 전이면 무시).</summary>
     public void PostCamera(Map3DCamera cam, bool animate)
     {
@@ -253,6 +268,9 @@ public sealed class Map3DViewHost : Grid
     {
         var msg = Map3DMath.ParseMessage(json);
         if (msg == null) return;
+        // 내려놓았거나 바꾼 옛 장면 페이지가 늦게 보낸 ready · rendered 는 지금 장면 것이 아니다
+        if (msg.Type is "ready" or "rendered" && msg.Job != null && msg.Job != _job) return;
+        if (msg.Type == "error" && msg.Job == _job) { _ready = _rendered = false; _failed = true; }   // 장면 불러오기 실패 — 재사용 · 다시 미리 열기 안 함
         if (msg.Type == "ready") { _ready = true; ReadyAt = DateTime.UtcNow; }
         if (msg.Type == "rendered") { _rendered = true; RenderedAt = DateTime.UtcNow; }
         MessageReceived?.Invoke(msg);

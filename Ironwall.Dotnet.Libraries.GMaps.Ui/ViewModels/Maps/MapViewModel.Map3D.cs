@@ -373,6 +373,7 @@ public partial class MapViewModel
             SetAimStatus(Map3DGuide.AreaTooLargeText(w, h, _map3DSettings.MaxAreaSideM));
             return;
         }
+        _map3DBakeReplaces = null;   // 새 영역 — 바꿀 옛 job 없음
         RequestMap3DBake(area);   // 만들기 패널 — 3D 줌 고르기(+ 영역과 겹치는 오버레이 이미지가 있으면 굽기 방식, MapViewModel.Map3DBakeOptions)
     }
 
@@ -542,6 +543,8 @@ public partial class MapViewModel
     private async Task BakeMap3DAsync(Map3DArea area, string overlayMode, IReadOnlyList<Map3DBakeOverlay>? overlays, double enterZoom)
     {
         if (_map3DClient == null || _isMap3DBaking) return;
+        string? replaces = _map3DBakeReplaces;   // 「다시 만들기」면 바꿀 옛 job(영역 그리기는 null)
+        _map3DBakeReplaces = null;
         _isMap3DBaking = true;
         var cts = new CancellationTokenSource();
         _map3DBakeCts = cts;
@@ -580,7 +583,9 @@ public partial class MapViewModel
                 return;
             }
             _map3DScenes.RemoveAll(sc => sc.Id == job.Id);
-            _map3DScenes.Add(new Map3DScene(job.Id, bbox) { EnterZoom = enterZoom, Rect = area.Rect });
+            // 맨 앞에 — 옛 영역과 겹치면 새 장면이 먼저 잡힌다(FindMap3DSceneAt 은 앞부터 · 서버 목록도 최신이 앞)
+            _map3DScenes.Insert(0, new Map3DScene(job.Id, bbox) { EnterZoom = enterZoom, Rect = area.Rect });
+            if (replaces != null && replaces != job.Id) await ReplaceMap3DJobAsync(replaces, job.Id);   // 「다시 만들기」 — 옛 job 을 새 job 으로
             _map3DEntrySuppressed = false;
             SetAimStatus(Map3DMath.IsZoomEntry(_map3DSettings.EntryMode)
                 ? $"3D 준비됨 — 줌 {Map3DGuide.Zoom(Map3DAreaEnterZoom(job.Id, enterZoom))} 이상에서 3D"
@@ -729,7 +734,7 @@ public partial class MapViewModel
         try
         {
             var scene = await _map3DClient.FindSceneAtAsync(center.Lng, center.Lat, cts.Token);
-            if (scene == null) return;
+            if (scene == null || Map3DGoneJobs.Contains(scene.Id)) return;   // 지운 장면(지우기 전에 보낸 조회의 늦은 응답)은 되살리지 않는다
             _map3DScenes.RemoveAll(sc => sc.Id == scene.Id);
             _map3DScenes.Add(scene);
             _log?.Info($"[Map3D] 장면 찾음 id={scene.Id}");
@@ -950,6 +955,20 @@ public partial class MapViewModel
         {
             if (_map3DOverlay?.IsActive == true) _map3DOverlay.SendSnapshot();
             else _map3DOverlay?.Stop();   // 접혀 있으면 기록만 버린다 — 다음 펼침 때 전체 스냅샷
+            return;
+        }
+        if (msg.Type == "error")
+        {
+            // 3D 화면이 장면을 불러오지 못했다(map-3d sceneload.js) — 지워진 장면이면 그 job 을 모든 상태에서 빼고 2D 로 · 영역 목록을 새로 고친다
+            _log?.Warning($"[Map3D] 3D 화면 불러오기 실패 job={msg.Job ?? "-"} reason={msg.Reason ?? "-"}");
+            if (msg.Job is not { } failed) return;
+            if (msg.Reason == Map3DGuide.SceneMissingReason)
+            {
+                RetireMap3DJob(failed, "scene-missing", remember: true);
+                SetAimStatus(Map3DGuide.SceneMissingText, autoHide: true);
+                _ = RefreshMap3DAreasAsync();
+            }
+            else if (_map3DJob == failed) OnMap3DLoadFailed(Map3DGuide.SceneLoadFailedText(msg.Reason));
             return;
         }
         if (msg.Type == "overlay.screen")

@@ -371,6 +371,10 @@ public static class Map3DMath
                 return new Map3DMessage(type, null, o["job"]?.ToString(), null)
                     { Items = o["items"]?.Type == JTokenType.Integer ? o.Value<int>("items") : null };
             if (type == "overlay.resync") return new Map3DMessage(type, null, null, null);
+            // 장면 불러오기 실패(map-3d sceneload.js) — reason = scene-missing(지워짐) · scene-broken · server-unreachable
+            if (type == "error")
+                return new Map3DMessage(type, o["reason"]?.Type == JTokenType.String ? o.Value<string>("reason") : null,
+                                        o["job"]?.Type == JTokenType.String ? o.Value<string>("job") : null, null);
             if (type == "overlay.screen") return new Map3DMessage(type, null, null, null) { Screens = Map3DScreen.ParseScreens(o), ScreenView = Map3DScreen.ParseScreenView(o) };
             if (type == "pick") return ParsePick(o);
             if (type == "perf.stats")

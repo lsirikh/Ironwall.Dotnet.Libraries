@@ -20,7 +20,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                   ④ 영역마다 3D 줌(2026-10-18) — 배지 툴팁 · 목록 · 칩에 그 영역의 줌, 배지 우클릭 「3D 줌 바꾸기…」
                     (PATCH /api/jobs/{id}, 서버가 모르면 GIS 로컬 map3d-areas.json — 그 값이 앞선다)
    Note         : 영역 마커는 편집 심볼이 아니다(DB 저장 없음). 판정 · 글은 순수 함수 Map3DGuide(헤드리스 시험).
-                  갱신은 3D 게이트 큐(QueueMap3DGate — 줌 · 위치 변경을 프레임당 1회로 모은다)에서 함께 한다.
+                  갱신은 3D 게이트 큐(QueueMap3DGate — 줌 · 위치 · 회전 변경을 프레임당 1회로 모은다)에서 함께 한다.
+                  ⑤ 지움 · 다시 만들기 · 목록에서 빠짐 · 3D 화면 scene-missing → RetireMap3DJob 이 그 job 을 모든 상태에서 뺀다(2026-10-19).
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageModel>
@@ -69,12 +70,14 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
     private void ApplyMap3DAreas(IReadOnlyList<Map3DSceneInfo> scenes)
     {
         if (MainMap == null) return;
-        _map3DLastAreaScenes = scenes;
+        _map3DLastAreaScenes = scenes.Where(s => !Map3DGoneJobs.Contains(s.Id)).ToList();   // 지운 영역은 다시 짜기에서도 빼 둔다
+        // 서버 목록에서 빠진 영역(다른 곳에서 지움 등) — 표시만이 아니라 그 job 을 잡고 있는 모든 상태에서 뺀다(보던 3D 면 2D 로)
         foreach (var gone in Map3DAreas.Where(a => scenes.All(s => s.Id != a.Id)).ToList())
-            RemoveMap3DArea(gone.Id);
+            RetireMap3DJob(gone.Id, "list-missing");
 
         foreach (var scene in scenes)
         {
+            if (Map3DGoneJobs.Contains(scene.Id)) continue;   // 지우기 전에 보낸 목록 요청의 늦은 응답 — 지운 영역을 되살리지 않는다
             _map3DScenes.RemoveAll(sc => sc.Id == scene.Id);
             _map3DScenes.Add(new Map3DScene(scene.Id, scene.Bbox) { EnterZoom = scene.EnterZoom, Rect = scene.Rect });
 
@@ -105,7 +108,68 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         NotifyOfPropertyChange(nameof(HasMap3DAreas));
     }
 
-    /// <summary>줌 · 위치가 바뀐 뒤(게이트 큐) — 테두리 크기 · 줌 13 표시 · "3D 가능" 칩.</summary>
+    private HashSet<string>? _map3DGoneJobs;
+    /// <summary>지운 · 3D 화면이 "지워졌다"고 알린 job — 늦게 온 목록 · 장면 조회 응답이 되살리지 않게(지연 초기화 — 생성자 없는 시험 VM).</summary>
+    private HashSet<string> Map3DGoneJobs => _map3DGoneJobs ??= new();
+
+    /// <summary>
+    /// 서버에서 사라진(지움 · 다시 만들기로 바뀜 · 목록에서 빠짐 · 3D 화면이 scene-missing) job 을 GIS 모든 상태에서 뺀다(2026-10-19 사용자 보고 —
+    /// 지운 옛 장면 scene.json 을 다시 불러 "불러오지 못했습니다: TypeError" 와 옛 장면 「건물 높이」 판이 남았다).
+    /// 보던 3D(또는 준비 중)면 2D 로 돌아오고 같은 자리에서 곧바로 다시 들어가지 않는다 · 3D 호스트가 그 장면을 열어 두었으면 내려놓는다(재사용 · 미리 불러오기 ·
+    /// 네이티브 창 전환 때 다시 열기 막기) · 오버레이 기록 · 「건물 높이」 판 · 「영역 보기」 진입 · 화면 가운데 영역 · 장면 캐시 · 목록 · 배지.
+    /// remember = 지운 것이 확실할 때(늦은 응답이 되살리지 않게). 보던 3D 에서 나왔으면 true.
+    /// </summary>
+    private bool RetireMap3DJob(string job, string cause, bool remember = false)
+    {
+        if (remember) Map3DGoneJobs.Add(job);
+        bool wasShowing = false;
+        if (_map3DJob == job)
+        {
+            wasShowing = _map3DState != Map3DState.Off;
+            if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, cause);
+            else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
+            if (wasShowing)
+            {
+                _map3DEntrySuppressed = true;
+                SetAimStatus(Map3DGuide.SceneMissingText, autoHide: true);   // 짧은 안내 — 보던 장면이 없어졌다
+            }
+            _map3DJob = null;
+        }
+        if (_map3DAreaViewJob == job) _map3DAreaViewJob = null;
+        if (_bhJob == job)
+        {
+            CloseBuildingHeightPanel(clearUndo: false);
+            _bhJob = null;
+        }
+        BhUndo.RemoveAll(u => u.Job == job);   // 판 안 되돌리기 — 없는 장면에 PUT 하지 않게
+        if (_map3DHost?.Job == job)
+        {
+            _map3DHost.Unload();
+            _map3DOverlay?.Stop();   // 그 페이지에 보낸 기록 — 다음 페이지는 전체 스냅샷부터
+        }
+        RemoveMap3DArea(job);
+        // 마지막 서버 목록(「만들기 취소」 달기 · 떼기용 다시 짜기)이 내려놓은 영역을 되살리지 않게
+        if (_map3DLastAreaScenes?.Any(s => s.Id == job) == true) _map3DLastAreaScenes = _map3DLastAreaScenes.Where(s => s.Id != job).ToList();
+        if (_map3DCenterScene?.Id == job) { _map3DCenterScene = null; NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible)); }
+        _log?.Info($"[Map3D] 장면 내려놓음({cause}) job={job} 보던중={wasShowing}");
+        QueueMap3DGate();
+        return wasShowing;
+    }
+
+    private double? _map3DAreaBearing;
+
+    /// <summary>
+    /// 지도 방위가 바뀌었다(뷰포트 스냅샷 — 키 · 나침반 · 3D 동기 · 회전 토글 등 모든 회전 경로, 프레임당 1회) — 테두리 · 배지를 이동 · 줌과 같은
+    /// 게이트 큐(프레임당 1회)로 다시 그린다. 예전에는 회전만 하면 테두리가 옛 방위로 남고 팬해야 고쳐졌다(2026-10-19 사용자 보고).
+    /// </summary>
+    private void OnMap3DAreaBearingChanged(double canonicalBearing)
+    {
+        if (_map3DAreaBearing == canonicalBearing) return;
+        _map3DAreaBearing = canonicalBearing;
+        if (_map3DAreaMarkers is { Count: > 0 }) QueueMap3DGate();
+    }
+
+    /// <summary>줌 · 위치 · 회전이 바뀐 뒤(게이트 큐) — 테두리 모양 · 줌 13 표시 · "3D 가능" 칩.</summary>
     private void UpdateMap3DAreaDisplay()
     {
         if (MainMap == null) return;
@@ -159,6 +223,36 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         _log?.Info($"[Map3D] 영역 다시 만들기 id={item.Id}");
         RequestMap3DBake(item.Area, item.EnterZoom);   // 회전 영역은 같은 회전 사각형으로   // 영역 그리기와 같은 만들기 패널(줌은 그 영역의 지금 줌)
         _map3DBakeOptionsSourceId = item.Id;   // 만드는 동안 이 영역 항목에 「만들기 취소」 — 옛 장면은 새로 다 만들 때까지 그대로
+        _map3DBakeReplaces = item.Id;   // 다 만들면 이 job 을 새 job 으로 바꾼다(ReplaceMap3DJobAsync)
+    }
+
+    /// <summary>「다시 만들기」의 옛 job — 만들기 패널 확정(BakeMap3DAsync)이 가져간다. 영역 그리기는 null.</summary>
+    private string? _map3DBakeReplaces;
+
+    /// <summary>
+    /// 「다시 만들기」가 끝났다 — 옛 job 을 GIS 모든 상태에서 빼고(보던 3D 면 2D 로) 서버에서도 지운다. 남겨 두면 겹친 옛 영역이 목록 · 배지에 남고
+    /// 3D 호스트에 열어 둔 옛 장면을 다시 쓰다가 지워지면 404 로 깨졌다(2026-10-19). 서버가 지웠다고 답할 때만 내려놓는다 —
+    /// 지우지 못했거나(견본 · 서버) 서버가 모르는 장면이면(404) 그대로 두고 서버 목록이 판단한다(새 장면이 앞에 있어 먼저 잡힌다).
+    /// </summary>
+    private async Task ReplaceMap3DJobAsync(string oldJob, string newJob)
+    {
+        try
+        {
+            if (!await _map3DClient!.DeleteSceneAsync(oldJob))
+            {
+                _log?.Info($"[Map3D] 다시 만들기 — 옛 장면 {oldJob} 은 서버에 없음(목록이 판단) → {newJob}");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Map3D] 다시 만들기 — 옛 장면 {oldJob} 지우기 실패(새 장면 {newJob} 이 앞선다): {ex.Message}");
+            return;
+        }
+        RetireMap3DJob(oldJob, "rebake", remember: true);
+        try { Map3DAreaZooms.Remove(oldJob); }
+        catch (Exception ex) { _log?.Warning($"[Map3D] 영역 줌 로컬 설정 정리 실패: {ex.Message}"); }
+        _log?.Info($"[Map3D] 다시 만들기 — 옛 장면 지움 {oldJob} → {newJob}");
     }
 
     /// <summary>
@@ -223,7 +317,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
                 else if (_map3DState == Map3DState.Pending) CancelMap3DPending();
             }
             bool removed = await _map3DClient.DeleteSceneAsync(item.Id, cancellationToken);
-            RemoveMap3DArea(item.Id);
+            RetireMap3DJob(item.Id, "area-delete", remember: true);   // 목록 · 배지만이 아니라 3D 호스트에 열어 둔 장면 · 판 · 진입 대상까지
             try { Map3DAreaZooms.Remove(item.Id); }   // 지운 영역의 로컬 줌도 지운다
             catch (Exception ex) { _log?.Warning($"[Map3D] 영역 줌 로컬 설정 정리 실패: {ex.Message}"); }
             _log?.Info($"[Map3D] 영역 지움 id={item.Id} removed={removed}");

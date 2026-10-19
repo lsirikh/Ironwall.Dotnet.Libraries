@@ -2994,6 +2994,7 @@ public partial class MapViewModel : BasePanelViewModel,
         RefreshCameraPopupPositions();
         if (MainMap != null) _customMapOverlayService?.RefreshVisibleTiles(MainMap);
         QueueRotationStateSave(snap.CanonicalBearing);
+        OnMap3DAreaBearingChanged(snap.CanonicalBearing);   // 3D 영역 테두리 · 배지도 회전을 따른다(MapViewModel.Map3DAreas)
     }
 
     // ── [회전 영속] 각도 저장 debounce — 휠 연속 회전 중 매 스텝 파일쓰기 방지(1초 정지 후 1회) ──
