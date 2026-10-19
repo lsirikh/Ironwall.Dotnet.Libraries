@@ -1893,29 +1893,10 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
             return;
         }
 
-        // [map-tilt FR-08 ③] Ctrl+Shift+↑/↓ = 미세 틸트(1°). kill-switch OFF 면 소비하지 않는다(NFR-03: OFF 에서 기존 키 동작 무변화).
-        // 드로잉 중 방향키는 위 TryHandleDrawingKey(DrawingKeyRouter Up/Down=Ignore)가 먼저 소비하므로 여기 도달하지 않는다.
-        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
-            && (e.Key == Key.Up || e.Key == Key.Down) && IsTiltFeatureEnabled)
-        {
-            StepTiltAngle(e.Key == Key.Up ? TILT_STEP_FINE : -TILT_STEP_FINE);
-            e.Handled = true;
-            return;
-        }
-
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             switch (e.Key)
             {
-                // [map-tilt FR-08 ③] Ctrl+↑/↓ = 틸트 ±5°(OFF 면 미소비 — 다른 핸들러로 통과).
-                case Key.Up:
-                case Key.Down:
-                    if (IsTiltFeatureEnabled)
-                    {
-                        StepTiltAngle(e.Key == Key.Up ? TILT_STEP_COARSE : -TILT_STEP_COARSE);
-                        e.Handled = true;
-                    }
-                    break;
                 // [Rotation FR-18 재개방] Ctrl+←/→ 회전 — kill-switch(기본 OFF) 게이트.
                 // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0). ON: RotateMap(∓5°) → SSOT 경유.
                 case Key.Left:

@@ -107,12 +107,12 @@ public class MapToolbarScenarioTests
         Assert.Equal(new[] { "홈 위치 이동", "관심지역 관리", "레이어 관리", "추적 재생(Playback)" }, buttons.Select(b => b.GetHelpText()));
         Assert.Equal("GMaps.Toolbar.LayerPanelButton", buttons[2].GetAutomationId());
 
-        // ③ 모드 토글 — 길이 · 넓이 · 회전 · (기울이기 한 쌍) · 편집 스위치. 카탈로그의 '토글 4'(길이 · 넓이 · 회전 · 편집)는 기울이기(map-tilt-25d) 이전 표기
+        // ③ 모드 토글 — 길이 · 넓이 · 회전 · 편집 스위치(카탈로그의 '토글 4'). 기울이기 한 쌍(토글 · 각도 단추)은 2026-10-19 제거됨
         var toggles = children.Where(p => SupportsToggle(p) && p.GetAutomationId() != "OverflowButton" && !(p.GetAutomationId() ?? "").StartsWith("Help.", StringComparison.Ordinal)).ToList();
         var toggleIds = toggles.Select(p => string.IsNullOrEmpty(p.GetAutomationId()) ? p.GetHelpText() : p.GetAutomationId()).ToList();
         var four = new[] { "길이 측정", "넓이 측정", "지도 회전 모드 (Ctrl+Shift+R)", "EditModeToggle" };
         Assert.Equal(four, toggleIds.Where(four.Contains).ToArray());                              // 넷이 이 순서로 있다
-        Assert.Equal(new[] { "GMaps.Tilt.Toggle", "GMaps.Tilt.AngleButton" }, toggleIds.Where(id => !four.Contains(id)).ToArray());   // 그 밖은 기울이기 한 쌍뿐
+        Assert.Empty(toggleIds.Where(id => !four.Contains(id)));                                    // 그 밖은 없다(기울이기 토글 · 각도 단추 제거)
         Assert.All(toggles, t => Assert.Equal(ToggleState.Off, ((IToggleProvider)t.GetPattern(PatternInterface.Toggle)).ToggleState));
         Assert.Equal("편집 모드", Peer(rig.EditToggle).GetHelpText());
         Assert.Equal(Visibility.Visible, ((FrameworkElement)rig.EditToggle.Parent).Visibility);   // 편집 권한(폴백 허용) — 스위치 보임
@@ -228,6 +228,15 @@ public class MapToolbarScenarioTests
         => Scenario.StaAsync(() => RunMapSwitch(checkPersistence: false));
 
     /// <summary>
+    /// 지도 기울이기 제거(2026-10-19) — 예전에 켜 둔 설정(AppSettings.MapTilt.IsEnabled=true · 각 30°)이 남아 있어도
+    /// 실제 지도 전환 경로(ConfigureCommonMapSettings)를 돈 뒤 기울기는 꺼짐 · 0° 이고, 그 옛 키는 읽지도 다시 쓰지도 않는다.
+    /// </summary>
+    [Fact]
+    [Trait("Scenario", "MAP-040")]
+    public void should_stay_flat_and_leave_old_tilt_key_untouched_when_saved_tilt_was_on_and_map_switched()
+        => Scenario.StaAsync(() => RunMapSwitch(checkPersistence: false, savedTiltOn: true));
+
+    /// <summary>
     /// MAP-040 의 전환을 그대로 하면서, 전환이 끝날 때 저장(SaveCurrentMapSettingsAsync → MapSettingsHelper.SaveMapSettingsAsync)한
     /// 지도 이름이 설정 파일(AppSettings.MapName)에 실제로 남는지 본다 — 남지 않으면 재시작 때 이전 지도로 돌아간다.
     /// </summary>
@@ -260,7 +269,7 @@ public class MapToolbarScenarioTests
         finally { NavKit.ResetSettings(); }
     });
 
-    private static async Task RunMapSwitch(bool checkPersistence)
+    private static async Task RunMapSwitch(bool checkPersistence, bool savedTiltOn = false)
     {
         var dir = Path.Combine(AppContext.BaseDirectory, "mbtiles-fixture");
         Directory.CreateDirectory(dir);
@@ -273,6 +282,8 @@ public class MapToolbarScenarioTests
         var provider = new MapProvider(); provider.Add(normal); provider.Add(satellite);
         var rig = NewToolbarRig(maps: provider, beforeLoad: vm => Scenario.SetField(vm, "_log", log));
         Scenario.SetField(rig.Vm, "_mapSwitchLock", new SemaphoreSlim(1, 1));   // 필드 초기화식(생성자 없이 만든 VM 이라 비어 있다)
+        Scenario.SetField(rig.Vm, "_map3DScenes", new List<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D.Map3DScene>());   // 〃 — 전환 뒤 3D 게이트 · 영역 표시가 읽는다
+        Scenario.SetField(rig.Vm, "_map3DAreaMarkers", new Dictionary<string, Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps.Map3DAreaMarker>());
         Scenario.SetField(rig.Vm, "_definedMapProvider", new DefinedMapProvider(log, provider));
         var db = new Moq.Mock<Ironwall.Dotnet.Libraries.GMaps.Db.Services.IGMapDbService>();   // 지도 DB 가짜 — 두 파일 모두 이미 등록됨(시드 무동작)
         db.Setup(d => d.FetchDefinedMapsAsync(Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult<List<IDefinedMapModel>?>(new List<IDefinedMapModel> { normal, satellite }));
@@ -283,6 +294,12 @@ public class MapToolbarScenarioTests
         var setup = Scenario.GetField<Ironwall.Dotnet.Libraries.GMaps.Models.GMapSetupModel>(rig.Vm, "_setupModel");
         setup.MapDataDirectory = dir;
         setup.MapName = "일반지도";
+        const string oldTilt = "{\"IsEnabled\":true,\"AngleDeg\":30.0,\"MinZoom\":5.0,\"HysteresisSteps\":1,\"MaxAngleDeg\":35.0}";
+        if (savedTiltOn)
+        {
+            setup.MapTilt = new Ironwall.Dotnet.Libraries.GMaps.Models.MapTiltModel { IsEnabled = true, AngleDeg = 30, MinZoom = 5, HysteresisSteps = 1, MaxAngleDeg = 35 };
+            File.WriteAllText(NavKit.SettingsPath, "{\"AppSettings\":{\"MapTilt\":" + oldTilt + "}}");
+        }
 
         // 지도 전환 라디오 — MapView.xaml 「지도 전환」 항목의 ItemContainerStyle 원문으로 만든 메뉴(최상위라 팝업 창 없이 항목이 생긴다)
         var menuXaml = NavKit.MapViewXaml().Descendants().Single(e => e.Name.LocalName == "MenuItem" && (string?)e.Attribute("Header") == "지도 전환");
@@ -323,6 +340,14 @@ public class MapToolbarScenarioTests
         Assert.Equal(new object[] { "일반지도", "위성지도" }, new object[] { Radio(normal).Header, Radio(satellite).Header });
         AssertShowing(normal, "W1 일반 타일");
         var center = rig.Map.Position;
+        if (savedTiltOn)
+        {
+            NavKit.Pump();
+            Assert.False(rig.Map.IsTiltFeatureEnabled, "옛 설정 MapTilt.IsEnabled=true 를 읽어 기울이기를 켰다");
+            Assert.Equal(0.0, rig.Map.TiltDeg);
+            Assert.Equal(0.0, rig.Map.TiltLayoutDeg);
+            Assert.True(rig.Map.RenderTransform == null || rig.Map.RenderTransform.Value.IsIdentity, $"기울기 변환이 남았다: {rig.Map.RenderTransform}");
+        }
 
         // 툴바 「지도 선택」 콤보 → 위성지도
         combo.SelectedItem = satellite;
@@ -348,6 +373,14 @@ public class MapToolbarScenarioTests
         {
             var saved = await NavKit.WaitSetting("MapName", t => (string?)t == "일반지도");
             Assert.Equal("일반지도", (string?)saved);
+        }
+        if (savedTiltOn)
+        {
+            Assert.False(rig.Map.IsTiltFeatureEnabled);
+            Assert.Equal(0.0, rig.Map.TiltDeg);
+            var tilt = NavKit.Setting("MapTilt");                     // 옛 키는 남아 있어도 되지만 다시 쓰지 않는다(값 그대로)
+            Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(Newtonsoft.Json.Linq.JToken.Parse(oldTilt), tilt), $"옛 MapTilt 키를 고쳐 썼다: {tilt}");
+            NavKit.ResetSettings();
         }
     }
 }

@@ -5,8 +5,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 /****************************************************************************
    Purpose      : 지도 카드 틸트(2.5D) 레이아웃 오버스캔·형제 캔버스 좌표 순수 수식(SSOT)
                   — map-tilt-25d PRD FR-04(Height/Δ/Margin) · FR-05(InnerToOuter/OuterToInner) · §3 수식.
-   Note         : WPF 무의존(tests/GMaps.Ui.Tests 소스 링크). Thickness/IMultiValueConverter 는
-                  TiltOverscanConverter(WPF 어댑터)가 이 클래스에 위임한다.
+   Note         : WPF 무의존(tests/GMaps.Ui.Tests 소스 링크). 2026-10-19 기울이기 제거로 MainMap 오버스캔 바인딩과
+                  WPF 어댑터(TiltOverscanConverter)는 지웠다 — 아래 '컨버터 입력 해석' 함수는 운영 코드가 더 쓰지 않는 순수 수식으로만 남는다.
                   불변식: 컨트롤 중심 = 뷰포트 중심(회전 피벗·디지털줌 피벗·휠 커서 워프·십자선 정합).
                   시뮬 근거: docs/analyses/map-tilt-25d-scenario-analysis.md §3, SIM-C001/C014/C015.
    Created By   : Claude

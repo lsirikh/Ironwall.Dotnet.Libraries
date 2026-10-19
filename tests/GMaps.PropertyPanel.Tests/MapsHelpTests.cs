@@ -51,9 +51,7 @@ public class MapsHelpTests
     [InlineData("Map.Measure.Tool", "Esc")]
     [InlineData("Map.Measure.Tool", "3개 이상")]
     [InlineData("Map.Toolbar.RotateTilt", "Shift+휠")]
-    [InlineData("Map.Toolbar.RotateTilt", "Ctrl+Shift+↑/↓ = 1°")]
-    [InlineData("Map.Toolbar.RotateTilt", "설정한 줌 이상에서만")]
-    [InlineData("Map.Toolbar.RotateTilt", "MGRS")]
+    [InlineData("Map.Toolbar.RotateTilt", "정북으로 되돌리려면")]
     [InlineData("Map.Toolbar.EditMode", "등록 · 심볼 · 선택 · 기준")]
     [InlineData("Map.EditStrip.Selection", "Shift+끌기")]
     [InlineData("Map.EditStrip.Selection", "Ctrl+V")]
@@ -88,6 +86,23 @@ public class MapsHelpTests
 
         Assert.True(HelpCatalog.TryGet(key, out var entry), $"{key} 미등록");
         Assert.Contains(phrase, entry.ToPlainText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>지도 기울이기 제거(2026-10-19) — 툴바 ④ "?" 는 회전 설명만 남고 기울이기 설명 · 단축키는 없다(키 이름은 UI 시험 id 호환으로 유지).</summary>
+    [Theory]
+    [InlineData("기울")]
+    [InlineData("Ctrl+Shift+T")]
+    [InlineData("Ctrl+↑/↓")]
+    [InlineData("Ctrl+Shift+↑/↓")]
+    [InlineData("탑뷰")]
+    public void should_drop_tilt_explanation_from_rotate_help_when_tilt_removed(string phrase)
+    {
+        RuntimeHelpers.RunModuleConstructor(typeof(MapsHelp).Module.ModuleHandle);
+
+        Assert.True(HelpCatalog.TryGet("Map.Toolbar.RotateTilt", out var entry));
+        Assert.Equal("지도 회전", entry.Title);
+        Assert.DoesNotContain(phrase, entry.ToPlainText(), StringComparison.Ordinal);
+        Assert.Contains("Ctrl+Shift+R", entry.ToPlainText(), StringComparison.Ordinal);   // 회전 설명은 그대로
     }
 
     [Fact]

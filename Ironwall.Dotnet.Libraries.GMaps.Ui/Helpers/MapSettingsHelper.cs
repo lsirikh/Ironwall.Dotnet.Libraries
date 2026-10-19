@@ -70,15 +70,6 @@ public static class MapSettingsHelper
     }
 
     /// <summary>
-    /// 지도 2.5D 기울이기 설정(kill-switch·각도·줌 게이트)을 JSON에 저장 (AppSettings.MapTilt) —
-    /// map-tilt-25d PRD FR-07. 토글은 즉시, 각도는 debounce 1 s 후 호출. 부팅 복원은 MapViewModel(홈 줌 이후).
-    /// </summary>
-    public static async Task SaveMapTiltAsync(MapTiltModel tilt, ILogService? log = default)
-    {
-        await SaveSettingAsync("MapTilt", tilt, log);
-    }
-
-    /// <summary>
     /// 방위각 심볼(나침반 컨트롤) 위치+설정을 JSON에 저장 (AppSettings.MapCompass) —
     /// GMap_Compass_Control FR-08. 부팅 복원은 MapViewModel.
     /// </summary>

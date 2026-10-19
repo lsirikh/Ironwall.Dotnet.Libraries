@@ -128,7 +128,7 @@ public class MapTiltWiringTests
     {
         var map = NewTiltedMap();
         Assert.NotNull(map.RenderTransform);
-        map.ToggleTiltFeature();                          // G10: OFF = 즉시 φ=0(회전의 각도 유지와 다름)
+        map.IsTiltFeatureEnabled = false;                 // G10: OFF = 즉시 φ=0(회전의 각도 유지와 다름) — 사용자 토글은 2026-10-19 제거, 엔진 kill-switch 만 남음
         Assert.False(map.IsTiltFeatureEnabled);
         Pump();
         Assert.Equal(0.0, map.TiltDeg);
@@ -287,23 +287,26 @@ public class MapTiltWiringTests
         Assert.Equal(420, i.X, 9); Assert.Equal(340, i.Y, 9);
     });
 
-    // ───────────────────────────────── FR-08 ③ 각도 스텝 · G3 앵커 · FR-13 Tier0
+    // ───────────────────────────────── 사용자 진입점 제거(2026-10-19) · G3 앵커 · FR-13 Tier0
 
     [Fact]
-    public void should_clamp_requested_angle_when_stepped_beyond_range() => HousingTests.Sta(() =>
+    public void should_have_no_toggle_or_step_entry_points_and_start_off_when_tilt_removed() => HousingTests.Sta(() =>
     {
-        var map = NewTiltedMap(angle: 33);
-        map.StepTiltAngle(GMapCustomControl.TILT_STEP_COARSE);
-        Assert.Equal(35.0, map.RequestedTiltDeg, 9);      // G1 클램프
-        map.StepTiltAngle(-GMapCustomControl.TILT_STEP_FINE);
-        Assert.Equal(34.0, map.RequestedTiltDeg, 9);
-        map.RequestedTiltDeg = 2;
-        map.StepTiltAngle(-GMapCustomControl.TILT_STEP_COARSE);
-        Assert.Equal(0.0, map.RequestedTiltDeg, 9);
-        map.RequestedTiltDeg = 90;                        // 하드 클램프(코어스)
+        // 예전 FR-08 ③ 각도 스텝(Ctrl(+Shift)+↑/↓) · 토글(Ctrl+Shift+T/툴바) 진입점은 사용자 기능 제거와 함께 없앴다
+        var t = typeof(GMapCustomControl);
+        Assert.Null(t.GetMethod("ToggleTiltFeature"));
+        Assert.Null(t.GetMethod("StepTiltAngle"));
+        Assert.Null(t.GetField("TILT_STEP_COARSE"));
+        Assert.Null(t.GetField("TILT_STEP_FINE"));
+
+        var map = NewMap();
+        Assert.False(map.IsTiltFeatureEnabled);           // 기본 OFF — 운영 코드는 켜지 않는다
+        Assert.Equal(0.0, map.TiltDeg);
+        map.RequestedTiltDeg = 90;                        // 엔진 입력 하드 클램프(코어스)는 그대로
+        Pump();
         Assert.Equal(MapTiltModel.HardMaxAngleDeg, map.RequestedTiltDeg, 9);
-        Assert.Equal(5.0, GMapCustomControl.TILT_STEP_COARSE);
-        Assert.Equal(1.0, GMapCustomControl.TILT_STEP_FINE);
+        Assert.Equal(0.0, map.TiltDeg);                   // 꺼져 있으면 요청각이 있어도 평면
+        AssertIdentity(map);
     });
 
     [Fact]

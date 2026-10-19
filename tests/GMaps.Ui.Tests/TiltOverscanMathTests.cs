@@ -223,7 +223,7 @@ public class TiltOverscanMathTests
         Assert.Equal(p, TiltOverscanMath.OuterToInner(p, 0.0, 20.0, W, Hv, 5.0));
     }
 
-    // ── 컨버터 입력 해석(순수) — TiltOverscanConverter 가 위임하는 경로 ─────────
+    // ── 컨버터 입력 해석(순수) — 예전 TiltOverscanConverter 가 위임하던 경로(컨버터는 2026-10-19 기울이기 제거로 삭제) ─────────
 
     [Fact]
     public void should_return_auto_height_and_zero_margin_when_values_missing()

@@ -28,29 +28,20 @@ using Xunit;
 namespace GMaps.MapNav.Tests;
 
 /// <summary>
-/// 카탈로그 §1 남은 지도 시나리오(t-20261011-094654-8195 W1) — 적재 마커(MAP-001) · 팬(MAP-013/014) · 기울이기(MAP-021/022/023/029) · 나침반(MAP-039).
-/// 창은 띄우지 않는다. 기울이기는 MapView.xaml 의 실제 조각(토글 · 각도 판 · 배지)을 그대로 떼어 뷰모델에 묶고,
+/// 카탈로그 §1 남은 지도 시나리오(t-20261011-094654-8195 W1) — 적재 마커(MAP-001) · 팬(MAP-013/014) · 기울이기 제거 확인(MAP-021/022/023/029) · 나침반(MAP-039).
+/// 창은 띄우지 않는다. 툴바는 MapView.xaml 의 실제 조각(회전 묶음)을 그대로 떼어 뷰모델에 묶고,
 /// 줌은 실제 줌 판(MapZoomStyle.xaml 템플릿)의 슬라이더에 UIA RangeValue 로 값을 넣는다(TiltRuntimeDiagTests 의 a~c · f 순서).
 /// </summary>
 public class MapNavRemainingScenarioTests
 {
-    // ───────────────────────── 공용: 기울이기 장치 ─────────────────────────
+    // ───────────────────────── 공용: 기울이기 제거 확인 장치 ─────────────────────────
+    // 지도 기울이기는 2026-10-19 사용자 요청으로 제거됐다(툴바 토글 · 각도 판 · 보기 메뉴 · 단축키 · 배지 · 설정 복원).
+    // MAP-021/022/023/029 는 예전 기울이기 조작이었고, 지금은 "어느 줌에서도 평면(0°) · 같은 그림" 과 "기울이기 화면 요소 없음" 을 단언한다.
 
-    private sealed record TiltRig(GMapCustomControl Map, MapViewModel Vm, MapZoomControl Zoom, Grid ToggleHost, Grid BadgeHost, Grid AngleHost)
+    private sealed record FlatRig(GMapCustomControl Map, MapViewModel Vm, MapZoomControl Zoom, Grid RotateGroupHost)
     {
-        public ToggleButton Toggle => NavXaml.Find<ToggleButton>(ToggleHost, "GMaps.Tilt.Toggle");
-        public TextBlock Badge => NavXaml.Find<TextBlock>(BadgeHost, "GMaps.Tilt.Badge");
-        /// <summary>배지 테두리(Visibility = IsTiltBadgeVisible) — 배지 글의 부모(StackPanel)의 부모.</summary>
-        public Border BadgeBorder => (Border)((StackPanel)Badge.Parent).Parent;
-        public Slider AngleSlider => NavXaml.Find<Slider>(AngleHost, "GMaps.Tilt.AngleSlider");
-        public TextBlock AngleText => NavXaml.Find<TextBlock>(AngleHost, "GMaps.Tilt.AngleText");
         public Slider ZoomSlider => NavXaml.Find<Slider>(Zoom, "GMaps.MapZoom.Slider");
         public string ZoomLabel => ((TextBlock)Zoom.Template.FindName("ZoomLabelText", Zoom)).Text;
-
-        public bool BadgeShown => BadgeBorder.Visibility == Visibility.Visible;
-
-        public ToggleState ToggleState
-            => ((IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(Toggle).GetPattern(PatternInterface.Toggle)).ToggleState;
 
         /// <summary>줌 판 슬라이더에 UIA RangeValue 로 값을 넣는다(TiltRuntimeDiagTests.SetZoom 과 같은 입력).</summary>
         public void SetZoom(double value)
@@ -60,154 +51,99 @@ public class MapNavRemainingScenarioTests
             NavKit.Pump();
             Assert.Equal(value, Map.EffectiveZoom, 6);
         }
-
-        /// <summary>툴바 토글을 사용자 클릭과 같은 경로(OnClick — 토글 + Command)로 누른다.</summary>
-        public void ClickToggle()
-        {
-            Assert.True(Toggle.IsEnabled, "기울이기 토글이 꺼져 있다");
-            NavXaml.Click(Toggle);
-            NavKit.Pump();
-        }
     }
 
     /// <summary>
-    /// 지도(줌 18) + 뷰모델 + 부팅 복원 경로(LoadMapTiltFromSettings — TiltDecided 구독 포함) + 줌 판 + MapView.xaml 조각 3개.
-    /// 기울이기 설정은 앱 기본값과 같은 게이트 18.0 · 히스테리시스 1 · 상한 35 · 각 20(map-tilt-25d PRD v1.1).
+    /// 지도(줌 18) + 뷰모델(예전에 켜 둔 기울이기 설정 IsEnabled=true · 각 20 · 게이트 18.0 이 남아 있는 상태) + 줌 판 +
+    /// MapView.xaml 의 툴바 ④ 묶음(회전 토글 + "?") 실제 조각.
     /// </summary>
-    private static TiltRig NewTiltRig()
+    private static FlatRig NewFlatRig()
     {
         NavKit.ResetSettings();
         var map = NavKit.NewMap(zoom: 18, maxZoom: 19);
-        var setup = new GMapSetupModel { MapTilt = new MapTiltModel { IsEnabled = false, AngleDeg = 20, MinZoom = 18, HysteresisSteps = 1, MaxAngleDeg = 35 } };
+        var setup = new GMapSetupModel { MapTilt = new MapTiltModel { IsEnabled = true, AngleDeg = 20, MinZoom = 18, HysteresisSteps = 1, MaxAngleDeg = 35 } };
         var vm = NavKit.NewVm(map, setup);
-        Scenario.Call(vm, "LoadMapTiltFromSettings");
+        Scenario.Call(vm, "InitializeRotationCommands");
         NavKit.Pump();
-        Assert.False(map.IsTiltFeatureEnabled);                  // 부팅 OFF 전제(가드와 같은 조건)
-
         var zoom = NavRemainingKit.ZoomPanel(map, vm);
-        var toggleHost = NavRemainingKit.Load(NavXaml.ById("GMaps.Tilt.Toggle").Parent!, vm, 60, 40);
-        var badgeHost = NavRemainingKit.Load(NavXaml.ById("GMaps.Tilt.Badge").Parent!.Parent!, vm, 220, 30);
-        var angleHost = NavRemainingKit.Load(NavXaml.ById("GMaps.Tilt.AngleSlider").Parent!.Parent!, vm, 460, 60);   // 각도 팝업의 몸(팝업 창 없이)
-        return new TiltRig(map, vm, zoom, toggleHost, badgeHost, angleHost);
+        var rotateToggle = NavKit.MapViewXaml().Descendants().Single(e => e.Name.LocalName == "ToggleButton"
+            && (string?)e.Attribute("Command") == "{Binding ToggleRotationFeatureCommand}");
+        var groupHost = NavRemainingKit.Load(rotateToggle.Parent!.Parent!, vm, 120, 40);
+        return new FlatRig(map, vm, zoom, groupHost);
     }
 
-    /// <summary>원근(세로 단축) — 지도 RenderTransform 이 ScaleTransform(s, s·cosφ, W/2, H/2) 인가.</summary>
-    private static void AssertPerspective(GMapCustomControl map, double phiDeg)
+    /// <summary>평면 — 기울기 0°, 변환이 있으면 세로 배율 = 가로 배율(원근 없음), 오버스캔 없음.</summary>
+    private static void AssertFlat(GMapCustomControl map)
     {
-        var st = Assert.IsType<ScaleTransform>(map.RenderTransform);
-        Assert.Equal(Math.Cos(phiDeg * Math.PI / 180.0), st.ScaleY / st.ScaleX, 6);
-        Assert.True(st.ScaleY < st.ScaleX, "기울였는데 세로가 줄지 않았다(원근 없음)");
-        Assert.Equal(map.ActualWidth / 2.0, st.CenterX, 6);
-        Assert.Equal(map.ActualHeight / 2.0, st.CenterY, 6);
+        Assert.False(map.IsTiltFeatureEnabled);
+        Assert.Equal(0.0, map.TiltDeg);
+        Assert.Equal(0.0, map.TiltLayoutDeg);
+        Assert.Equal(0.0, map.ViewportOffsetY);
+        var m = map.RenderTransform?.Value ?? Matrix.Identity;
+        Assert.Equal(m.M11, m.M22, 9);
     }
 
     // ───────────────────────── MAP-021 ─────────────────────────
 
     [Fact]
     [Trait("Scenario", "MAP-021")]
-    public void should_show_tilt_badge_and_foreshorten_map_when_tilt_toggle_clicked_above_gate_zoom() => Scenario.Sta(() =>
+    public void should_show_only_rotation_toggle_and_keep_map_flat_when_zoom_above_former_tilt_gate() => Scenario.Sta(() =>
     {
-        var rig = NewTiltRig();
-        rig.SetZoom(18.5);                                         // 게이트(18.0) 이상
+        var rig = NewFlatRig();
+        rig.SetZoom(18.5);                                         // 예전 게이트(18.0) 이상
         Assert.Equal("18.5", rig.ZoomLabel);
-        Assert.False(rig.BadgeShown);                              // OFF — 배지 없음
-        Assert.Equal(ToggleState.Off, rig.ToggleState);
-        var flat = Assert.IsType<ScaleTransform>(rig.Map.RenderTransform);   // 18.5 = 화면 배율만(세로 = 가로)
-        Assert.Equal(flat.ScaleX, flat.ScaleY, 9);
+        AssertFlat(rig.Map);
 
-        rig.ClickToggle();                                         // GMaps.Tilt.Toggle
-
-        Assert.Equal(ToggleState.On, rig.ToggleState);
-        Assert.True(rig.Vm.IsTiltFeatureEnabled);
-        Assert.True(rig.BadgeShown, "기울였는데 배지가 숨어 있다");
-        Assert.Equal("기울임 20°", rig.Badge.Text);                // 배지 「기울임 N°」
-        Assert.Equal(20.0, rig.Map.TiltDeg, 6);
-        AssertPerspective(rig.Map, 20);                            // 원근
-        Assert.True(rig.Vm.IsTiltAnglePopupOpen);                  // 켜면 각도 판이 따라 열린다
+        var toggles = NavXaml.All<ToggleButton>(rig.RotateGroupHost).Where(t => t.GetType() == typeof(ToggleButton)).ToList();   // "?"(HelpTip) 는 빼고
+        var only = Assert.Single(toggles);                          // ④ 묶음 = 회전 토글 하나(기울이기 토글 · 각도 단추 없음)
+        Assert.Same(rig.Vm.ToggleRotationFeatureCommand, only.Command);
+        Assert.DoesNotContain(NavKit.MapViewXaml().Descendants(), e => (NavXaml.AutomationIdOf(e) ?? "").StartsWith("GMaps.Tilt.", StringComparison.Ordinal));
     });
 
     // ───────────────────────── MAP-022 ─────────────────────────
 
     [Fact]
     [Trait("Scenario", "MAP-022")]
-    public void should_hold_then_flatten_then_reenter_tilt_when_zoom_goes_18_5_17_5_17_0_18_5() => Scenario.Sta(() =>
+    public void should_stay_flat_at_every_step_when_zoom_goes_18_5_17_5_17_0_18_5() => Scenario.Sta(() =>
     {
-        var rig = NewTiltRig();
-        rig.SetZoom(18.5);
-        rig.ClickToggle();
-        Assert.Equal("기울임 20°", rig.Badge.Text);
-
-        rig.SetZoom(17.5);                                         // 히스테리시스 1 스텝 — 유지
-        Assert.True(rig.BadgeShown, "17.5 에서 배지가 사라졌다(유지 기대)");
-        Assert.Equal("기울임 20°", rig.Badge.Text);
-        AssertPerspective(rig.Map, 20);
-
-        rig.SetZoom(17.0);                                         // 이탈 임계 아래 — 평면
-        Assert.False(rig.BadgeShown, "17.0 에서 배지가 남았다(평면 기대)");
-        Assert.Equal(string.Empty, rig.Badge.Text);
-        Assert.Equal(0.0, rig.Map.TiltDeg, 9);
+        var rig = NewFlatRig();
+        foreach (var z in new[] { 18.5, 17.5, 17.0, 18.5 })
+        {
+            rig.SetZoom(z);
+            AssertFlat(rig.Map);                                   // 예전 유지 · 이탈 · 재진입 구간 어디서도 기울지 않는다
+        }
+        rig.SetZoom(17.0);
         Assert.Null(rig.Map.RenderTransform);                      // 17.0 = 배율 1 · φ 0 → 항등
-        Assert.True(rig.Map.IsTiltFeatureEnabled);                 // 끈 것은 아니다(줌 게이트만 내려감)
-        Assert.Equal(ToggleState.On, rig.ToggleState);
-
-        rig.SetZoom(18.5);                                         // 재진입
-        Assert.True(rig.BadgeShown, "18.5 재진입에서 배지가 안 나왔다");
-        Assert.Equal("기울임 20°", rig.Badge.Text);
-        AssertPerspective(rig.Map, 20);
     });
 
     // ───────────────────────── MAP-023 ─────────────────────────
 
     [Fact]
     [Trait("Scenario", "MAP-023")]
-    public void should_show_35_degrees_in_badge_and_angle_text_when_angle_slider_set_to_35() => Scenario.Sta(() =>
+    public void should_have_no_tilt_badge_beside_scale_bar_when_tilt_removed() => Scenario.Sta(() =>
     {
-        var rig = NewTiltRig();
-        rig.SetZoom(18.5);
-        rig.ClickToggle();
-        Assert.Equal("20°", rig.AngleText.Text);
-        Assert.Equal(35.0, rig.AngleSlider.Maximum);               // 상한 = TiltMaxAngleDeg
+        // 축척 막대 줄 = 축척 막대 하나(「기울임 N°」 배지 없음)
+        var scaleRow = NavKit.MapViewXaml().Descendants().Single(e => e.Name.LocalName == "MapScaleBarControl").Parent!;
+        Assert.Equal(new[] { "MapScaleBarControl" }, scaleRow.Elements().Select(e => e.Name.LocalName).ToArray());
 
-        var range = (IRangeValueProvider)UIElementAutomationPeer.CreatePeerForElement(rig.AngleSlider).GetPattern(PatternInterface.RangeValue);
-        range.SetValue(35);                                        // GMaps.Tilt.AngleSlider 35
-        NavKit.Pump();
-
-        Assert.Equal(35.0, rig.Vm.TiltAngleDeg, 6);
-        Assert.Equal(35.0, rig.Map.RequestedTiltDeg, 6);
-        Assert.Equal("35°", rig.AngleText.Text);                   // AngleText "35°"
-        Assert.Equal("기울임 35°", rig.Badge.Text);                // 배지
-        AssertPerspective(rig.Map, 35);
-
-        range.SetValue(20);                                        // 되돌림
-        NavKit.Pump();
-        Assert.Equal("20°", rig.AngleText.Text);
-        Assert.Equal("기울임 20°", rig.Badge.Text);
+        var rig = NewFlatRig();
+        rig.SetZoom(19.0);                                         // 최대 줌에서도 평면
+        AssertFlat(rig.Map);
     });
 
     // ───────────────────────── MAP-029 ─────────────────────────
 
     [Fact]
     [Trait("Scenario", "MAP-029")]
-    public void should_hide_badge_and_restore_identical_view_state_when_tilt_turned_off() => Scenario.Sta(() =>
+    public void should_restore_identical_view_state_when_zoom_round_trips_through_former_tilt_gate() => Scenario.Sta(() =>
     {
-        var rig = NewTiltRig();
+        var rig = NewFlatRig();
         rig.SetZoom(18.5);
-        // 처음 그림(OFF · 18.5) — 화면 그림을 정하는 상태값 전부
-        var before = NavRemainingKit.ViewState(rig.Map);
-
-        rig.ClickToggle();
-        Assert.True(rig.BadgeShown);
-        Assert.NotEqual(before, NavRemainingKit.ViewState(rig.Map));   // 켜는 동안은 그림이 다르다
-
-        rig.ClickToggle();                                         // 끔
-
-        Assert.Equal(ToggleState.Off, rig.ToggleState);
-        Assert.False(rig.Vm.IsTiltFeatureEnabled);
-        Assert.False(rig.BadgeShown, "끈 뒤 배지가 남았다");
-        Assert.Equal(string.Empty, rig.Badge.Text);
-        Assert.False(rig.Vm.IsTiltAnglePopupOpen);                 // 각도 판도 닫힘
-        Assert.Equal(0.0, rig.Map.TiltDeg, 9);
-        Assert.Equal(before, NavRemainingKit.ViewState(rig.Map));  // 처음 그림과 같음(변환 · 오버스캔 · 보이는 범위 · 가운데 · 줌)
+        var before = NavRemainingKit.ViewState(rig.Map);           // 화면 그림을 정하는 상태값 전부
+        rig.SetZoom(17.0);
+        rig.SetZoom(18.5);
+        Assert.Equal(before, NavRemainingKit.ViewState(rig.Map));  // 같은 그림(변환 · 오버스캔 · 보이는 범위 · 가운데 · 줌)
+        Assert.Equal(new Thickness(0), rig.Map.Margin);            // MainMap 오버스캔 마진 없음
     });
 
     // ───────────────────────── MAP-013 ─────────────────────────
