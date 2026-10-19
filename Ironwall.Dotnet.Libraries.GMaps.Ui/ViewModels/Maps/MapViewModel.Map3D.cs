@@ -388,7 +388,10 @@ public partial class MapViewModel
         if (e.Key == System.Windows.Input.Key.Escape && _map3DState == Map3DState.Shown)
         {
             // 「건물 높이」 판이 열려 있으면 3D 를 나가지 않고 판만 취소(끄는 중이면 끌기만)
-            if (!TryCancelBuildingHeightByEscape()) ExitMap3D("esc");
+            if (TryCancelBuildingHeightByEscape()) { e.Handled = true; return true; }
+            // 3D 는 Esc 로 나가지 않는다 — 「나가기」 단추로만(2026-10-19). 단, 네이티브 창 3D 는 그 창이 단추를 가리므로 Esc 를 남긴다.
+            if (!Map3DGuide.EscExitsMap3D(Map3DHost.HostMode)) return false;
+            ExitMap3D("esc");
             e.Handled = true;
             return true;
         }

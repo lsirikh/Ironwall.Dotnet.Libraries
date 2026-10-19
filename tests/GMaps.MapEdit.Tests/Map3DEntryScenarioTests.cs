@@ -262,7 +262,9 @@ public class Map3DEntryScenarioTests
             SettleEntry(rig);
             Assert.True(rig.Shown);
 
-            Assert.True(rig.PressEsc(), "3D 중 ESC 는 처리된다");
+            Assert.False(rig.PressEsc(), "3D 중 ESC 로는 나가지 않는다(2026-10-19 — 「나가기」 단추로만)");
+            Assert.True(rig.Shown);
+            rig.Vm.ExitMap3DCommand.Execute(null);
             Assert.False(rig.Shown);
             rig.Gate(); rig.Tick();
             Assert.False(rig.Shown, "같은 줌(자동이면 진입 줌 17)에서 곧바로 다시 들어가지 않는다");
@@ -270,7 +272,7 @@ public class Map3DEntryScenarioTests
             Assert.False(rig.PressEsc(), "2D 에서 ESC 는 3D 경로가 받지 않는다");
 
             rig.PressEnter(); SettleEntry(rig);
-            Assert.True(rig.Shown, "ESC 뒤에도 단추로는 바로 들어간다");
+            Assert.True(rig.Shown, "나간 뒤에도 단추로는 바로 들어간다");
         });
 
     [Theory]

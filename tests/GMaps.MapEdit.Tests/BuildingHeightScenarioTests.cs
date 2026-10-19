@@ -373,10 +373,10 @@ public class BuildingHeightScenarioTests
             Assert.Equal(how == "leave" ? "2D" : "3D", vm.Map3DStatusText); // Esc 는 판만 닫고 3D 에 남는다
         }
         Assert.Same(vm.CancelBuildingHeightCommand, vm.BuildingHeightPanel.CloseCommand);
-        // 판이 닫혀 있으면 Esc 는 예전처럼 3D 를 나간다
+        // 판이 닫혀 있어도 Esc 로는 3D 를 나가지 않는다(2026-10-19 — 「나가기」 단추로만)
         rig.Enter3D();
-        Assert.True(rig.PressEsc());
-        Assert.Equal("2D", vm.Map3DStatusText);
+        Assert.False(rig.PressEsc());
+        Assert.Equal("3D", vm.Map3DStatusText);
     });
 
     [Fact]
