@@ -18,6 +18,8 @@ public partial class Map3DNavControl : UserControl
     private readonly Map3DNavDrag _ring = new(ring: true, DragMath.DeadZone);
     private readonly Map3DNavDrag _tilt = new(ring: false, DragMath.DeadZone);
     private Map3DNavMove? _mouseMove;
+    /// <summary>키로 누르고 있는 이동 — 마우스와 같은 방향을 함께 누르면 한쪽을 떼도 다른 쪽이 누르고 있는 동안 계속 간다.</summary>
+    private readonly HashSet<Map3DNavMove> _keyMoves = new();
 
     public Map3DNavControl()
     {
@@ -78,7 +80,7 @@ public partial class Map3DNavControl : UserControl
     {
         if (_mouseMove is not { } move) return;
         _mouseMove = null;
-        Vm?.StopMap3DMove(move);
+        if (!_keyMoves.Contains(move)) Vm?.StopMap3DMove(move);
     }
 
     /// <summary>마우스 클릭은 누름 · 뗌이 이미 처리했다 — 키보드 · UIA(Invoke)로 누른 것만 한 걸음.</summary>
@@ -98,7 +100,7 @@ public partial class Map3DNavControl : UserControl
         var key = e.Key.ToString();
         if (Map3DNavMath.KeyNudge(key) is { } n) vm.NudgeMap3D(n);
         else if (Map3DNavMath.KeyPreset(key) is { } preset) vm.PresetMap3D(preset);
-        else if (Map3DNavMath.KeyMove(key) is { } move) vm.StartMap3DMove(move);   // 키 반복은 이미 누름이라 무시된다
+        else if (Map3DNavMath.KeyMove(key) is { } move) { _keyMoves.Add(move); vm.StartMap3DMove(move); }   // 키 반복은 이미 누름이라 무시된다
         else return;
         e.Handled = true;
     }
@@ -106,12 +108,13 @@ public partial class Map3DNavControl : UserControl
     private void OnPreviewKeyUp(object sender, KeyEventArgs e)
     {
         if (Map3DNavMath.KeyMove(e.Key.ToString()) is not { } move) return;
-        Vm?.StopMap3DMove(move);
+        _keyMoves.Remove(move);
+        if (_mouseMove != move) Vm?.StopMap3DMove(move);   // 마우스가 같은 방향을 아직 누르고 있으면 계속
         e.Handled = true;
     }
 
     private void OnKeyboardFocusWithinChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.NewValue is false) Vm?.StopAllMap3DMoves();   // 키를 뗀 것을 못 받는다 — 계속 가지 않게
+        if (e.NewValue is false) { _keyMoves.Clear(); Vm?.StopAllMap3DMoves(); }   // 키를 뗀 것을 못 받는다 — 계속 가지 않게
     }
 }

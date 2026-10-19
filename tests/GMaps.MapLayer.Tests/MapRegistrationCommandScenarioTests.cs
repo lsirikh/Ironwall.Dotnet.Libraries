@@ -115,6 +115,25 @@ public class MapRegistrationCommandScenarioTests
         Assert.True(start > 0 && perm > start && edit > perm && edit < dialog, "편집 모드 가드가 권한 확인 뒤 · 파일창 앞에 없다");
     });
 
+    // 편집 모드 가드의 빈 칸 — 권한 없음 + 운영 모드면 권한 안내가 먼저(편집 모드 안내는 안 뜬다), 연타해도 파일창 단계에 가지 않는다.
+    [Trait("Scenario", "MAP-075")]
+    [Fact]
+    public void should_tell_permission_first_and_never_reach_file_dialog_when_image_load_is_pressed_repeatedly_outside_edit_mode() => Scenario.Sta(() =>
+    {
+        var denied = WithFileCommands(canEdit: false);
+        Assert.False(denied.Vm.IsEditModeEnabled);
+        denied.Vm.LoadImageOverlayCommand!.Execute(null);
+        Assert.Equal("권한 없음", Assert.Single(denied.Of<OpenInfoPopupMessageModel>()).Title);
+        Assert.NotEqual("편집 모드에서 쓸 수 있습니다", denied.Vm.AimStatusMessage);
+
+        var f = WithFileCommands(canEdit: true);
+        for (int i = 0; i < 5; i++) f.Vm.LoadImageOverlayCommand!.Execute(null);   // Ctrl+I 연타
+        Assert.Equal("편집 모드에서 쓸 수 있습니다", f.Vm.AimStatusMessage);
+        Assert.DoesNotContain(f.Log.Lines, l => l.Contains("이미지 오버레이 불러오기 시작"));
+        Assert.Empty(f.Of<OpenInfoPopupMessageModel>());
+        Assert.Equal(0, f.Map.Markers.Count);
+    });
+
     [Trait("Scenario", "MAP-075")]
     [Fact]
     public void should_disable_load_image_when_there_is_no_map_yet() => Scenario.Sta(() =>

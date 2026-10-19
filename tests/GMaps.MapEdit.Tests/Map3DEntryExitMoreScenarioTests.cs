@@ -836,6 +836,36 @@ public class Map3DEntryExitMoreScenarioTests
             finally { System.Windows.Input.Mouse.OverrideCursor = null; }
         });
 
+    // 진입 보류(2026-10-19)의 빈 칸 — 보류는 줌 게이트 재진입만 막는다. 「3D 로 보기」 단추는 보류 중에도 곧바로 들어가고(자동 · 수동),
+    // 모드를 여러 번 켰다 꺼도(연타) 그 자리에서 저절로 들어가지 않는다.
+    [Theory]
+    [InlineData(Map3DModel.EntryAuto)]
+    [InlineData(Map3DModel.EntryManual)]
+    public void should_enter_at_once_by_enter_button_when_reentry_is_suppressed_after_input_mode(string entryMode)
+        => Map3DEntryScenarioTests.Run(entryMode, rig =>
+        {
+            X.Enter(rig);
+            if (!rig.Shown) { rig.PressEnter(); Map3DEntryScenarioTests.SettleEntry(rig); }   // 수동은 단추로
+            Assert.True(rig.Shown);
+            try
+            {
+                for (int i = 0; i < 3; i++)   // 편집 모드 연타
+                {
+                    rig.Vm.IsEditModeEnabled = true;
+                    Assert.False(rig.Shown);
+                    rig.Vm.IsEditModeEnabled = false;
+                    Scenario.Pump();
+                    rig.Gate(); rig.Tick();
+                    Assert.False(rig.Shown, $"{entryMode} {i} — 모드를 끝낸 그 자리에서 저절로 들어가지 않는다");
+                }
+                Assert.True(rig.Vm.IsMap3DEnterButtonVisible);
+                rig.PressEnter();                                                 // 「3D 로 보기」 = 보류와 상관없이 곧바로
+                Map3DEntryScenarioTests.SettleEntry(rig);
+                Assert.True(rig.Shown, "보류 중에도 단추로는 들어간다");
+            }
+            finally { System.Windows.Input.Mouse.OverrideCursor = null; }
+        });
+
     [Fact]
     public void should_cancel_pending_entry_and_close_guide_when_input_mode_starts_while_pending()
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>

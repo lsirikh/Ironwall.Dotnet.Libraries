@@ -433,6 +433,67 @@ public class BuildingHeightScenarioTests
         Assert.Empty(rig.Sent("building.preview"));
     });
 
+    // 판이 열린 채 3D 방향 링 · 이동 단추(2026-10-19 두 기능 조합) — 카메라만 움직이고 판 · 미리보기는 그대로, Esc 는 판만, 나가면 둘 다 정리.
+    [Fact]
+    public void should_keep_panel_and_preview_when_ring_and_move_buttons_are_used_while_panel_is_open() => Run(rig =>
+    {
+        bool Moving() => Scenario.GetField<Map3DNavMover?>(rig.Vm, "_map3DNavMover")?.IsActive == true;
+        rig.Enter3D();
+        var vm = rig.Vm;
+        rig.PickBuilding(7, 14.5);
+        vm.BuildingHeightFloorsText = "12";                                 // 미리보기 36 m
+        rig.Posts.Clear();
+
+        vm.NudgeMap3D(new Map3DNudge(-30, 5, 0, 0, 0));                    // 링 끌기 · 지구본
+        vm.Map3DNorthCommand.Execute(null);
+        vm.Map3DTopViewCommand.Execute(null);
+        vm.StartMap3DMove(Map3DNavMove.Forward);                            // 이동 단추 누름
+        Scenario.Call(vm, "TickMap3DMove");
+        Assert.True(Moving());
+        Assert.True(vm.IsBuildingHeightPanelOpen, "카메라를 움직여도 판은 그대로");
+        Assert.Equal(36.0, vm.BuildingHeightPreview);
+        Assert.Empty(rig.Posts);                                            // 건물 메시지(미리보기 취소 · 강조 지움)는 보내지 않는다
+
+        Assert.True(rig.PressEsc());                                        // 이동 단추를 누른 채 Esc — 판만 취소
+        Assert.False(vm.IsBuildingHeightPanelOpen);
+        Assert.Equal("3D", vm.Map3DStatusText);
+        Assert.True(Moving(), "Esc 는 판 몫 — 누르고 있는 이동은 그대로");
+        vm.StopMap3DMove(Map3DNavMove.Forward);
+
+        rig.PickBuilding(7, 14.5);                                          // 판을 다시 열고 이동을 누른 채 「나가기」
+        vm.BuildingHeightFloorsText = "12";
+        vm.StartMap3DMove(Map3DNavMove.ZoomOut);
+        vm.ExitMap3DCommand.Execute(null);
+        Assert.False(vm.IsBuildingHeightPanelOpen);
+        Assert.False(Moving());
+        AssertPreview(rig.Sent("building.preview").Last(), 7, null);
+        Assert.Empty(rig.Server.Requests);
+    });
+
+    // 저장 중 빈 땅 클릭 — 판은 닫히고(미리보기 취소 글을 먼저 보냄) 늦게 온 저장 응답은 3D 에 저장된 높이로 알린다(화면 = 서버).
+    [Fact]
+    public void should_close_panel_and_still_commit_saved_height_when_empty_ground_is_clicked_during_save() => RunAsync(async rig =>
+    {
+        rig.Enter3D();
+        var vm = rig.Vm;
+        rig.PickBuilding(7, 14.5);
+        vm.BuildingHeightFloorsText = "10";                                 // 30 m
+        rig.Server.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var save = rig.Apply();
+        await Task.Delay(20);
+        rig.Posts.Clear();
+        Assert.True(rig.From3D("{\"type\":\"building.none\"}"));
+        Assert.False(vm.IsBuildingHeightPanelOpen);
+        rig.Server.Gate.SetResult();
+        await save;
+        await Task.Delay(20);
+        Assert.Single(rig.Server.Requests);
+        Assert.Equal(new[] { "building.preview", "building.select", "building.commit" }, rig.Posts.Select(p => p.Value<string>("type")));
+        Assert.False(vm.IsBuildingHeightPanelOpen, "늦게 온 응답이 판을 다시 열지 않는다");
+        Assert.Equal(1, vm.BuildingHeightUndoCount);                        // 같은 3D 세션 — 판 안 되돌리기로 되돌릴 수 있다
+        Assert.Equal("3D", vm.Map3DStatusText);
+    });
+
     // ─────────────── 4. 권한 · 연타 · 실패 ───────────────
 
     [Fact]

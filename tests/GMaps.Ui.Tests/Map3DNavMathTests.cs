@@ -156,6 +156,22 @@ public class Map3DNavMathTests
     }
 
     [Fact]
+    public void should_restart_clock_when_pressed_again_after_release_and_ignore_clock_going_back()
+    {
+        var m = new Map3DNavMover();
+        m.Start(Map3DNavMove.Forward, T0);
+        m.StopAll();
+        m.Stop(Map3DNavMove.Back);                                   // 누르지 않은 것을 떼도 아무 일 없음
+        Assert.False(m.IsActive);
+        Assert.NotNull(m.Start(Map3DNavMove.Forward, T0.AddSeconds(10)));   // 10 초 뒤 다시 누름 — 쉬던 시간을 셈하지 않는다
+        var t = m.Tick(T0.AddMilliseconds(10040));
+        Assert.Equal(Map3DNavMath.MoveSpeedPerSecond * 0.04, t!.Value.Forward, 9);
+        Assert.Null(m.Tick(T0.AddSeconds(9)));                      // 시계가 뒤로 가면(시각 맞춤) 움직이지 않는다
+        Assert.True(m.IsActive);
+        Assert.Null(m.Start(Map3DNavMove.Forward, T0.AddSeconds(11)));      // 이미 누름(키 반복) — 한 걸음을 또 보내지 않는다
+    }
+
+    [Fact]
     public void should_combine_held_moves_and_cancel_opposites()
     {
         var m = new Map3DNavMover();

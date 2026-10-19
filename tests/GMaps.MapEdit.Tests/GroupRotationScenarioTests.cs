@@ -505,4 +505,57 @@ public class GroupRotationScenarioTests
         }
         Assert.False(rig.Undo.CanUndo);
     });
+
+    // 부분 실패의 빈 칸 — 장비(감시 방향이 함께 도는 멤버)가 저장 실패하면 위치 · 아이콘 · 감시 방향 모두 회전 전으로, 성공한 장비만 Undo.
+    [Fact]
+    public void should_restore_view_direction_of_failed_device_and_undo_only_saved_device_when_rotation_save_partly_fails() => Scenario.StaAsync(async () =>
+    {
+        var rig = WiredMapRig.Create();
+        var saved = new List<(int id, double detection)>();
+        rig.Db.Setup(d => d.UpdatePidsSymbolAsync(It.IsAny<IPidsSymbolModel>(), It.IsAny<CancellationToken>()))
+              .Returns<IPidsSymbolModel, CancellationToken>((x, _) =>
+              {
+                  if (x.Id == 2401) throw new InvalidOperationException("DB 끊김 2401");
+                  saved.Add((x.Id, x.DetectionBearing));
+                  return Task.FromResult<IPidsSymbolModel?>(null);
+              });
+        var c =rig.Map.FromLatLngToLocal(rig.Map.Position);
+        GMapPidsMarker Device(int id, int dx, double bearing, double detection)
+        {
+            var geo = rig.Map.FromLocalToLatLng((int)c.X + dx, (int)c.Y);
+            var m = new GMapPidsMarker(Mock.Of<ILogService>(), new PidsSymbolModel
+            {
+                Id = id, Title = $"장비-{id}", DeviceType = EnumDeviceType.IpCamera, Latitude = geo.Lat, Longitude = geo.Lng,
+                Bearing = bearing, DetectionBearing = detection, BaseBearing = 45,
+            });
+            rig.Map.Markers.Add(m);
+            return m;
+        }
+        var bad = Device(2401, -100, bearing: 0, detection: 30);
+        var good = Device(2402, 100, bearing: 10, detection: 350);
+        Scenario.Layout(rig.Deco, 1200, 800);
+        var badPos = bad.Position;
+        var g = Group(rig);
+        g.SetSelection(new IEditableMarker[] { bad, good });
+        Assert.True(g.BeginRotation());
+        g.PreviewRotation(20);
+        g.EndRotation(commit: true);
+        await Task.Delay(60);
+
+        AssertAt(badPos, bad.Position);                  // 실패 장비 = 회전 전(위치 · 아이콘 · 감시 방향)
+        Assert.Equal(0, bad.Bearing, 9);
+        Assert.Equal(30, bad.DetectionBearing, 9);
+        Assert.Equal(30, good.Bearing, 9);               // 성공 장비 = 회전됨(350 + 20 → 10)
+        Assert.Equal(10, good.DetectionBearing, 9);
+        Assert.Equal(new[] { (2402, 10.0) }, saved);
+        Assert.Equal("1개 회전 +20.0° 저장 · 1개 저장 실패 — 원위치", rig.Vm.AimStatusMessage);
+        Assert.Equal("그룹 회전 1개", rig.Undo.NextUndoDescription);
+
+        Assert.True(await rig.Undo.UndoAsync());
+        await Task.Delay(30);
+        Assert.Equal(10, good.Bearing, 9);
+        Assert.Equal(350, good.DetectionBearing, 9);
+        Assert.Equal(30, bad.DetectionBearing, 9);       // 실패 장비는 Undo 대상이 아니다 — 그대로
+        Assert.False(rig.Undo.CanUndo);
+    });
 }
