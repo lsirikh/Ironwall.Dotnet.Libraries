@@ -1,0 +1,22 @@
+﻿
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui
+\Tests\GMapImageMarkerTests.cs(96,9): warning xUnit2002: Do not use Assert.NotNull() on value type 'RectLatLng'. Remove
+ this assert. (https://xunit.net/xunit.analyzers/rules/xUnit2002) [C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-
+worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui\Ironwall.Dotnet.Libraries.GMaps.Ui_fbtmfn5k_wpftmp.
+csproj]
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui
+\Tests\MarkerEditAdornerTests.cs(170,9): warning xUnit2002: Do not use Assert.NotNull() on value type 'RectLatLng'. Rem
+ove this assert. (https://xunit.net/xunit.analyzers/rules/xUnit2002) [C:\workspace_app\Ironwall.Dotnet.Libraries\.harne
+ss-worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui\Ironwall.Dotnet.Libraries.GMaps.Ui_fbtmfn5k_wpft
+mp.csproj]
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui
+\Tests\MarkerEditAdornerTests.cs(170,9): warning xUnit2002: Do not use Assert.NotNull() on value type 'RectLatLng'. Rem
+ove this assert. (https://xunit.net/xunit.analyzers/rules/xUnit2002) [C:\workspace_app\Ironwall.Dotnet.Libraries\.harne
+ss-worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui\Ironwall.Dotnet.Libraries.GMaps.Ui.csproj]
+C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui
+\Tests\GMapImageMarkerTests.cs(96,9): warning xUnit2002: Do not use Assert.NotNull() on value type 'RectLatLng'. Remove
+ this assert. (https://xunit.net/xunit.analyzers/rules/xUnit2002) [C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-
+worktrees\t-20261019-222255-515a\Ironwall.Dotnet.Libraries.GMaps.Ui\Ironwall.Dotnet.Libraries.GMaps.Ui.csproj]
+   Assert.Equal() Failure: Collections differ
+
+

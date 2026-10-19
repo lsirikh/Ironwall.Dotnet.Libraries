@@ -1,0 +1,931 @@
+diff --git a/map3d/heights.py b/map3d/heights.py
+index 3356240..b30101a 100644
+--- a/map3d/heights.py
++++ b/map3d/heights.py
+@@ -308,6 +308,18 @@ def set_height(data_dir, job_dir: Path, bid: int, height: float | None, floors:
+         b = next((x for x in scene.get("buildings", []) if x.get("id") == bid), None)
+         if b is None:
+             raise HeightError(404, f"건물 {bid} 이 이 장면에 없습니다")
++        if b.get("user_uid"):
++            # 직접 그린 건물 — 높이는 그 파일(userbuildings)이 갖는다. 자동 높이가 없어 되돌리기는 그대로
++            if height is None:
++                return b
++            from . import userbuildings
++            if userbuildings.set_height(data_dir, b["user_uid"], height, floors) is None:
++                raise HeightError(409, "직접 그린 건물 자료가 지워졌습니다 — 다시 만들어 주세요")
++            if floors:
++                b["levels"] = floors
++            _reshape(job_dir, scene, b, round(float(height), 1))
++            _save_scene(job_dir, scene)
++            return b
+         if height is None:
+             if not b.get("manual"):
+                 return b
+diff --git a/map3d/jobs.py b/map3d/jobs.py
+index afbc366..c89ec3f 100644
+--- a/map3d/jobs.py
++++ b/map3d/jobs.py
+@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
+ from dataclasses import dataclass, field
+ from pathlib import Path
+ 
+-from . import cancel
++from . import cancel, userbuildings
+ from .config import Settings
+ from .params import SceneParams, apply_patch
+ from .pipeline import GenerateRequest, generate
+@@ -98,6 +98,8 @@ class JobManager:
+                         # 직접 입력한 건물 높이 수 · 다시 붙이지 못한 직접 입력 수(GIS 영역 목록 · 알림)
+                         "manual_heights": int((s.get("height_overrides") or {}).get("applied") or 0),
+                         "manual_unmatched": len((s.get("height_overrides") or {}).get("unmatched") or []),
++                        # 직접 그린 건물 수(파일 기준 — 아직 다시 만들지 않은 것도 센다)
++                        "user_buildings": len(userbuildings.items_in(self.settings.data_dir, s)),
+                         "view_url": f"/view?job={d.name}"})
+         out.sort(key=lambda x: x.get("created") or "", reverse=True)
+         return out
+diff --git a/map3d/pipeline.py b/map3d/pipeline.py
+index 25f9393..98d0678 100644
+--- a/map3d/pipeline.py
++++ b/map3d/pipeline.py
+@@ -41,7 +41,7 @@ from . import textures
+ 
+ MATCH_IOU = 0.3            # 지도 · 국가 건물 ↔ 사진 윤곽을 같은 건물로 보는 IoU 하한(DECISIONS 1)
+ CONFLICT_FRAC = 0.2        # 짝 없는 사진 건물이 지도 건물과 자기 넓이의 이만큼 넘게 겹치면 어느 한쪽만 남긴다
+-ORIGIN = {"osm": "map", "user": "map", "local": "national", "overlay": "photo", "tile-photo": "photo"}
++ORIGIN = {"osm": "map", "user": "map", "local": "national", "overlay": "photo", "tile-photo": "photo", "drawn": "user"}
+ PHOTO_LIT = 0.5            # 사진 재질(지형 · 지붕 · 사진 벽)이 해 빛 대신 제 빛으로 보이는 몫 — 사진에 이미 든 음영과 겹치지 않게
+ WALL_AO, WALL_AO_M = 0.6, 3.0    # 벽 밑동 정점색(밝기)과 그 높이(m) — 위로 갈수록 1
+ SITE_R_M, SITE_MAX_H = 300.0, 25.0   # 탱크 · 굴뚝 2 개 이상이 이 거리 안이면 용도 모름 · 이 높이 이하 건물은 공장으로
+@@ -429,6 +429,13 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+                 s.roof_shape, s.roof_source = f.roof, "photo"
+             if f.outline == "overlay":      # 흐림 처리된 타일 자리 — 타일 지붕 그림이 뭉개져 있어 사진 지붕 색(한 색)으로
+                 s.roof_color = "#%02x%02x%02x" % f.color
++    # 운영자가 GIS 에서 직접 그린 건물(userbuildings.py) — 자동 건물(지도 · 국가 · 사진)보다 우선, 겹치는 자동 건물은 뺀다
++    from . import userbuildings
++    u_items = userbuildings.items_in(settings.data_dir, {"bbox": list(bbox), "rect": rr.to_json() if rr else None})
++    user_info = {"applied": 0, "removed_auto": 0, "removed": {}}
++    if u_items:
++        specs, user_info = userbuildings.merge(specs, u_items, P.level_height)
++        say(0.46, f"직접 그린 건물 {user_info['applied']}개(겹친 자동 건물 {user_info['removed_auto']}개 뺌)")
+     specs = [s for s in specs if clip_to_rect(s, frame, rect)]
+     # 지형 직사각형 밖으로 나간 부분은 잘라 낸다(지형 가장자리 밖에 벽이 떠 있지 않게)
+     for s in specs:
+@@ -453,7 +460,8 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+     h_items = heights.items_in(settings.data_dir, bbox)
+     if rr:   # 감싸는 bbox 의 모서리(회전 사각형 밖) 항목은 이 장면 것이 아니다 — 못 붙인 것으로 세지 않는다
+         h_items = [it for it in h_items if rr.contains(*it["center"])]
+-    manual_by_id, auto_by_id, manual_left = heights.apply_to_specs(specs, h_items)
++    # 직접 그린 건물은 높이를 그 파일이 갖는다 — 높이 직접 입력 항목이 그 자리에 붙지 않게 뺀다
++    manual_by_id, auto_by_id, manual_left = heights.apply_to_specs([s for s in specs if s.source != userbuildings.SOURCE], h_items)
+     if manual_left:
+         warnings.append(f"다시 붙이지 못한 직접 입력 건물 높이 {len(manual_left)}개(그 자리에 건물이 없음) — 지우지 않고 남겨 둠")
+     llm_info ={"enabled": bool(P.use_llm), "sent_images": 0, "classified": 0, "errors": []}
+@@ -594,6 +602,8 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+             pf, v = photo_for[s.source_id]
+             m["photo_match"] = {"iou": v, "height": pf.height, "height_from": pf.height_from}
+         m["footprint"] = heights.footprint_list(s.footprint_ll)   # 직접 입력 높이를 다시 붙이는 자리
++        if s.source == userbuildings.SOURCE:
++            m["user_uid"] = s.source_id.split("/", 1)[1]           # 직접 그린 건물 — 3D 「건물 높이」 판이 그 파일 높이를 고친다
+         if s.id in manual_by_id:
+             m["manual"] = manual_by_id[s.id]
+             a = auto_by_id[s.id]
+@@ -739,6 +749,8 @@ def generate(req: GenerateRequest, settings: Settings, out_dir: Path, progress:
+                   "thumbnail": "thumbnail.png", "compress": compress_note},
+         "buildings": bmeta,
+         "height_overrides": {"applied": len([m for m in bmeta if m.get("manual")]), "unmatched": [it["uid"] for it in manual_left]},
++        # 직접 그린 건물 — 넣은 수(영역 밖으로 잘린 것 빼고 실제 만든 수 built) · 겹쳐 뺀 자동 건물 수(출처별)
++        "user_buildings": {**user_info, "built": len([m for m in bmeta if m.get("user_uid")])},
+         "llm": llm_info,
+         "warnings": warnings,
+         "timings_s": {**timings, "total": round(time.time() - t_all, 2)},
+diff --git a/map3d/server.py b/map3d/server.py
+index 0d3c94a..042110a 100644
+--- a/map3d/server.py
++++ b/map3d/server.py
+@@ -13,7 +13,7 @@ from typing import Literal
+ 
+ from pydantic import BaseModel, Field
+ 
+-from . import heights
++from . import heights, userbuildings
+ from .config import Settings, llm_key_present
+ from .geo import bbox_side_lengths_m, parse_bbox, parse_rect, scene_contains
+ from .jobs import ALLOWED_FILES, JobManager
+@@ -64,6 +64,15 @@ class HeightIn(BaseModel):
+     floors: int | None = Field(None, ge=1, le=200, strict=True)
+ 
+ 
++class UserBuildingIn(BaseModel):
++    """직접 그린 건물 — 윤곽 [[lon, lat] …](3~200 꼭짓점, 닫지 않아도 됨) · 높이(m, 1~600) · 층수(1~200, 선택) · 이름(선택, 60자). 모르는 키는 거절."""
++    model_config = {"extra": "forbid"}
++    outline: list = Field(..., min_length=3, max_length=201)   # 꼭짓점 형식 · 수(참 · 거짓 · 글 거절) · 자기 교차는 userbuildings.clean_outline
++    height: float = Field(..., ge=1, le=600, allow_inf_nan=False, strict=True)
++    floors: int | None = Field(None, ge=1, le=200, strict=True)
++    name: str | None = Field(None, max_length=60)
++
++
+ class EditIn(BaseModel):
+     instruction: str = Field(..., min_length=1, max_length=2000)
+ 
+@@ -267,6 +276,53 @@ def create_app(settings: Settings, jobs: JobManager | None = None) -> FastAPI:
+         rows = heights.reset_all(settings.data_dir, job.dir)
+         return {"reset": len(rows), "buildings": rows, "overrides": heights.summary(json.loads((job.dir / "scene.json").read_text(encoding="utf-8")))}
+ 
++    # ---------------------------------------------------------------- 직접 그린 건물(userbuildings.py)
++    UID = FPath(..., pattern=r"^[0-9a-f]{12}$")
++
++    def scene_of(job) -> dict:
++        return json.loads((job.dir / "scene.json").read_text(encoding="utf-8"))
++
++    def user_call(fn):
++        try:
++            return fn()
++        except userbuildings.UserBuildingError as ex:
++            raise HTTPException(ex.status, ex.detail)
++
++    def user_list(job) -> dict:
++        scene = scene_of(job)
++        baked = {b["user_uid"]: b["id"] for b in scene.get("buildings", []) if b.get("user_uid")}
++        items = [{**it, "baked_id": baked.get(it["uid"])} for it in userbuildings.items_in(settings.data_dir, scene)]
++        return {"items": items, "count": len(items)}
++
++    @app.get("/api/jobs/{job_id}/user-buildings")
++    def get_user_buildings(job_id: str):
++        """그 장면 범위의 직접 그린 건물(baked_id = 지금 장면에 구워진 건물 id, 아직 안 구웠으면 null — 뷰어가 상자로 미리 보인다)."""
++        j = jm.get(job_id)
++        if j is None:
++            raise HTTPException(404, "작업이 없습니다")
++        return user_list(j)
++
++    @app.put("/api/jobs/{job_id}/user-buildings/{uid}")
++    def put_user_building(job_id: str, uid: str = UID, body: UserBuildingIn = ...):
++        """넣기 · 고치기 — 영역 파일에 남긴다. 3D 반영은 다시 만들기(그 전에는 뷰어 상자 미리보기)."""
++        job = editable_job(job_id)
++        item = user_call(lambda: userbuildings.put(settings.data_dir, scene_of(job), uid, body.outline, round(body.height, 1),
++                                                   body.floors, body.name))
++        return {"item": item, "count": user_list(job)["count"]}
++
++    @app.delete("/api/jobs/{job_id}/user-buildings/{uid}")
++    def delete_user_building(job_id: str, uid: str = UID):
++        job = editable_job(job_id)
++        if not userbuildings.delete(settings.data_dir, uid):
++            raise HTTPException(404, "그 건물이 없습니다")
++        return {"deleted": 1, "count": user_list(job)["count"]}
++
++    @app.delete("/api/jobs/{job_id}/user-buildings")
++    def delete_user_buildings(job_id: str):
++        """「모두 지우기」 — 그 장면 범위의 직접 그린 건물을 모두."""
++        job = editable_job(job_id)
++        return {"deleted": userbuildings.delete_in(settings.data_dir, scene_of(job)), "count": 0}
++
+     @app.get("/api/jobs/{job_id}/files/{name}")
+     def job_file(job_id: str, name: str):
+         j = jm.get(job_id)
+diff --git a/map3d/static/view.js b/map3d/static/view.js
+index cf3f051..3580fc1 100644
+--- a/map3d/static/view.js
++++ b/map3d/static/view.js
+@@ -18,6 +18,7 @@ import { GpuTimer, lowerWhileMoving, movePixelRatio, PerfWindow, SETTLE_MS } fro
+ import { bakedLight, sunOf, sunVector } from "./light.js";
+ import { buildingMessage, isClick, parseHostBuilding, stretchPositions, wallTop } from "./buildingedit.js";
+ import { fetchSceneJson, loadFailure } from "./sceneload.js";
++import { boxShape, parseHostUserBuilding, pendingBoxes } from "./userbuilding.js";
+ 
+ const $ = (id) => document.getElementById(id);
+ const qs = new URLSearchParams(location.search);
+@@ -848,6 +849,37 @@ function onBuildingMessage(m) {
+   indexGround();   // 보안 가림 상자 높이(buildingBoxes)가 새 높이를 따른다
+ }
+ 
++// ------------------------------------------------------------ 직접 그린 건물 상자 미리보기(다시 만들기 전 — userbuilding.js)
++// 평지붕 상자(윤곽을 세로로 뽑음)를 장면(scene)에 바로 둔다 — 세계 ENU(enuOf)라 회전 영역의 모델 회전과 무관하다.
++const userBoxes = new Map();   // uid → Mesh
++const userBoxMat = new THREE.MeshStandardMaterial({ color: 0xd9d4c7, roughness: 0.85, transparent: true, opacity: 0.92 });
++function setUserBox(m) {
++  const old = userBoxes.get(m.uid);
++  if (old) { scene.remove(old); old.geometry.dispose(); userBoxes.delete(m.uid); }
++  if (m.height == null) return;
++  const { ring, base } = boxShape(m.outline, (lon, lat) => enuOf(sceneInfo.origin, lon, lat), groundY);
++  const shape = new THREE.Shape(ring.map(([e, n]) => new THREE.Vector2(e, n)));
++  const geo = new THREE.ExtrudeGeometry(shape, { depth: m.height, bevelEnabled: false });
++  geo.rotateX(-Math.PI / 2);     // (east, north, 위) → (x, y=위, z=−north)
++  geo.translate(0, base, 0);
++  const mesh = new THREE.Mesh(geo, userBoxMat);
++  mesh.castShadow = mesh.receiveShadow = true;
++  mesh.userData = { kind: "userbuilding", uid: m.uid };
++  scene.add(mesh);
++  userBoxes.set(m.uid, mesh);
++}
++function onUserBuildingMessage(m) {
++  if (m.type === "userbuilding.clear") { for (const uid of [...userBoxes.keys()]) setUserBox({ uid, height: null }); return; }
++  setUserBox(m);
++}
++async function loadUserBoxes() {
++  try {
++    const r = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/user-buildings`, { cache: "no-store" });
++    if (r.ok) for (const m of pendingBoxes(await r.json())) setUserBox(m);
++  } catch { /* 옛 서버 · 끊김 — 상자 없이 */ }
++  invalidate();
++}
++
+ // 오버레이 메시지가 장면을 다 불러오기 전에 오면 모아 뒀다가 오버레이를 만든 뒤 차례대로 적용한다
+ //   (아이콘 · 이미지 자료는 같은 key 를 한 번만 보내므로 버리면 다시 오지 않는다).
+ const early = [];
+@@ -866,6 +898,12 @@ function onHostMessage(data) {
+     invalidate();
+     return;
+   }
++  if (t.startsWith("userbuilding.")) {
++    const m = parseHostUserBuilding(data);
++    if (m && model && sceneInfo) onUserBuildingMessage(m);
++    invalidate();
++    return;
++  }
+   if (t.startsWith("overlay.") || t.startsWith("track.")) {
+     if (!overlay) { if (early.length < 5000) early.push(data); return; }
+     if (t.startsWith("track.")) overlay.applyTrack(data);
+@@ -887,6 +925,7 @@ try {
+     bakedImages: bakedImageIds(sceneInfo),
+     onSnapshotBuilt: (n) => { if (!renderedSent) { renderedSent = true; renderedPending = n; dirty = true; } } });
+   for (const m of early.splice(0)) onHostMessage(m);
++  loadUserBoxes();   // 기다리지 않는다 — ready 를 늦추지 않게
+   performance.mark("m3d:ready");
+   post({ type: "ready", job: jobId, bbox: sceneInfo.bbox, origin: sceneInfo.origin, quality: quality.reason || "full", gl: glName });
+   const q = ["lon", "lat", "zoom", "bearing", "pitch"].map((k) => parseFloat(qs.get(k)));
+diff --git a/map3d/static/userbuilding.js b/map3d/static/userbuilding.js
+new file mode 100644
+index 0000000..41cdd1d
+--- /dev/null
++++ b/map3d/static/userbuilding.js
+@@ -0,0 +1,59 @@
++// 직접 그린 건물 상자 미리보기 — 다시 만들기 전, 저장한 윤곽 · 높이를 평지붕 상자로 보인다(three 무의존 순수 함수, node 시험 tests/userbuilding_check.mjs).
++//   받는 것 {type:"userbuilding.preview", uid, outline:[[lon, lat] …], height|null} — 그 건물 상자 넣기 · 바꾸기(null = 지움)
++//          {type:"userbuilding.clear"}                                            — 상자 모두 지움(「모두 지우기」)
++//   장면을 불러올 때는 GET /api/jobs/{job}/user-buildings 의 아직 안 구운(baked_id null) 건물을 상자로 보인다.
++
++export const UID_RE = /^[0-9a-f]{12}$/;
++export const MIN_H = 1, MAX_H = 600, MIN_POINTS = 3, MAX_POINTS = 200;
++
++/** 윤곽 검사 — [[lon, lat] …] 3~200 개(끝점이 첫 점과 같으면 뺀다), 아니면 null. */
++export function cleanOutline(outline) {
++  if (!Array.isArray(outline)) return null;
++  const pts = [];
++  for (const p of outline) {
++    if (!Array.isArray(p) || p.length !== 2 || !p.every((v) => typeof v === "number" && Number.isFinite(v))) return null;
++    if (Math.abs(p[0]) > 180 || Math.abs(p[1]) > 90) return null;
++    pts.push([p[0], p[1]]);
++  }
++  if (pts.length >= 2 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts.pop();
++  return pts.length >= MIN_POINTS && pts.length <= MAX_POINTS ? pts : null;
++}
++
++/** GIS → 3D 메시지 검사 — 형식이 틀리면 null(버린다). */
++export function parseHostUserBuilding(d) {
++  if (!d || typeof d.type !== "string") return null;
++  if (d.type === "userbuilding.clear") return { type: d.type };
++  if (d.type !== "userbuilding.preview" || typeof d.uid !== "string" || !UID_RE.test(d.uid)) return null;
++  if (d.height === null) return { type: d.type, uid: d.uid, height: null };
++  const outline = cleanOutline(d.outline);
++  if (!outline || !Number.isFinite(d.height) || d.height < MIN_H || d.height > MAX_H) return null;
++  return { type: d.type, uid: d.uid, outline, height: d.height };
++}
++
++/** 서버 목록(GET …/user-buildings) → 상자로 보일 것(아직 안 구운 건물만). */
++export function pendingBoxes(list) {
++  const out = [];
++  for (const it of (list && Array.isArray(list.items) ? list.items : [])) {
++    if (it && it.baked_id == null) {
++      const m = parseHostUserBuilding({ type: "userbuilding.preview", uid: it.uid, outline: it.outline, height: it.height });
++      if (m) out.push(m);
++    }
++  }
++  return out;
++}
++
++/**
++ * 상자 모양 — 윤곽 경위도 → 장면 평면 [east, north](m, toEnu = camsync.enuOf 처럼 {x, z: −north} 를 돌려주는 함수),
++ * 반시계 방향으로 맞춘 고리. 바닥 높이는 꼭짓점 지면 높이(groundAt(x, z))의 가장 낮은 값(경사지에서 건물 밑이 뜨지 않게).
++ */
++export function boxShape(outline, toEnu, groundAt) {
++  const ring = outline.map(([lon, lat]) => { const p = toEnu(lon, lat); return [p.x, -p.z]; });
++  let area = 0;
++  for (let i = 0; i < ring.length; i++) {
++    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length];
++    area += x0 * y1 - x1 * y0;
++  }
++  if (area < 0) ring.reverse();
++  const base = Math.min(...ring.map(([e, n]) => groundAt(e, -n)));
++  return { ring, base, area: Math.abs(area) / 2 };
++}
+diff --git a/map3d/userbuildings.py b/map3d/userbuildings.py
+new file mode 100644
+index 0000000..6f5dd72
+--- /dev/null
++++ b/map3d/userbuildings.py
+@@ -0,0 +1,216 @@
++"""직접 그린 건물 — 운영자가 GIS 2D 지도에서 위에서 본 윤곽을 그리고 높이를 넣으면, 굽기가 그 건물을 출처 "user" 로 우선 만든다.
++
++저장: data/user-buildings/area-<영역 키>.json — 영역 키는 건물 높이 직접 입력(heights.area_file)과 같은 bbox 해시라
++  요청 값이 경로가 되지 않는다. 항목 하나 = {uid, outline[[lon, lat] …](닫지 않은 꼭짓점), height, floors, name, created, updated}.
++굽기: 장면 범위(회전 영역은 회전 사각형)에 중심이 든 항목을 건물 사양(source "drawn" → scene.json origin "user")으로 넣고,
++  그 건물과 겹치는 자동 건물(지도 · 국가 · 사진)은 뺀다 — 겹친 넓이가 자동 건물 넓이의 OVERLAP_FRAC 이상이거나 IoU ≥ OVERLAP_IOU.
++  옥상 · 외벽 · 난간 · 옥탑 · 구운 그림자 · 평탄화는 다른 건물과 같은 길(정사영상 지붕 · 사진 텍스처 · 절차 외벽)을 탄다.
++"""
++from __future__ import annotations
++
++import datetime as dt
++import json
++import math
++import re
++import threading
++from pathlib import Path
++
++from shapely.geometry import Polygon
++
++from . import heights
++from .buildings import BuildingSpec, classify_use
++from .geo import scene_contains
++
++MIN_POINTS, MAX_POINTS = 3, 200
++MIN_AREA_M2 = 4.0            # 이보다 작은 윤곽은 건물로 보지 않는다(잘못 누름)
++MAX_SIDE_M = 2000.0          # 윤곽 한 변(감싸는 상자)의 상한 — 영역 상한과 같다
++OVERLAP_FRAC = 0.5           # 자동 건물 넓이 중 직접 그린 건물에 덮인 몫이 이 이상이면 뺀다
++OVERLAP_IOU = 0.3            # 또는 두 윤곽 IoU 가 이 이상이면 뺀다
++MAX_NAME = 60
++UID_RE = re.compile(r"^[0-9a-f]{12}$")
++SOURCE = "drawn"             # BuildingSpec.source — scene.json origin 은 "user"(pipeline.ORIGIN)
++
++_lock = threading.Lock()
++
++
++class UserBuildingError(Exception):
++    def __init__(self, status: int, detail: str):
++        super().__init__(detail)
++        self.status, self.detail = status, detail
++
++
++# ---------------------------------------------------------------- 검증
++
++def clean_outline(outline) -> list[list[float]]:
++    """윤곽 검사 → 닫지 않은 꼭짓점 목록(소수 7자리). 형식 · 개수 · 자기 교차 · 넓이가 틀리면 UserBuildingError(400)."""
++    if not isinstance(outline, list):
++        raise UserBuildingError(400, "outline 은 [[lon, lat], …] 목록이어야 합니다")
++    pts = []
++    for p in outline:
++        if (not isinstance(p, (list, tuple)) or len(p) != 2
++                or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in p)):
++            raise UserBuildingError(400, "outline 의 꼭짓점은 [lon, lat] 두 숫자여야 합니다")
++        lon, lat = float(p[0]), float(p[1])
++        if not (math.isfinite(lon) and math.isfinite(lat) and -180 <= lon <= 180 and -85 <= lat <= 85):
++            raise UserBuildingError(400, "outline 꼭짓점이 경위도 범위 밖입니다")
++        pts.append([round(lon, 7), round(lat, 7)])
++    if len(pts) >= 2 and pts[0] == pts[-1]:
++        pts = pts[:-1]                              # 닫힌 고리로 보내도 받는다
++    if not (MIN_POINTS <= len(pts) <= MAX_POINTS):
++        raise UserBuildingError(400, f"윤곽 꼭짓점은 {MIN_POINTS}~{MAX_POINTS}개여야 합니다")
++    poly = to_meters(pts)
++    if not poly.is_valid:
++        raise UserBuildingError(400, "윤곽 선이 서로 엇갈립니다(자기 교차)")
++    if poly.area < MIN_AREA_M2:
++        raise UserBuildingError(400, f"윤곽이 너무 작습니다({MIN_AREA_M2:.0f} m² 미만)")
++    minx, miny, maxx, maxy = poly.bounds
++    if max(maxx - minx, maxy - miny) > MAX_SIDE_M:
++        raise UserBuildingError(400, f"윤곽이 너무 큽니다(한 변 {MAX_SIDE_M:.0f} m 초과)")
++    return pts
++
++
++def to_meters(pts) -> Polygon:
++    """윤곽(경위도) → 첫 꼭짓점 기준 미터 다각형(heights 와 같은 근사)."""
++    to_m = heights._meters(pts[0][0], pts[0][1])
++    return Polygon([to_m(x, y) for x, y in pts])
++
++
++def center(pts) -> list[float]:
++    c = Polygon(pts).centroid
++    return [round(c.x, 7), round(c.y, 7)]
++
++
++# ---------------------------------------------------------------- 저장
++
++def user_dir(data_dir) -> Path:
++    return Path(data_dir) / "user-buildings"
++
++
++def area_file(data_dir, bbox) -> Path:
++    """영역 파일 — heights.area_file 과 같은 이름(bbox 해시)을 user-buildings 폴더에."""
++    return user_dir(data_dir) / heights.area_file(data_dir, bbox).name
++
++
++def _files(data_dir):
++    d = user_dir(data_dir)
++    return sorted(d.glob("area-*.json")) if d.exists() else []
++
++
++def items_in(data_dir, scene: dict) -> list[dict]:
++    """장면(bbox · 회전 영역 rect)에 중심이 든 직접 그린 건물(어느 영역 파일이든 — 다시 굽기 영역이 조금 달라도)."""
++    out = []
++    for p in _files(data_dir):
++        for it in heights._read(p)["items"]:
++            try:
++                c = center(it["outline"])
++            except (KeyError, TypeError, ValueError):
++                continue
++            if scene_contains(scene, c[0], c[1]):
++                out.append(it)
++    return out
++
++
++def put(data_dir, scene: dict, uid: str, outline, height: float, floors: int | None, name: str | None) -> dict:
++    """새로 넣거나(uid 처음) 고친다(같은 uid — 만든 시각은 그대로). 중심이 장면 밖이면 400. 반환 = 저장한 항목."""
++    if not UID_RE.match(uid or ""):
++        raise UserBuildingError(400, "uid 는 소문자 16진수 12자여야 합니다")
++    pts = clean_outline(outline)
++    c = center(pts)
++    if not scene_contains(scene, c[0], c[1]):
++        raise UserBuildingError(400, "윤곽이 이 3D 영역 밖에 있습니다")
++    now = dt.datetime.now().astimezone().isoformat(timespec="seconds")
++    item = {"uid": uid, "outline": pts, "height": round(float(height), 1), "floors": floors,
++            "name": (name or "").strip()[:MAX_NAME] or None, "created": now, "updated": now}
++    with _lock:
++        for p in _files(data_dir):
++            d = heights._read(p)
++            old = next((it for it in d["items"] if it.get("uid") == uid), None)
++            if old is not None:
++                item["created"] = old.get("created") or now
++                d["items"] = [item if it.get("uid") == uid else it for it in d["items"]]
++                heights._write(p, d)
++                return item
++        p = area_file(data_dir, scene["bbox"])
++        d = heights._read(p)
++        d["bbox"] = [float(v) for v in scene["bbox"]]
++        d["items"].append(item)
++        heights._write(p, d)
++    return item
++
++
++def set_height(data_dir, uid: str, height: float, floors: int | None) -> dict | None:
++    """그 건물 높이 · 층수만 고친다(3D 「건물 높이」 판) — 없으면 None."""
++    with _lock:
++        for p in _files(data_dir):
++            d = heights._read(p)
++            for it in d["items"]:
++                if it.get("uid") == uid:
++                    it.update(height=round(float(height), 1), floors=floors,
++                              updated=dt.datetime.now().astimezone().isoformat(timespec="seconds"))
++                    heights._write(p, d)
++                    return it
++    return None
++
++
++def _drop(data_dir, pred) -> int:
++    n = 0
++    with _lock:
++        for p in _files(data_dir):
++            d = heights._read(p)
++            keep = [it for it in d["items"] if not pred(it)]
++            if len(keep) != len(d["items"]):
++                n += len(d["items"]) - len(keep)
++                d["items"] = keep
++                heights._write(p, d)
++    return n
++
++
++def delete(data_dir, uid: str) -> bool:
++    return _drop(data_dir, lambda it: it.get("uid") == uid) > 0
++
++
++def delete_in(data_dir, scene: dict) -> int:
++    """「모두 지우기」 — 장면 범위에 중심이 든 직접 그린 건물을 모두 지운다."""
++    def inside(it):
++        try:
++            c = center(it["outline"])
++        except (KeyError, TypeError, ValueError):
++            return False
++        return scene_contains(scene, c[0], c[1])
++    return _drop(data_dir, inside)
++
++
++# ---------------------------------------------------------------- 굽기(pipeline) 에서
++
++def specs_of(items: list[dict], level_h: float) -> list[BuildingSpec]:
++    """직접 그린 건물 → 건물 사양(평지붕 · 높이 출처 user · 이름이 있으면 name 태그). id 는 굽기가 다시 매긴다."""
++    out = []
++    for it in items:
++        tags = {"building": "yes", **({"name": it["name"]} if it.get("name") else {})}
++        out.append(BuildingSpec(id=0, source=SOURCE, source_id=f"{SOURCE}/{it['uid']}", footprint_ll=Polygon(it["outline"]),
++                                tags=tags, height=float(it["height"]), height_source="user",
++                                levels=int(it["floors"]) if it.get("floors") else max(1, round(float(it["height"]) / level_h)),
++                                use=classify_use(tags)))
++    return out
++
++
++def overlaps(auto: Polygon, user: Polygon) -> bool:
++    """자동 건물을 뺄 만큼 겹치나 — 겹친 넓이 ÷ 자동 건물 넓이 ≥ OVERLAP_FRAC 또는 IoU ≥ OVERLAP_IOU.
++    넓이 비율은 경위도 그대로 셈한다(작은 영역에서 경위도 → 미터는 아핀 변환이라 비율이 같다)."""
++    if not auto.intersects(user) or auto.area <= 0:
++        return False
++    inter = auto.intersection(user).area
++    union = auto.union(user).area
++    return inter / auto.area >= OVERLAP_FRAC or (union > 0 and inter / union >= OVERLAP_IOU)
++
++
++def merge(specs: list[BuildingSpec], items: list[dict], level_h: float) -> tuple[list[BuildingSpec], dict]:
++    """직접 그린 건물을 넣고 겹치는 자동 건물을 뺀다 — 반환 (새 사양 목록, 집계 {applied, removed_auto, removed[출처별]})."""
++    users = specs_of(items, level_h)
++    kept, removed = [], {}
++    for s in specs:
++        if any(overlaps(s.footprint_ll, u.footprint_ll) for u in users):
++            removed[s.source] = removed.get(s.source, 0) + 1
++            continue
++        kept.append(s)
++    return kept + users, {"applied": len(users), "removed_auto": sum(removed.values()), "removed": removed}
+diff --git a/tests/test_userbuildings.py b/tests/test_userbuildings.py
+new file mode 100644
+index 0000000..218fb5a
+--- /dev/null
++++ b/tests/test_userbuildings.py
+@@ -0,0 +1,310 @@
++"""직접 그린 건물(userbuildings.py · /api/jobs/{id}/user-buildings) — 저장 · 검증 · 굽기 우선 · 겹친 자동 건물 빼기 · 옥상 텍스처 ·
++외벽 방식 · 회전 영역 · 외부 자료 0건 · 다시 만들기 유지 · 3D 「건물 높이」 판으로 높이 고치기 · 뷰어 상자 미리보기(node)."""
++import json
++import shutil
++import subprocess
++from pathlib import Path
++
++import httpx
++import numpy as np
++import pytest
++from fastapi.testclient import TestClient
++from shapely.geometry import Polygon
++
++from map3d import heights, userbuildings as UB
++from map3d import pipeline as PL
++from map3d.buildings import BuildingSpec
++from map3d.config import Settings
++from map3d.geo import parse_rect
++from map3d.params import SceneParams
++from map3d.pipeline import GenerateRequest, generate
++from map3d.server import create_app
++
++from test_heights import FLAT, GABLE, _all_ys, _bake, _settings
++from test_rotated_area import RECT, _gen, _rr, _square, _user_geojson
++from test_scenarios_f import BB, _building_nodes, _glb_json, _no_net, _node_materials, _offline
++from test_overlay import OV, _illustration
++
++UID, UID2 = "a1b2c3d4e5f6", "0123456789ab"
++# FLAT(지도 자료 평지붕 26 × 22 m)를 덮는 오각형 — 그 자리 자동 건물을 갈아 끼운다
++OVER_FLAT = [[127.10095, 37.36095], [127.10135, 37.36095], [127.10135, 37.36125], [127.10115, 37.36130], [127.10095, 37.36125]]
++# 빈 자리(자동 건물 없음) 사각형 약 26 × 22 m
++EMPTY = [[127.1030, 37.3620], [127.1033, 37.3620], [127.1033, 37.3622], [127.1030, 37.3622]]
++
++
++def _client(tmp_path, mbtiles):
++    return TestClient(create_app(_settings(tmp_path, mbtiles)))
++
++
++def _files(tmp_path):
++    return sorted((tmp_path / "data" / "user-buildings").glob("area-*.json"))
++
++
++# ---------------------------------------------------------------- 검증
++def should_reject_bad_outlines_and_accept_closed_ring_when_cleaning():
++    ok = UB.clean_outline(EMPTY + [EMPTY[0]])                       # 닫힌 고리도 받는다(끝점은 뺀다)
++    assert ok == EMPTY and len(ok) == 4
++    bad = [
++        None, "x", [[1, 2], [3, 4]],                                # 형식 · 3점 미만
++        [[127.1, 37.36], [127.1001, 37.36], [True, 37.3601]],       # 참 · 거짓
++        [[127.1, 37.36], [127.1001, 37.36], ["127.1", 37.3601]],    # 글
++        [[127.1, 37.36], [127.1001, 37.36], [float("nan"), 37.3601]],
++        [[127.1, 37.36], [127.1001, 37.36], [127.1, 95.0]],          # 범위 밖
++        [[127.1, 37.36], [127.1001, 37.36], [127.1, 37.3601, 5]],     # 세 숫자
++        [[127.1000, 37.3600], [127.1003, 37.3602], [127.1003, 37.3600], [127.1000, 37.3602]],   # 나비넥타이(자기 교차)
++        [[127.1, 37.36], [127.100001, 37.36], [127.1, 37.360001]],   # 너무 작다
++        [[127.0, 37.36], [127.03, 37.36], [127.03, 37.38]],          # 한 변 2 km 넘음
++        [[127.1 + i * 1e-6, 37.36 + (i % 2) * 1e-4] for i in range(201)],   # 꼭짓점 200 개 넘음
++    ]
++    for o in bad:
++        with pytest.raises(UB.UserBuildingError) as ex:
++            UB.clean_outline(o)
++        assert ex.value.status == 400, o
++
++
++def should_name_user_files_like_override_files_when_saving():
++    bbox = [127.1, 37.36, 127.104, 37.3632]
++    p = UB.area_file("D:/x", bbox)
++    assert p.parent == Path("D:/x") / "user-buildings" and p.name == heights.area_file("D:/x", bbox).name
++
++
++# ---------------------------------------------------------------- REST
++def should_save_list_update_and_delete_when_using_rest(tmp_path, mbtiles, slope_dem):
++    _bake(tmp_path, mbtiles, slope_dem)
++    c = _client(tmp_path, mbtiles)
++    assert c.get("/api/jobs/j1/user-buildings").json() == {"items": [], "count": 0}
++    r = c.put(f"/api/jobs/j1/user-buildings/{UID}", json={"outline": EMPTY, "height": 18.04, "floors": 6, "name": " 경비동 "})
++    assert r.status_code == 200, r.text
++    it = r.json()["item"]
++    assert it["uid"] == UID and it["outline"] == EMPTY and it["height"] == 18.0 and it["floors"] == 6 and it["name"] == "경비동"
++    assert it["created"] == it["updated"] and r.json()["count"] == 1
++    files = _files(tmp_path)
++    assert len(files) == 1 and json.loads(files[0].read_text(encoding="utf-8"))["items"][0]["uid"] == UID
++    listed = c.get("/api/jobs/j1/user-buildings").json()
++    assert listed["count"] == 1 and listed["items"][0]["baked_id"] is None        # 아직 안 구움 → 뷰어 상자
++    assert c.get("/api/jobs").json()["scenes"][0]["user_buildings"] == 1
++    # 같은 uid = 고치기(만든 시각 그대로, 항목 늘지 않음)
++    moved = [[x + 0.00001, y] for x, y in EMPTY]
++    r = c.put(f"/api/jobs/j1/user-buildings/{UID}", json={"outline": moved, "height": 9})
++    assert r.status_code == 200 and r.json()["item"]["created"] == it["created"] and r.json()["item"]["name"] is None
++    assert len(json.loads(files[0].read_text(encoding="utf-8"))["items"]) == 1
++    # 두 번째 · 하나 지우기 · 모두 지우기
++    assert c.put(f"/api/jobs/j1/user-buildings/{UID2}", json={"outline": OVER_FLAT, "height": 25}).json()["count"] == 2
++    assert c.delete(f"/api/jobs/j1/user-buildings/{UID}").json() == {"deleted": 1, "count": 1}
++    assert c.delete(f"/api/jobs/j1/user-buildings/{UID}").status_code == 404
++    assert c.delete("/api/jobs/j1/user-buildings").json() == {"deleted": 1, "count": 0}
++    assert c.get("/api/jobs/j1/user-buildings").json()["count"] == 0
++    assert not list((tmp_path / "data").rglob("*.tmp"))
++
++
++def should_reject_bad_input_paths_and_outside_area_without_writing(tmp_path, mbtiles, slope_dem):
++    _bake(tmp_path, mbtiles, slope_dem)
++    c = _client(tmp_path, mbtiles)
++    url = f"/api/jobs/j1/user-buildings/{UID}"
++    good = {"outline": EMPTY, "height": 10}
++    for bad in ({"outline": EMPTY}, {"height": 10}, {**good, "height": 0.9}, {**good, "height": 600.1}, {**good, "height": "10"},
++                {**good, "height": True}, {**good, "floors": 0}, {**good, "floors": 201}, {**good, "floors": 2.5},
++                {**good, "extra": 1}, {**good, "name": "가" * 61}, {**good, "outline": EMPTY[:2]}, {**good, "outline": "x"}):
++        assert c.put(url, json=bad).status_code == 422, bad
++    for bad in ({**good, "outline": [[127.1030, 37.3620], [127.1033, 37.3622], [127.1033, 37.3620], [127.1030, 37.3622]]},   # 자기 교차
++                {**good, "outline": [[127.1030, 37.3620], [127.1033, 37.3620], [True, 37.3622]]},
++                {**good, "outline": [[127.2, 37.36], [127.2003, 37.36], [127.2003, 37.3602]]}):              # 영역 밖
++        assert c.put(url, json=bad).status_code == 400, bad
++    for bad_uid in ("A1B2C3D4E5F6", "short", "a1b2c3d4e5f6a", "..", "a1b2c3d4e5f%2F"):
++        assert c.put(f"/api/jobs/j1/user-buildings/{bad_uid}", json=good).status_code in (404, 405, 422), bad_uid
++    for bad_job in ("nojob", "..", "a.b", "..%5Cj1"):
++        assert c.put(f"/api/jobs/{bad_job}/user-buildings/{UID}", json=good).status_code in (404, 405), bad_job
++        assert c.get(f"/api/jobs/{bad_job}/user-buildings").status_code in (404, 405), bad_job
++    demo = tmp_path / "data" / "samples" / "demo"
++    shutil.copytree(tmp_path / "data" / "jobs" / "j1", demo)
++    assert c.put(f"/api/jobs/demo/user-buildings/{UID}", json=good).status_code == 405
++    assert c.delete("/api/jobs/demo/user-buildings").status_code == 405
++    from map3d.jobs import Job
++    c.app.state.jobs.jobs["j1"] = Job(id="j1", dir=tmp_path / "data" / "jobs" / "j1", status="running")
++    assert c.put(url, json=good).status_code == 409
++    assert not (tmp_path / "data" / "user-buildings").exists()      # 거절은 아무것도 쓰지 않았다
++
++
++# ---------------------------------------------------------------- 굽기
++def _put(tmp_path, scene, uid, outline, height, floors=None, name=None):
++    return UB.put(tmp_path / "data", scene, uid, outline, height, floors, name)
++
++
++def should_bake_user_building_first_and_drop_overlapped_auto_building(tmp_path, mbtiles, slope_dem):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    assert sorted(b["origin"] for b in s1["buildings"]) == ["map", "map"]
++    _put(tmp_path, s1, UID, OVER_FLAT, 25.0, 8, "본관")
++    _put(tmp_path, s1, UID2, EMPTY, 6.0)
++    # 그 자리 높이 직접 입력(옛 자동 건물 자리) — 직접 그린 건물에 붙지 않는다
++    heights._put_item(tmp_path / "data", s1["bbox"], {"uid": "h1", "center": next(b for b in s1["buildings"] if b["roof_shape_built"] == "flat")["center"],
++                                                        "area_m2": 572.0, "footprint": FLAT, "height": 40.0, "floors": None})
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    users = {b["user_uid"]: b for b in s2["buildings"] if b.get("user_uid")}
++    assert set(users) == {UID, UID2} and len(s2["buildings"]) == 3          # FLAT 자동 건물이 빠지고 GABLE 은 남음
++    u = users[UID]
++    assert u["origin"] == "user" and u["source"] == "drawn" and u["height"] == 25.0 and u["height_from"] == "user"
++    assert u["levels"] == 8 and u["tags"]["name"] == "본관" and "manual" not in u and u["estimated"] is False
++    assert u["roof_shape_built"] == "flat" and u["parapet"]                  # 평지붕 + 기본 난간 규칙
++    assert u["top_z"] - u["ground_min"] > 25.0 - 0.2
++    assert users[UID2]["levels"] == 2                                        # 층수 없으면 높이 ÷ 층고
++    assert s2["user_buildings"] == {"applied": 2, "removed_auto": 1, "removed": {"user": 1}, "built": 2}
++    assert s2["height_overrides"] == {"applied": 0, "unmatched": ["h1"]}     # 갈아 끼운 자리 → 못 붙인 것으로 남김
++    assert [b["roof_shape_built"] for b in s2["buildings"] if not b.get("user_uid")] == ["gable"]
++    # 옥상 = 정사영상(윤곽 투영) · 외벽 = 절차(사진 없음) · 구운 그림자에 든다
++    g = _glb_json(tmp_path / "data" / "jobs" / "j2" / "scene.glb")
++    mats = _node_materials(g, _building_nodes(g)[u["id"]])
++    assert "roof_ortho" in mats and "facade" in mats
++    assert any(i.get("name") == "ground_shade" for i in g["images"])
++    # 다시 만들기(새 장면) 에도 그대로
++    s3 = _bake(tmp_path, mbtiles, slope_dem, job="j3")
++    assert {b["user_uid"] for b in s3["buildings"] if b.get("user_uid")} == {UID, UID2}
++    c = _client(tmp_path, mbtiles)
++    listed = c.get("/api/jobs/j3/user-buildings").json()
++    by_uid = {b["user_uid"]: b["id"] for b in s3["buildings"] if b.get("user_uid")}
++    assert {it["uid"]: it["baked_id"] for it in listed["items"]} == by_uid      # 구워짐 → 뷰어 상자 없음
++
++
++def should_project_ortho_onto_outline_for_roof_texture_coordinates(tmp_path, mbtiles, slope_dem):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    _put(tmp_path, s1, UID, EMPTY, 12.0)
++    _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    raw = (tmp_path / "data" / "jobs" / "j2" / "scene.glb").read_bytes()
++    jl = int.from_bytes(raw[12:16], "little")
++    g = json.loads(raw[20:20 + jl])
++    scene = json.loads((tmp_path / "data" / "jobs" / "j2" / "scene.json").read_text(encoding="utf-8"))
++    u = next(b for b in scene["buildings"] if b.get("user_uid") == UID)
++    node = _building_nodes(g)[u["id"]]
++    names = [m["name"] for m in g["materials"]]
++    roof = next(p for p in g["meshes"][node["mesh"]]["primitives"] if names[p.get("material", -1)] == "roof_ortho")
++
++    def arr(acc_i, n):
++        acc = g["accessors"][acc_i]
++        bv = g["bufferViews"][acc["bufferView"]]
++        start = 20 + jl + 8 + bv.get("byteOffset", 0) + acc.get("byteOffset", 0)
++        return np.frombuffer(raw[start:start + acc["count"] * 4 * n], dtype=np.float32).reshape(-1, n)
++    uv = arr(roof["attributes"]["TEXCOORD_0"], 2)
++    pos = arr(roof["attributes"]["POSITION"], 3)
++    # 지붕 = 윤곽을 정사영상에 투영 — 지붕 정점이 윤곽 안, UV 는 정사영상 안에서 동쪽일수록 U 크고 북쪽일수록 V 작다(위쪽 행)
++    o = scene["origin"]
++    lon = o["lon"] + pos[:, 0] / (111320.0 * np.cos(np.radians(o["lat"])))
++    lat = o["lat"] - pos[:, 2] / 110540.0
++    from shapely.geometry import Point
++    poly = Polygon(EMPTY).buffer(1e-5)
++    assert all(poly.contains(Point(a, b)) for a, b in zip(lon, lat))
++    assert 0.0 <= uv.min() and uv.max() <= 1.0
++    west, east = pos[:, 0].argmin(), pos[:, 0].argmax()
++    south, north = pos[:, 2].argmax(), pos[:, 2].argmin()
++    assert uv[west, 0] < uv[east, 0] and uv[north, 1] < uv[south, 1]
++    # 지붕 UV 넓이 비 ≈ 윤곽 넓이 ÷ 정사영상 넓이(투영이 윤곽 모양 그대로)
++    w_m = (scene["bbox"][2] - scene["bbox"][0]) * 111320.0 * np.cos(np.radians(o["lat"]))
++    assert (uv[:, 0].max() - uv[:, 0].min()) * w_m == pytest.approx(pos[:, 0].max() - pos[:, 0].min(), rel=0.15)
++
++
++def should_send_user_building_to_photo_walls_only_with_oblique_overlay(tmp_path, mbtiles, monkeypatch):
++    """외벽 방식 — 비스듬한 실사 오버레이(extract)면 사진 텍스처 단계로 간다(photo_texture 투영), 아니면 절차 외벽."""
++    png, _ = _illustration(tmp_path)
++    inside = [[127.1014, 37.3612], [127.1017, 37.3612], [127.1017, 37.3614], [127.1014, 37.3614]]   # 오버레이 안
++    seen = {}
++
++    def fake_tex(built, baked, frame, rect, ortho, gb, P, warnings):
++        seen["specs"] = [s for s, *_ in built]
++        return {}
++    monkeypatch.setattr(PL, "_photo_textures", fake_tex)
++    data = tmp_path / "data"
++    UB.put(data, {"bbox": list(BB)}, UID, inside, 15.0, None, None)
++    req = GenerateRequest(bbox=BB, params=SceneParams(zoom=16), offline=True, overlay_mode="extract", fill_gaps=False,
++                          overlays=[{"id": 8, "image_path": str(png), "bounds": OV}])
++    with httpx.Client(transport=httpx.MockTransport(_no_net)) as dc:
++        sc = generate(req, _offline(tmp_path, mbtiles), tmp_path / "x", dem_client=dc)
++    assert any(s.source == UB.SOURCE for s in seen["specs"])                # 사진 텍스처 단계에 들어감
++    assert sum(1 for b in sc["buildings"] if b.get("user_uid") == UID) == 1
++    u = next(b for b in sc["buildings"] if b.get("user_uid") == UID)
++    # 사진에서 찾은 건물 중 직접 그린 건물에 덮인 것은 빠졌다(겹친 건물 없음)
++    up = Polygon(inside)
++    for b in sc["buildings"]:
++        if b is not u:
++            assert not UB.overlaps(Polygon(b["footprint"]), up)
++    # tiles(사진 없음) — 사진 텍스처 단계 없이 절차 외벽
++    seen.clear()
++    req = GenerateRequest(bbox=BB, params=SceneParams(zoom=16), offline=True, fill_gaps=False)
++    with httpx.Client(transport=httpx.MockTransport(_no_net)) as dc:
++        sc2 = generate(req, _offline(tmp_path, mbtiles), tmp_path / "t", dem_client=dc)
++    assert "specs" not in seen
++    g = _glb_json(tmp_path / "t" / "scene.glb")
++    u2 = next(b for b in sc2["buildings"] if b.get("user_uid") == UID)
++    assert {"facade", "roof_ortho"} <= _node_materials(g, _building_nodes(g)[u2["id"]])
++
++
++def should_build_user_building_with_no_external_data(tmp_path, mbtiles):
++    """외부 자료 0건(지도 · 국가 · DEM · 인터넷 없음) — 직접 그린 건물만으로도 장면 · 그림자 · 난간이 만들어진다."""
++    UB.put(tmp_path / "data", {"bbox": list(BB)}, UID, EMPTY, 30.0, 10, None)
++    req = GenerateRequest(bbox=BB, params=SceneParams(zoom=16), offline=True, fill_gaps=False)
++    with httpx.Client(transport=httpx.MockTransport(_no_net)) as dc:
++        sc = generate(req, _offline(tmp_path, mbtiles), tmp_path / "z", dem_client=dc)
++    assert [b["origin"] for b in sc["buildings"]] == ["user"] and sc["buildings"][0]["parapet"]
++    assert sc["user_buildings"]["built"] == 1 and sc["sun"]["baked"] is True
++
++
++def should_drop_by_overlap_fraction_or_iou_only():
++    sq = lambda x0, y0, dx, dy: Polygon([(x0, y0), (x0 + dx, y0), (x0 + dx, y0 + dy), (x0, y0 + dy)])   # noqa: E731
++    user = sq(0, 0, 10, 10)
++    assert UB.overlaps(sq(1, 1, 2, 2), user)              # 작은 자동 건물이 다 덮임
++    assert UB.overlaps(sq(5, 0, 10, 10), user)            # 반 겹침(덮인 몫 0.5)
++    assert not UB.overlaps(sq(8, 0, 10, 10), user)        # 20 % 겹침 · IoU 0.11 → 남김(옆 건물)
++    assert not UB.overlaps(sq(10, 0, 10, 10), user)       # 맞닿음
++    assert not UB.overlaps(sq(-5, -5, 20, 20), user)      # 4 배 큰 자동 건물이 감쌈 — IoU · 덮인 몫 0.25 → 다른 건물로 보고 남김
++    assert UB.overlaps(sq(-1, -1, 12, 12), user)          # 조금 큰 윤곽(같은 건물을 크게 딴 자료) — IoU 0.69 → 뺌
++    specs = [BuildingSpec(id=i, source="osm", source_id=f"o{i}", footprint_ll=p, tags={}) for i, p in
++             enumerate([sq(1, 1, 2, 2), sq(8, 0, 10, 10)], start=1)]
++    out, info = UB.merge(specs, [{"uid": UID, "outline": [[0, 0], [10, 0], [10, 10], [0, 10]], "height": 9.0}], 3.0)
++    assert [s.source_id for s in out] == ["o2", f"drawn/{UID}"] and info["removed"] == {"osm": 1}
++
++
++def should_apply_only_inside_rotated_rect(tmp_path, mbtiles, slope_dem):
++    rr = _rr()
++    data = tmp_path / "data"
++    scene = {"bbox": list(rr.bbox()), "rect": RECT}
++    UB.put(data, scene, UID, _square(rr, 30, 0, 5.0)[:-1], 20.0, None, None)          # 안
++    with pytest.raises(UB.UserBuildingError):                                         # 감싸는 bbox 모서리(사각형 밖) 거절
++        UB.put(data, scene, UID2, _square(rr, 0, 95, 4.0)[:-1], 20.0, None, None)
++    # 파일에 직접 넣은 사각형 밖 항목도 굽기에서는 빼고, 「모두 지우기」 에서도 남긴다
++    UB.put(data, {"bbox": list(rr.bbox())}, UID2, _square(rr, 0, 95, 4.0)[:-1], 20.0, None, None)
++    sc = _gen(tmp_path, mbtiles, slope_dem, "r", rect=RECT, gj=_user_geojson(tmp_path, rr))
++    assert [b["user_uid"] for b in sc["buildings"] if b.get("user_uid")] == [UID]
++    u = next(b for b in sc["buildings"] if b.get("user_uid"))
++    assert Polygon(sc["rect"]["corners"]).buffer(2e-7).contains(Polygon(u["footprint"]))
++    assert u["area_m2"] == pytest.approx(100, rel=0.05)                              # 10 × 10 m — 회전과 무관
++    assert UB.delete_in(data, {**scene, "rect": sc["rect"]}) == 1
++    assert [it["uid"] for p in UB._files(data) for it in json.loads(p.read_text(encoding="utf-8"))["items"]] == [UID2]
++
++
++def should_change_drawn_building_height_in_user_file_when_3d_panel_saves(tmp_path, mbtiles, slope_dem):
++    s1 = _bake(tmp_path, mbtiles, slope_dem)
++    _put(tmp_path, s1, UID, EMPTY, 12.0)
++    s2 = _bake(tmp_path, mbtiles, slope_dem, job="j2")
++    u = next(b for b in s2["buildings"] if b.get("user_uid") == UID)
++    glb = tmp_path / "data" / "jobs" / "j2" / "scene.glb"
++    y0, _ = _all_ys(glb, u["id"])
++    c = _client(tmp_path, mbtiles)
++    r = c.put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 21.0, "floors": 7})
++    assert r.status_code == 200, r.text
++    b = r.json()["building"]
++    assert b["height"] == 21.0 and b["levels"] == 7 and b["origin"] == "user" and "manual" not in b
++    y1, extras = _all_ys(glb, u["id"])
++    assert y1.max() - y0.max() == pytest.approx(9.0, abs=1e-3) and extras["height"] == 21.0
++    item = json.loads(_files(tmp_path)[0].read_text(encoding="utf-8"))["items"][0]
++    assert item["height"] == 21.0 and item["floors"] == 7
++    assert not (tmp_path / "data" / "overrides").exists()                   # 높이 직접 입력 파일에는 남기지 않는다
++    assert c.delete(f"/api/jobs/j2/buildings/{u['id']}/height").json()["building"]["height"] == 21.0   # 자동 높이 없음 — 그대로
++    s3 = _bake(tmp_path, mbtiles, slope_dem, job="j3")
++    assert next(b for b in s3["buildings"] if b.get("user_uid") == UID)["height"] == 21.0
++    # 파일에서 지운 건물을 판으로 고치면 409(다시 만들기 안내)
++    UB.delete(tmp_path / "data", UID)
++    assert c.put(f"/api/jobs/j2/buildings/{u['id']}/height", json={"height": 22.0}).status_code == 409
++
++
++def should_preview_boxes_when_checked_with_node():
++    node = shutil.which("node")
++    assert node, "node 가 없어 상자 미리보기 순수 함수 시험(userbuilding_check.mjs)을 돌릴 수 없다"
++    r = subprocess.run([node, str(Path(__file__).with_name("userbuilding_check.mjs"))], capture_output=True, text=True, timeout=60)
++    assert r.returncode == 0, r.stdout + r.stderr
+diff --git a/tests/userbuilding_check.mjs b/tests/userbuilding_check.mjs
+new file mode 100644
+index 0000000..1f4cc13
+--- /dev/null
++++ b/tests/userbuilding_check.mjs
+@@ -0,0 +1,68 @@
++// userbuilding.js 순수 함수 · view.js 연결 시험 — 직접 그린 건물 상자 미리보기 메시지 · 서버 목록 · 상자 모양(pytest 가 node 로 부른다).
++import { readFileSync } from "node:fs";
++import { boxShape, cleanOutline, parseHostUserBuilding, pendingBoxes } from "../map3d/static/userbuilding.js";
++import { enuOf } from "../map3d/static/camsync.js";
++
++const fails = [];
++const eq = (a, b, what) => { if (JSON.stringify(a) !== JSON.stringify(b)) fails.push(`${what}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
++const near = (a, b, tol, what) => { if (!(Math.abs(a - b) <= tol)) fails.push(`${what}: ${a} != ${b}`); };
++
++const SQ = [[127.1030, 37.3620], [127.1033, 37.3620], [127.1033, 37.3622], [127.1030, 37.3622]];
++const UID = "a1b2c3d4e5f6";
++
++// 메시지 검사
++{
++  eq(parseHostUserBuilding({ type: "userbuilding.preview", uid: UID, outline: SQ, height: 18 }), { type: "userbuilding.preview", uid: UID, outline: SQ, height: 18 }, "preview");
++  eq(parseHostUserBuilding({ type: "userbuilding.preview", uid: UID, outline: [...SQ, SQ[0]], height: 18 }).outline, SQ, "closed ring");
++  eq(parseHostUserBuilding({ type: "userbuilding.preview", uid: UID, height: null }), { type: "userbuilding.preview", uid: UID, height: null }, "remove");
++  eq(parseHostUserBuilding({ type: "userbuilding.clear" }), { type: "userbuilding.clear" }, "clear");
++  for (const bad of [
++    { type: "userbuilding.preview", uid: "A1B2C3D4E5F6", outline: SQ, height: 18 },   // 대문자
++    { type: "userbuilding.preview", uid: "../x", outline: SQ, height: 18 },
++    { type: "userbuilding.preview", uid: UID, outline: SQ.slice(0, 2), height: 18 },  // 2점
++    { type: "userbuilding.preview", uid: UID, outline: SQ, height: 0.5 },
++    { type: "userbuilding.preview", uid: UID, outline: SQ, height: 601 },
++    { type: "userbuilding.preview", uid: UID, outline: SQ, height: "18" },
++    { type: "userbuilding.preview", uid: UID, outline: [[1, "2"], [3, 4], [5, 6]], height: 18 },
++    { type: "userbuilding.preview", uid: UID, outline: [[1, 2], [3, 4], [5, NaN]], height: 18 },
++    { type: "userbuilding.preview", uid: UID, outline: [[1, 2], [3, 4], [500, 6]], height: 18 },
++    { type: "userbuilding.what", uid: UID }, null, {},
++  ]) eq(parseHostUserBuilding(bad), null, `bad ${JSON.stringify(bad)}`);
++  eq(cleanOutline(Array.from({ length: 201 }, (_, i) => [i * 1e-5, (i % 2) * 1e-5])), null, "201 points");
++}
++// 서버 목록 → 아직 안 구운 것만 상자
++{
++  const list = { items: [
++    { uid: UID, outline: SQ, height: 18, baked_id: null },
++    { uid: "0123456789ab", outline: SQ, height: 9, baked_id: 4 },     // 구워짐 → 상자 없음(GLB 에 이미 있다)
++    { uid: "bad", outline: SQ, height: 9, baked_id: null },           // 형식 틀림 → 버림
++  ] };
++  eq(pendingBoxes(list).map((m) => m.uid), [UID], "pending only");
++  eq(pendingBoxes(null), [], "no list");
++  eq(pendingBoxes({}), [], "no items");
++}
++// 상자 모양 — 장면 평면(동 · 북 m), 반시계 고리, 바닥 = 꼭짓점 지면의 가장 낮은 값
++{
++  const origin = { lon: 127.102, lat: 37.3616 };
++  const toEnu = (lon, lat) => enuOf(origin, lon, lat);
++  const cw = [...SQ].reverse();                                        // 시계 방향으로 줘도
++  const { ring, base, area } = boxShape(cw, toEnu, (x, z) => 50 + x * 0.01 - z * 0.02);
++  let s = 0;
++  for (let i = 0; i < ring.length; i++) s += ring[i][0] * ring[(i + 1) % ring.length][1] - ring[(i + 1) % ring.length][0] * ring[i][1];
++  eq(s > 0, true, "ccw");
++  near(area, 26.5 * 22.2, 12, "area m2");                              // 약 26.5 × 22.2 m
++  const e0 = toEnu(SQ[0][0], SQ[0][1]);
++  eq(ring.some(([e, n]) => Math.abs(e - e0.x) < 1e-9 && Math.abs(n + e0.z) < 1e-9), true, "north = -z");
++  const grounds = SQ.map(([lon, lat]) => { const p = toEnu(lon, lat); return 50 + p.x * 0.01 - p.z * 0.02; });
++  near(base, Math.min(...grounds), 1e-9, "base = lowest ground");
++}
++// view.js 연결
++{
++  const src = readFileSync(new URL("../map3d/static/view.js", import.meta.url), "utf8");
++  for (const s of ["parseHostUserBuilding(data)", "onUserBuildingMessage(m)", "pendingBoxes(await r.json())", "loadUserBoxes()",
++    "ExtrudeGeometry(shape, { depth: m.height", "geo.rotateX(-Math.PI / 2)", "/user-buildings`", "scene.add(mesh)"])
++    if (!src.includes(s)) fails.push(`view.js lacks ${s}`);
++}
++
++if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
++console.log("userbuilding ok");

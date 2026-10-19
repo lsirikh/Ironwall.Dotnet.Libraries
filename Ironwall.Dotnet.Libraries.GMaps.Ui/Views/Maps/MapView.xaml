@@ -1132,6 +1132,14 @@
 							ToolTip="3D 영역 만들기 (Enter = 지금 화면 전체)">
 							<md:PackIcon Kind="CubeOutline" />
 						</Button>
+						<!--  건물 그리기(2026-10-19) — 화면 가운데 3D 영역 위에 건물 윤곽을 그려 들어올린다(MapViewModel.UserBuilding)  -->
+						<Button
+							AutomationProperties.AutomationId="Map.UserBuilding.Draw"
+							Command="{Binding DrawUserBuildingCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="건물 그리기 — 3D 영역 안에 위에서 본 윤곽을 그려 들어올리기">
+							<md:PackIcon Kind="OfficeBuildingOutline" />
+						</Button>
 					</StackPanel>
 				</Border>
 			</StackPanel>
@@ -1854,6 +1862,14 @@
 					Panel.ZIndex="126"
 					Content="{Binding BuildingHeightPanel}"
 					Visibility="{Binding IsBuildingHeightPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  「건물 그리기」 판(2026-10-19) — 그리는 동안 늘 보임(꼭짓점 수 · 높이 · 저장). 같은 크롬 · 머리 띠 끌기.  -->
+				<ContentPresenter
+					Canvas.Left="620"
+					Canvas.Top="90"
+					Panel.ZIndex="126"
+					Content="{Binding UserBuildingPanel}"
+					Visibility="{Binding IsUserBuildingDrawing, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  「이미지 자르기」 판(2026-10-19) — 오버레이 이미지를 처음 불러올 때 · 우클릭 「다각형으로 자르기」. 같은 크롬 · 머리 띠 끌기.  -->
 				<ContentPresenter

@@ -173,6 +173,7 @@ public static class Map3DBuilding
     public static string SourceText(string? heightFrom, string? origin)
         => heightFrom switch
         {
+            _ when origin == "user" => "직접 그린 건물",   // 「건물 그리기」 — 높이는 그린 사람이 넣은 값(map-3d userbuildings)
             "manual" or "edit" => "직접 입력",
             "tag" or "levels" or "user" => origin == "national" ? "국가 자료" : "지도 자료",
             "oblique" or "overlay" or "llm" => "사진에서 잼",

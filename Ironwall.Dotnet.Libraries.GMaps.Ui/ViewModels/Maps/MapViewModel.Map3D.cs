@@ -1063,7 +1063,7 @@ public partial class MapViewModel
 
     /// <summary>편집 모드 · 독점 입력 모드 중인가 — 이때는 3D 에 들어가지 않는다.</summary>
     private bool IsMap3DBlockedByInputMode()
-        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled, ExclusiveInputModeGate.IsActive(MainMap));
+        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled, ExclusiveInputModeGate.IsActive(MainMap) || IsUserBuildingDrawing);
 
     /// <summary>
     /// 입력 모드가 켜지거나 꺼진 직후 호출 — 모드 중이면 3D 를 접고(표시 중이면 3D 마지막 카메라를 2D 에 적용),

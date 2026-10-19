@@ -1,0 +1,4 @@
+﻿
+통과!  - 실패:     0, 통과:     1, 건너뜀:     0, 전체:     1, 기간: 457 ms - GMaps.MapEdit.Tests.dll (net8.0)
+
+
