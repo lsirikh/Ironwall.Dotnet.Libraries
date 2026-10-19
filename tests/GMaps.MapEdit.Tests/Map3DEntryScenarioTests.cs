@@ -29,7 +29,7 @@ public class Map3DEntryScenarioTests
 
     // ─────────────── 장치 ───────────────
 
-    private sealed class Rig
+    internal sealed class Rig
     {
         public WiredMapRig W { get; }
         public MapViewModel Vm => W.Vm;
@@ -143,7 +143,7 @@ public class Map3DEntryScenarioTests
         }
     }
 
-    private static void Run(string mode, Action<Rig> body) => Scenario.Sta(() =>
+    internal static void Run(string mode, Action<Rig> body) => Scenario.Sta(() =>
     {
         var rig = new Rig(mode);
         body(rig);
@@ -151,7 +151,7 @@ public class Map3DEntryScenarioTests
     });
 
     /// <summary>들어가서 펼쳐질 때까지(재사용 장면은 안내 타이머 한 틱 뒤 펼침).</summary>
-    private static void SettleEntry(Rig rig) { if (rig.State == "Pending") rig.Tick(); }
+    internal static void SettleEntry(Rig rig) { if (rig.State == "Pending") rig.Tick(); }
 
     // ─────────────── 1. 방식 × 줌 × 위치 × 장면 표 ───────────────
 
