@@ -1264,9 +1264,6 @@ public partial class MapViewModel : BasePanelViewModel,
         // 「이미지 자르기」 판 안에서 온 키는 판 것 — Delete(꼭짓점) · Ctrl+Z/Y(판 안 되돌리기) · 방향키가 선택 그림 삭제 · 전역 Undo · 그림 이동으로 새지 않게.
         if (IsImageCropPanelKey(e)) return;
 
-        // 「건물 그리기」 중 지도 화면의 키는 그리기 몫 — Delete(꼭짓점) · Ctrl+Z(윤곽 되돌리기) · 방향키가 선택 심볼 삭제 · 전역 Undo · 심볼 이동으로 새지 않게.
-        if (IsUserBuildingKey(e)) return;
-
         // [C10] 드로잉 중에는 Ctrl+Z = 마지막 점 제거, Delete/방향키/Redo = 무시 — 전역 Undo·선택 삭제·격자 이동보다 먼저 판정.
         //   윈도우 터널이라 포커스와 무관하게 여기가 가장 먼저 도달한다(그룹 후킹은 초기화 시 구독).
         if (TryRouteDrawingKey(e)) return;
@@ -1274,9 +1271,10 @@ public partial class MapViewModel : BasePanelViewModel,
         // 묶음 회전 키(]/[ · Enter · Esc) — 열린 회전이 있으면 다른 키보다 먼저(ESC 가 선택 해제로 새지 않게).
         if (TryRouteGroupRotationKey(e)) return;
 
-        // 「건물 그리기」 중에는 그리기 키(Delete = 고른 꼭짓점 · Backspace · Enter · Esc · Ctrl+Z)가 먼저 — 이 처리기는 초기화 때 구독돼
-        //   그리기 처리기(그리기 시작 때 구독)보다 앞서므로, 안 하면 편집 모드의 남은 선택이 Delete 로 지워지고 Ctrl+Z 가 전역 Undo 로 샌다.
-        if (IsUserBuildingDrawing && HandleUserBuildingKey(e.Key, System.Windows.Input.Keyboard.Modifiers, inTextBox: false)) { e.Handled = true; return; }
+        // 「건물 그리기」 중 지도 화면에서 온 키는 그리기 몫(그리기 처리기 OnUserBuildingKeyDown 이 받는다) — Delete(꼭짓점) · Ctrl+Z(윤곽 되돌리기) ·
+        //   방향키가 선택 심볼 삭제 · 전역 Undo · 심볼 이동으로 새지 않게. 묶음 회전 키 뒤(열린 회전의 Esc 가 먼저), 그 위에 뜬 확인 창의 키(Enter · Delete)는 제외.
+        //   (두 수정이 같은 자리를 다르게 고친 것을 하나로 — 2026-10-20 병합 뒤 시험 2건 실패로 확인)
+        if (IsUserBuildingKey(e)) return;
 
         // 레이어 패널에 초점이 있으면 선택 키(↑/↓ · Space · Ctrl+A · Esc)는 패널 몫 — 지도 방향키 이동 · 전체 선택으로 새지 않게.
         if (LayerPanel is { IsKeyboardFocusWithin: true } && LayerPanelControl.IsSelectionKey(e.Key, System.Windows.Input.Keyboard.Modifiers)) return;
