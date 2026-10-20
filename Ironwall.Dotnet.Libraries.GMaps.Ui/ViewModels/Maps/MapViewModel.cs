@@ -869,6 +869,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (MainMap.IsLineDrawing) _ = MainMap.LineDrawingService?.CancelDrawingAsync();
         if (MainMap.IsMeasuring) MainMap.StopMeasure();
         if (IsUserBuildingDrawing) ExitUserBuildingDraw("symbol-place");   // 「건물 그리기」 표면이 배치 클릭을 가로챈다
+        if (IsDecorating) ExitDecoration("symbol-place");
         _placeCategory = category; _placeType = type; _placeTitle = title; _placeVariant = null;
         MainMap.IsSymbolPlacementMode = true;
         SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로
@@ -1054,6 +1055,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private void OnLineDrawingStarted(string status)
     {
         if (IsUserBuildingDrawing) ExitUserBuildingDraw("line-draw");   // 「건물 그리기」 표면이 선 그리기 클릭을 가로챈다
+        if (IsDecorating) ExitDecoration("line-draw");
         IsLineDrawing = true;
         LineDrawingStatus = status;
         ClearAllSelections();
@@ -1065,7 +1067,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>ESC = 타겟 모드 취소. 드로잉 중이면 드로잉 키 라우팅이 우선(C8/C9).</summary>
     private void OnMapPreviewKeyDownForAim(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (IsUserBuildingKey(e)) return;   // 「건물 그리기」 Esc 두 단계가 편집 모드 선택 해제로 새지 않게
+        if (IsUserBuildingKey(e) || IsDecorationKey(e)) return;   // 「건물 그리기」 · 「꾸미기」 Esc 단계가 편집 모드 선택 해제로 새지 않게
         if (TryRouteDrawingKey(e)) return;
         if (TryHandleMap3DKey(e)) return;   // 3D 그리기 Enter · 3D 화면 ESC(MapViewModel.Map3D)
         if (e.Key != System.Windows.Input.Key.Escape) return;
@@ -1274,7 +1276,7 @@ public partial class MapViewModel : BasePanelViewModel,
         // 「건물 그리기」 중 지도 화면에서 온 키는 그리기 몫(그리기 처리기 OnUserBuildingKeyDown 이 받는다) — Delete(꼭짓점) · Ctrl+Z(윤곽 되돌리기) ·
         //   방향키가 선택 심볼 삭제 · 전역 Undo · 심볼 이동으로 새지 않게. 묶음 회전 키 뒤(열린 회전의 Esc 가 먼저), 그 위에 뜬 확인 창의 키(Enter · Delete)는 제외.
         //   (두 수정이 같은 자리를 다르게 고친 것을 하나로 — 2026-10-20 병합 뒤 시험 2건 실패로 확인)
-        if (IsUserBuildingKey(e)) return;
+        if (IsUserBuildingKey(e) || IsDecorationKey(e)) return;   // 「꾸미기」도 같은 몫(Delete = 고른 항목 · Ctrl+Z/Y = 꾸미기 기록)
 
         // 레이어 패널에 초점이 있으면 선택 키(↑/↓ · Space · Ctrl+A · Esc)는 패널 몫 — 지도 방향키 이동 · 전체 선택으로 새지 않게.
         if (LayerPanel is { IsKeyboardFocusWithin: true } && LayerPanelControl.IsSelectionKey(e.Key, System.Windows.Input.Keyboard.Modifiers)) return;

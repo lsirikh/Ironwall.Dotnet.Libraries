@@ -11,6 +11,8 @@ public sealed record UserBuildingState(IReadOnlyList<UbPoint> Outline, double He
 {
     public string Roof { get; init; } = Map3DUserBuilding.RoofFlat;
     public string Use { get; init; } = Map3DUserBuilding.UseAuto;
+    /// <summary>외관 — 외벽 색 · 지붕 색 · 외벽 무늬(Hidden 은 쓰지 않음).</summary>
+    public Map3DLookState Look { get; init; } = Map3DLookState.Auto;
 }
 
 /****************************************************************************

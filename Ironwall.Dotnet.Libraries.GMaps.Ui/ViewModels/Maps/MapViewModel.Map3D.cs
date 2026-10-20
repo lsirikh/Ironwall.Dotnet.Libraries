@@ -1090,6 +1090,18 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 빈 땅 클릭 처리 실패(격리): {ex.Message}"); }
             return;
         }
+        if (msg.Type == "userbuilding.pick")
+        {
+            try { if (msg.UserUid is { } uid) OnMap3DUserBuildingPicked(uid); }   // 직접 그린 건물 고치기 판(MapViewModel.UserBuilding)
+            catch (Exception ex) { _log?.Error($"[Map3D] 직접 그린 건물 고르기 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
+        if (msg.Type == "decoration.pick")
+        {
+            try { if (msg.DecorationUid is { } uid) OnMap3DDecorationPicked(uid); }   // 「꾸미기」 판(MapViewModel.Decoration)
+            catch (Exception ex) { _log?.Error($"[Map3D] 꾸미기 항목 고르기 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
         if (msg.Pick is { } pick)
         {
             try { OnMap3DPick(pick); }
@@ -1161,7 +1173,7 @@ public partial class MapViewModel
 
     /// <summary>편집 모드 · 독점 입력 모드 중인가 — 이때는 3D 에 들어가지 않는다.</summary>
     private bool IsMap3DBlockedByInputMode()
-        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled, ExclusiveInputModeGate.IsActive(MainMap) || IsUserBuildingDrawing);
+        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled, ExclusiveInputModeGate.IsActive(MainMap) || IsUserBuildingDrawing || IsDecorating);
 
     /// <summary>
     /// 입력 모드가 켜지거나 꺼진 직후 호출 — 모드 중이면 3D 를 접고(표시 중이면 3D 마지막 카메라를 2D 에 적용),
