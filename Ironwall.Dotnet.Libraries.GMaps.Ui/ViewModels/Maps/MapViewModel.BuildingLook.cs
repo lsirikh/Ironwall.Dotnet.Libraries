@@ -32,7 +32,7 @@ public partial class MapViewModel
     private string? _pendingLooksReset;
 
     public IReadOnlyList<KeyValuePair<string, string>> BuildingFacades => Map3DLook.Facades;
-    public IReadOnlyList<KeyValuePair<string, string>> BuildingColors => Map3DLook.Colors;
+    public IReadOnlyList<KeyValuePair<string, string>> BuildingColors => Map3DLook.ColorsWith(_bhBuilding?.Look.WallColor, _bhBuilding?.Look.RoofColor);
     private Map3DLookState BhLook => _bhLookEdit ?? _bhBuilding?.Look ?? Map3DLookState.Auto;
 
     /// <summary>외벽 무늬(auto · residential · commercial · industrial · glass · brick · concrete).</summary>

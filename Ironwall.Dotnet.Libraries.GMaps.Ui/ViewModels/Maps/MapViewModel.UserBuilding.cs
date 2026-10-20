@@ -148,7 +148,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
 
     private string? _ubWallColor, _ubRoofColor, _ubFacade;
     public IReadOnlyList<KeyValuePair<string, string>> UserBuildingFacades => Map3DLook.Facades;
-    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingColors => Map3DLook.Colors;
+    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingColors => Map3DLook.ColorsWith(_ubWallColor, _ubRoofColor);
 
     /// <summary>외벽 무늬(auto · residential · commercial · industrial · glass · brick · concrete).</summary>
     public string UserBuildingFacade
@@ -647,7 +647,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(IsUserBuildingToolPolygon), nameof(UserBuildingCircleSidesText), nameof(UserBuildingRoof), nameof(UserBuildingUse),
                      nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus), nameof(IsUserBuildingToolTriangle),
                      nameof(UserBuildingSelectedUids), nameof(HasUserBuildingSelection), nameof(UserBuildingSelectionText), nameof(IsUserBuildingMergeVisible),
-                     nameof(UserBuildingFacade), nameof(UserBuildingWallColor), nameof(UserBuildingRoofColor),
+                     nameof(UserBuildingColors), nameof(UserBuildingFacade), nameof(UserBuildingWallColor), nameof(UserBuildingRoofColor),
                  })
             NotifyOfPropertyChange(name);
         ApplyUserBuildingCommand.RaiseCanExecuteChanged();

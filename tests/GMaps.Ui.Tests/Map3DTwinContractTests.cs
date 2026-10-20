@@ -288,4 +288,13 @@ public class Map3DTwinContractTests
         var limit = new Map3DClient("http://h", new FakeHandler((_, _) => Json(HttpStatusCode.BadRequest, "{\"detail\":\"영역 채우기 나무는 2000그루까지입니다\"}")));
         Assert.Equal("영역 채우기 나무는 2000그루까지입니다", (await Assert.ThrowsAsync<Map3DRequestException>(() => limit.PutDecorationAsync("j1", item))).Message);
     }
+
+    [Fact]
+    public void should_list_unknown_current_color_as_custom_entry_when_not_in_palette()
+    {
+        Assert.Same(Map3DLook.Colors, Map3DLook.ColorsWith(null, "", "#b03a2e"));
+        var list = Map3DLook.ColorsWith("#7D3C98", null, "#7d3c98");
+        Assert.Equal(Map3DLook.Colors.Count + 1, list.Count);
+        Assert.Equal(new KeyValuePair<string, string>("#7d3c98", "지정 색 #7d3c98"), list[^1]);
+    }
 }

@@ -264,7 +264,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
                      nameof(BuildingHeightSourceText), nameof(IsBuildingHeightReadOnly), nameof(IsBuildingHeightEditable), nameof(IsBuildingHeightChanged),
                      nameof(BuildingHeightSummary), nameof(BuildingHeightFloorsText), nameof(BuildingHeightText), nameof(BuildingHeightFloorHeightText),
                      nameof(BuildingHeightError), nameof(HasBuildingHeightError), nameof(BuildingHeightUndoCount),
-                     nameof(BuildingFacade), nameof(BuildingWallColor), nameof(BuildingRoofColor), nameof(IsBuildingLookChanged),
+                     nameof(BuildingColors), nameof(BuildingFacade), nameof(BuildingWallColor), nameof(BuildingRoofColor), nameof(IsBuildingLookChanged),
                      nameof(IsBuildingLookAvailable), nameof(IsBuildingLookUnsupported), nameof(BuildingHideButtonText), nameof(IsBuildingHidden),
                      nameof(BuildingHiddenItems), nameof(BuildingHiddenCountText), nameof(HasBuildingHidden), nameof(BuildingLookNotice), nameof(HasBuildingLookNotice),
                  })

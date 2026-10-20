@@ -56,6 +56,17 @@ public static class Map3DLook
         new("#6fa8b8", "청록"), new("#4f7a4f", "녹색"), new("#b03a2e", "붉은색"), new("#2f3e66", "남색"),
     };
 
+    /// <summary>
+    /// 색 고르기 목록 + 목록에 없는 지금 색("지정 색 #rrggbb") — 엔진 · 다른 곳에서 넣은 색이 콤보에서 빈칸으로 보이지 않게.
+    /// 모두 목록 안이면 <see cref="Colors"/> 그대로.
+    /// </summary>
+    public static IReadOnlyList<KeyValuePair<string, string>> ColorsWith(params string?[] current)
+    {
+        var extra = current.Select(NormalizeColor).OfType<string>().Distinct()
+                           .Where(c => Colors.All(p => p.Key != c)).Select(c => new KeyValuePair<string, string>(c, "지정 색 " + c)).ToList();
+        return extra.Count == 0 ? Colors : Colors.Concat(extra).ToList();
+    }
+
     /// <summary>JObject.Merge 가 null 값(= 자동으로)을 버리지 않게.</summary>
     public static readonly JsonMergeSettings KeepNulls = new() { MergeNullValueHandling = MergeNullValueHandling.Merge };
 

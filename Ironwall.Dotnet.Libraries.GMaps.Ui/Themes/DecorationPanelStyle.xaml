@@ -471,7 +471,14 @@
 									Foreground="{DynamicResource TextPrimaryBrush}"
 									ItemsSource="{Binding DecorationItems}"
 									SelectedValue="{Binding DecorationSelectedUid, Mode=TwoWay}"
-									SelectedValuePath="Uid" />
+									SelectedValuePath="Uid">
+									<!--  화면 읽기 · 자동화 이름 = 보이는 글(기본은 항목 record 의 ToString)  -->
+									<ListBox.ItemContainerStyle>
+										<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding Text}" />
+										</Style>
+									</ListBox.ItemContainerStyle>
+								</ListBox>
 							</StackPanel>
 						</Grid>
 					</fb:FrameBorder>
