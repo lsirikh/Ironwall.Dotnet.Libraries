@@ -159,6 +159,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         }
         BhUndo.RemoveAll(u => u.Job == job);   // 판 안 되돌리기 — 없는 장면에 PUT 하지 않게
         if (_ubArea?.Id == job) ExitUserBuildingDraw(cause);   // 그 영역에서 건물을 그리던 중
+        if (_decoArea?.Id == job) ExitDecoration(cause);   // 그 영역을 꾸미던 중
         // 그 영역의 「다시 만들기」 · 「3D 줌 바꾸기」 판 — 남기면 [만들기] 가 사라진 영역을 다시 구워 지운 영역이 되살아났다(2026-10-20)
         if (_map3DBakeOptionsSourceId == job || _map3DBakeReplaces == job || _map3DZoomEditArea?.Id == job)
         {

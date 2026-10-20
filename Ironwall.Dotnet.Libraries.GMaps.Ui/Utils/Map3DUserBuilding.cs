@@ -27,6 +27,10 @@ public sealed record Map3DUserBuildingItem(string Uid, IReadOnlyList<UbPoint> Ou
     public string Roof { get; init; } = Map3DUserBuilding.RoofFlat;
     /// <summary>외벽 성격(auto · commercial · industrial · residential).</summary>
     public string Use { get; init; } = Map3DUserBuilding.UseAuto;
+    /// <summary>외벽 색 · 지붕 색("#rrggbb", null = 자동) · 외벽 무늬(Map3DLook.Facades, twin-contract B).</summary>
+    public string? WallColor { get; init; }
+    public string? RoofColor { get; init; }
+    public string Facade { get; init; } = Map3DLook.FacadeAuto;
 }
 
 /// <summary>합치기(POST …/user-buildings/merge) 응답 — 합친 건물 · 합쳐진(지워진) uid · 채운 안쪽 빈 곳 수 · 지붕을 평지붕으로 바꿨는가.</summary>
@@ -59,13 +63,14 @@ public static class Map3DUserBuilding
     /// <summary>원 · 타원 근사 꼭짓점 수(기본 · 범위).</summary>
     public const int DefaultCircleSides = 32, MinCircleSides = 8, MaxCircleSides = 128;
 
-    public const string RoofFlat = "flat", RoofGable = "gable", RoofCone = "cone", RoofDome = "dome";
+    public const string RoofFlat = "flat", RoofGable = "gable", RoofCone = "cone", RoofDome = "dome", RoofHip = "hip", RoofShed = "shed";
     public const string UseAuto = "auto", UseCommercial = "commercial", UseIndustrial = "industrial", UseResidential = "residential";
     /// <summary>판의 지붕 모양 고르기(값, 쉬운 말).</summary>
     public static readonly IReadOnlyList<KeyValuePair<string, string>> Roofs = new[]
     {
         new KeyValuePair<string, string>(RoofFlat, "평지붕"), new(RoofGable, "박공(세모 지붕)"),
         new(RoofCone, "원뿔(둥근 윤곽)"), new(RoofDome, "돔(둥근 윤곽 · 탱크)"),
+        new(RoofHip, "모임지붕(네 면 경사)"), new(RoofShed, "외쪽 지붕(한쪽 경사)"),
     };
     /// <summary>판의 외벽 성격 고르기(값, 쉬운 말).</summary>
     public static readonly IReadOnlyList<KeyValuePair<string, string>> Uses = new[]
@@ -269,7 +274,7 @@ public static class Map3DUserBuilding
 
     /// <summary>고른 지붕을 그 윤곽으로 지을 수 있는가(평지붕은 늘 된다) — 안 되면 map-3d 가 평지붕으로 짓는다.</summary>
     public static bool CanBuildRoof(string roof, IReadOnlyList<UbPoint> geo)
-        => roof == RoofGable ? CanGable(geo) : roof is RoofCone or RoofDome ? CanRoundRoof(geo) : true;
+        => roof is RoofGable or RoofHip or RoofShed ? CanGable(geo) : roof is RoofCone or RoofDome ? CanRoundRoof(geo) : true;   // 모임 · 외쪽도 박공처럼 네모에 가까운 모양
 
     /// <summary>볼록 껍질(단조 사슬, 반시계).</summary>
     private static List<UbPoint> ConvexHull(IReadOnlyList<UbPoint> pts)
@@ -323,7 +328,12 @@ public static class Map3DUserBuilding
 
     /// <summary>PUT 본문 — 지붕 모양 · 외벽 성격까지(모르는 값은 평지붕 · 자동).</summary>
     public static JObject PutBody(IReadOnlyList<UbPoint> outline, double height, int? floors, string? name, string roof, string use)
-        => new()
+        => PutBody(outline, height, floors, name, roof, use, null);
+
+    /// <summary>PUT 본문 — 외벽 색 · 지붕 색(null = 자동) · 외벽 무늬까지(look 의 Hidden 은 쓰지 않는다). look 이 null 이면 그 키를 빼서 옛 본문 그대로.</summary>
+    public static JObject PutBody(IReadOnlyList<UbPoint> outline, double height, int? floors, string? name, string roof, string use, Map3DLookState? look)
+    {
+        var body = new JObject
         {
             ["outline"] = OutlineJson(outline),
             ["height"] = Map3DBuilding.ClampHeight(height),
@@ -332,6 +342,12 @@ public static class Map3DUserBuilding
             ["roof"] = Roofs.Any(r => r.Key == roof) ? roof : RoofFlat,
             ["use"] = Uses.Any(u => u.Key == use) ? use : UseAuto,
         };
+        if (look != null) body.Merge(Map3DLook.PutBody(null, look), Map3DLook.KeepNulls);   // wall_color · roof_color · facade
+        return body;
+    }
+
+    /// <summary>항목의 외관(외벽 색 · 지붕 색 · 외벽 무늬).</summary>
+    public static Map3DLookState LookOf(Map3DUserBuildingItem it) => new(false, it.WallColor, it.RoofColor, it.Facade);
 
     /// <summary>3D 상자 미리보기(다시 만들기 전) — 높이 null = 그 상자 지움.</summary>
     public static string PreviewMessageJson(string uid, IReadOnlyList<UbPoint>? outline, double? height)
@@ -342,6 +358,23 @@ public static class Map3DUserBuilding
         return o.ToString(Formatting.None);
     }
 
+    /// <summary>저장된 건물 그대로 3D 상자 미리보기 — 층수 · 외벽 색 · 지붕 색 · 외벽 무늬 · 지붕 모양까지(뷰어가 층 띠 · 창 칸 · 지붕 색을 입힌다).</summary>
+    public static string PreviewMessageJson(Map3DUserBuildingItem it)
+    {
+        var o = JObject.Parse(PreviewMessageJson(it.Uid, it.Outline, it.Height));
+        o["floors"] = it.Floors is int f ? f : JValue.CreateNull();
+        o.Merge(Map3DLook.PutBody(null, LookOf(it)), Map3DLook.KeepNulls);
+        o["roof"] = it.Roof;
+        return o.ToString(Formatting.None);
+    }
+
+    /// <summary>3D 상자 고름 표시(null = 지움) — {"type":"userbuilding.select","uid"}.</summary>
+    public static string SelectMessageJson(string? uid)
+        => new JObject { ["type"] = "userbuilding.select", ["uid"] = uid is null ? JValue.CreateNull() : uid }.ToString(Formatting.None);
+
+    /// <summary>map-3d UID_RE — 소문자 16진수 12자.</summary>
+    public static bool IsUid(string? uid) => uid is { Length: 12 } && uid.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+
     /// <summary>3D 상자 모두 지움(「모두 지우기」).</summary>
     public static string ClearMessageJson() => new JObject { ["type"] = "userbuilding.clear" }.ToString(Formatting.None);
 
@@ -350,7 +383,7 @@ public static class Map3DUserBuilding
     {
         if (o?["uid"]?.Type != JTokenType.String || o["outline"] is not JArray arr) return null;
         string uid = o.Value<string>("uid")!;
-        if (uid.Length != 12 || !uid.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')) return null;
+        if (!IsUid(uid)) return null;
         var pts = new List<UbPoint>();
         foreach (var t in arr)
         {
@@ -363,10 +396,12 @@ public static class Map3DUserBuilding
         string? name = o["name"]?.Type == JTokenType.String && o.Value<string>("name") is { Length: > 0 } s ? s : null;
         string? roof = o["roof"]?.Type == JTokenType.String ? o.Value<string>("roof") : null;
         string? use = o["use"]?.Type == JTokenType.String ? o.Value<string>("use") : null;
+        var look = Map3DLook.StateOf(o);
         return new Map3DUserBuildingItem(uid, pts, h, floors, name, baked)
         {
             Roof = Roofs.Any(r => r.Key == roof) ? roof! : RoofFlat,
             Use = Uses.Any(u => u.Key == use) ? use! : UseAuto,
+            WallColor = look.WallColor, RoofColor = look.RoofColor, Facade = look.Facade,
         };
     }
 
@@ -382,7 +417,7 @@ public static class Map3DUserBuilding
 
     /// <summary>POST …/user-buildings/merge 본문 — {"uids":[…],"height","floors","name","use"}(null = 서버가 정함).</summary>
     public static JObject MergeBody(IReadOnlyList<string> uids, double? height = null, int? floors = null, string? name = null, string? use = null,
-                                    string? uid = null)
+                                    string? uid = null, Map3DLookState? look = null)
     {
         var body = new JObject
         {
@@ -394,6 +429,7 @@ public static class Map3DUserBuilding
         };
         // 다시 하기 — 처음 합친 건물 uid 그대로(그 뒤 높이 고치기 기록이 같은 건물을 가리키게). 처음 합칠 때는 보내지 않는다(옛 엔진 호환).
         if (!string.IsNullOrEmpty(uid)) body["uid"] = uid;
+        if (look != null) body.Merge(Map3DLook.PutBody(null, look), Map3DLook.KeepNulls);   // 다시 하기 — 처음 합친 건물의 외관 그대로(처음 합칠 때는 서버가 정함)
         return body;
     }
 

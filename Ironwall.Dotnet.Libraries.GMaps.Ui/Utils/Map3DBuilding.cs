@@ -21,7 +21,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 /// Manual = 직접 입력한 높이인가. 모르는 값은 null.
 /// </summary>
 public sealed record Map3DBuildingPick(int Id, string? Origin, double Height, string? HeightSource, string? HeightFrom, int? Levels,
-                                       double? AreaM2, double? Lon, double? Lat, bool Manual);
+                                       double? AreaM2, double? Lon, double? Lat, bool Manual)
+{
+    /// <summary>모양 덮어쓰기(숨김 · 외벽 색 · 지붕 색 · 외벽 무늬, twin-contract A) — 키가 없으면 자동.</summary>
+    public Map3DLookState Look { get; init; } = Map3DLookState.Auto;
+    /// <summary>다시 만든 직접 그린 건물의 uid(user_uid) — 아니면 null.</summary>
+    public string? UserUid { get; init; }
+}
 
 public static class Map3DBuilding
 {
@@ -63,8 +69,10 @@ public static class Map3DBuilding
         bool isManual = manual?.Type == JTokenType.Boolean ? manual.Value<bool>() : manual?.Type == JTokenType.Object;
         int? levels = o["levels"]?.Type == JTokenType.Integer && o.Value<long>("levels") is long lv && lv > 0 && lv <= 10_000 ? (int)lv : null;
         double? area = Finite(o["area_m2"]) is double a && a > 0 ? a : null;
+        string? uid = Str(o["user_uid"]);
         return new Map3DBuildingPick((int)id, Str(o["origin"]), h, Str(o["height_source"]), Str(o["height_from"]) ?? Str(o["height_source"]),
-                                     levels, area, lon, lat, isManual);
+                                     levels, area, lon, lat, isManual)
+               { Look = Map3DLook.StateOf(o), UserUid = uid != null && Map3DUserBuilding.IsUid(uid) ? uid : null };
     }
 
     // ── GIS → 3D 메시지 ──

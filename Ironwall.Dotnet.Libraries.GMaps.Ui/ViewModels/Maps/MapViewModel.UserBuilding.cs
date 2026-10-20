@@ -144,6 +144,57 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         set { _ubUse = value ?? Map3DUserBuilding.UseAuto; NotifyOfPropertyChange(); }
     }
 
+    // ── 외관(외벽 색 · 지붕 색 · 외벽 무늬, twin-contract B) ──
+
+    private string? _ubWallColor, _ubRoofColor, _ubFacade;
+    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingFacades => Map3DLook.Facades;
+    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingColors => Map3DLook.ColorsWith(_ubWallColor, _ubRoofColor);
+
+    /// <summary>외벽 무늬(auto · residential · commercial · industrial · glass · brick · concrete).</summary>
+    public string UserBuildingFacade
+    {
+        get => _ubFacade ?? Map3DLook.FacadeAuto;
+        set { _ubFacade = Map3DLook.NormalizeFacade(value); NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>외벽 색("#rrggbb", "" = 자동 — null 은 콤보가 목록에 없는 값을 비우며 되쓴 것이라 무시).</summary>
+    public string UserBuildingWallColor
+    {
+        get => _ubWallColor ?? "";
+        set { if (value == null) return; _ubWallColor = Map3DLook.NormalizeColor(value); NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>지붕 색("#rrggbb", "" = 자동).</summary>
+    public string UserBuildingRoofColor
+    {
+        get => _ubRoofColor ?? "";
+        set { if (value == null) return; _ubRoofColor = Map3DLook.NormalizeColor(value); NotifyOfPropertyChange(); }
+    }
+
+    private Map3DLookState UserBuildingLook => new(false, _ubWallColor, _ubRoofColor, UserBuildingFacade);
+
+    // ── 3D 에서 고르기 → 2D 고치기 판 ──
+
+    /// <summary>3D 에서 고른 직접 그린 건물 — 목록을 받은 뒤 그 건물 고치기로 연다.</summary>
+    private string? _ubPendingEditUid;
+
+    /// <summary>
+    /// 3D 에서 직접 그린 건물을 눌렀다(userbuilding.pick · user_uid 있는 building) — 그 3D 영역에서 「건물 그리기」를 시작하고(2D 로 바뀐다)
+    /// 목록을 받으면 그 건물 고치기 판을 연다. 3D 의 그 상자에 고름 표시(userbuilding.select).
+    /// </summary>
+    private void OnMap3DUserBuildingPicked(string uid)
+    {
+        if (_map3DState != Map3DState.Shown || _map3DJob is not { } job || Map3DAreas.FirstOrDefault(a => a.Id == job) is not { } area) return;
+        _log?.Info($"[UserBuilding] 3D 에서 고름 uid={uid} job={job}");
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
+        CloseBuildingHeightPanel(clearUndo: false);
+        PostUserBuilding3D(job, Map3DUserBuilding.SelectMessageJson(uid));
+        StartUserBuildingDraw(area);
+        _ubPendingEditUid = uid;
+        if (_ubArea?.Id != job) { _ubPendingEditUid = null; return; }   // 시작하지 못함(만드는 중 등)
+        if (UserBuildingItems.FirstOrDefault(i => i.Uid == uid) is { } hit) { _ubPendingEditUid = null; ResetUserBuildingDraft(hit); }   // 목록을 이미 받았다
+    }
+
     private RelayCommand? _selectUserBuildingToolCommand;
     /// <summary>형상 도구 고르기(매개변수 "Rect" · "Triangle" · "Circle" · "Ellipse" · "Polygon") — 그리던 윤곽이 있으면 버리고 새로.</summary>
     public RelayCommand SelectUserBuildingToolCommand => _selectUserBuildingToolCommand ??= new RelayCommand(p =>
@@ -343,9 +394,11 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (_ubArea == null) return;
         _log?.Info($"[UserBuilding] 그리기 끝 area={_ubArea.Id} cause={cause}");
+        if (_ubEditing != null) PostUserBuilding3D(_ubArea.Id, Map3DUserBuilding.SelectMessageJson(null));
         _ubArea = null;
         _ubDraft = null;
         _ubEditing = null;
+        _ubPendingEditUid = null;
         _ubDragStart = null;
         _ubItems = Array.Empty<Map3DUserBuildingItem>();
         UbSelected.Clear();
@@ -367,10 +420,14 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         _ubDraft.CircleSides = UbCircleSides;
         if (edit == null) _ubDraft.SetTool(_ubTool);
         _ubDraft.Changed += OnUserBuildingDraftChanged;
+        if (edit?.Uid != _ubEditing?.Uid) PostUserBuilding3D(area.Id, Map3DUserBuilding.SelectMessageJson(edit?.Uid));   // 3D 상자 고름 표시
         _ubEditing = edit;
         UbSelected.Clear();   // 새 윤곽 · 고치기 = 여러 개 고름은 끝
         _ubRoof = edit?.Roof ?? Map3DUserBuilding.RoofFlat;
         _ubUse = edit?.Use ?? Map3DUserBuilding.UseAuto;
+        _ubWallColor = edit?.WallColor;
+        _ubRoofColor = edit?.RoofColor;
+        _ubFacade = edit?.Facade ?? Map3DLook.FacadeAuto;
         _ubRoofChosen = edit != null;
         _ubDragStart = null;
         _ubError = null;
@@ -436,6 +493,11 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             _ubItems = items;
             UbSelected.RemoveAll(uid => items.All(i => i.Uid != uid));   // 없어진 건물은 고름에서 뺀다
             _ubAdorner?.InvalidateVisual();
+            if (_ubPendingEditUid is { } pending)
+            {
+                _ubPendingEditUid = null;
+                if (items.FirstOrDefault(i => i.Uid == pending) is { } hit) { ResetUserBuildingDraft(hit); return; }   // 3D 에서 고른 건물 고치기
+            }
             RefreshUserBuildingPanel();
         }
         catch (Map3DServerUnavailableException ex)
@@ -498,11 +560,14 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     /// 지도 키 처리기(Delete = 선택 심볼 삭제 · Ctrl+Z · 방향키 이동 · Esc 선택 해제)는 이 키를 건드리지 않는다(이미지 자르기 IsImageCropPanelKey 관용구).
     /// 지도 화면 밖(팝업층의 확인 창 · 다른 화면)에서 온 키는 그쪽 몫이다.
     /// </summary>
-    private bool IsUserBuildingKey(KeyEventArgs e)
+    private bool IsUserBuildingKey(KeyEventArgs e) => IsUserBuildingDrawing && IsMapAreaKey(e, _ubPanel);
+
+    /// <summary>키가 지도 화면(지도를 품은 MapView · 그 위 조상) 또는 판(panel)에서 왔는가 — 「건물 그리기」 · 「꾸미기」 공용.</summary>
+    private bool IsMapAreaKey(KeyEventArgs e, System.Windows.Controls.Control? panel)
     {
-        if (!IsUserBuildingDrawing || MainMap is not { } map) return false;
+        if (MainMap is not { } map) return false;
         if ((e.OriginalSource ?? Keyboard.FocusedElement) is not System.Windows.DependencyObject d) return true;
-        if (_ubPanel != null && IsInImageCropPanel(_ubPanel, d)) return true;   // 판(같은 Visual 안 판정)
+        if (panel != null && IsInImageCropPanel(panel, d)) return true;   // 판(같은 Visual 안 판정)
         System.Windows.DependencyObject root = map;   // 지도를 품은 가장 가까운 UserControl(MapView), 없으면 맨 위 조상
         for (var p = System.Windows.Media.VisualTreeHelper.GetParent(map); p != null; p = System.Windows.Media.VisualTreeHelper.GetParent(p))
         {
@@ -582,6 +647,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(IsUserBuildingToolPolygon), nameof(UserBuildingCircleSidesText), nameof(UserBuildingRoof), nameof(UserBuildingUse),
                      nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus), nameof(IsUserBuildingToolTriangle),
                      nameof(UserBuildingSelectedUids), nameof(HasUserBuildingSelection), nameof(UserBuildingSelectionText), nameof(IsUserBuildingMergeVisible),
+                     nameof(UserBuildingColors), nameof(UserBuildingFacade), nameof(UserBuildingWallColor), nameof(UserBuildingRoofColor),
                  })
             NotifyOfPropertyChange(name);
         ApplyUserBuildingCommand.RaiseCanExecuteChanged();
@@ -628,7 +694,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         var before = _ubEditing is { } e ? StateOf(e) : null;
         int floors = Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight);
         var after = new UserBuildingState(d.Points.ToList(), _ubHeight, floors, string.IsNullOrWhiteSpace(_ubName) ? null : _ubName)
-                    { Roof = UserBuildingRoof, Use = UserBuildingUse };
+                    { Roof = UserBuildingRoof, Use = UserBuildingUse, Look = UserBuildingLook };
         if (await SaveUserBuildingAsync(area.Id, uid, after))
         {
             _undoService?.Push(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} {(before == null ? "넣기" : "고치기")}", area.Id, uid, before, after,
@@ -652,7 +718,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     }
 
     private static UserBuildingState StateOf(Map3DUserBuildingItem e)
-        => new(e.Outline, e.Height, e.Floors, e.Name) { Roof = e.Roof, Use = e.Use };
+        => new(e.Outline, e.Height, e.Floors, e.Name) { Roof = e.Roof, Use = e.Use, Look = Map3DUserBuilding.LookOf(e) };
 
     /// <summary>[합치기] — 고른 건물들(고른 순서)을 map-3d 가 하나로 → 목록 다시 받기 · 합친 건물 고치기로 열기 · 상태 글 · 편집 기록 1단위.</summary>
     private async Task MergeUserBuildingsAsync()
@@ -704,9 +770,10 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             var r = like == null
                 ? await _map3DClient.MergeUserBuildingsAsync(job, uids)
-                : await _map3DClient.MergeUserBuildingsAsync(job, uids, like.Height, like.Floors, like.Name, like.Use, like.Uid);   // 다시 하기 — 처음 합친 uid 그대로
+                : await _map3DClient.MergeUserBuildingsAsync(job, uids, like.Height, like.Floors, like.Name, like.Use, like.Uid,
+                                                             look: Map3DUserBuilding.LookOf(like));   // 다시 하기 — 처음 합친 uid · 외관 그대로
             foreach (var uid in r.Merged.Count > 0 ? r.Merged : uids) PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(uid, null, null));
-            PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(r.Item.Uid, r.Item.Outline, r.Item.Height));
+            PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(r.Item));
             _log?.Info($"[UserBuilding] 합침 {string.Join(",", uids)} → {r.Item.Uid} 빈곳={r.HolesFilled} job={job}");
             if (_ubArea?.Id == job) await LoadUserBuildingsAsync(job);
             _ = RefreshMap3DAreasAsync();
@@ -789,8 +856,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             if (state != null)
             {
-                var saved = await _map3DClient.PutUserBuildingAsync(job, uid, state.Outline, state.Height, state.Floors, state.Name, state.Roof, state.Use);
-                PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(uid, saved.Outline, saved.Height));
+                var saved = await _map3DClient.PutUserBuildingAsync(job, uid, state.Outline, state.Height, state.Floors, state.Name, state.Roof, state.Use, state.Look);
+                PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(saved with { Uid = uid }));   // 층 띠 · 창 칸 · 색을 입힌 상자
                 _log?.Info($"[UserBuilding] 저장 uid={uid} 점={saved.Outline.Count} 높이={saved.Height} job={job}");
             }
             else

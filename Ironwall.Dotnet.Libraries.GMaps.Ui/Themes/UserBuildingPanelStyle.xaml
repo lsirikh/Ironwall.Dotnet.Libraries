@@ -350,6 +350,46 @@
 											Text="{Binding UserBuildingCircleSidesText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 									</StackPanel>
 								</Grid>
+								<!--  외관(2026-10-21) — 외벽 무늬 · 외벽 색 · 지붕 색(자동 = 엔진이 고름). 3D 상자에도 바로 입혀진다  -->
+								<Grid Margin="0,8,0,0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="8" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="8" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<StackPanel Grid.Column="0">
+										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 무늬" />
+										<ComboBox
+											AutomationProperties.AutomationId="Map.UserBuilding.Facade"
+											AutomationProperties.Name="외벽 무늬"
+											DisplayMemberPath="Value"
+											ItemsSource="{Binding UserBuildingFacades}"
+											SelectedValue="{Binding UserBuildingFacade, Mode=TwoWay}"
+											SelectedValuePath="Key" />
+									</StackPanel>
+									<StackPanel Grid.Column="2">
+										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 색" />
+										<ComboBox
+											AutomationProperties.AutomationId="Map.UserBuilding.WallColor"
+											AutomationProperties.Name="외벽 색"
+											DisplayMemberPath="Value"
+											ItemsSource="{Binding UserBuildingColors}"
+											SelectedValue="{Binding UserBuildingWallColor, Mode=TwoWay}"
+											SelectedValuePath="Key" />
+									</StackPanel>
+									<StackPanel Grid.Column="4">
+										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="지붕 색" />
+										<ComboBox
+											AutomationProperties.AutomationId="Map.UserBuilding.RoofColor"
+											AutomationProperties.Name="지붕 색"
+											DisplayMemberPath="Value"
+											ItemsSource="{Binding UserBuildingColors}"
+											SelectedValue="{Binding UserBuildingRoofColor, Mode=TwoWay}"
+											SelectedValuePath="Key" />
+									</StackPanel>
+								</Grid>
 								<!--  고른 지붕이 이 윤곽으로는 안 됨(ㄱ자에 박공 등) — 짧은 상태 글, 판정 규칙은 "?" 말풍선  -->
 								<TextBlock
 									Margin="2,6,2,0"

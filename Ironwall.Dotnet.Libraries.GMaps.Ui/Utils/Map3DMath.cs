@@ -54,6 +54,12 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>building 일 때 3D 에서 누른 건물(「건물 높이」 판, <see cref="Map3DBuilding"/>).</summary>
     public Map3DBuildingPick? Building { get; init; }
+
+    /// <summary>userbuilding.pick 일 때 3D 에서 누른 직접 그린 건물 상자의 uid(twin-contract B).</summary>
+    public string? UserUid { get; init; }
+
+    /// <summary>decoration.pick 일 때 3D 에서 누른 꾸미기 항목의 uid(twin-contract C).</summary>
+    public string? DecorationUid { get; init; }
 }
 
 /// <summary>
@@ -380,6 +386,13 @@ public static class Map3DMath
             if (type == "building")
                 return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b } : null;
             if (type == "building.none") return new Map3DMessage(type, null, null, null);   // 건물 아닌 땅을 눌렀다(2026-10-19)
+            if (type is "userbuilding.pick" or "decoration.pick")   // 직접 그린 건물 상자 · 꾸미기 항목을 눌렀다(2026-10-21) — uid 가 틀리면 버린다
+            {
+                string? uid = o["uid"]?.Type == JTokenType.String ? o.Value<string>("uid") : null;
+                if (!Map3DUserBuilding.IsUid(uid)) return null;
+                return type == "userbuilding.pick" ? new Map3DMessage(type, null, null, null) { UserUid = uid }
+                                                   : new Map3DMessage(type, null, null, null) { DecorationUid = uid };
+            }
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;

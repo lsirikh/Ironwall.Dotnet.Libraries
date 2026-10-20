@@ -21,10 +21,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                   ★ 지도 편집 권한(CanEditMap)이 없으면 보기만(입력 비활성 + 이유 한 줄). 규칙 · 글은 순수 함수 Map3DBuilding(헤드리스 시험).
    Created On   : 2026-10-19 · Sensorway Co., Ltd.
  ****************************************************************************/
-public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetMap3DHeightsProcessMessageModel>
+public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetMap3DHeightsProcessMessageModel>,
+                                    IHandle<CallHideMap3DBuildingProcessMessageModel>, IHandle<CallRestoreMap3DLooksProcessMessageModel>
 {
-    /// <summary>판 안 되돌리기 한 칸 — 그 장면 · 건물을 Before 높이로(null = 자동).</summary>
-    private sealed record BuildingHeightUndoStep(string Job, int Id, double? Before, int? BeforeFloors);
+    /// <summary>판 안 되돌리기 한 칸 — 그 장면 · 건물을 Before 높이로(null = 자동). Look 이 있으면 외관 칸 — 그 모양(숨김 · 색 · 무늬)으로 다시 저장.</summary>
+    private sealed record BuildingHeightUndoStep(string Job, int Id, double? Before, int? BeforeFloors)
+    {
+        public Map3DLookState? Look { get; init; }
+    }
 
     private Map3DBuildingPick? _bhBuilding;   // 고른 건물(저장된 값 = 취소하면 돌아갈 값)
     private string? _bhJob;
@@ -170,6 +174,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private void OnMap3DBuildingPicked(Map3DBuildingPick pick)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
+        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
         if (Map3DHost.HostMode == "hwnd")
         {
             // 네이티브 창 3D 는 WPF 판을 덮는다 — 안 보이는 판이 첫 Esc 를 가로채 3D 를 못 나가게 되므로 열지 않고 알린다(3D 가 그린 윤곽은 지운다)
@@ -188,10 +193,13 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhBuilding = pick;
         _bhJob = _map3DJob;
         _bhPreview = pick.Height;
+        _bhLookEdit = null;
+        _bhLookNotice = null;
         _bhError = null;
         _bhInputError = false;
         _log?.Info($"[Map3D] 건물 고름 id={pick.Id} 높이={pick.Height} 출처={pick.HeightFrom ?? "-"} job={_map3DJob}");
         RefreshBuildingHeightPanel();
+        _ = LoadBuildingLooksAsync(_map3DJob);   // 「숨긴 건물」 목록 · 옛 엔진 판정
     }
 
     /// <summary>판 닫기 — 미리보기 원래대로 · 강조 지움. clearUndo = 3D 를 나갈 때(판 안 되돌리기 비움).</summary>
@@ -207,6 +215,8 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         }
         catch (Exception ex) { _log?.Error($"[Map3D] 「건물 높이」 판 닫기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
         _bhBuilding = null;
+        _bhLookEdit = null;
+        _bhLookNotice = null;
         _bhDragStart = null;
         _bhError = null;
         _bhInputError = false;
@@ -254,6 +264,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
                      nameof(BuildingHeightSourceText), nameof(IsBuildingHeightReadOnly), nameof(IsBuildingHeightEditable), nameof(IsBuildingHeightChanged),
                      nameof(BuildingHeightSummary), nameof(BuildingHeightFloorsText), nameof(BuildingHeightText), nameof(BuildingHeightFloorHeightText),
                      nameof(BuildingHeightError), nameof(HasBuildingHeightError), nameof(BuildingHeightUndoCount),
+                     nameof(BuildingColors), nameof(BuildingFacade), nameof(BuildingWallColor), nameof(BuildingRoofColor), nameof(IsBuildingLookChanged),
+                     nameof(IsBuildingLookAvailable), nameof(IsBuildingLookUnsupported), nameof(BuildingHideButtonText), nameof(IsBuildingHidden),
+                     nameof(BuildingHiddenItems), nameof(BuildingHiddenCountText), nameof(HasBuildingHidden), nameof(BuildingLookNotice), nameof(HasBuildingLookNotice),
                  })
             NotifyOfPropertyChange(name);
         StepBuildingFloorCommand.RaiseCanExecuteChanged();
@@ -261,6 +274,10 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         ResetBuildingHeightCommand.RaiseCanExecuteChanged();
         UndoBuildingHeightCommand.RaiseCanExecuteChanged();
         CancelBuildingHeightCommand.RaiseCanExecuteChanged();
+        ApplyBuildingLookCommand.RaiseCanExecuteChanged();
+        HideBuildingCommand.RaiseCanExecuteChanged();
+        RestoreHiddenBuildingCommand.RaiseCanExecuteChanged();
+        RestoreAllHiddenBuildingsCommand.RaiseCanExecuteChanged();
     }
 
     private void SetBuildingHeightBusy(bool busy)
@@ -301,7 +318,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         var step = BhUndo[index];
         BhUndo.RemoveAt(index);
         int session = _bhSession;
-        bool ok = await SaveBuildingHeightAsync(step.Job, step.Id, step.Before, step.BeforeFloors, null, () => "되돌렸습니다");
+        bool ok = step.Look is { } look
+            ? await SaveBuildingLookAsync(step.Job, step.Id, look.Hidden, look, null, "되돌렸습니다")
+            : await SaveBuildingHeightAsync(step.Job, step.Id, step.Before, step.BeforeFloors, null, () => "되돌렸습니다");
         if (!ok && session == _bhSession) BhUndo.Insert(Math.Min(index, BhUndo.Count), step);   // 실패면 다시 할 수 있게 남긴다(그 사이 3D 를 나갔으면 비운 채로)
         RefreshBuildingHeightPanel();
     }
