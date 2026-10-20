@@ -174,6 +174,51 @@ public class Map3DNavScenarioTests
             Assert.False(PressKey(ctrl, source, System.Windows.Input.Key.Q, down: true));
         });
 
+    [Fact]
+    public void should_move_panel_not_camera_when_arrow_pressed_on_move_grip()
+        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        {
+            Enter(rig);
+            Camera(rig, 0);
+            var ctrl = new Map3DNavControl { DataContext = rig.Vm };
+            var source = new HeadlessSource { RootVisual = ctrl };
+            var grip = FindThumb(ctrl, "GMaps.Map3D.Nav.Move");
+            var offset = Assert.IsType<TranslateTransform>(ctrl.RenderTransform);
+
+            Assert.True(PressKey(grip, source, System.Windows.Input.Key.Right, down: true));
+            Assert.True(PressKey(grip, source, System.Windows.Input.Key.Up, down: true));
+            Assert.Equal((16d, -16d), (offset.X, offset.Y));
+            Assert.Equal("방위 0°", rig.Vm.Map3DNavBearingText);   // 손잡이 화살표는 카메라를 돌리지 않는다
+            Assert.True(PressKey(grip, source, System.Windows.Input.Key.Home, down: true));
+            Assert.Equal((0d, 0d), (offset.X, offset.Y));
+            Assert.False(PressKey(grip, source, System.Windows.Input.Key.Escape, down: true), "끄는 중이 아니면 Esc 를 먹지 않는다");
+            Assert.True(PressKey(ctrl, source, System.Windows.Input.Key.Right, down: true));   // 손잡이 밖 화살표는 예전처럼 방향 돌리기
+            Assert.Equal("방위 15°", rig.Vm.Map3DNavBearingText);
+            Assert.Equal((0d, 0d), (offset.X, offset.Y));
+        });
+
+    [Fact]
+    public void should_draw_shadow_on_separate_layer_when_nav_xaml_read()
+    {
+        var xaml = Read("Views", "Maps", "Map3DNavControl.xaml");
+        Assert.Contains("UseLayoutRounding=\"True\"", xaml);
+        var content = Regex.Match(xaml, @"<Border\s+Padding=""6""\s+AutomationProperties.AutomationId=""GMaps.Map3D.Nav""[^>]*>", RegexOptions.Singleline).Value;
+        Assert.Contains("Effect=\"{x:Null}\"", content);   // 내용 판은 효과 없이(그림자는 뒤 빈 판만) — 모서리 · 글자 흐림 방지
+        Assert.Contains("AutomationProperties.AutomationId=\"GMaps.Map3D.Nav.Move\"", xaml);
+    }
+
+    private static System.Windows.Controls.Primitives.Thumb FindThumb(DependencyObject root, string id)
+    {
+        System.Windows.Controls.Primitives.Thumb? Find(object node)
+        {
+            if (node is System.Windows.Controls.Primitives.Thumb t && System.Windows.Automation.AutomationProperties.GetAutomationId(t) == id) return t;
+            if (node is not DependencyObject d) return null;
+            foreach (var c in LogicalTreeHelper.GetChildren(d)) if (Find(c) is { } hit) return hit;
+            return null;
+        }
+        return Find(root) ?? throw new Xunit.Sdk.XunitException($"{id} 없음");
+    }
+
     private static bool PressKey(UIElement target, PresentationSource source, System.Windows.Input.Key key, bool down)
     {
         var e = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
@@ -193,8 +238,8 @@ public class Map3DNavScenarioTests
         var xaml = Read("Views", "Maps", "MapView.xaml");
         var nav = Regex.Match(xaml, @"<local:Map3DNavControl[^>]*/>", RegexOptions.Singleline).Value;
         Assert.Contains("Visibility=\"{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}\"", nav);
-        Assert.Contains("HorizontalAlignment=\"Right\"", nav);
-        Assert.Contains("VerticalAlignment=\"Top\"", nav);
+        Assert.Contains("HorizontalAlignment=\"Left\"", nav);     // 왼쪽 아래(2026-10-20 사용자 지시) — 손잡이로 옮길 수 있다
+        Assert.Contains("VerticalAlignment=\"Bottom\"", nav);
         var compass = Regex.Match(xaml, @"<ctrl:GMapCompassControl[^>]*/>", RegexOptions.Singleline).Value;
         Assert.Contains("Visibility=\"{Binding IsCompassShown, Converter={StaticResource BooleanToVisibilityConverter}}\"", compass);
         Assert.Single(Regex.Matches(xaml, "<local:Map3DNavControl"));
@@ -216,9 +261,9 @@ public class Map3DNavScenarioTests
         // 링 · 지구본은 peer 가 있는 Thumb, 나머지는 Button
         Assert.Matches(@"<Thumb\s+AutomationProperties.AutomationId=""GMaps.Map3D.Nav.Ring""", xaml);
         Assert.Matches(@"<Thumb\s+Width=""40""\s+Height=""40""\s+AutomationProperties.AutomationId=""GMaps.Map3D.Nav.Tilt""", xaml);
-        // 템플릿 밖 x:Name 없음(CM 바인딩 지시자) — 템플릿 부품 이름(Rim · Letter · Globe)만
+        // 템플릿 밖 x:Name 없음(CM 바인딩 지시자) — 템플릿 부품 이름(Rim · Letter · Globe · Grip)만
         foreach (Match m in Regex.Matches(xaml, @"x:Name=""([^""]+)"""))
-            Assert.Contains(m.Groups[1].Value, new[] { "Rim", "Letter", "Globe" });
+            Assert.Contains(m.Groups[1].Value, new[] { "Rim", "Letter", "Globe", "Grip" });
     }
 
     [Fact]

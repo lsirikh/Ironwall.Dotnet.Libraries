@@ -1726,15 +1726,16 @@
 				</StackPanel>
 			</Border>
 
-			<!--  3D 방향 링 · 이동 단추(2026-10-19) — 3D 가 보이는 동안만(IsMap3DShown), 2D 나침반 자리(오른쪽 위)에 나침반 대신.
+			<!--  3D 방향 링 · 이동 단추(2026-10-19) — 3D 가 보이는 동안만(IsMap3DShown). 자리 = 왼쪽 아래(좌측 메뉴 50 오른쪽 · 스케일바 위, 2026-10-20),
+			      판 위 손잡이를 끌어 지도 칸 안 어디로든 옮길 수 있다(Map3DNavControl — 옮긴 자리는 3D 를 나갔다 들어와도 유지).
 			      링 끌기 = 방위 · N = 정북 · 가운데 지구본 위아래 끌기 = 기울기 · 위에서 보기 · 비스듬히 · 앞뒤좌우 이동(누르고 있으면 계속) · 확대 축소.
 			      ZIndex 150 = 3D 호스트(0) 위 · 속성창 캔버스(200) 아래. 디자인 = MapFloatingPanelStyle · PanelSecondaryButtonStyle · 토큰만.  -->
 			<local:Map3DNavControl
 				Grid.Row="2"
 				Grid.ColumnSpan="2"
-				Margin="0,16,16,0"
-				HorizontalAlignment="Right"
-				VerticalAlignment="Top"
+				Margin="50,0,0,44"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Bottom"
 				Panel.ZIndex="150"
 				Visibility="{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}" />
 

@@ -3,8 +3,10 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Automation;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps;
 
@@ -23,11 +25,24 @@ public partial class Map3DNavControl : UserControl
     private long _mouseClickAt;
     /// <summary>키로 누르고 있는 이동 — 마우스와 같은 방향을 함께 누르면 한쪽을 떼도 다른 쪽이 누르고 있는 동안 계속 간다.</summary>
     private readonly HashSet<Map3DNavMove> _keyMoves = new();
+    /// <summary>판 옮기기 — 옮긴 양은 RenderTransform(지도 칸 안에 붙잡음). 3D 를 나갔다 들어와도 그 자리.</summary>
+    private readonly Map3DNavPanelMove _panel = new(DragMath.DeadZone);
+    private readonly TranslateTransform _offset = new();
+    private Thumb? _panelThumb;
+    private FrameworkElement? _host;
+    /// <summary>키보드로 한 번 옮기는 양(DIU).</summary>
+    private const double PanelKeyStep = 16;
 
     public Map3DNavControl()
     {
         InitializeComponent();
+        RenderTransform = _offset;
+        SizeChanged += (_, _) => ClampPanel();
+        Loaded += (_, _) => { _host = Parent as FrameworkElement; if (_host != null) _host.SizeChanged += OnHostSizeChanged; ClampPanel(); };
+        Unloaded += (_, _) => { if (_host != null) _host.SizeChanged -= OnHostSizeChanged; _host = null; };
     }
+
+    private void OnHostSizeChanged(object sender, SizeChangedEventArgs e) => ClampPanel();
 
     private MapViewModel? Vm => DataContext as MapViewModel;
 
@@ -100,10 +115,70 @@ public partial class Map3DNavControl : UserControl
         vm.StopMap3DMove(move);
     }
 
+    // ── 판 옮기기(손잡이) ──
+
+    private void OnPanelDragStarted(object sender, DragStartedEventArgs e)
+    {
+        _panelThumb = (Thumb)sender;
+        _panelThumb.Focus();   // 키보드 폴백(화살표 · Home) · Esc 취소
+        var p = Mouse.GetPosition(_host ?? this);
+        _panel.Press(_offset.X, _offset.Y, p.X, p.Y);
+    }
+
+    private void OnPanelDragDelta(object sender, DragDeltaEventArgs e)
+    {
+        var p = Mouse.GetPosition(_host ?? this);
+        if (_panel.Move(p.X, p.Y)) SetPanelOffset(_panel.X, _panel.Y);
+    }
+
+    /// <summary>뗌 · 캡처 잃음 · Esc(CancelDrag) 모두 여기 하나 — 취소면 처음 자리로.</summary>
+    private void OnPanelDragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        _panel.Finish(commit: !e.Canceled);
+        SetPanelOffset(_panel.X, _panel.Y);
+        _panelThumb = null;
+    }
+
+    private void SetPanelOffset(double x, double y)
+    {
+        _offset.X = x; _offset.Y = y;
+        ClampPanel();
+    }
+
+    /// <summary>판이 지도 칸 밖으로 나가지 않게 — 창 크기가 바뀌어도 다시 붙잡는다.</summary>
+    private void ClampPanel()
+    {
+        if (_host is not { } host || ActualWidth <= 0 || !IsVisible) return;
+        var slot = LayoutInformation.GetLayoutSlot(this);
+        var at = TransformToAncestor(host).Transform(new Point(0, 0));
+        double baseX = at.X - _offset.X, baseY = at.Y - _offset.Y;
+        var (x, y) = Map3DNavPanelMove.Clamp(_offset.X, _offset.Y, baseX, baseY, ActualWidth, ActualHeight,
+            slot.Left, slot.Top, slot.Right, slot.Bottom);
+        if (x != _offset.X) _offset.X = x;
+        if (y != _offset.Y) _offset.Y = y;
+    }
+
+    /// <summary>손잡이에 초점: 화살표 = 16 씩 옮기기 · Home = 원래 자리. 끄는 중 Esc = 취소. 처리했으면 true.</summary>
+    private bool HandlePanelKey(KeyEventArgs e)
+    {
+        if (_panel.IsPressed && e.Key == Key.Escape) { _panelThumb?.CancelDrag(); return true; }
+        if (e.OriginalSource is not Thumb t || AutomationProperties.GetAutomationId(t) != "GMaps.Map3D.Nav.Move") return false;
+        switch (e.Key)
+        {
+            case Key.Left: SetPanelOffset(_offset.X - PanelKeyStep, _offset.Y); return true;
+            case Key.Right: SetPanelOffset(_offset.X + PanelKeyStep, _offset.Y); return true;
+            case Key.Up: SetPanelOffset(_offset.X, _offset.Y - PanelKeyStep); return true;
+            case Key.Down: SetPanelOffset(_offset.X, _offset.Y + PanelKeyStep); return true;
+            case Key.Home: SetPanelOffset(0, 0); return true;
+            default: return false;
+        }
+    }
+
     // ── 키보드 폴백(이 판에 초점이 있을 때) ──
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (HandlePanelKey(e)) { e.Handled = true; return; }
         if (Vm is not { } vm || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) != 0) return;
         var key = e.Key.ToString();
         if (Map3DNavMath.KeyNudge(key) is { } n) vm.NudgeMap3D(n);

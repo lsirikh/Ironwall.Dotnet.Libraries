@@ -40,12 +40,65 @@
 		</ResourceDictionary>
 	</UserControl.Resources>
 
+	<!--  그림자 층 · 내용 층 분리(2026-10-20) — 그림자(DropShadowEffect)를 내용 판에 걸면 판 전체(글자 · 링 · 단추)가 효과 비트맵으로
+	      한 번 더 그려져 둥근 모서리와 글자가 흐릿했다. 그림자는 빈 판에만, 내용은 효과 없이 그 위에. 화소 맞춤(UseLayoutRounding)도 함께.  -->
+	<Grid UseLayoutRounding="True" SnapsToDevicePixels="True">
+	<Border Style="{StaticResource MapFloatingPanelStyle}" Padding="0" />
 	<Border
 		Padding="6"
 		AutomationProperties.AutomationId="GMaps.Map3D.Nav"
-		Style="{StaticResource MapFloatingPanelStyle}">
+		Style="{StaticResource MapFloatingPanelStyle}"
+		Background="Transparent"
+		BorderBrush="Transparent"
+		Effect="{x:Null}">
 		<StackPanel>
-			<DockPanel Margin="2,0,0,4">
+			<DockPanel Margin="0,0,0,4">
+				<!--  옮기기 손잡이(2026-10-20) — 이 손잡이를 끌면 판이 옮겨진다(지도 칸 안에서만 · 데드존 8 DIU · Esc = 처음 자리).
+				      초점이 있을 때 화살표 = 16 씩 옮기기, Home = 원래 자리(왼쪽 아래). Thumb = UIA 에 보인다.  -->
+				<Thumb
+					Width="16"
+					Height="20"
+					Margin="0,0,4,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="GMaps.Map3D.Nav.Move"
+					AutomationProperties.Name="조절기 옮기기"
+					Cursor="SizeAll"
+					DockPanel.Dock="Left"
+					DragCompleted="OnPanelDragCompleted"
+					DragDelta="OnPanelDragDelta"
+					DragStarted="OnPanelDragStarted"
+					Focusable="True"
+					ToolTip="끌어서 옮기기">
+					<Thumb.Template>
+						<ControlTemplate TargetType="Thumb">
+							<Border
+								x:Name="Grip"
+								Background="Transparent"
+								BorderBrush="Transparent"
+								BorderThickness="1"
+								CornerRadius="3">
+								<md:PackIcon
+									Width="14"
+									Height="18"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Kind="DragVertical" />
+							</Border>
+							<ControlTemplate.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter TargetName="Grip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+								</Trigger>
+								<Trigger Property="IsKeyboardFocused" Value="True">
+									<Setter TargetName="Grip" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+								</Trigger>
+								<Trigger Property="IsDragging" Value="True">
+									<Setter TargetName="Grip" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								</Trigger>
+							</ControlTemplate.Triggers>
+						</ControlTemplate>
+					</Thumb.Template>
+				</Thumb>
 				<help:HelpTip
 					VerticalAlignment="Center"
 					DockPanel.Dock="Right"
@@ -335,4 +388,5 @@
 			</Grid>
 		</StackPanel>
 	</Border>
+	</Grid>
 </UserControl>

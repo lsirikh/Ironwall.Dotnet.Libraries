@@ -265,4 +265,67 @@ public class Map3DNavMathTests
         Assert.Equal("camera.preset", (string?)o["type"]);
         Assert.Equal(expected, (string?)o["name"]);
     }
+
+    [Fact]
+    public void should_not_move_panel_when_inside_dead_zone()
+    {
+        var m = new Map3DNavPanelMove(8);
+        m.Press(10, 20, 100, 100);
+        Assert.False(m.Move(105, 104));
+        Assert.False(m.IsDragging);
+        Assert.Equal((10d, 20d), (m.X, m.Y));
+    }
+
+    [Fact]
+    public void should_move_panel_by_full_distance_when_dead_zone_passed()
+    {
+        var m = new Map3DNavPanelMove(8);
+        m.Press(10, 20, 100, 100);
+        Assert.True(m.Move(112, 95));
+        Assert.Equal((22d, 15d), (m.X, m.Y));
+        Assert.True(m.Move(130, 90));
+        Assert.Equal((40d, 10d), (m.X, m.Y));
+        Assert.True(m.Finish(commit: true));
+        Assert.Equal((40d, 10d), (m.X, m.Y));
+    }
+
+    [Fact]
+    public void should_return_to_start_when_drag_cancelled()
+    {
+        var m = new Map3DNavPanelMove(8);
+        m.Press(10, 20, 100, 100);
+        m.Move(160, 40);
+        Assert.False(m.Finish(commit: false));
+        Assert.Equal((10d, 20d), (m.X, m.Y));
+        Assert.False(m.Move(200, 200));   // 끝난 뒤 움직임은 무시
+    }
+
+    [Fact]
+    public void should_report_click_not_drag_when_released_inside_dead_zone()
+    {
+        var m = new Map3DNavPanelMove(8);
+        m.Press(0, 0, 50, 50);
+        m.Move(53, 52);
+        Assert.False(m.Finish(commit: true));
+    }
+
+    [Theory]
+    // 칸 0..1000 × 0..800, 판 150 × 300 이 (50, 450) 에 있다
+    [InlineData(0, 0, 0, 0)]
+    [InlineData(-200, 0, -50, 0)]        // 왼쪽 끝
+    [InlineData(2000, 0, 800, 0)]        // 오른쪽 끝 = 1000 - 150 - 50
+    [InlineData(0, 500, 0, 50)]          // 아래 끝 = 800 - 300 - 450
+    [InlineData(0, -900, 0, -450)]       // 위 끝
+    public void should_keep_panel_inside_map_when_clamped(double offX, double offY, double ex, double ey)
+    {
+        var (x, y) = Map3DNavPanelMove.Clamp(offX, offY, 50, 450, 150, 300, 0, 0, 1000, 800);
+        Assert.Equal((ex, ey), (x, y));
+    }
+
+    [Fact]
+    public void should_pin_to_left_top_when_panel_larger_than_map()
+    {
+        var (x, y) = Map3DNavPanelMove.Clamp(30, 30, 50, 450, 1200, 900, 0, 0, 1000, 800);
+        Assert.Equal((-50d, -450d), (x, y));
+    }
 }

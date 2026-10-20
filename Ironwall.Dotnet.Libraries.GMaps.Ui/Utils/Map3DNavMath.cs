@@ -243,3 +243,68 @@ public sealed class Map3DNavMover
         return n.IsZero ? null : n;
     }
 }
+
+/// <summary>
+/// 조절기 판 옮기기(2026-10-20) — 손잡이 끌기 판정(눌림 · 데드존 통과 · 끝 분리, 취소면 처음 자리)과 화면 안 붙잡기.
+/// 좌표는 부모(지도 칸) 기준 — 판이 움직여도 기준이 흔들리지 않는다. 데드존은 호출부가 DragMath.DeadZone(8 DIU)을 넘긴다.
+/// </summary>
+public sealed class Map3DNavPanelMove
+{
+    private readonly double _deadZone;
+    private double _startX, _startY, _px, _py;
+
+    public Map3DNavPanelMove(double deadZone) => _deadZone = deadZone;
+
+    public bool IsPressed { get; private set; }
+    public bool IsDragging { get; private set; }
+    /// <summary>옮긴 양(원래 자리 기준) — 붙잡기 전 값.</summary>
+    public double X { get; private set; }
+    public double Y { get; private set; }
+
+    /// <summary>눌렀다 — 지금 옮긴 양(offX, offY)과 누른 자리(부모 기준).</summary>
+    public void Press(double offX, double offY, double px, double py)
+    {
+        _startX = X = offX; _startY = Y = offY; _px = px; _py = py;
+        IsPressed = true;
+        IsDragging = false;
+    }
+
+    /// <summary>움직였다 — 데드존을 넘은 뒤부터 true(X · Y 갱신). 데드존 안에서 움직인 만큼도 버리지 않는다.</summary>
+    public bool Move(double px, double py)
+    {
+        if (!IsPressed) return false;
+        double dx = px - _px, dy = py - _py;
+        if (!IsDragging)
+        {
+            if (dx * dx + dy * dy <= _deadZone * _deadZone) return false;
+            IsDragging = true;
+        }
+        X = _startX + dx; Y = _startY + dy;
+        return true;
+    }
+
+    /// <summary>끝(뗌 · 캡처 잃음 · Esc — 한 경로). 취소(commit = false)면 처음 자리로. 끌었고 확정이면 true.</summary>
+    public bool Finish(bool commit)
+    {
+        bool dragged = IsDragging && commit;
+        if (!commit) { X = _startX; Y = _startY; }
+        IsPressed = false;
+        IsDragging = false;
+        return dragged;
+    }
+
+    /// <summary>
+    /// 판이 지도 칸(left · top · right · bottom) 밖으로 나가지 않게 옮긴 양을 붙잡는다. baseX · baseY = 옮기기 전 판 왼쪽 위, w · h = 판 크기.
+    /// 판이 칸보다 크면 왼쪽 · 위에 맞춘다.
+    /// </summary>
+    public static (double X, double Y) Clamp(double offX, double offY, double baseX, double baseY, double w, double h,
+        double left, double top, double right, double bottom)
+    {
+        static double One(double off, double b, double size, double lo, double hi)
+        {
+            double min = lo - b, max = hi - size - b;
+            return max < min ? min : Math.Min(max, Math.Max(min, off));
+        }
+        return (One(offX, baseX, w, left, right), One(offY, baseY, h, top, bottom));
+    }
+}
