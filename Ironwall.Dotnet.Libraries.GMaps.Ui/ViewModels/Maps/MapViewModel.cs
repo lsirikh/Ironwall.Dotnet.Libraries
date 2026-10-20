@@ -3883,21 +3883,18 @@ public partial class MapViewModel : BasePanelViewModel,
                     _log?.Warning($"이미지 크기 로드 실패, 기본값 사용: {ex.Message}");
                 }
 
-                // 현재 줌 레벨에서 원본 픽셀 크기 → degree 변환
+                // 지금 화면에서 그림 원본 픽셀 크기만큼의 실제 크기로, 지도 중심에 북쪽 위로 놓는다(OverlayPlacementMath).
+                //   화면 1 px 의 실제 길이 = 중심에서 화면 가로 100 px 떨어진 점까지 거리 / 100 — 지도를 돌려도 거리는 같다.
+                //   (종전: 화면 왼쪽 위 · 오른쪽 아래를 위경도로 바꿨다 — 지도가 돌아가 있으면 범위가 뒤집히고 비율이 깨졌다, 2026-10-20 실기)
                 var centerScreen = MainMap.FromLatLngToLocal(currentPosition);
-                _log?.Info($"[DEBUG-LOAD] 지도중심={currentPosition.Lat:F6},{currentPosition.Lng:F6} → 화면좌표=({centerScreen.X},{centerScreen.Y}), Zoom={MainMap.Zoom}");
-
-                var topLeftScreen = new GMap.NET.GPoint(
-                    (long)(centerScreen.X - imageWidth / 2),
-                    (long)(centerScreen.Y - imageHeight / 2));
-                var bottomRightScreen = new GMap.NET.GPoint(
-                    (long)(centerScreen.X + imageWidth / 2),
-                    (long)(centerScreen.Y + imageHeight / 2));
-                _log?.Info($"[DEBUG-LOAD] imageW={imageWidth}, imageH={imageHeight} → topLeftScreen=({topLeftScreen.X},{topLeftScreen.Y}), bottomRightScreen=({bottomRightScreen.X},{bottomRightScreen.Y})");
-
-                var topLeftGeo = MainMap.FromLocalToLatLng((int)topLeftScreen.X, (int)topLeftScreen.Y);
-                var bottomRightGeo = MainMap.FromLocalToLatLng((int)bottomRightScreen.X, (int)bottomRightScreen.Y);
-                _log?.Info($"[DEBUG-LOAD] → Geo: TopLeft=({topLeftGeo.Lat:F6},{topLeftGeo.Lng:F6}), BottomRight=({bottomRightGeo.Lat:F6},{bottomRightGeo.Lng:F6})");
+                var probeGeo = MainMap.FromLocalToLatLng((int)centerScreen.X + 100, (int)centerScreen.Y);
+                double metersPerPixel = OverlayPlacementMath.MetersBetween(currentPosition.Lat, currentPosition.Lng, probeGeo.Lat, probeGeo.Lng) / 100d;
+                var placed = OverlayPlacementMath.NorthUpBounds(currentPosition.Lat, currentPosition.Lng, imageWidth, imageHeight, metersPerPixel)
+                             ?? OverlayPlacementMath.NorthUpBounds(currentPosition.Lat, currentPosition.Lng, imageWidth, imageHeight, 1d)!.Value;
+                var topLeftGeo = new PointLatLng(placed.Top, placed.Left);
+                var bottomRightGeo = new PointLatLng(placed.Bottom, placed.Right);
+                _log?.Info($"[ImageLoad] 지도중심={currentPosition.Lat:F6},{currentPosition.Lng:F6} 줌={MainMap.Zoom} 회전={MainMap.Bearing:F1} 1px={metersPerPixel:F3}m " +
+                           $"그림={imageWidth}x{imageHeight} → 범위 L:{placed.Left:F6} T:{placed.Top:F6} R:{placed.Right:F6} B:{placed.Bottom:F6}");
 
                 // ImageModel 생성
                 var imageModel = new Ironwall.Dotnet.Monitoring.Models.Symbols.ImageModel
