@@ -357,6 +357,26 @@ public sealed class Map3DClient : IDisposable
         return JObject.Parse(json!)["deleted"]?.Type == JTokenType.Integer ? JObject.Parse(json!).Value<int>("deleted") : 0;
     }
 
+    /// <summary>
+    /// 합치기(POST /api/jobs/{id}/user-buildings/merge {"uids":[…],"height","floors","name","use"}) — 여러 건물을 하나로(서버가 원래 것은 지운다).
+    /// 서로 떨어진 도형(400) · 없는 uid(404)는 Map3DRequestException(Message = 서버 detail), 닿지 않으면 Map3DServerUnavailableException.
+    /// </summary>
+    public Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, CancellationToken ct = default)
+        => MergeUserBuildingsAsync(jobId, uids, null, null, null, null, ct);
+
+    /// <summary>합치기 — 합친 건물의 높이 · 층수 · 이름 · 외벽 성격까지(null = 서버가 정함).</summary>
+    public async Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, double? height, int? floors,
+                                                                            string? name, string? use, CancellationToken ct = default)
+    {
+        var body = Map3DUserBuilding.MergeBody(uids, height, floors, name, use).ToString(Formatting.None);
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"{UserBuildingsUrl(jobId)}/merge")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return Map3DUserBuilding.ParseMergeResult(json!)
+               ?? throw new Map3DRequestException(HttpStatusCode.OK, "건물 응답 형식이 올바르지 않습니다");
+    }
+
     private string UserBuildingsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/user-buildings";
 
     private string BuildingHeightUrl(string job, int buildingId)

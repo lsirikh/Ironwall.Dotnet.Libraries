@@ -101,8 +101,8 @@
 
 							<!--  바디 (DataContext = MapViewModel)  -->
 							<StackPanel Grid.Row="1" Margin="14,12,14,14">
-								<!--  형상 도구 줄 — 사각형(R) · 원(C) · 타원(E) · 다각형(P). 쓰는 법은 단추 풍선과 판 "?"  -->
-								<UniformGrid Margin="0,0,0,8" Columns="4">
+								<!--  형상 도구 줄 — 사각형(R) · 삼각형(T) · 원(C) · 타원(E) · 다각형(P). 쓰는 법은 단추 풍선과 판 "?"  -->
+								<UniformGrid Margin="0,0,0,8" Columns="5">
 									<Button
 										AutomationProperties.AutomationId="Map.UserBuilding.Tool.Rect"
 										AutomationProperties.Name="사각형"
@@ -114,6 +114,19 @@
 											<md:PackIcon HorizontalAlignment="Center" Kind="VectorRectangle" />
 											<TextBlock HorizontalAlignment="Center" Text="사각형" />
 											<Border Style="{StaticResource UserBuildingToolBar}" Visibility="{Binding IsUserBuildingToolRect, Converter={StaticResource BooleanToVisibilityConverter}}" />
+										</StackPanel>
+									</Button>
+									<Button
+										AutomationProperties.AutomationId="Map.UserBuilding.Tool.Triangle"
+										AutomationProperties.Name="삼각형"
+										Command="{Binding SelectUserBuildingToolCommand}"
+										CommandParameter="Triangle"
+										Style="{StaticResource UserBuildingToolButton}"
+										ToolTip="삼각형 (T) — 상자처럼 끌기 · Shift = 정삼각형">
+										<StackPanel>
+											<md:PackIcon HorizontalAlignment="Center" Kind="TriangleOutline" />
+											<TextBlock HorizontalAlignment="Center" Text="삼각형" />
+											<Border Style="{StaticResource UserBuildingToolBar}" Visibility="{Binding IsUserBuildingToolTriangle, Converter={StaticResource BooleanToVisibilityConverter}}" />
 										</StackPanel>
 									</Button>
 									<Button
@@ -156,6 +169,57 @@
 										</StackPanel>
 									</Button>
 								</UniformGrid>
+								<!--  여러 개 고름(Ctrl+클릭) — 「도형 N개 선택」 + [합치기](2개 이상) · [선택 풀기]. 쓰는 법은 판 "?"  -->
+								<Border
+									Margin="0,0,0,8"
+									Padding="8,6"
+									Background="{DynamicResource SurfaceAltBrush}"
+									BorderBrush="{DynamicResource PrimaryBrush}"
+									BorderThickness="1"
+									CornerRadius="6"
+									Visibility="{Binding HasUserBuildingSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+									<StackPanel>
+										<TextBlock
+											AutomationProperties.AutomationId="Map.UserBuilding.SelectionCount"
+											FontSize="12"
+											FontWeight="SemiBold"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											Text="{Binding UserBuildingSelectionText}"
+											TextWrapping="Wrap" />
+										<Grid Margin="0,6,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*" />
+												<ColumnDefinition Width="7" />
+												<ColumnDefinition Width="*" />
+											</Grid.ColumnDefinitions>
+											<Button
+												Grid.Column="0"
+												AutomationProperties.AutomationId="Map.UserBuilding.Merge"
+												AutomationProperties.Name="합치기"
+												Command="{Binding MergeUserBuildingsCommand}"
+												Style="{StaticResource PanelPrimaryButtonStyle}"
+												ToolTip="고른 건물을 하나로 합칩니다(되돌리기 가능)"
+												Visibility="{Binding IsUserBuildingMergeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+												<StackPanel Orientation="Horizontal">
+													<md:PackIcon
+														Width="14"
+														Height="14"
+														VerticalAlignment="Center"
+														Kind="VectorUnion" />
+													<TextBlock Margin="5,0,0,0" Text="합치기" />
+												</StackPanel>
+											</Button>
+											<Button
+												Grid.Column="2"
+												AutomationProperties.AutomationId="Map.UserBuilding.ClearSelection"
+												AutomationProperties.Name="선택 풀기"
+												Command="{Binding ClearUserBuildingSelectionCommand}"
+												Content="선택 풀기"
+												Style="{StaticResource PanelSecondaryButtonStyle}"
+												ToolTip="고른 것을 모두 풉니다 (Esc)" />
+										</Grid>
+									</StackPanel>
+								</Border>
 								<TextBlock
 									AutomationProperties.AutomationId="Map.UserBuilding.PointCount"
 									FontSize="13"

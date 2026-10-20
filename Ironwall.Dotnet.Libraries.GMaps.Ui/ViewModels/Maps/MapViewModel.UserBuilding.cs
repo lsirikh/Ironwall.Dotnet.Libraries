@@ -26,6 +26,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                     Ctrl+Z(윤곽 → 그다음은 GIS 편집 기록의 이 기능 기록). 저장된 건물은 흐린 점선 — 빈 윤곽에서 그 안을 누르면 고치기.
                   ★ 들어올리기 = 판(UserBuildingPanelControl) 층수 · 높이 · 층고 · ±1층 · 손잡이 끌기 · ↑/↓. [저장] = PUT → 3D 상자 미리보기
                     (userbuilding.preview — 다시 굽지 않음) + GIS 편집 기록(UserBuildingCommand). 3D 에서는 다시 만든 뒤 「건물 높이」 판으로 끌어 올린다.
+                  ★ 합치기(2026-10-20) = 저장된 건물을 Ctrl+클릭으로 여러 개 고름(굵은 실선 + 네 모서리 네모로 표시 · Esc = 고름 풀기) →
+                    판 [합치기] = POST …/user-buildings/merge → 합친 건물을 바로 고치기로 연다 + GIS 편집 기록(UserBuildingMergeCommand:
+                    되돌리기 = 합친 것 지우고 원래 것들 그대로 다시 저장, 다시 하기 = 다시 합치기).
    Created On   : 2026-10-19 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUserBuildingsProcessMessageModel>
@@ -81,9 +84,10 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     private string? _ubRoof, _ubUse;
     private bool _ubRoofChosen;
 
-    /// <summary>지금 형상 도구(다각형 · 사각형 · 원 · 타원).</summary>
+    /// <summary>지금 형상 도구(다각형 · 사각형 · 원 · 타원 · 삼각형).</summary>
     public UbTool UserBuildingTool => _ubTool;
     public bool IsUserBuildingToolRect => _ubTool == UbTool.Rect;
+    public bool IsUserBuildingToolTriangle => _ubTool == UbTool.Triangle;
     public bool IsUserBuildingToolCircle => _ubTool == UbTool.Circle;
     public bool IsUserBuildingToolEllipse => _ubTool == UbTool.Ellipse;
     public bool IsUserBuildingToolPolygon => _ubTool == UbTool.Polygon;
@@ -141,7 +145,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     }
 
     private RelayCommand? _selectUserBuildingToolCommand;
-    /// <summary>형상 도구 고르기(매개변수 "Rect" · "Circle" · "Ellipse" · "Polygon") — 그리던 윤곽이 있으면 버리고 새로.</summary>
+    /// <summary>형상 도구 고르기(매개변수 "Rect" · "Triangle" · "Circle" · "Ellipse" · "Polygon") — 그리던 윤곽이 있으면 버리고 새로.</summary>
     public RelayCommand SelectUserBuildingToolCommand => _selectUserBuildingToolCommand ??= new RelayCommand(p =>
     {
         if (!IsUserBuildingDrawing || !Enum.TryParse<UbTool>(p?.ToString(), out var tool)) return;
@@ -252,6 +256,64 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     /// <summary>「되돌리기」(Ctrl+Z) — 윤곽 편집부터, 없으면 GIS 편집 기록의 이 기능 기록.</summary>
     public RelayCommand UndoUserBuildingCommand => _undoUserBuildingCommand ??= new RelayCommand(_ => _ = UndoUserBuildingAsync(), _ => IsUserBuildingDrawing && !_ubBusy);
 
+    // ── 여러 개 고르기 · 합치기 ──
+
+    private List<string>? _ubSelectedList;
+    /// <summary>Ctrl+클릭으로 고른 저장된 건물 uid(고른 순서) — 지연 초기화(생성자 없이 만든 시험 VM 에서도).</summary>
+    private List<string> UbSelected => _ubSelectedList ??= new List<string>();
+
+    /// <summary>고른 저장된 건물 uid(지도 표면이 굵은 실선 + 모서리 네모로 그린다).</summary>
+    public IReadOnlyCollection<string> UserBuildingSelectedUids => UbSelected;
+    public bool HasUserBuildingSelection => UbSelected.Count > 0;
+    /// <summary>판 「도형 N개 선택」 줄.</summary>
+    public string UserBuildingSelectionText => Map3DUserBuilding.SelectionText(UbSelected.Count);
+    /// <summary>[합치기] 보임 — 2개 이상 골랐을 때만.</summary>
+    public bool IsUserBuildingMergeVisible => UbSelected.Count >= 2;
+
+    private RelayCommand? _mergeUserBuildingsCommand;
+    /// <summary>[합치기] — 고른 2개 이상을 map-3d 가 하나로.</summary>
+    public RelayCommand MergeUserBuildingsCommand => _mergeUserBuildingsCommand ??= new RelayCommand(
+        _ => _ = MergeUserBuildingsAsync(), _ => IsUserBuildingDrawing && !_ubBusy && UbSelected.Count >= 2);
+
+    private RelayCommand? _clearUserBuildingSelectionCommand;
+    /// <summary>[선택 풀기](Esc 와 같음).</summary>
+    public RelayCommand ClearUserBuildingSelectionCommand => _clearUserBuildingSelectionCommand ??= new RelayCommand(
+        _ => ClearUserBuildingSelection(), _ => UbSelected.Count > 0);
+
+    /// <summary>고름 풀기 — 풀었으면 true.</summary>
+    private bool ClearUserBuildingSelection()
+    {
+        if (UbSelected.Count == 0) return false;
+        UbSelected.Clear();
+        _ubAdorner?.InvalidateVisual();
+        RefreshUserBuildingPanel();
+        return true;
+    }
+
+    /// <summary>
+    /// Ctrl+클릭 — 저장된 건물을 고름에 넣거나 뺀다. 저장된 건물을 고치는 중이었으면 그것부터 고름에 넣고 고치기를 닫는다(누른 뒤 Ctrl+클릭 = 둘 다).
+    /// 새 윤곽을 그리던 중이면(점 · 형상 클릭이 있음) 고르지 않는다(false — 보통 클릭으로).
+    /// </summary>
+    private bool ToggleUserBuildingSelection(UbPoint screen)
+    {
+        if (_ubDraft is not { } d || MainMap == null) return false;
+        bool drawingNew = _ubEditing == null && (d.Points.Count > 0 || d.Anchors.Count > 0);
+        if (drawingNew) return false;
+        var g = MainMap.FromLocalToLatLng((int)Math.Round(screen.X), (int)Math.Round(screen.Y));
+        var hit = UserBuildingItems.LastOrDefault(it => Map3DUserBuilding.Contains(it.Outline, new UbPoint(g.Lng, g.Lat)));
+        var seed = _ubEditing?.Uid;
+        var keep = UbSelected.ToList();
+        if (_ubEditing != null) ResetUserBuildingDraft(null);   // 고치던 건물 → 고름으로(저장하지 않은 고침은 버린다)
+        UbSelected.Clear();
+        UbSelected.AddRange(keep);
+        if (seed != null && !UbSelected.Contains(seed)) UbSelected.Add(seed);
+        if (hit != null && hit.Uid != seed && !UbSelected.Remove(hit.Uid)) UbSelected.Add(hit.Uid);
+        _log?.Info($"[UserBuilding] 고름 {UbSelected.Count}개");
+        _ubAdorner?.InvalidateVisual();
+        RefreshUserBuildingPanel();
+        return true;
+    }
+
     // ── 들어가기 · 나가기 ──
 
     /// <summary>그 영역에서 그리기 시작 — 권한 · 만드는 중 · 영역 확인, 충돌 모드 끝내기, 표면 · 키 · 저장된 건물 불러오기.</summary>
@@ -286,6 +348,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         _ubEditing = null;
         _ubDragStart = null;
         _ubItems = Array.Empty<Map3DUserBuildingItem>();
+        UbSelected.Clear();
         DetachUserBuildingSurface();
         RefreshUserBuildingPanel();
         SyncMap3DWithInputModes();
@@ -305,6 +368,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (edit == null) _ubDraft.SetTool(_ubTool);
         _ubDraft.Changed += OnUserBuildingDraftChanged;
         _ubEditing = edit;
+        UbSelected.Clear();   // 새 윤곽 · 고치기 = 여러 개 고름은 끝
         _ubRoof = edit?.Roof ?? Map3DUserBuilding.RoofFlat;
         _ubUse = edit?.Use ?? Map3DUserBuilding.UseAuto;
         _ubRoofChosen = edit != null;
@@ -370,6 +434,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             var items = await _map3DClient.ListUserBuildingsAsync(job);
             if (_ubArea?.Id != job) return;   // 그 사이 나갔거나 다른 영역
             _ubItems = items;
+            UbSelected.RemoveAll(uid => items.All(i => i.Uid != uid));   // 없어진 건물은 고름에서 뺀다
             _ubAdorner?.InvalidateVisual();
             RefreshUserBuildingPanel();
         }
@@ -384,9 +449,20 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
 
     // ── 지도 표면(IUserBuildingDrawHost) ──
 
-    void IUserBuildingDrawHost.UserBuildingPointerDown(UbPoint screen, int clickCount)
+    void IUserBuildingDrawHost.UserBuildingPointerDown(UbPoint screen, int clickCount, bool ctrl)
     {
         if (_ubDraft is not { } d || _ubBusy) return;
+        if (ctrl && clickCount < 2 && ToggleUserBuildingSelection(screen)) return;
+        if (UbSelected.Count > 0)
+        {
+            // 고름이 있을 때 보통 클릭 = 고름 풀기(빈 곳이면 그것만 — 점을 찍지 않는다, 저장된 건물 안이면 아래에서 그 건물 고치기)
+            ClearUserBuildingSelection();
+            if (MainMap is { } m)
+            {
+                var g0 = m.FromLocalToLatLng((int)Math.Round(screen.X), (int)Math.Round(screen.Y));
+                if (!UserBuildingItems.Any(it => Map3DUserBuilding.Contains(it.Outline, new UbPoint(g0.Lng, g0.Lat)))) return;
+            }
+        }
         if (clickCount >= 2) { d.DoubleClick(); return; }
         // 빈 윤곽에서 저장된 건물 안을 누르면 그 건물 고치기(형상 도구로 찍던 점이 있으면 그리기 계속)
         if (d.Points.Count == 0 && d.Anchors.Count == 0 && MainMap != null)
@@ -444,6 +520,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             if (_ubPanel?.CancelHandleDrag() == true) return true;
             if (d.PointerCancel()) return true;   // 꼭짓점 끄는 중 → 끌기 전으로
+            if (ClearUserBuildingSelection()) return true;   // 여러 개 고름 → 고름 풀기(그리기는 그대로)
             if (d.IsClosed && (d.CanUndo || _ubEditing != null)) { ResetUserBuildingDraft(null); return true; }   // 닫은(고치던) 윤곽 → 빈 윤곽
             if (d.Escape() == UbEscapeResult.Exit) ExitUserBuildingDraw("escape");
             return true;
@@ -503,12 +580,15 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(UserBuildingFloorHeightText), nameof(UserBuildingError), nameof(HasUserBuildingError),
                      nameof(UserBuildingTool), nameof(IsUserBuildingToolRect), nameof(IsUserBuildingToolCircle), nameof(IsUserBuildingToolEllipse),
                      nameof(IsUserBuildingToolPolygon), nameof(UserBuildingCircleSidesText), nameof(UserBuildingRoof), nameof(UserBuildingUse),
-                     nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus),
+                     nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus), nameof(IsUserBuildingToolTriangle),
+                     nameof(UserBuildingSelectedUids), nameof(HasUserBuildingSelection), nameof(UserBuildingSelectionText), nameof(IsUserBuildingMergeVisible),
                  })
             NotifyOfPropertyChange(name);
         ApplyUserBuildingCommand.RaiseCanExecuteChanged();
         DeleteUserBuildingCommand.RaiseCanExecuteChanged();
         UndoUserBuildingCommand.RaiseCanExecuteChanged();
+        MergeUserBuildingsCommand.RaiseCanExecuteChanged();
+        ClearUserBuildingSelectionCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>판 손잡이 · 키(IBuildingHeightPanelHost 규약) — 「건물 높이」 판과 같은 수식(10 px = 1 m · ↑/↓ = ±1층 · Shift = 0.1 m).</summary>
@@ -573,6 +653,94 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
 
     private static UserBuildingState StateOf(Map3DUserBuildingItem e)
         => new(e.Outline, e.Height, e.Floors, e.Name) { Roof = e.Roof, Use = e.Use };
+
+    /// <summary>[합치기] — 고른 건물들(고른 순서)을 map-3d 가 하나로 → 목록 다시 받기 · 합친 건물 고치기로 열기 · 상태 글 · 편집 기록 1단위.</summary>
+    private async Task MergeUserBuildingsAsync()
+    {
+        if (_ubArea is not { } area || _ubBusy || UbSelected.Count < 2) return;
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
+        var members = UbSelected.Select(uid => UserBuildingItems.FirstOrDefault(i => i.Uid == uid)).OfType<Map3DUserBuildingItem>()
+                                .Select(i => (i.Uid, StateOf(i))).ToList();
+        if (members.Count < 2) return;
+        if (await SendUserBuildingMergeAsync(area.Id, members.Select(m => m.Uid).ToList(), null) is not { } r) return;
+        var first = r.Item;
+        _undoService?.Push(new UserBuildingMergeCommand($"{Map3DUserBuilding.UndoPrefix} 합치기", area.Id, members, first.Uid,
+            (job, uids, ct) => RedoUserBuildingMergeAsync(job, uids, first),
+            ApplyUserBuildingUnmergeAsync, ResolveUserBuildingJob));
+        if (_ubArea?.Id == area.Id)
+            ResetUserBuildingDraft(UserBuildingItems.FirstOrDefault(i => i.Uid == first.Uid) ?? first);   // 높이 · 층수를 바로 고칠 수 있게
+        SetAimStatus(Map3DUserBuilding.MergedText(members.Count, r.HolesFilled), autoHide: true);
+    }
+
+    /// <summary>편집 기록 다시 하기 — 같은 uid 들을 처음 합친 건물의 높이 · 층수 · 이름 · 외벽으로 다시 합친다. 실패는 예외. 합친 uid 를 돌려준다.</summary>
+    private async Task<string> RedoUserBuildingMergeAsync(string job, IReadOnlyList<string> uids, Map3DUserBuildingItem like)
+    {
+        if (await SendUserBuildingMergeAsync(job, uids, like) is not { } r) throw new InvalidOperationException(_ubError ?? "직접 그린 건물 합치기 실패");
+        if (_ubEditing != null && uids.Contains(_ubEditing.Uid)) ResetUserBuildingDraft(null);
+        SetAimStatus(Map3DUserBuilding.MergedText(uids.Count, r.HolesFilled), autoHide: true);
+        return r.Item.Uid;
+    }
+
+    /// <summary>편집 기록 되돌리기 — 합친 건물을 지우고 원래 건물들을 같은 uid · 상태로 다시 저장. 실패는 예외(편집 기록이 그 칸을 남긴다).</summary>
+    private async Task ApplyUserBuildingUnmergeAsync(string job, string mergedUid, IReadOnlyList<(string Uid, UserBuildingState State)> members, CancellationToken ct)
+    {
+        if (_ubEditing?.Uid == mergedUid) ResetUserBuildingDraft(null);
+        if (!await SaveUserBuildingAsync(job, mergedUid, null)) throw new InvalidOperationException(_ubError ?? "합친 건물 지우기 실패");
+        foreach (var (uid, state) in members)
+            if (!await SaveUserBuildingAsync(job, uid, state)) throw new InvalidOperationException(_ubError ?? "직접 그린 건물 저장 실패");
+        SetAimStatus($"합친 건물을 원래 {members.Count}개로 되돌렸습니다", autoHide: true);
+    }
+
+    /// <summary>
+    /// map-3d 합치기 → 3D 상자 미리보기(원래 것 지움 · 합친 것) · 목록 갱신. 실패는 판 오류 줄(떨어진 도형 400 · 없는 건물 404 = 서버 문구 그대로). 성공이면 응답.
+    /// </summary>
+    private async Task<Map3DUserBuildingMergeResult?> SendUserBuildingMergeAsync(string job, IReadOnlyList<string> uids, Map3DUserBuildingItem? like)
+    {
+        if (_map3DClient == null) return null;
+        _ubBusy = true;
+        _ubError = null;
+        RefreshUserBuildingPanel();
+        try
+        {
+            var r = like == null
+                ? await _map3DClient.MergeUserBuildingsAsync(job, uids)
+                : await _map3DClient.MergeUserBuildingsAsync(job, uids, like.Height, like.Floors, like.Name, like.Use);
+            foreach (var uid in r.Merged.Count > 0 ? r.Merged : uids) PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(uid, null, null));
+            PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(r.Item.Uid, r.Item.Outline, r.Item.Height));
+            _log?.Info($"[UserBuilding] 합침 {string.Join(",", uids)} → {r.Item.Uid} 빈곳={r.HolesFilled} job={job}");
+            if (_ubArea?.Id == job) await LoadUserBuildingsAsync(job);
+            _ = RefreshMap3DAreasAsync();
+            return r;
+        }
+        catch (Map3DServerUnavailableException ex)
+        {
+            _log?.Warning($"[UserBuilding] 합치기 — 서버 닿지 않음: {ex.Message}");
+            SetUserBuildingError(Map3DUnavailableText);
+            NoteMap3DEngineDown("user-building-merge");
+        }
+        catch (Map3DRequestException ex) when (ex.Message is "Not Found" or "Method Not Allowed")   // 옛 map-3d — 합치기 주소가 없다
+        {
+            _log?.Warning($"[UserBuilding] 합치기 — 옛 서버({(int)ex.StatusCode} {ex.Message})");
+            SetUserBuildingError(Map3DUserBuilding.OldServerText);
+        }
+        catch (Map3DRequestException ex)
+        {
+            _log?.Warning($"[UserBuilding] 합치기 거절({(int)ex.StatusCode}): {ex.Message}");
+            SetUserBuildingError(ex.Message);   // 떨어진 도형 · 없는 건물 — 서버의 한국어 문구
+            if (ex.StatusCode == System.Net.HttpStatusCode.NotFound && _ubArea?.Id == job) await LoadUserBuildingsAsync(job);   // 다른 곳에서 지워졌다
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[UserBuilding] 합치기 실패: {ex.Message}");
+            SetUserBuildingError("합치지 못했습니다.");
+        }
+        finally
+        {
+            _ubBusy = false;
+            RefreshUserBuildingPanel();
+        }
+        return null;
+    }
 
     /// <summary>되돌리기 — 윤곽 편집 칸이 있으면 그것, 없으면 GIS 편집 기록 맨 위가 이 기능 기록일 때만 그것.</summary>
     private async Task UndoUserBuildingAsync()
