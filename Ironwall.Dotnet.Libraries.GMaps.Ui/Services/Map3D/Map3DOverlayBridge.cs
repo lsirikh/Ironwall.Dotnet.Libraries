@@ -274,7 +274,7 @@ internal sealed class Map3DOverlayBridge
                 return Map3DOverlay.Line(Map3DOverlay.KindPidsGroup, g.Id, m.Title,
                     m.LinePoints?.Select(pt => (pt.Latitude, pt.Longitude)), m.IsClosedPath,
                     m.StrokeColor.ToHexString(), m.StrokeThickness,
-                    hasFence: true, m.FenceHeightM, m.PostSpacingM, m.Render3D,
+                    hasFence: true, m.FenceHeightM ?? Utils.Symbol3DFeature.FenceHeightM, m.PostSpacingM, m.Render3D,   // 그룹 값이 없으면 설정(Symbol3D.FenceHeightM) — 2D 와 같은 높이
                     m.CompositeStatus, m.Visible, g.IsLayerEnabled, m.Zoom);
             }
             case GMapLineMarker l:

@@ -254,7 +254,7 @@ public class HousingTests
             var (s, error) = Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.Symbol3DFeature.ReadSettings(path);
             Assert.Null(error);
             Assert.True(s.IsEnabled); Assert.Null(s.Directory);
-            Assert.Equal(3.0, s.FencePostSpacingM); Assert.Equal(2.4, s.FenceHeightM); Assert.True(s.DoorContactFallback);
+            Assert.Equal(3.0, s.FencePostSpacingM); Assert.Equal(Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Fence.FenceDefaults.FenceHeightM, s.FenceHeightM); Assert.True(s.DoorContactFallback);
             var (enabled, _, err2) = Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.Symbol3DFeature.ReadFile(path);   // 하위 호환 튜플
             Assert.True(enabled); Assert.Null(err2);
         }
@@ -288,7 +288,7 @@ public class HousingTests
             Assert.NotNull(error);
             Assert.Contains("FencePostSpacingM", error); Assert.Contains("FenceHeightM", error);
             Assert.True(s.IsEnabled);
-            Assert.Equal(3.0, s.FencePostSpacingM); Assert.Equal(2.4, s.FenceHeightM); Assert.False(s.DoorContactFallback);
+            Assert.Equal(3.0, s.FencePostSpacingM); Assert.Equal(Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Fence.FenceDefaults.FenceHeightM, s.FenceHeightM); Assert.False(s.DoorContactFallback);
         }
         finally { File.Delete(path); }
     }

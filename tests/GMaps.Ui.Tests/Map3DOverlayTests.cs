@@ -77,7 +77,7 @@ public class Map3DOverlayTests
         Assert.True(o.Value<bool>("closed"));
         Assert.Equal("#F44336", o.Value<string>("stroke"));
         Assert.Equal(2.5, o.Value<double>("strokeW"));
-        Assert.Equal(2.4, o["fence"]!.Value<double>("heightM"));     // FenceDefaults.FenceHeightM
+        Assert.Equal(Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Fence.FenceDefaults.FenceHeightM, o["fence"]!.Value<double>("heightM"));     // 기본(2026-10-20 2배 → 4.8)
         Assert.Equal(4.0, o["fence"]!.Value<double>("postSpacingM"));
         Assert.True(o["fence"]!.Value<bool>("render3d"));
         Assert.Equal("Detecting", o["state"]!.Value<string>("composite"));
