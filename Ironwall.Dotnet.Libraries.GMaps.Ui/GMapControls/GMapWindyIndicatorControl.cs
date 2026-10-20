@@ -26,6 +26,10 @@ public class GMapWindyIndicatorControl : Control
     private bool _pressed, _dragging;
     private Point _startOnCanvas;
     private double _startX, _startY;
+    /// <summary>기본 자리 기준 요소(DockBelowId 로 찾음) — 그 아래 왼쪽에 붙는다.</summary>
+    private FrameworkElement? _anchor;
+    /// <summary>기준 요소와 배지 사이 간격(DIU).</summary>
+    private const double DockGap = 6.0;
 
     static GMapWindyIndicatorControl()
     {
@@ -88,6 +92,14 @@ public class GMapWindyIndicatorControl : Control
         DependencyProperty.Register(nameof(WindyY), typeof(double), typeof(GMapWindyIndicatorControl),
             new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnPosChanged));
 
+    /// <summary>
+    /// 기본 자리 기준 요소의 AutomationId(2026-10-20) — 사용자가 옮기기 전(WindyX/Y = NaN)에는 그 요소 바로 아래 · 같은 왼쪽 줄에 붙고,
+    /// 그 요소 크기가 바뀌면(좌표 줄 추가 · 3D 단추 나타남) 따라 움직인다. 비어 있거나 못 찾으면 예전 기본 자리(DefaultDockWindy).
+    /// </summary>
+    public string? DockBelowId { get => (string?)GetValue(DockBelowIdProperty); set => SetValue(DockBelowIdProperty, value); }
+    public static readonly DependencyProperty DockBelowIdProperty =
+        DependencyProperty.Register(nameof(DockBelowId), typeof(string), typeof(GMapWindyIndicatorControl), new PropertyMetadata(null));
+
     /// <summary>드래그 종료 → 호스트가 위치 영속.</summary>
     public ICommand? DragCompletedCommand { get => (ICommand?)GetValue(DragCompletedCommandProperty); set => SetValue(DragCompletedCommandProperty, value); }
     public static readonly DependencyProperty DragCompletedCommandProperty =
@@ -130,6 +142,7 @@ public class GMapWindyIndicatorControl : Control
     private void OnUnloaded(object? sender, RoutedEventArgs e)
     {
         SizeChanged -= OnControlSizeChanged;
+        if (_anchor != null) { _anchor.SizeChanged -= OnAnchorSizeChanged; _anchor = null; }
         if (_hookedCanvas != null) { _hookedCanvas.SizeChanged -= OnCanvasSizeChanged; _hookedCanvas = null; }
         ResetInteraction();
     }
@@ -143,7 +156,8 @@ public class GMapWindyIndicatorControl : Control
 
     private void ResetInteraction() { _pressed = false; _dragging = false; }
     private void OnControlSizeChanged(object? sender, SizeChangedEventArgs e) => TryPosition();
-    private void OnCanvasSizeChanged(object? sender, SizeChangedEventArgs e) => UpdateDisplayPosition();
+    private void OnCanvasSizeChanged(object? sender, SizeChangedEventArgs e) => TryPosition();
+    private void OnAnchorSizeChanged(object? sender, SizeChangedEventArgs e) => TryPosition();
 
     private void TryPosition()
     {
@@ -159,10 +173,51 @@ public class GMapWindyIndicatorControl : Control
         if (cw <= 0 || ch <= 0 || w <= 0 || h <= 0) return;
         if (double.IsNaN(WindyX) || double.IsNaN(WindyY))
         {
+            if (DockBelow(_parentCanvas) is { } dock)
+            {
+                // 옮기기 전 = 기준 요소 아래에 붙여 그리기만(영속값은 NaN 그대로 — 기준 요소가 바뀌면 다시 따라간다)
+                var (dx, dy) = InstrumentMath.ClampWithMargin(dock.X, dock.Y, w, h, cw, ch);
+                Canvas.SetLeft(this, dx); Canvas.SetTop(this, dy);
+                return;
+            }
             var (x, y) = InstrumentMath.DefaultDockWindy(cw, ch);
             WindyX = x; WindyY = y;
         }
         else UpdateDisplayPosition();
+    }
+
+    /// <summary>기준 요소 왼쪽 아래 + 간격(캔버스 좌표). 기준 요소가 없거나 아직 그려지지 않았으면 null.</summary>
+    private Point? DockBelow(Canvas canvas)
+    {
+        if (string.IsNullOrEmpty(DockBelowId)) return null;
+        if (_anchor == null || !_anchor.IsLoaded)
+        {
+            if (_anchor != null) _anchor.SizeChanged -= OnAnchorSizeChanged;
+            DependencyObject top = canvas;
+            while (VisualTreeHelper.GetParent(top) is { } up) top = up;   // 맨 위 조상(창)에서 찾는다
+            _anchor = FindById(top, DockBelowId);
+            if (_anchor == null) return null;
+            _anchor.SizeChanged += OnAnchorSizeChanged;
+        }
+        if (_anchor.ActualWidth <= 0 || !_anchor.IsVisible) return null;
+        try
+        {
+            var p = _anchor.TransformToVisual(canvas).Transform(new Point(0, _anchor.ActualHeight));
+            return new Point(p.X, p.Y + DockGap);
+        }
+        catch (InvalidOperationException) { return null; }   // 공통 조상 없음(다른 창)
+    }
+
+    private static FrameworkElement? FindById(DependencyObject root, string id)
+    {
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            if (c is FrameworkElement fe && System.Windows.Automation.AutomationProperties.GetAutomationId(fe) == id) return fe;
+            if (FindById(c, id) is { } hit) return hit;
+        }
+        return null;
     }
 
     /// <summary>desired(WindyX/Y)를 클램프해 Canvas.Left/Top에만 반영(영속값 미훼손, 리뷰 #4).</summary>
@@ -204,8 +259,8 @@ public class GMapWindyIndicatorControl : Control
         if (_parentCanvas == null || _root == null) return;
         _pressed = true; _dragging = false;
         _startOnCanvas = e.GetPosition(_parentCanvas);
-        _startX = double.IsNaN(WindyX) ? 0 : WindyX;
-        _startY = double.IsNaN(WindyY) ? 0 : WindyY;
+        _startX = double.IsNaN(WindyX) ? Num(Canvas.GetLeft(this)) : WindyX;   // 붙어 있던 자리에서 시작
+        _startY = double.IsNaN(WindyY) ? Num(Canvas.GetTop(this)) : WindyY;
         _root.CaptureMouse();
         e.Handled = true;
     }
@@ -239,6 +294,7 @@ public class GMapWindyIndicatorControl : Control
         e.Handled = true;
     }
     private void OnLost(object sender, MouseEventArgs e) => ResetInteraction();
+    private static double Num(double v) => double.IsNaN(v) ? 0 : v;
 
     protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
     {
@@ -262,6 +318,8 @@ public class GMapWindyIndicatorControl : Control
         Add("아이콘만", "style:IconOnly", () => DisplayStyle = WindyDisplayStyle.IconOnly);
         menu.Items.Add(new Separator());
         Add("평상시(보통) 숨김", "hideNormal", () => HideOnNormal = !HideOnNormal);
+        menu.Items.Add(new Separator());
+        Add("기본 자리로(좌표 아래)", "dock", () => { WindyX = double.NaN; WindyY = double.NaN; TryPosition(); });
         return menu;
     }
     private void SyncMenuChecks()

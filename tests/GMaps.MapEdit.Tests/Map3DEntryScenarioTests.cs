@@ -554,12 +554,13 @@ public class Map3DEntryScenarioTests
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "Ironwall.Dotnet.Libraries.GMaps.Ui", "Views", "Maps", "MapView.xaml"));
         int enter = xaml.IndexOf("AutomationProperties.AutomationId=\"Map.Map3D.EnterButton\"", StringComparison.Ordinal);
         int exit = xaml.IndexOf("AutomationProperties.AutomationId=\"GMaps.Map3D.ExitButton\"", StringComparison.Ordinal);
-        Assert.True(enter > 0 && exit > enter, "「3D 로 보기」는 「나가기」 바로 앞(같은 왼쪽 위 줄)");
+        Assert.True(enter > 0 && exit > enter, "「3D 로 보기」는 「나가기」 바로 앞(같은 왼쪽 위 자리)");
+        int coord = xaml.IndexOf("<ctrl:MapCoordinateControl", StringComparison.Ordinal);
+        Assert.True(coord > 0 && coord < enter, "좌표 표시가 맨 위, 3D 단추는 그 아래(좌표 줄이 늘어나면 같이 내려간다)");
         string block = xaml.Substring(xaml.LastIndexOf("<Border", enter, StringComparison.Ordinal), exit - xaml.LastIndexOf("<Border", enter, StringComparison.Ordinal));
         Assert.Contains("Visibility=\"{Binding IsMap3DEnterButtonVisible", block);
         Assert.Contains("Command=\"{Binding EnterMap3DCommand}\"", block);
-        Assert.Contains("Style=\"{StaticResource MapFloatingPanelStyle}\"", block);
-        Assert.Contains("Style=\"{StaticResource PanelPrimaryButtonStyle}\"", block);
+        Assert.Contains("Style=\"{StaticResource Map3DPillButtonStyle}\"", block);   // 바람 위젯과 같은 알약 모양(2026-10-20)
         Assert.Contains("HelpKey=\"Map.Map3D.Enter\"", block);
         Assert.DoesNotContain("x:Name", block);
         Assert.DoesNotContain("#", block.Replace("Map.Map3D", ""));   // 색은 토큰만

@@ -56,6 +56,52 @@
 		<symbolUtils:SymbolTypeToDisplayNameConverter x:Key="SymbolTypeToDisplayNameConverter" />
 		<symbolUtils:SymbolTypeToIconConverter x:Key="SymbolTypeToIconConverter" />
 		<utils:EnumToVisibilityConverter x:Key="EnumToVisibilityConverter" />
+		<!--  3D 로 보기 · 나가기 알약 단추(2026-10-20 사용자 지시 — 바람 위젯과 같은 모양: 둥근 알약 · 큰 아이콘 · 제목 + 작은 설명 두 줄).
+		      그림자는 뒤 바탕 판에만(내용은 효과 없이 — 글자 · 둥근 모서리 흐림 방지), 테두리 = 주 색(누를 수 있는 것). 색은 토큰만.  -->
+		<Style x:Key="Map3DPillButtonStyle" TargetType="Button">
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
+							<Border Background="{DynamicResource SurfaceTranslucentBrush}" CornerRadius="22">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="8"
+										Opacity="0.28"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+							</Border>
+							<Border
+								x:Name="Chrome"
+								Padding="9,6,14,6"
+								Background="Transparent"
+								BorderBrush="{DynamicResource PrimaryBrush}"
+								BorderThickness="1.5"
+								CornerRadius="22">
+								<ContentPresenter VerticalAlignment="Center" />
+							</Border>
+						</Grid>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chrome" Property="Background" Value="{DynamicResource TintAccentBrush}" />
+							</Trigger>
+							<Trigger Property="IsKeyboardFocused" Value="True">
+								<Setter TargetName="Chrome" Property="BorderThickness" Value="2.5" />
+							</Trigger>
+							<Trigger Property="IsPressed" Value="True">
+								<Setter TargetName="Chrome" Property="BorderThickness" Value="2.5" />
+							</Trigger>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.5" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 		<Style
 			x:Name="CustomIconButton"
 			BasedOn="{StaticResource MaterialDesignIconButton}"
@@ -1412,99 +1458,106 @@
 					ScalePoints="{Binding ScalePoints}" />
 			</StackPanel>
 
-			<!--  왼쪽 위 줄 — [3D 나가기] + 좌표 표시. 좌측 메뉴(50) 오른쪽 · 바람 위젯(좌표 아래 도킹) 위라 겹치지 않는다.
-			      「나가기」는 3D 가 보이는 동안만(IsMap3DShown = Map3DStatusText "3D" 에서 파생) 좌표 칩 왼쪽에 붙는다.
-			      ExitMap3DCommand → ExitMap3D 로 들어오기 직전 2D 자리에 돌아온다 — 3D 는 줌으로도 Esc 로도 나가지 않는다(2026-10-19). 설명은 "?" 말풍선.
-			      WPF 안에서 그리는 3D(기본) 위에 보인다 — 네이티브 창 3D 로 바뀐 경우엔 그 창에 가려 Esc 만 남는다(Map3DGuide.EscExitsMap3D).
-			      디자인 = 지도 HUD 와 같은 MapFloatingPanelStyle + 패널 주 단추(PanelPrimaryButtonStyle), 토큰만(라이트/다크).  -->
+			<!--  왼쪽 위 — 맨 위 = 좌표 표시(UTM · MGRS 를 켜면 줄이 늘어난다 — 세로로 쌓아 아래 단추가 같이 내려간다), 그 아래 = 3D 단추(2026-10-20).
+			      3D 단추 = 바람 위젯과 같은 알약 모양(Map3DPillButtonStyle). 왼쪽 끝 50 = 좌측 메뉴 오른쪽 — 왼쪽 아래 3D 조절기 · 스케일바와 같은 줄(x).
+			      「3D 로 보기」 — 2D 에서 화면 가운데가 만들어 둔 3D 영역 안일 때만(IsMap3DEnterButtonVisible). 줌과 상관없이 바로 들어간다(EnterMap3DCommand).
+			      「나가기」 — 3D 가 보이는 동안만(IsMap3DShown). ExitMap3DCommand → 들어오기 직전 2D 자리로. 3D 는 줌으로도 Esc 로도 나가지 않는다(2026-10-19).
+			      좌표 — 3D 동안은 3D 마우스가 가리키는 땅(cursor 메시지, 고도 줄 덧붙음). 설명은 "?" 말풍선.  -->
 			<StackPanel
 				Grid.Row="2"
 				Grid.ColumnSpan="2"
 				Margin="50,5,5,5"
 				HorizontalAlignment="Left"
 				VerticalAlignment="Top"
-				Orientation="Horizontal">
-				<!--  「3D 로 보기」 — 2D 에서 화면 가운데가 만들어 둔 3D 영역 안일 때만(IsMap3DEnterButtonVisible), 「나가기」와 같은 자리 · 같은 디자인.
-				      줌과 상관없이 바로 들어간다(EnterMap3DCommand → EnterMap3DDirect, 수동(단추) 방식의 들어가는 길). 설명은 "?" 말풍선.  -->
+				AutomationProperties.AutomationId="GMaps.Map.TopLeftStack">
+				<ctrl:MapCoordinateControl
+					HorizontalAlignment="Left"
+					AltitudeText="{Binding CurrentAltitudeText}"
+					IsShowMGRS="{Binding IsShowMGRS}"
+					IsShowUTM="{Binding IsShowUTM}"
+					IsShowWGS84="{Binding IsShowWSG84}"
+					Latitude="{Binding CurrentCoordinatePosition.Latitude}"
+					Longitude="{Binding CurrentCoordinatePosition.Longitude}"
+					MGRS="{Binding CurrentMGRS}"
+					UTM="{Binding CurrentUTM}" />
 				<Border
-					Margin="0,0,8,0"
-					Padding="4"
-					VerticalAlignment="Top"
+					Margin="0,6,0,0"
+					HorizontalAlignment="Left"
 					AutomationProperties.AutomationId="GMaps.Map3D.Enter"
-					Style="{StaticResource MapFloatingPanelStyle}"
 					Visibility="{Binding IsMap3DEnterButtonVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<StackPanel Orientation="Horizontal">
 						<Button
 							AutomationProperties.AutomationId="Map.Map3D.EnterButton"
 							AutomationProperties.Name="3D 로 보기"
 							Command="{Binding EnterMap3DCommand}"
-							Style="{StaticResource PanelPrimaryButtonStyle}"
+							Style="{StaticResource Map3DPillButtonStyle}"
 							ToolTip="이 자리를 3D 지도로 봅니다">
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon
-									Width="16"
-									Height="16"
+									Width="24"
+									Height="24"
 									VerticalAlignment="Center"
+									Foreground="{DynamicResource PrimaryBrush}"
 									Kind="CubeOutline" />
-								<TextBlock
-									Margin="6,0,0,0"
-									VerticalAlignment="Center"
-									FontWeight="SemiBold"
-									Text="3D 로 보기" />
+								<StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+									<TextBlock
+										FontSize="13"
+										FontWeight="SemiBold"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="3D 로 보기" />
+									<TextBlock
+										FontSize="10"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Text="이 자리를 3D 지도로" />
+								</StackPanel>
 							</StackPanel>
 						</Button>
 						<help:HelpTip
-							Margin="6,0,2,0"
+							Margin="6,0,0,0"
 							VerticalAlignment="Center"
 							HelpKey="Map.Map3D.Enter"
 							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 				</Border>
 				<Border
-					Margin="0,0,8,0"
-					Padding="4"
-					VerticalAlignment="Top"
+					Margin="0,6,0,0"
+					HorizontalAlignment="Left"
 					AutomationProperties.AutomationId="GMaps.Map3D.Exit"
-					Style="{StaticResource MapFloatingPanelStyle}"
 					Visibility="{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<StackPanel Orientation="Horizontal">
 						<Button
 							AutomationProperties.AutomationId="GMaps.Map3D.ExitButton"
 							AutomationProperties.Name="나가기"
 							Command="{Binding ExitMap3DCommand}"
-							Style="{StaticResource PanelPrimaryButtonStyle}"
+							Style="{StaticResource Map3DPillButtonStyle}"
 							ToolTip="2D 지도로 돌아갑니다">
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon
-									Width="16"
-									Height="16"
+									Width="24"
+									Height="24"
 									VerticalAlignment="Center"
+									Foreground="{DynamicResource PrimaryBrush}"
 									Kind="ArrowLeft" />
-								<TextBlock
-									Margin="6,0,0,0"
-									VerticalAlignment="Center"
-									FontWeight="SemiBold"
-									Text="나가기" />
+								<StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+									<TextBlock
+										FontSize="13"
+										FontWeight="SemiBold"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="나가기" />
+									<TextBlock
+										FontSize="10"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Text="2D 지도로 돌아가기" />
+								</StackPanel>
 							</StackPanel>
 						</Button>
 						<help:HelpTip
-							Margin="6,0,2,0"
+							Margin="6,0,0,0"
 							VerticalAlignment="Center"
 							HelpKey="Map.Map3D.Exit"
 							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 				</Border>
-			<!--  좌표 표시 — 3D 동안은 3D 마우스가 가리키는 땅(cursor 메시지, 고도 줄 덧붙음)  -->
-			<ctrl:MapCoordinateControl
-				VerticalAlignment="Top"
-				AltitudeText="{Binding CurrentAltitudeText}"
-				IsShowMGRS="{Binding IsShowMGRS}"
-				IsShowUTM="{Binding IsShowUTM}"
-				IsShowWGS84="{Binding IsShowWSG84}"
-				Latitude="{Binding CurrentCoordinatePosition.Latitude}"
-				Longitude="{Binding CurrentCoordinatePosition.Longitude}"
-				MGRS="{Binding CurrentMGRS}"
-				UTM="{Binding CurrentUTM}" />
 			</StackPanel>
 
 			<!--  화면 정중앙 십자가(비상호작용 시각 기준) — IsCenterCrosshairVisible 토글. AdornerDecorator 형제라 디지털줌 RenderTransform 영향 없이 항상 화면 중앙.
@@ -1818,12 +1871,14 @@
 					Variant="{Binding CompassVariant, Mode=TwoWay}"
 					Visibility="{Binding IsCompassShown, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-				<!--  강풍모드(WINDY) 인디케이터 — 계기층 z6, 보기 메뉴 가시성(FR-17), 클릭→WINDY 패널(D-10).  -->
+				<!--  강풍모드(WINDY) 인디케이터 — 계기층 z6, 보기 메뉴 가시성(FR-17), 클릭→WINDY 패널(D-10).
+				      옮기기 전에는 왼쪽 위 묶음(좌표 · 3D 단추, GMaps.Map.TopLeftStack) 바로 아래 같은 왼쪽 줄에 붙어 따라 움직인다(2026-10-20).  -->
 				<ctrl:GMapWindyIndicatorControl
 					x:Name="MapWindyIndicator"
 					Panel.ZIndex="6"
 					ClickCommand="{Binding OpenWindyPanelCommand}"
 					DisplayStyle="{Binding WindyDisplayStyle, Mode=TwoWay}"
+					DockBelowId="GMaps.Map.TopLeftStack"
 					DragCompletedCommand="{Binding SaveMapWindyCommand}"
 					HideOnNormal="{Binding WindyHideOnNormal, Mode=TwoWay}"
 					IsInstrumentVisible="{Binding IsWindyIndicatorVisible}"
