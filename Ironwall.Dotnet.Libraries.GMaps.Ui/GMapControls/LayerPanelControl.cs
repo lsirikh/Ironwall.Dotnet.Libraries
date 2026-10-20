@@ -523,9 +523,51 @@ public class LayerPanelControl : Control
         var cp = FindParent<ContentPresenter>(this);
         var canvas = cp?.Parent as Canvas;
         if (canvas == null || cp == null) return;
-        // 좌상단 고정 위치 (툴바 아래, 좌표 표시 옆)
-        Canvas.SetLeft(cp, 50);
-        Canvas.SetTop(cp, 60);
+        // 좌상단 — 왼쪽 위 묶음(좌표 · 3D 단추, GMaps.Map.TopLeftStack) 바로 아래 같은 왼쪽 줄(2026-10-20: 3D 단추가 좌표 아래로 내려가 덮지 않게).
+        //   묶음을 못 찾으면 예전 자리(툴바 아래 50, 60).
+        double left = 50, top = 60;
+        DependencyObject root = canvas;
+        while (VisualTreeHelper.GetParent(root) is { } up) root = up;
+        if (FindById(root, "GMaps.Map.TopLeftStack") is { ActualWidth: > 0, IsVisible: true } stack)
+        {
+            try
+            {
+                var p = stack.TransformToVisual(canvas).Transform(new Point(0, stack.ActualHeight));
+                left = p.X; top = Math.Max(top, p.Y + 6);
+                // 그 아래 같은 줄에 붙은 바람 배지도 피한다
+                if (FindVisible<GMapWindyIndicatorControl>(root) is { } windy)
+                {
+                    var w = windy.TransformToVisual(canvas).TransformBounds(new Rect(windy.RenderSize));
+                    if (Math.Abs(w.Left - left) < 24 && w.Top < top + 24) top = Math.Max(top, w.Bottom + 6);
+                }
+            }
+            catch (InvalidOperationException) { }   // 공통 조상 없음
+        }
+        var (l, t) = ClampHeaderInside(left, top, canvas);
+        Canvas.SetLeft(cp, l);
+        Canvas.SetTop(cp, t);
+    }
+
+    private static T? FindVisible<T>(DependencyObject root) where T : FrameworkElement
+    {
+        for (int i = 0, n = VisualTreeHelper.GetChildrenCount(root); i < n; i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            if (c is T t && t.IsVisible && t.ActualWidth > 0) return t;
+            if (FindVisible<T>(c) is { } hit) return hit;
+        }
+        return null;
+    }
+
+    private static FrameworkElement? FindById(DependencyObject root, string id)
+    {
+        for (int i = 0, n = VisualTreeHelper.GetChildrenCount(root); i < n; i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            if (c is FrameworkElement fe && System.Windows.Automation.AutomationProperties.GetAutomationId(fe) == id) return fe;
+            if (FindById(c, id) is { } hit) return hit;
+        }
+        return null;
     }
 
     private T? FindParent<T>(DependencyObject child) where T : DependencyObject
