@@ -18,6 +18,9 @@ public partial class Map3DNavControl : UserControl
     private readonly Map3DNavDrag _ring = new(ring: true, DragMath.DeadZone);
     private readonly Map3DNavDrag _tilt = new(ring: false, DragMath.DeadZone);
     private Map3DNavMove? _mouseMove;
+    /// <summary>마우스로 누른 단추 · 시각 — 그 누름이 뗄 때 올리는 Click 만 건너뛴다(키보드 · UIA Invoke 는 마지막 입력 장치와 상관없이 한 걸음).</summary>
+    private Map3DNavMove? _mouseClickMove;
+    private long _mouseClickAt;
     /// <summary>키로 누르고 있는 이동 — 마우스와 같은 방향을 함께 누르면 한쪽을 떼도 다른 쪽이 누르고 있는 동안 계속 간다.</summary>
     private readonly HashSet<Map3DNavMove> _keyMoves = new();
 
@@ -69,6 +72,7 @@ public partial class Map3DNavControl : UserControl
         if (sender is not FrameworkElement { Tag: Map3DNavMove move }) return;
         EndMouseMove();
         _mouseMove = move;
+        _mouseClickMove = move; _mouseClickAt = Environment.TickCount64;
         Vm?.StartMap3DMove(move);
     }
 
@@ -86,8 +90,12 @@ public partial class Map3DNavControl : UserControl
     /// <summary>마우스 클릭은 누름 · 뗌이 이미 처리했다 — 키보드 · UIA(Invoke)로 누른 것만 한 걸음.</summary>
     private void OnMoveClick(object sender, RoutedEventArgs e)
     {
-        if (InputManager.Current.MostRecentInputDevice is MouseDevice) return;
         if (sender is not FrameworkElement { Tag: Map3DNavMove move } || Vm is not { } vm) return;
+        // 마우스 누름 · 뗌이 이미 처리한 그 클릭만 건너뛴다. 예전엔 "마지막 입력 장치 = 마우스"면 버려서
+        // 마우스를 쓴 뒤 UIA Invoke · 보조 기술로 누르면 반응이 없었다(2026-10-20 실기 N6).
+        bool fromMousePress = _mouseClickMove == move && Environment.TickCount64 - _mouseClickAt < 2000;
+        _mouseClickMove = null;
+        if (fromMousePress) return;
         vm.StartMap3DMove(move);
         vm.StopMap3DMove(move);
     }
