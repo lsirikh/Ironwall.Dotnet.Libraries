@@ -109,6 +109,7 @@ public sealed class ServerContractBootService : IService, IDisposable
                 if (ReferenceEquals(finished, all))
                 {
                     foreach (var probe in pending) LogOutcome(probe);
+                    RetryUnresolvedInBackground(pending, linked);
                     return;
                 }
             }
@@ -124,6 +125,8 @@ public sealed class ServerContractBootService : IService, IDisposable
             }
 
             ObserveInBackground(all, pending);   // 배경 Task 관측(UnobservedTaskException 방지)
+            _ = all.ContinueWith(_ => RetryUnresolvedInBackground(pending, linked), CancellationToken.None,
+                                 TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
         catch (Exception ex)
         {
@@ -192,6 +195,37 @@ public sealed class ServerContractBootService : IService, IDisposable
             catch { /* 로깅 실패까지 번지지 않게 */ }
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
+
+    /// <summary>
+    /// 부팅 때 못 얻은 프로브를 배경에서 다시 묻는다(2 · 5 · 10 · 30초 뒤, 그 뒤로 60초마다 — 얻으면 멈춤 · 종료 때 취소).
+    /// 2026-10-20 실기: 부팅 순간 TLS 연결이 한 번 실패하자 그 실행 내내 폴백 V6_3 에 굳어, v8 서버에 옛 질의(include_controller)를
+    /// 보내 422 → 탐지 장비를 "서버에 없음"으로 보고 카메라 이벤트 창이 뜨지 않았다.
+    /// </summary>
+    private void RetryUnresolvedInBackground(List<IServerContractProbe> probes, CancellationToken token)
+    {
+        var left = probes.Where(p => !p.IsResolved).ToList();
+        if (left.Count == 0 || token.IsCancellationRequested) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                for (int attempt = 0; left.Count > 0 && !token.IsCancellationRequested; attempt++)
+                {
+                    await Task.Delay(RetryDelay(attempt), token).ConfigureAwait(false);
+                    await Task.WhenAll(left.Select(p => SafeResolveAsync(p, token))).ConfigureAwait(false);
+                    foreach (var probe in left.Where(p => p.IsResolved))
+                        _log?.Info($"[ServerContract] 다시 물어 확보 — raw='{probe.RawVersion}' → {probe.Contract} ({attempt + 1}번째 재시도)");
+                    left = left.Where(p => !p.IsResolved).ToList();
+                }
+            }
+            catch (OperationCanceledException) { /* 종료 */ }
+            catch (Exception ex) { _log?.Warning($"[ServerContract] 재시도 중 예외(흡수): {ex.Message}"); }
+        }, CancellationToken.None);
+    }
+
+    /// <summary>재시도 간격 — 2 · 5 · 10 · 30초, 그 뒤로 60초.</summary>
+    internal static TimeSpan RetryDelay(int attempt)
+        => TimeSpan.FromSeconds(attempt switch { 0 => 2, 1 => 5, 2 => 10, 3 => 30, _ => 60 });
 
     private void LogOutcome(IServerContractProbe probe)
     {

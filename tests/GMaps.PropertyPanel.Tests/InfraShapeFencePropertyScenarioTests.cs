@@ -357,13 +357,13 @@ public class InfraShapeFencePropertyScenarioTests
         Assert.True(posts6 < posts3, $"간격을 넓혔는데 기둥이 줄지 않았다({posts3} → {posts6})");
         Assert.Equal(posts6, PostsInSummary(summary.Text));             // 요약 = 3D
 
-        // 높이 4 m → 3D 메시가 위로 자란다 · DB
-        height.Value = 4.0;
+        // 높이 8 m(기본 4.8 보다 높게) → 3D 메시가 위로 자란다 · DB
+        height.Value = 8.0;
         Property3DRig.PumpFor(FenceDefaults.SliderCommitDelayMs * 3);
-        Assert.Equal(4.0, marker.FenceHeightM);
-        Assert.Equal(4.0, (double)rig.Last(GroupUpdate)["FenceHeightM"]!);
+        Assert.Equal(8.0, marker.FenceHeightM);
+        Assert.Equal(8.0, (double)rig.Last(GroupUpdate)["FenceHeightM"]!);
         Frame(control, marker);
-        Assert.True(MeshTop(fence) > top24 * 1.3, $"높이 4 m 인데 메시 꼭대기가 {top24:F1} → {MeshTop(fence):F1}");
+        Assert.True(MeshTop(fence) > top24 * 1.3, $"높이 8 m 인데 메시 꼭대기가 {top24:F1} → {MeshTop(fence):F1}");
 
         // 형태 → 센서 장착: 요약이 '센서 N개' 로 · 3D 노드 버킷 · DB
         mode.SelectedItem = mode.Items.Cast<object>().First(i => Equals(i, EnumFenceMode.SensorMount) || i.ToString() == nameof(EnumFenceMode.SensorMount));

@@ -58,6 +58,8 @@ public sealed record Map3DOverlayLine(
 {
     /// <summary>일반 선 · 다각형 스타일. null 이면 보내지 않는다(구역 선).</summary>
     public Map3DOverlayLineStyle? Style { get; init; }
+    /// <summary>구역 선 위 탐지 센서 구간 — 선 길이 비율 [From, To](0~1). 모르면 null. 구역 선(pidsGroup)만 state.activeSection 으로 보낸다.</summary>
+    public (double From, double To)? ActiveSection { get; init; }
 }
 
 /// <summary>일반 선 · 다각형 스타일 — Fill "#RRGGBB"(채움 없음이면 null), Pattern "Solid" | "Dash" | "Dot".</summary>
@@ -207,6 +209,8 @@ public static class Map3DOverlay
             ["visible"] = l.Visible,
             ["minZoom"] = l.MinZoom,
         };
+        if (l.Kind == KindPidsGroup)   // 옛 뷰어는 모르는 키를 무시한다
+            o["state"]!["activeSection"] = l.ActiveSection is { } a ? new JArray(a.From, a.To) : JValue.CreateNull();
         if (l.Style is { } s)
         {
             o["fill"] = Str(s.Fill);

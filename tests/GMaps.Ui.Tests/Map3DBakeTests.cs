@@ -62,7 +62,9 @@ public class Map3DBakeTests
     [InlineData(null, "tiles")]
     [InlineData("", "tiles")]
     [InlineData("TILES", "tiles")]
-    [InlineData(" Composite ", "composite")]
+    [InlineData(" Composite ", "extract")]   // 옛 값("오버레이 포함") → extract(2026-10-18 — 오버레이 범위는 이미지대로, 나머지는 타일대로)
+    [InlineData("Photo", "photo")]
+    [InlineData("mask", "mask")]
     [InlineData("extract", "extract")]
     [InlineData("mesh", "tiles")]
     public void should_normalize_mode_when_value_is_given(string? input, string expected)
@@ -79,9 +81,21 @@ public class Map3DBakeTests
     public void should_preselect_last_mode_when_overlay_images_are_in_area()
     {
         Assert.True(Map3DBake.ShouldAsk(2));
-        Assert.Equal("composite", Map3DBake.DefaultMode("composite", 2));
+        Assert.Equal("extract", Map3DBake.DefaultMode("composite", 2));
+        Assert.Equal("photo", Map3DBake.DefaultMode("photo", 2));
         Assert.Equal("tiles", Map3DBake.DefaultMode("bogus", 1));
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void should_preselect_extract_when_overlay_images_are_in_area_and_no_mode_saved(string? lastMode)
+        => Assert.Equal("extract", Map3DBake.DefaultMode(lastMode, 1));
+
+    [Fact]
+    public void should_preselect_extract_when_settings_are_new_and_overlay_images_are_in_area()
+        => Assert.Equal("extract", Map3DBake.DefaultMode(new Map3DModel().OverlayMode, 3));
 
     [Theory]
     [InlineData(@"C:\maps\a.png", 1_000, false)]
@@ -109,7 +123,7 @@ public class Map3DBakeTests
     {
         var body = Map3DBake.BuildBody(Bbox, mode, new[] { Overlay(7) });
 
-        Assert.Equal(mode, body.Value<string>("overlay_mode"));
+        Assert.Equal("extract", body.Value<string>("overlay_mode"));   // composite(옛 값) = extract(2026-10-18)
         Assert.Equal(Bbox, body["bbox"]!.ToObject<double[]>());
         var o = (JObject)((JArray)body["overlays"]!)[0];
         Assert.Equal(7, o.Value<int>("id"));
@@ -121,7 +135,7 @@ public class Map3DBakeTests
         Assert.Equal(37.504, o["bounds"]!.Value<double>("bottom"));
         Assert.Equal(15d, o.Value<double>("rotation"));
         Assert.Equal(0.8, o.Value<double>("opacity"));
-        Assert.True(o.Value<bool>("mask"));
+        Assert.True(o.Value<bool>("mask"));   // composite(옛 값) · extract → true(이미지 범위 안 지도 건물 자료를 뺀다)
     }
 
     [Fact]
@@ -171,7 +185,8 @@ public class Map3DBakeTests
     [Theory]
     [InlineData(null, "tiles")]
     [InlineData("Extract", "extract")]
-    [InlineData("composite", "composite")]
+    [InlineData("composite", "extract")]
+    [InlineData("photo", "photo")]
     [InlineData("whatever", "tiles")]
     public void should_normalize_saved_overlay_mode_when_settings_load(string? saved, string expected)
     {
@@ -181,8 +196,43 @@ public class Map3DBakeTests
     }
 
     [Fact]
-    public void should_default_overlay_mode_to_tiles_when_settings_are_new()
-        => Assert.Equal("tiles", new Map3DModel().OverlayMode);
+    public void should_default_overlay_mode_to_extract_when_settings_are_new()
+        => Assert.Equal("extract", new Map3DModel().OverlayMode);   // 2026-10-18 — 새 기본 = 오버레이 영역은 이미지에서 건물 찾기
+
+    // ── 만들기 방식 넷(2026-10-18) → 서버 overlay_mode · 이미지 mask ──
+
+    [Theory]
+    [InlineData("tiles", "tiles", false)]
+    [InlineData("photo", "composite", false)]
+    [InlineData("mask", "composite", true)]
+    [InlineData("extract", "extract", true)]
+    [InlineData("composite", "extract", true)]   // 옛 설정값 = 오버레이 영역은 이미지에서 건물 찾기(2026-10-18)
+    public void should_map_gis_mode_to_server_mode_and_mask_when_baking(string mode, string serverMode, bool mask)
+    {
+        Assert.Equal(serverMode, Map3DBake.ServerOverlayMode(mode));
+        Assert.Equal(mask, Map3DBake.MaskFor(mode));
+    }
+
+    [Fact]
+    public void should_keep_buildings_by_sending_mask_false_when_photo_mode()
+    {
+        var body = Map3DBake.BuildBody(Bbox, Map3DBake.ModePhoto, new[] { Overlay(1), Overlay(2) });
+
+        Assert.Equal("composite", body.Value<string>("overlay_mode"));
+        Assert.All((JArray)body["overlays"]!, o => Assert.False(o.Value<bool>("mask")));
+    }
+
+    [Theory]
+    [InlineData("mask", "composite")]
+    [InlineData("extract", "extract")]
+    public void should_send_mask_true_when_hiding_modes(string mode, string serverMode)
+    {
+        var body = Map3DBake.BuildBody(Bbox, mode, new[] { Overlay(1) }, 17);
+
+        Assert.Equal(serverMode, body.Value<string>("overlay_mode"));
+        Assert.True(((JArray)body["overlays"]!)[0].Value<bool>("mask"));
+        Assert.Equal(17, body.Value<double>("enter_zoom"));
+    }
 
     private static Map3DBakeOverlay Overlay(int id)
         => new(id, $"가림 {id}", $@"C:\maps\mask{id}.png", 127.001, 37.506, 127.003, 37.504, 15, 0.8, true);

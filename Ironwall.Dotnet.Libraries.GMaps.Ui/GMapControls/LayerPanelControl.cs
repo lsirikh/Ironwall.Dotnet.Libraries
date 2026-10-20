@@ -46,6 +46,7 @@ public class LayerPanelControl : Control
         if (d is LayerPanelControl ctrl && e.NewValue is ObservableCollection<LayerTreeNode> nodes)
         {
             ctrl.SubscribeLeafCheckChanged(nodes);
+            ctrl._selection.Remap(nodes);   // 재조회로 트리가 바뀌어도 Shift 기준 · 초점 행은 같은 항목으로
         }
     }
 
@@ -237,11 +238,159 @@ public class LayerPanelControl : Control
 
     #endregion
 
+    #region Selection (클릭 · Ctrl · Shift · 키보드 다중 선택)
+
+    private readonly LayerSelection _selection = new();
+
+    /// <summary>
+    /// 사용자가 패널에서 선택을 바꿨다. 편집 모드면 VM 이 지도 마커 선택(단일 · 묶음)으로 옮긴다.
+    /// 프로그램이 노드 IsSelected 를 바꿀 때(지도 → 패널)는 나지 않는다.
+    /// </summary>
+    public event EventHandler<LayerSelectionChangedEventArgs>? LayerSelectionChanged;
+
+    /// <summary>지금 선택된 잎(트리 순서).</summary>
+    public IReadOnlyList<LayerTreeNode> SelectedNodes => TreeNodes == null ? Array.Empty<LayerTreeNode>() : LayerSelection.SelectedLeaves(TreeNodes);
+
+    /// <summary>잎 행 클릭(마우스 처리기 · 시험이 같은 길을 탄다). 반환 = 선택이 바뀌었는가.</summary>
+    public bool SelectNode(LayerTreeNode node, ModifierKeys modifiers)
+        => TreeNodes != null && RaiseSelectionIf(_selection.Click(TreeNodes, node, modifiers));
+
+    /// <summary>Ctrl+묶음 머리 클릭 — 그 묶음 잎 전부를 더한다. 반환 = 선택이 바뀌었는가.</summary>
+    public bool SelectGroup(LayerTreeNode header)
+        => TreeNodes != null && RaiseSelectionIf(_selection.AddGroup(TreeNodes, header));
+
+    /// <summary>선택 키보드 폴백(↑/↓ · Shift · Ctrl · Space · Ctrl+A · Esc). 반환 = 이 키를 받았는가.</summary>
+    public bool HandleSelectionKey(Key key, ModifierKeys modifiers)
+    {
+        if (TreeNodes == null) return false;
+        bool handled = _selection.HandleKey(TreeNodes, key, modifiers, out var changed);
+        RaiseSelectionIf(changed);
+        if (handled && _selection.Current != null) FocusRow(_selection.Current);
+        return handled;
+    }
+
+    /// <summary>
+    /// 패널에 초점이 있을 때 패널이 가져가는 선택 키인가 — 지도 창 후킹(방향키 이동 · Ctrl+A 전체 선택)이 이 키를 양보한다.
+    /// Alt+↑/↓ 는 순서 바꾸기라 넣지 않는다.
+    /// </summary>
+    public static bool IsSelectionKey(Key key, ModifierKeys modifiers)
+    {
+        if ((modifiers & ModifierKeys.Alt) != 0) return false;
+        return key is Key.Up or Key.Down or Key.Space or Key.Escape
+            || (key == Key.A && (modifiers & ModifierKeys.Control) != 0);
+    }
+
+    /// <summary>그 행이 보이게 패널을 굴린다(레이아웃 뒤 — 방금 펼친 묶음의 행이 생긴 다음).</summary>
+    public void BringNodeIntoView(LayerTreeNode node)
+        => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => FindRow(node)?.BringIntoView()));
+
+    private bool RaiseSelectionIf(bool changed)
+    {
+        if (changed) LayerSelectionChanged?.Invoke(this, new LayerSelectionChangedEventArgs(SelectedNodes));
+        return changed;
+    }
+
+    /// <summary>
+    /// 행 클릭 = 선택. 체크박스 · 자물쇠 · 펼치기 단추 · 슬라이더 · 끌기 손잡이 · 이름 편집 칸은 제 일을 하고 선택은 그대로다.
+    /// 묶음 머리는 Ctrl+클릭만 받는다(그냥 클릭은 예전 그대로 — 펼치기/접기는 셰브런).
+    /// </summary>
+    private void OnRowPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _handleGesture = false;
+        if (!TryHitRow(e.OriginalSource as DependencyObject, out var node, out var blocker))
+        {
+            _handleGesture = blocker is DragHandle;   // 손잡이 클릭(데드존 미만)은 커널이 목록 선택으로 그 행을 고른다 → OnListSelectionChanged
+            return;
+        }
+        var modifiers = Keyboard.Modifiers;
+        if (node.NodeType == LayerNodeType.Leaf)
+        {
+            SelectNode(node, modifiers);
+            e.Handled = true;   // 목록(ListBox)이 제 규칙으로 다시 고르지 않게
+            FocusRow(node);
+        }
+        else if ((modifiers & ModifierKeys.Control) != 0 && SelectGroup(node))
+        {
+            e.Handled = true;
+            Focus();
+        }
+    }
+
+    private void OnSelectionPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        // 글 칸 · 체크박스 · 단추 · 슬라이더가 초점이면 그 키는 그쪽 몫(Space = 체크, ←/→ = 슬라이더, Esc = "?" 닫기)
+        if (IsOwnInput(Keyboard.FocusedElement as DependencyObject) || IsOwnInput(e.OriginalSource as DependencyObject)) return;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (HandleSelectionKey(key, Keyboard.Modifiers)) e.Handled = true;
+    }
+
+    /// <summary>우클릭 — 고르지 않은 잎이면 그 행만 고른다(탐색기 관례 · 목록 행의 기본 동작과 같게). 메뉴는 그대로 뜬다.</summary>
+    private void OnRowPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (TryHitRow(e.OriginalSource as DependencyObject, out var node, out _) && node.NodeType == LayerNodeType.Leaf && !node.IsSelected)
+            SelectNode(node, ModifierKeys.None);
+    }
+
+    private bool _handleGesture;
+
+    /// <summary>끌기 손잡이 클릭으로 커널이 목록 선택을 그 행 하나로 바꿨다 — 패널 전체에서도 그 행만 고른 것으로 맞춘다.</summary>
+    private void OnListSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_handleGesture || LayerSelection.IsApplying || e.OriginalSource is not ListBox) return;
+        _handleGesture = false;
+        if (e.AddedItems.Count > 0 && e.AddedItems[e.AddedItems.Count - 1] is LayerTreeNode added) SelectNode(added, ModifierKeys.None);
+    }
+
+    private static bool IsOwnInput(DependencyObject? d)
+        => d is ButtonBase or Thumb or Slider or TextBoxBase or ComboBox or ScrollBar;
+
+    private bool TryHitRow(DependencyObject? source, out LayerTreeNode node, out DependencyObject? blocker)
+    {
+        node = null!;
+        blocker = null;
+        for (var d = source; d != null && !ReferenceEquals(d, this); d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+        {
+            if (IsOwnInput(d)) { blocker = d; return false; }
+            if (d is FrameworkElement { DataContext: LayerTreeNode hit } && node == null) node = hit;
+        }
+        return node != null && node.NodeType != LayerNodeType.Section;
+    }
+
+    /// <summary>행의 컨테이너(목록 행 · 카테고리 잎 칸) — 데이터로 찾는다(가상화 · 인덱스 산술 없음).</summary>
+    private FrameworkElement? FindRow(LayerTreeNode node)
+    {
+        var stack = new Stack<DependencyObject>();
+        stack.Push(this);
+        while (stack.Count > 0)
+        {
+            var d = stack.Pop();
+            if (d is FrameworkElement { DataContext: LayerTreeNode n } fe && ReferenceEquals(n, node)) return fe;
+            for (int i = VisualTreeHelper.GetChildrenCount(d) - 1; i >= 0; i--) stack.Push(VisualTreeHelper.GetChild(d, i));
+        }
+        return null;
+    }
+
+    /// <summary>초점을 그 행으로 — 목록 행이면 그 ListBoxItem(Alt+↑/↓ 순서 바꾸기가 이어서 된다), 아니면 패널.</summary>
+    private void FocusRow(LayerTreeNode node)
+    {
+        var row = FindRow(node);
+        for (DependencyObject? d = row; d != null && !ReferenceEquals(d, this); d = VisualTreeHelper.GetParent(d))
+            if (d is ListBoxItem item) { item.Focus(); row!.BringIntoView(); return; }
+        Focus();
+        row?.BringIntoView();
+    }
+
+    #endregion
+
     #region Constructor
 
     public LayerPanelControl()
     {
         CloseCommand = new RelayCommand(_ => OnCloseRequested());
+        PreviewMouseLeftButtonDown += OnRowPreviewMouseLeftButtonDown;
+        PreviewMouseRightButtonDown += OnRowPreviewMouseRightButtonDown;
+        PreviewKeyDown += OnSelectionPreviewKeyDown;
+        AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(OnListSelectionChanged));
         ReorderHandler = new LayerReorderDropHandler((section, newOrder) => RaiseLayerReorderRequested(section, newOrder, "list"));
         InitializeDragSupport();
         _opacityDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
@@ -374,9 +523,51 @@ public class LayerPanelControl : Control
         var cp = FindParent<ContentPresenter>(this);
         var canvas = cp?.Parent as Canvas;
         if (canvas == null || cp == null) return;
-        // 좌상단 고정 위치 (툴바 아래, 좌표 표시 옆)
-        Canvas.SetLeft(cp, 50);
-        Canvas.SetTop(cp, 60);
+        // 좌상단 — 왼쪽 위 묶음(좌표 · 3D 단추, GMaps.Map.TopLeftStack) 바로 아래 같은 왼쪽 줄(2026-10-20: 3D 단추가 좌표 아래로 내려가 덮지 않게).
+        //   묶음을 못 찾으면 예전 자리(툴바 아래 50, 60).
+        double left = 50, top = 60;
+        DependencyObject root = canvas;
+        while (VisualTreeHelper.GetParent(root) is { } up) root = up;
+        if (FindById(root, "GMaps.Map.TopLeftStack") is { ActualWidth: > 0, IsVisible: true } stack)
+        {
+            try
+            {
+                var p = stack.TransformToVisual(canvas).Transform(new Point(0, stack.ActualHeight));
+                left = p.X; top = Math.Max(top, p.Y + 6);
+                // 그 아래 같은 줄에 붙은 바람 배지도 피한다
+                if (FindVisible<GMapWindyIndicatorControl>(root) is { } windy)
+                {
+                    var w = windy.TransformToVisual(canvas).TransformBounds(new Rect(windy.RenderSize));
+                    if (Math.Abs(w.Left - left) < 24 && w.Top < top + 24) top = Math.Max(top, w.Bottom + 6);
+                }
+            }
+            catch (InvalidOperationException) { }   // 공통 조상 없음
+        }
+        var (l, t) = ClampHeaderInside(left, top, canvas);
+        Canvas.SetLeft(cp, l);
+        Canvas.SetTop(cp, t);
+    }
+
+    private static T? FindVisible<T>(DependencyObject root) where T : FrameworkElement
+    {
+        for (int i = 0, n = VisualTreeHelper.GetChildrenCount(root); i < n; i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            if (c is T t && t.IsVisible && t.ActualWidth > 0) return t;
+            if (FindVisible<T>(c) is { } hit) return hit;
+        }
+        return null;
+    }
+
+    private static FrameworkElement? FindById(DependencyObject root, string id)
+    {
+        for (int i = 0, n = VisualTreeHelper.GetChildrenCount(root); i < n; i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            if (c is FrameworkElement fe && System.Windows.Automation.AutomationProperties.GetAutomationId(fe) == id) return fe;
+            if (FindById(c, id) is { } hit) return hit;
+        }
+        return null;
     }
 
     private T? FindParent<T>(DependencyObject child) where T : DependencyObject

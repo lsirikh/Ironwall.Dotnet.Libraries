@@ -8,7 +8,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Models;
    Purpose      : 지도 2.5D 기울이기(틸트) 설정 영속 — map-tilt-25d PRD FR-07(§0 G1/G2/G5).
                   회전(MapRotation)과 분리된 kill-switch(기본 OFF) + 사용자 각도 + 줌 게이트 파라미터를
                   AppSettings.MapTilt 에 저장. 키 부재 시 기본값(SIM-P003), 범위 밖 값은 Normalize 가
-                  클램프 + 경고 로그(SIM-P002). 저장: MapSettingsHelper.SaveMapTiltAsync, 복원: MapViewModel(홈 줌 이후).
+                  클램프 + 경고 로그(SIM-P002). (2026-10-19 기울이기 제거 — 이 키는 더 이상 읽지도 쓰지도 않는다. 엔진 TiltSettings 형식으로만 남음)
    Note         : 판정(TiltMath.Decide)은 이 모델의 MinZoom/HysteresisSteps/MaxAngleDeg 를 입력으로 받는다.
                   GMaps 모델 프로젝트는 GMaps.Ui 를 참조할 수 없어 0.5 스냅은 ZoomLadder.Snap 과 동형 수식을 둔다.
    Created On   : 2026-09-08 · Sensorway Co., Ltd.

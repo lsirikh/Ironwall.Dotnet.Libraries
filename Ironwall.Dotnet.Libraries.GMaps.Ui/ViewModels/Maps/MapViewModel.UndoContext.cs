@@ -48,15 +48,21 @@ public partial class MapViewModel : IUndoApplyContext
         if (_undoService == null) return;
         UndoCommand = new AsyncRelayCommand(async () =>
         {
+            _groupSelection?.EndRotation(commit: true);   // 열린 묶음 회전은 먼저 확정 → 이번 되돌리기가 그 회전을 되돌린다
+            if (_groupRotateSaveTask is { } rotateSave) await rotateSave;   // 확정 저장 · Undo 기록이 끝난 뒤에(느린 DB 에서 이전 편집이 되돌려지지 않게)
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.UndoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
+            RefreshGroupPropertyPanelValues();   // 열린 그룹 속성 판이 되돌린 값을 보이게(판은 열릴 때 한 번만 채움)
         }, () => CanUndo);
         RedoCommand = new AsyncRelayCommand(async () =>
         {
+            _groupSelection?.EndRotation(commit: true);   // 열린 묶음 회전 먼저 확정(Undo 단위 섞임 방지)
+            if (_groupRotateSaveTask is { } rotateSave) await rotateSave;   // 확정 기록이 옛 Redo 를 지운 뒤에 Redo
             System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.RedoAsync(); }
             finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
+            RefreshGroupPropertyPanelValues();
         }, () => CanRedo);
 
         _undoService.StateChanged += OnUndoStateChanged;
@@ -109,6 +115,9 @@ public partial class MapViewModel : IUndoApplyContext
             try
             {
                 await DbUpdateProcess(marker);
+                // 연결 장비 재할당 Undo/Redo — 되돌려 받은 마커가 다시 이벤트를 받게 조회표를 그 마커로 맞춘다(장비 1개 = 마커 1개).
+                if (marker is GMapPidsMarker { LinkedDevice: { } relinked } relinkedMarker)
+                    _symbolLifecycle?.RegisterDevice(relinked, relinkedMarker.Model);
                 // 이미지 마커: undo/redo로 ImageBounds(크기)가 바뀌어도 Shape 컨트롤의 화면 픽셀크기는
                 // 어도너 드래그 경로만 갱신함 → 프로그램적 변경(undo)에선 컨트롤이 stale로 남아 화면상 이미지가 "튐".
                 // 줌 리프레시와 동일 경로(RefreshFromMarker→UpdateGeometryFromBounds)로 바운즈 기준 재계산해 동기화.

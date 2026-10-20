@@ -70,15 +70,6 @@ public static class MapSettingsHelper
     }
 
     /// <summary>
-    /// 지도 2.5D 기울이기 설정(kill-switch·각도·줌 게이트)을 JSON에 저장 (AppSettings.MapTilt) —
-    /// map-tilt-25d PRD FR-07. 토글은 즉시, 각도는 debounce 1 s 후 호출. 부팅 복원은 MapViewModel(홈 줌 이후).
-    /// </summary>
-    public static async Task SaveMapTiltAsync(MapTiltModel tilt, ILogService? log = default)
-    {
-        await SaveSettingAsync("MapTilt", tilt, log);
-    }
-
-    /// <summary>
     /// 방위각 심볼(나침반 컨트롤) 위치+설정을 JSON에 저장 (AppSettings.MapCompass) —
     /// GMap_Compass_Control FR-08. 부팅 복원은 MapViewModel.
     /// </summary>
@@ -147,18 +138,11 @@ public static class MapSettingsHelper
     /// </summary>
     public static Map3DModel LoadMap3D(ILogService? log = default)
     {
-        var model = new Map3DModel();
+        Map3DModel model;
         try
         {
             var fp = AppSettingsLocation.AppSettingsReadPath;
-            var t = File.Exists(fp) ? JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Map3D"] : null;
-            if (t != null)
-            {
-                model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
-                model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
-                model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
-                model.OverlayMode = t["OverlayMode"]?.ToString() ?? model.OverlayMode;
-            }
+            model = ReadMap3D(File.Exists(fp) ? JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Map3D"] : null);
             if (model.Normalize()) log?.Warning($"[Map3D] ServerUrl 이 올바르지 않아 고쳐 씀 → {model.ServerUrl}");
             log?.Info($"[Map3D] 로드(appsettings.Map3D): {model}");
         }
@@ -170,11 +154,38 @@ public static class MapSettingsHelper
         return model;
     }
 
-    /// <summary>지도 3D 설정 저장(AppSettings.Map3D — 절을 통째로 바꾸므로 읽은 모델 전체를 싣는다). 굽기 방식 고르기 뒤 호출.</summary>
+    /// <summary>AppSettings.Map3D 절(JSON)을 모델로 — 없는 키는 기본값(옛 파일에 EntryMode 가 없으면 auto). Normalize 는 부르는 쪽이 한다.</summary>
+    public static Map3DModel ReadMap3D(JToken? t)
+    {
+        var model = new Map3DModel();
+        if (t != null)
+        {
+            model.IsEnabled = t["IsEnabled"]?.ToObject<bool>() ?? model.IsEnabled;
+            model.ServerUrl = t["ServerUrl"]?.ToString() ?? model.ServerUrl;
+            model.UseCompositionHost = t["UseCompositionHost"]?.ToObject<bool>() ?? model.UseCompositionHost;
+            model.HwndWhenRemote = t["HwndWhenRemote"]?.ToObject<bool>() ?? model.HwndWhenRemote;
+            model.OverlayMode = t["OverlayMode"]?.ToString() ?? model.OverlayMode;
+            model.EntryMode = t["EntryMode"]?.ToString() ?? model.EntryMode;
+            model.EnterZoom = t["EnterZoom"]?.ToObject<double>() ?? model.EnterZoom;
+            model.ExitZoom = t["ExitZoom"]?.ToObject<double>() ?? model.ExitZoom;
+            model.PreloadZoom = t["PreloadZoom"]?.ToObject<double>() ?? model.PreloadZoom;
+            model.AreaShowZoom = t["AreaShowZoom"]?.ToObject<double>() ?? model.AreaShowZoom;
+            model.MaxAreaSideM = t["MaxAreaSideM"]?.ToObject<double>() ?? model.MaxAreaSideM;
+            model.GuideMinSeconds = t["GuideMinSeconds"]?.ToObject<double>() ?? model.GuideMinSeconds;
+        }
+        return model;
+    }
+
+    /// <summary>지도 3D 설정 저장(AppSettings.Map3D — 절을 통째로 바꾸므로 읽은 모델 전체를 싣는다). 굽기 방식 고르기 · 설정 화면 「3D 지도」 뒤 호출.
+    /// 저장이 끝나면 <see cref="Map3DSaved"/> 를 알린다(지도가 다시 불러와 바로 반영한다).</summary>
     public static async Task SaveMap3DAsync(Map3DModel model, ILogService? log = default)
     {
         await SaveSettingAsync("Map3D", model, log);
+        Map3DSaved?.Invoke();
     }
+
+    /// <summary>AppSettings.Map3D 를 저장했다(배경 스레드일 수 있다) — 받는 쪽은 <see cref="LoadMap3D"/> 로 다시 읽는다.</summary>
+    public static event Action? Map3DSaved;
 
     /// <summary>
     /// 지도 타입을 JSON에 저장

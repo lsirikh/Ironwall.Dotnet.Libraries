@@ -1,0 +1,339 @@
+﻿<ResourceDictionary
+	xmlns:fb="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+	<!--  묶음 회전 컨트롤러 판(2026-10-18) — 사이트 고정 창(MapAnchorPanelStyle) 크롬 답습:
+	      FrameBorder(Surface · Border · 반지름 10 · 그림자) + PrimaryBrush 머리 띠 38(끌기) + [아이콘][제목][? 받침][✕].
+	      단추 = 표준 PanelPrimaryButtonStyle / PanelSecondaryButtonStyle, 닫기 = PanelCloseButtonStyle, "?" = PanelHeaderHelpDisc.
+	      색은 전부 DynamicResource 토큰(Tactical Command 라이트/다크 — 테마 전환 즉시 반영).  -->
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  섹션 라벨 — MapAnchorSectionLabel 과 같은 값(그 키는 다른 사전 안이라 StaticResource 로 닿지 않아 같은 값으로 둔다)  -->
+	<Style x:Key="GroupRotationSectionLabel" TargetType="TextBlock">
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+		<Setter Property="Margin" Value="0,0,0,4" />
+	</Style>
+
+	<!--  숫자 입력칸 — 속성창 CompactTextBox(BasePropertyStyle) 와 같은 값 + 좌표 칩과 같은 Consolas 글꼴  -->
+	<Style x:Key="GroupRotationInputBox" TargetType="TextBox">
+		<Setter Property="Margin" Value="2" />
+		<Setter Property="Padding" Value="4,2" />
+		<Setter Property="FontFamily" Value="Consolas" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="MinHeight" Value="24" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="VerticalContentAlignment" Value="Center" />
+	</Style>
+
+	<!--  ±각 단추 — 표준 보조 단추를 작게(폭 고정)  -->
+	<Style
+		x:Key="GroupRotationStepButton"
+		BasedOn="{StaticResource PanelSecondaryButtonStyle}"
+		TargetType="Button">
+		<Setter Property="MinWidth" Value="40" />
+		<Setter Property="Margin" Value="2" />
+		<Setter Property="FontSize" Value="11" />
+	</Style>
+
+	<!--  좌표 칩(MapCoordinateStyle)과 같은 MGRS · UTM 줄 글꼴  -->
+	<Style x:Key="GroupRotationCoordLabel" TargetType="TextBlock">
+		<Setter Property="FontFamily" Value="Consolas" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+	</Style>
+	<Style x:Key="GroupRotationCoordValue" TargetType="TextBlock">
+		<Setter Property="FontFamily" Value="Consolas" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+	</Style>
+
+	<Style TargetType="{x:Type ctrl:GroupRotationPanelControl}">
+		<Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+		<Setter Property="UseLayoutRounding" Value="True" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ctrl:GroupRotationPanelControl}">
+					<fb:FrameBorder
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="10">
+						<Border.Effect>
+							<DropShadowEffect
+								BlurRadius="10"
+								Opacity="0.15"
+								ShadowDepth="3"
+								Color="Black" />
+						</Border.Effect>
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="38" />
+								<RowDefinition Height="Auto" />
+							</Grid.RowDefinitions>
+
+							<!--  머리 띠(끌기)  -->
+							<Border
+								Grid.Row="0"
+								Background="{DynamicResource PrimaryBrush}"
+								Cursor="SizeAll">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="34" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="34" />
+									</Grid.ColumnDefinitions>
+									<md:PackIcon
+										Grid.Column="0"
+										Width="16"
+										Height="16"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Kind="RotateRight" />
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="13"
+										FontWeight="Bold"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Text="묶음 회전" />
+									<!--  판 "?"(help-callout H-4) — 쓰는 법 · 중심 바꾸기 · 단축키  -->
+									<Border Grid.Column="1" Style="{StaticResource PanelHeaderHelpDisc}">
+										<fb:HelpTip HelpKey="Map.GroupRotation.Panel" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+									</Border>
+									<Button
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.GroupRotation.Close"
+										AutomationProperties.Name="닫기(취소)"
+										Command="{TemplateBinding CloseCommand}"
+										Style="{StaticResource PanelCloseButtonStyle}"
+										ToolTip="닫기 = 취소(처음 자리로)" />
+								</Grid>
+							</Border>
+
+							<!--  바디 (DataContext = MapViewModel)  -->
+							<StackPanel Grid.Row="1" Margin="14,12,14,14">
+								<TextBlock Style="{StaticResource GroupRotationSectionLabel}" Text="선택" />
+								<TextBlock
+									Margin="0,0,0,12"
+									AutomationProperties.AutomationId="Map.GroupRotation.Kinds"
+									FontSize="12"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding GroupRotationSummary}"
+									TextWrapping="Wrap" />
+
+								<!--  회전 중심 — WGS-84 위도 · 경도는 입력칸(좌표 칩과 같은 소수 8자리), MGRS · UTM 은 좌표 설정이 켜졌을 때만  -->
+								<TextBlock Style="{StaticResource GroupRotationSectionLabel}" Text="회전 중심 (WGS-84 위도 / 경도)" />
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition />
+									</Grid.ColumnDefinitions>
+									<TextBox
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.GroupRotation.CenterLat"
+										AutomationProperties.Name="회전 중심 위도"
+										Style="{StaticResource GroupRotationInputBox}"
+										Text="{Binding GroupRotationCenterLat, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+									<TextBox
+										Grid.Column="1"
+										AutomationProperties.AutomationId="Map.GroupRotation.CenterLon"
+										AutomationProperties.Name="회전 중심 경도"
+										Style="{StaticResource GroupRotationInputBox}"
+										Text="{Binding GroupRotationCenterLon, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+								</Grid>
+								<Grid Margin="2,3,2,0" Visibility="{Binding IsShowMGRS, Converter={StaticResource BooleanToVisibilityConverter}}">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="45" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<TextBlock Style="{StaticResource GroupRotationCoordLabel}" Text="MGRS:" />
+									<TextBlock
+										Grid.Column="1"
+										AutomationProperties.AutomationId="Map.GroupRotation.CenterMgrs"
+										Style="{StaticResource GroupRotationCoordValue}"
+										Text="{Binding GroupRotationCenterMgrs}" />
+								</Grid>
+								<Grid Margin="2,3,2,0" Visibility="{Binding IsShowUTM, Converter={StaticResource BooleanToVisibilityConverter}}">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="45" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<TextBlock Style="{StaticResource GroupRotationCoordLabel}" Text="UTM:" />
+									<TextBlock
+										Grid.Column="1"
+										AutomationProperties.AutomationId="Map.GroupRotation.CenterUtm"
+										Style="{StaticResource GroupRotationCoordValue}"
+										Text="{Binding GroupRotationCenterUtm}" />
+								</Grid>
+								<Grid Margin="0,6,0,12">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition />
+									</Grid.ColumnDefinitions>
+									<Button
+										Grid.Column="0"
+										Margin="2"
+										AutomationProperties.AutomationId="Map.GroupRotation.PickCenter"
+										Command="{Binding PickGroupRotationCenterCommand}"
+										ToolTip="누른 뒤 지도를 누르면 그 자리가 중심 (Esc = 그만)">
+										<Button.Style>
+											<Style BasedOn="{StaticResource PanelSecondaryButtonStyle}" TargetType="Button">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding IsGroupRotationPickingCenter}" Value="True">
+														<Setter Property="Background" Value="{DynamicResource TintAccentBrush}" />
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Button.Style>
+										<StackPanel Orientation="Horizontal">
+											<md:PackIcon
+												Width="14"
+												Height="14"
+												VerticalAlignment="Center"
+												Kind="CrosshairsGps" />
+											<TextBlock Margin="5,0,0,0" Text="지도에서 고르기" />
+										</StackPanel>
+									</Button>
+									<Button
+										Grid.Column="1"
+										Margin="2"
+										AutomationProperties.AutomationId="Map.GroupRotation.ResetCenter"
+										Command="{Binding ResetGroupRotationCenterCommand}"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="묶음 가운데로 되돌리기">
+										<StackPanel Orientation="Horizontal">
+											<md:PackIcon
+												Width="14"
+												Height="14"
+												VerticalAlignment="Center"
+												Kind="ImageFilterCenterFocus" />
+											<TextBlock Margin="5,0,0,0" Text="가운데로" />
+										</StackPanel>
+									</Button>
+								</Grid>
+
+								<!--  각도 — 입력칸 · ±1° · ±0.1° · 막대(손잡이 · ] [ 로 돌려도 따라 바뀐다)  -->
+								<TextBlock Style="{StaticResource GroupRotationSectionLabel}" Text="각도 (°, 시계 방향 +)" />
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+									<Button
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.GroupRotation.Minus1"
+										Command="{Binding StepGroupRotationCommand}"
+										CommandParameter="-1"
+										Content="−1°"
+										Style="{StaticResource GroupRotationStepButton}" />
+									<Button
+										Grid.Column="1"
+										AutomationProperties.AutomationId="Map.GroupRotation.Minus01"
+										Command="{Binding StepGroupRotationCommand}"
+										CommandParameter="-0.1"
+										Content="−0.1°"
+										Style="{StaticResource GroupRotationStepButton}" />
+									<TextBox
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.GroupRotation.Angle"
+										AutomationProperties.Name="회전 각도"
+										HorizontalContentAlignment="Center"
+										Style="{StaticResource GroupRotationInputBox}"
+										Text="{Binding GroupRotationAngleText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+									<Button
+										Grid.Column="3"
+										AutomationProperties.AutomationId="Map.GroupRotation.Plus01"
+										Command="{Binding StepGroupRotationCommand}"
+										CommandParameter="0.1"
+										Content="+0.1°"
+										Style="{StaticResource GroupRotationStepButton}" />
+									<Button
+										Grid.Column="4"
+										AutomationProperties.AutomationId="Map.GroupRotation.Plus1"
+										Command="{Binding StepGroupRotationCommand}"
+										CommandParameter="1"
+										Content="+1°"
+										Style="{StaticResource GroupRotationStepButton}" />
+								</Grid>
+								<Slider
+									Margin="2,6,2,0"
+									AutomationProperties.AutomationId="Map.GroupRotation.Slider"
+									AutomationProperties.Name="회전 각도 막대"
+									IsSnapToTickEnabled="True"
+									LargeChange="1"
+									Maximum="180"
+									Minimum="-180"
+									SmallChange="0.1"
+									TickFrequency="0.1"
+									Value="{Binding GroupRotationAngle, Mode=TwoWay}" />
+								<TextBlock
+									Margin="2,4,2,0"
+									AutomationProperties.AutomationId="Map.GroupRotation.Error"
+									FontSize="11"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Text="{Binding GroupRotationInputError}"
+									TextWrapping="Wrap"
+									Visibility="{Binding HasGroupRotationInputError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+								<!--  확정할 내용 한 줄(늘 보임 — 확정 단추가 곧 확인)  -->
+								<Border
+									Height="1"
+									Margin="0,12,0,10"
+									Background="{DynamicResource DividerBrush}" />
+								<TextBlock
+									Margin="0,0,0,12"
+									AutomationProperties.AutomationId="Map.GroupRotation.Summary"
+									FontSize="12"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding GroupRotationConfirmText}"
+									TextWrapping="Wrap" />
+
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Button
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.GroupRotation.Confirm"
+										Command="{Binding ConfirmGroupRotationCommand}"
+										Content="✓ 확정"
+										Style="{StaticResource PanelPrimaryButtonStyle}"
+										ToolTip="확정 · 저장 (Enter)" />
+									<Button
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.GroupRotation.Cancel"
+										Command="{Binding CancelGroupRotationCommand}"
+										Content="취소"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="처음 자리로 (Esc)" />
+								</Grid>
+							</StackPanel>
+						</Grid>
+					</fb:FrameBorder>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>

@@ -141,6 +141,7 @@ public partial class MapViewModel
         try
         {
             if (MainMap == null) return;
+            if (IsUserBuildingDrawing) ExitUserBuildingDraw("measure");   // 「건물 그리기」 표면이 왼쪽 입력을 모두 받는다
             if (MainMap.IsTargetAimMode) ExitTargetAimMode();
             if (MainMap.IsSymbolPlacementMode) ExitSymbolPlacementMode();
             if (MainMap.IsHomePlacementMode) ExitHomePlacementMode();

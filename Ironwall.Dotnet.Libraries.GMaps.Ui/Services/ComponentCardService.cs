@@ -1,11 +1,14 @@
 ﻿using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 
@@ -246,13 +249,27 @@ public sealed class ComponentCardService : IDisposable
         }
     }
 
-    /// <summary>지도 어도너 층에 카드를 띄우는 호스트.</summary>
+    /// <summary>
+    /// 3D 화면(WPF 안 3D)이 보이는 동안 카드를 3D 위 층(<paramref name="layer"/>)에 띄운다 — <paramref name="anchor"/> 는 심볼이 3D 에 보이는
+    /// 자리(층 좌표, 모르면 null — 그동안 카드를 감춘다). layer = null 이면 지도 어도너로 돌아간다. 열린 카드는 닫지 않고 같은 VM 으로 옮긴다.
+    /// 지도에 붙인 서비스에서만 동작한다(시험 호스트는 무시).
+    /// </summary>
+    public void UseOverlay(Canvas? layer, Func<GMapPidsMarker, Point?>? anchor) => (_host as AdornerCardHost)?.UseOverlay(layer, anchor);
+
+    /// <summary>열린 카드의 자리만 다시 잡는다(3D 화면 자리가 바뀌었다).</summary>
+    public void Relayout() => _host.Relayout();
+
+    /// <summary>지도 어도너 층(2D) 또는 3D 위 층(<see cref="UseOverlay"/>)에 카드를 띄우는 호스트. 카드 VM 은 층을 옮겨도 그대로다.</summary>
     private sealed class AdornerCardHost : IComponentCardHost
     {
         private readonly GMapCustomControl _map;
         private readonly ILogService? _log;
         private readonly Func<IDeviceConsoleNavigator?> _navigator;
+        private ComponentCardViewModel? _vm;
         private ComponentCardAdorner? _adorner;
+        private ComponentCardControl? _overlayCard;
+        private Canvas? _overlay;
+        private Func<GMapPidsMarker, Point?>? _anchor;
         private Action? _onClose;
 
         public AdornerCardHost(GMapCustomControl map, ILogService? log, Func<IDeviceConsoleNavigator?> navigator)
@@ -260,39 +277,103 @@ public sealed class ComponentCardService : IDisposable
             _map = map; _log = log; _navigator = navigator;
         }
 
-        public GMapPidsMarker? Current => _adorner?.Marker;
+        public GMapPidsMarker? Current => _vm?.Marker;
 
         public void Open(GMapPidsMarker marker, Action onCloseRequested)
         {
-            var layer = AdornerLayer.GetAdornerLayer(_map);
-            if (layer is null) { _log?.Warning("[ComponentCard] AdornerLayer 없음 — 카드를 띄우지 않는다"); return; }
             IDeviceConsoleNavigator? navigator;
             try { navigator = _navigator(); } catch (Exception) { navigator = null; }
-            var vm = new ComponentCardViewModel(marker, navigator, DateTime.Today);
+            _vm = new ComponentCardViewModel(marker, navigator, DateTime.Today);
+            if (!Attach()) { _vm = null; return; }
             _onClose = onCloseRequested;
-            vm.CloseRequested += onCloseRequested;
-            _adorner = new ComponentCardAdorner(_map, vm);
-            layer.Add(_adorner);
+            _vm.CloseRequested += onCloseRequested;
         }
 
         public void Close()
         {
-            var adorner = _adorner;
-            if (adorner is null) return;
-            _adorner = null;
-            if (_onClose != null) adorner.ViewModel.CloseRequested -= _onClose;
+            var vm = _vm;
+            if (vm is null) return;
+            Detach();
+            _vm = null;
+            if (_onClose != null) vm.CloseRequested -= _onClose;
             _onClose = null;
-            try { AdornerLayer.GetAdornerLayer(_map)?.Remove(adorner); } catch (Exception) { /* 레이어 정리 중 */ }
-            adorner.Dispose();
         }
 
         public void Refresh()
         {
-            if (_adorner is null) return;
-            _adorner.ViewModel.Refresh();
-            _adorner.InvalidateMeasure();
+            if (_vm is null) return;
+            _vm.Refresh();
+            _adorner?.InvalidateMeasure();
+            PlaceOverlay();
         }
 
-        public void Relayout() => _adorner?.InvalidateArrange();
+        public void Relayout()
+        {
+            _adorner?.InvalidateArrange();
+            PlaceOverlay();
+        }
+
+        public void UseOverlay(Canvas? layer, Func<GMapPidsMarker, Point?>? anchor)
+        {
+            _anchor = anchor;
+            if (ReferenceEquals(_overlay, layer)) { PlaceOverlay(); return; }
+            Detach();
+            _overlay = layer;
+            if (_vm != null && !Attach())   // 2D 어도너 층을 잃었다(분리 중) — 서비스 쪽 정리(Hide)까지 거쳐 카드를 걷는다
+            {
+                if (_onClose != null) _onClose(); else Close();
+            }
+        }
+
+        /// <summary>지금 층에 카드 보기를 붙인다. 2D 어도너 층이 없으면 false.</summary>
+        private bool Attach()
+        {
+            if (_overlay != null)
+            {
+                _overlayCard = new ComponentCardControl { DataContext = _vm };
+                _overlayCard.SizeChanged += OnOverlayCardSizeChanged;
+                _overlay.Children.Add(_overlayCard);
+                PlaceOverlay();
+                return true;
+            }
+            var layer = AdornerLayer.GetAdornerLayer(_map);
+            if (layer is null) { _log?.Warning("[ComponentCard] AdornerLayer 없음 — 카드를 띄우지 않는다"); return false; }
+            _adorner = new ComponentCardAdorner(_map, _vm!);
+            layer.Add(_adorner);
+            return true;
+        }
+
+        private void Detach()
+        {
+            if (_adorner is { } adorner)
+            {
+                _adorner = null;
+                try { AdornerLayer.GetAdornerLayer(_map)?.Remove(adorner); } catch (Exception) { /* 레이어 정리 중 */ }
+                adorner.Dispose();
+            }
+            if (_overlayCard is { } card)
+            {
+                _overlayCard = null;
+                card.SizeChanged -= OnOverlayCardSizeChanged;
+                _overlay?.Children.Remove(card);
+            }
+        }
+
+        private void OnOverlayCardSizeChanged(object sender, SizeChangedEventArgs e) => PlaceOverlay();
+
+        /// <summary>3D 위 층 카드 자리 — 2D 와 같은 규칙(아이콘 오른쪽, 자리가 없으면 왼쪽, 층 안에 가둠 — ComponentCardPlacement). 자리를 모르면 감춘다.</summary>
+        private void PlaceOverlay()
+        {
+            if (_overlayCard is not { } card || _vm is null || _overlay is null) return;
+            var at = _anchor?.Invoke(_vm.Marker);
+            if (at is not Point anchor) { card.Visibility = Visibility.Hidden; return; }
+            card.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var viewport = _overlay.RenderSize is { Width: > 0, Height: > 0 } size ? size : new Size(_map.ActualWidth, _map.ActualHeight);
+            double half = double.IsFinite(_vm.Marker.Width) && _vm.Marker.Width > 0 ? _vm.Marker.Width / 2.0 : 0;
+            var place = ComponentCardPlacement.Place(anchor, half, card.DesiredSize, viewport);
+            Canvas.SetLeft(card, place.X);
+            Canvas.SetTop(card, place.Y);
+            card.Visibility = Visibility.Visible;
+        }
     }
 }

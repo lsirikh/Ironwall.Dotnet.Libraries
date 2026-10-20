@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Data;
 
@@ -215,6 +216,29 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             return typeof(GMapInfraMarker);
         }
 
+        /// <summary>그룹 Pending — 건물 칸도 "전원 동일=값 / 다름=빈칸(—)"(같은 종류 다중 선택 = 단일 선택 칸 전부, 2026-10-19).
+        /// 층수(int)는 NaN 이 없어 대표값을 두고 <see cref="IsFloorCountMixed"/> 로 글만 "—" 로 바꾼다.</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            base.ApplyGroupPendingSpecific();
+            var g = GroupMarkers!.OfType<IInfraEditableMarker>().ToList();
+            if (g.Count < 2) return;
+            bool AllEq<T>(Func<IInfraEditableMarker, T> sel) => g.All(m => System.Collections.Generic.EqualityComparer<T>.Default.Equals(sel(m), sel(g[0])));
+            BuildingType = AllEq(m => m.BuildingType) ? g[0].BuildingType : (EnumBuildingType)(-1);
+            BuildingUsage = AllEq(m => m.BuildingUsage) ? g[0].BuildingUsage : (EnumBuildingUsage)(-1);
+            SupportsFloors = g.All(m => BuildingTypeSupportsFloors(m.BuildingType));   // 층수 칸은 전원이 층을 가질 때만 켠다
+            IsFloorCountMixed = !AllEq(m => m.FloorCount);
+            IsBasementFloorCountMixed = !AllEq(m => m.BasementFloorCount);
+            BuildingArea = AllEq(m => m.BuildingArea) ? g[0].BuildingArea : MIXED_DOUBLE;
+        }
+
+        /// <summary>그룹 편집에서 지상층 값이 서로 다름(글 "—").</summary>
+        public bool IsFloorCountMixed { get => (bool)GetValue(IsFloorCountMixedProperty); set => SetValue(IsFloorCountMixedProperty, value); }
+        public static readonly DependencyProperty IsFloorCountMixedProperty = DependencyProperty.Register(nameof(IsFloorCountMixed), typeof(bool), typeof(GMapPropertyInfraControl), new PropertyMetadata(false));
+        /// <summary>그룹 편집에서 지하층 값이 서로 다름(글 "—").</summary>
+        public bool IsBasementFloorCountMixed { get => (bool)GetValue(IsBasementFloorCountMixedProperty); set => SetValue(IsBasementFloorCountMixedProperty, value); }
+        public static readonly DependencyProperty IsBasementFloorCountMixedProperty = DependencyProperty.Register(nameof(IsBasementFloorCountMixed), typeof(bool), typeof(GMapPropertyInfraControl), new PropertyMetadata(false));
+
         #endregion
 
         #region - Property Changed Callbacks -
@@ -226,7 +250,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 if (!control._isInitializing && !control._isClearingBindings)
                 {
-                    infraMarker.BuildingType = (EnumBuildingType)e.NewValue;
+                    if (e.NewValue is EnumBuildingType bt && !Enum.IsDefined(bt)) return;   // 그룹 Pending sentinel — 미전파
+                    if (!control.IsGroupMode) infraMarker.BuildingType = (EnumBuildingType)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                     control.OnMarkerPropertyChanged("BuildingType", e.OldValue, e.NewValue);
                 }
             }
@@ -238,7 +263,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 if (!control._isInitializing && !control._isClearingBindings)
                 {
-                    infraMarker.BuildingUsage = (EnumBuildingUsage)e.NewValue;
+                    if (e.NewValue is EnumBuildingUsage bu && !Enum.IsDefined(bu)) return;
+                    if (!control.IsGroupMode) infraMarker.BuildingUsage = (EnumBuildingUsage)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                     control.OnMarkerPropertyChanged("BuildingUsage", e.OldValue, e.NewValue);
                 }
             }
@@ -250,7 +276,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 if (!control._isInitializing && !control._isClearingBindings)
                 {
-                    infraMarker.FloorCount = (int)e.NewValue;
+                    if (!control.IsGroupMode) infraMarker.FloorCount = (int)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
+                    control.IsFloorCountMixed = false;
                     control.OnMarkerPropertyChanged("FloorCount", e.OldValue, e.NewValue);
                 }
             }
@@ -262,7 +289,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 if (!control._isInitializing && !control._isClearingBindings)
                 {
-                    infraMarker.BasementFloorCount = (int)e.NewValue;
+                    if (!control.IsGroupMode) infraMarker.BasementFloorCount = (int)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
+                    control.IsBasementFloorCountMixed = false;
                     control.OnMarkerPropertyChanged("BasementFloorCount", e.OldValue, e.NewValue);
                 }
             }
@@ -274,7 +302,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 if (!control._isInitializing && !control._isClearingBindings)
                 {
-                    infraMarker.BuildingArea = (double)e.NewValue;
+                    if (double.IsNaN((double)e.NewValue)) return;
+                    if (!control.IsGroupMode) infraMarker.BuildingArea = (double)e.NewValue;   // 그룹=VM 이 전원 일괄 적용
                     control.OnMarkerPropertyChanged("BuildingArea", e.OldValue, e.NewValue);
                 }
             }

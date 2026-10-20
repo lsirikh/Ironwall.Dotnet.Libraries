@@ -70,10 +70,36 @@ public sealed class Map3DViewHost : Grid
     /// <summary>펼쳐져 있는가.</summary>
     public bool IsRevealed { get; private set; }
 
+    private Canvas? _overlayLayer;
+    /// <summary>
+    /// 3D 화면 위 층(조립 카드 등 3D 마커 화면 자리에 붙는 창) — 좌표 = 이 호스트 좌표 = 3D 화면 CSS px × <see cref="ZoomFactor"/>.
+    /// 배경이 없어 창 밖 입력은 3D 로 간다. WPF 안 3D(composition)에서만 보인다(네이티브 창 3D 는 덮는다).
+    /// </summary>
+    public Canvas OverlayLayer
+    {
+        get
+        {
+            if (_overlayLayer != null) return _overlayLayer;
+            _overlayLayer = new Canvas { ClipToBounds = true };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(_overlayLayer, "GMaps.Map3D.OverlayLayer");
+            Children.Add(_overlayLayer);   // WebView2 는 늘 맨 아래에 끼운다(EnsureWebView)
+            return _overlayLayer;
+        }
+    }
+
+    /// <summary>WebView2 확대 배율(CSS px → DIP). 아직 만들지 않았으면 1.</summary>
+    public double ZoomFactor => _el switch
+    {
+        WebView2CompositionControl c => c.ZoomFactor,
+        WebView2 w => w.ZoomFactor,
+        _ => 1d,
+    };
+
     /// <summary>장면 주소를 연다(1×1 대기 상태로). ready 가 오면 MessageReceived("ready").</summary>
     public async Task LoadAsync(string job, string url)
     {
         EnsureWebView();
+        var web = _web;
         Park();
         _job = job;
         _url = url;
@@ -85,11 +111,13 @@ public sealed class Map3DViewHost : Grid
         }
         catch (Exception ex)
         {
+            // 기다리는 사이 네이티브 창으로 바뀌었다(SwitchToHwnd) — 버린 컨트롤의 실패다. 새 컨트롤의 불러오기가 자기 결과를 알린다
+            if (!ReferenceEquals(web, _web)) return;
             if (_job == job) _failed = true;
             LoadFailed?.Invoke($"3D 화면(WebView2)을 준비하지 못했습니다: {ex.Message}");
             return;
         }
-        if (_job != job || _web?.CoreWebView2 == null) return;   // 기다리는 사이 다른 장면 요청이 왔다
+        if (_job != job || !ReferenceEquals(web, _web) || _web?.CoreWebView2 == null) return;   // 기다리는 사이 다른 장면 요청이 왔거나 컨트롤이 바뀌었다
         _web.CoreWebView2.Navigate(url);
     }
 
@@ -100,8 +128,10 @@ public sealed class Map3DViewHost : Grid
     public async Task PrewarmAsync()
     {
         EnsureWebView();
+        var web = _web;
         try { await EnsureCoreAsync(); }
-        catch (Exception ex) { LoadFailed?.Invoke($"3D 화면(WebView2)을 미리 준비하지 못했습니다: {ex.Message}"); }
+        catch (Exception ex) when (ReferenceEquals(web, _web)) { LoadFailed?.Invoke($"3D 화면(WebView2)을 미리 준비하지 못했습니다: {ex.Message}"); }
+        catch (Exception) { }   // 버린 컨트롤(SwitchToHwnd)의 실패 — 새 컨트롤과 무관
     }
 
     /// <summary>WebView2 기동은 한 번만(미리 데우기 · 장면 열기가 같은 Task 를 기다린다). 끝나면 메시지 · 탐색 이벤트를 1회 붙인다.</summary>
@@ -121,6 +151,14 @@ public sealed class Map3DViewHost : Grid
             if (e.IsSuccess || e.NavigationId != _navigationId) return;
             _failed = true;
             LoadFailed?.Invoke($"3D 화면을 열지 못했습니다({e.WebErrorStatus})");
+        };
+        // 페이지(렌더 프로세스)가 죽으면 3D 가 멈춘 채 "3D"(「나가기」)로 남는다 — 실패로 알려 2D 로 돌아가게 하고, 다음 진입은 다시 연다
+        web.CoreWebView2.ProcessFailed += (_, e) =>
+        {
+            if (e.ProcessFailedKind != Microsoft.Web.WebView2.Core.CoreWebView2ProcessFailedKind.RenderProcessExited) return;
+            _ready = _rendered = false;
+            _failed = true;
+            LoadFailed?.Invoke($"3D 화면이 멈췄습니다({e.ProcessFailedKind} · {e.Reason})");
         };
         _coreHooked = true;
     }
@@ -146,6 +184,21 @@ public sealed class Map3DViewHost : Grid
         _el.Width = 1;
         _el.Height = 1;
         IsRevealed = false;
+    }
+
+    /// <summary>
+    /// 지금 장면을 내려놓는다 — 지워진 장면을 재사용(ready) · 미리 불러오기 · 네이티브 창 전환 때 다시 열기로 다시 부르지 않게(2026-10-19 지운 job 의 scene.json 404).
+    /// 페이지는 빈 화면으로 바꾸고 1×1 로 접는다. WebView2 는 그대로 둔다(다음 장면에 재사용).
+    /// </summary>
+    public void Unload()
+    {
+        _job = null;
+        _url = null;
+        _ready = _rendered = _failed = false;
+        ReadyAt = RenderedAt = null;
+        Park();
+        try { _web?.CoreWebView2?.Navigate("about:blank"); }
+        catch (Exception) { }   // WebView2 가 이미 닫혔다 — 내려놓기만 하면 된다
     }
 
     /// <summary>카메라 메시지 보내기(ready 전이면 무시).</summary>
@@ -182,7 +235,7 @@ public sealed class Map3DViewHost : Grid
             _web = w; _el = w;
         }
         System.Windows.Automation.AutomationProperties.SetAutomationId(_el, "GMaps.Map3D.View");
-        Children.Add(_el);
+        Children.Insert(0, _el);   // 3D 위 층(OverlayLayer)보다 아래
         Park();   // 만들자마자 1×1 대기(미리 데우기 중 지도를 덮지 않게)
     }
 
@@ -220,6 +273,9 @@ public sealed class Map3DViewHost : Grid
     {
         var msg = Map3DMath.ParseMessage(json);
         if (msg == null) return;
+        // 내려놓았거나 바꾼 옛 장면 페이지가 늦게 보낸 ready · rendered 는 지금 장면 것이 아니다
+        if (msg.Type is "ready" or "rendered" && msg.Job != null && msg.Job != _job) return;
+        if (msg.Type == "error" && msg.Job == _job) { _ready = _rendered = false; _failed = true; }   // 장면 불러오기 실패 — 재사용 · 다시 미리 열기 안 함
         if (msg.Type == "ready") { _ready = true; ReadyAt = DateTime.UtcNow; }
         if (msg.Type == "rendered") { _rendered = true; RenderedAt = DateTime.UtcNow; }
         MessageReceived?.Invoke(msg);

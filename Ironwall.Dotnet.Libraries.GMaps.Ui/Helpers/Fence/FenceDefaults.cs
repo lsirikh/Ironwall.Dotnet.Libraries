@@ -12,10 +12,13 @@
         public const double PostSpacingMaxM = 10.0;
         public const double PostSpacingStepM = 0.5;
 
-        /// <summary>철망 높이(m) 기본/범위 — 속성창 슬라이더 1.5~4.0(0.1)</summary>
-        public const double FenceHeightM = 2.4;
+        /// <summary>철망 높이(m) 기본/범위 — 속성창 슬라이더 1.5~8.0(0.1). 2026-10-20 사용자 지시로 기본 2.4 → 4.8 · 최대 4.0 → 8.0(전체 2배).</summary>
+        public const double FenceHeightM = 4.8;
         public const double FenceHeightMinM = 1.5;
-        public const double FenceHeightMaxM = 4.0;
+        public const double FenceHeightMaxM = 8.0;
+        /// <summary>2D 3D 철망의 과장 배율 기준 높이(m) — 이 높이가 <see cref="MinVisualHeightPx"/> 로 보인다. 기본 높이와 분리해 두어야
+        /// 기본을 올렸을 때 화면 높이도 그만큼 올라간다(기본 4.8 m = 기준의 2배 = 화면 2배).</summary>
+        public const double VisualReferenceHeightM = 2.4;
         public const double FenceHeightStepM = 0.1;
         /// <summary>
         /// 3D 철망 화면 높이 하한(px) — 실척(2.4 m ≈ 5 px @z18)으로는 높이 차이가 안 보인다(사용자 지적 2026-09-08).

@@ -180,6 +180,7 @@ public class CameraStreamPopupControl : Control
             var canvas = FindParentCanvas();
             if (canvas == null) return;
             _isDragging = true;
+            vm.IsWindowDragging = true;
             _lastMousePosition = e.GetPosition(canvas);
             CaptureMouse();
             e.Handled = true;
@@ -246,6 +247,7 @@ public class CameraStreamPopupControl : Control
         if (_isDragging)
         {
             _isDragging = false;
+            if (DataContext is CameraStreamPopupViewModel dragged) dragged.IsWindowDragging = false;
             ReleaseMouseCapture();
             (DataContext as CameraStreamPopupViewModel)?.RaiseDragCompleted();
         }
@@ -410,6 +412,7 @@ public class CameraStreamPopupControl : Control
         if (_isDragging)
         {
             _isDragging = false;
+            if (DataContext is CameraStreamPopupViewModel dragged) dragged.IsWindowDragging = false;
             (DataContext as CameraStreamPopupViewModel)?.RaiseDragCompleted();
         }
     }

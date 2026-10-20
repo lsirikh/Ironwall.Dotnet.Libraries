@@ -51,6 +51,10 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\AnchorViewportClamp.cs" />
     <!-- 디지털줌 드래그 서브픽셀 보간(심볼 이동 뻑뻑함 방지) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\SubPixelGeo.cs" />
+    <!-- 선택 묶음 회전 순수 수학(메르카토르 왕복 · 중심 · 회전 · 방향 감기 · 드래그 각 · Shift 스냅) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\GroupRotationMath.cs" />
+    <!-- 묶음 회전 컨트롤러 판 순수 규칙(각도 · 위경도 입력 검증 · 한 칸 · 요약 · 확인 글) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\GroupRotationPanelRules.cs" />
     <!-- 드로잉 키 라우팅 순수 판정(C8 ESC 취소·C9 포커스 무관 터널·C10 Ctrl+Z/Delete/방향키 선점) — 실코드 링크(WPF 어댑터 .Wpf.cs 는 미링크) -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\DrawingKeyRouter.cs" />
     <!-- C12 독점 입력 모드 어도너 투과 게이트(라벨·편집핸들·그룹선택 공용, D-19 동일 목록+측정) — 실코드 링크 -->
@@ -65,14 +69,12 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Fence\StrokeReducer.cs" />
     <!-- 드래그 드로잉 입력 게이트(C11 휠 차단·C13 팬 억제·C14 클릭 최소 간격) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\LineDrawingInputGates.cs" />
-    <!-- 지도 카드 틸트 오버스캔 수식·φ_layout 정착기(map-tilt-25d PRD FR-04/FR-05, G8) — 실코드 링크(WPF 컨버터 TiltOverscanConverter.cs 는 미링크) -->
+    <!-- 지도 카드 틸트 오버스캔 수식·φ_layout 정착기(map-tilt-25d PRD FR-04/FR-05, G8) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\TiltOverscanMath.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\TiltLayoutSettler.cs" />
     <!-- 지도 카드 틸트 판정 순수 함수(map-tilt-25d PRD FR-02, SIM-T 매트릭스) — 실코드 링크. ZoomLadder 는 GateEpsilon/Snap 의존 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\ZoomLadder.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\TiltMath.cs" />
-    <!-- 틸트 VM 표시 로직(툴팁 사유 매핑·배지·토글 잠금·스텝 클램프, map-tilt-25d FR-08/09) — 실코드 링크 -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\TiltUiText.cs" />
     <!-- 틸트 게이트 재평가 코얼레싱 큐(map-tilt-25d PRD v1.1 FR-03 판정 원자성 — 래더 스텝을 하나의 판정으로) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\TiltGateCoalescer.cs" />
     <!-- 렌더 Tier 0 강등 순수 판정(map-tilt-25d FR-13, SIM-C008) — 실코드 링크(WPF 어댑터 .Wpf.cs 는 미링크) -->
@@ -89,14 +91,28 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\MapFlyToMath.cs" />
     <!-- 지도 3D 바꿔 끼우기(map-3d POC) — 게이트 · 방위 · 줌 · 주소 · 메시지 순수 함수, HTTP 응답 해석(가짜 처리기), 설정 모델 — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DMath.cs" />
+    <!-- 3D 방향 링 · 이동 단추 — 링 각도 · 끌기 판정 · 계속 이동 · 키보드 폴백 · 메시지 순수 함수 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DNavMath.cs" />
+    <!-- 회전된 3D 영역(중심 · 가로 · 세로 · 회전각) — 위경도 ↔ 사각형 로컬 · 모서리 · 감싸는 bbox · 안/밖 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DRotRect.cs" />
+    <!-- 3D 건물 높이 직접 입력(「건물 높이」 판) — 메시지 해석 · 층수↔높이 · 입력 검증 · 키 · 끌기 · 출처 글 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DBuilding.cs" />
+    <!-- 직접 그린 건물(「건물 그리기」) — 윤곽 그리기 상태 기계 · 검사 · 요청 본문 · 미리보기 메시지 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DUserBuilding.cs" />
+    <!-- 3D 화면 위 GIS 창 자리(overlay.watch · overlay.screen · 팝업 오프셋) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DScreen.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DClient.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\Map3DModel.cs" />
     <!-- 지도 3D 굽기 방식(오버레이 이미지 포함 여부) — 겹침 판정 · 요청 본문 · 기본값 순수 함수 — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DBake.cs" />
     <!-- 지도 3D 전환 안내 · 영역 표시 · 그리기 크기 판정 순수 함수(지도 3D 시나리오 R4~R7) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DGuide.cs" />
+    <!-- 지도 3D 성능 계측(WPF 프레임 간격 · perf 로그 줄) · 원격 호스트 방식 순수 함수 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DPerf.cs" />
     <!-- 지도 3D 오버레이 다리 DTO · patch 비교 · 메시지(2차) — 실코드 링크. 상태 enum 은 실코드 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DOverlay.cs" />
+    <!-- 영역마다 3D 줌 — GIS 로컬 영역 줌(map3d-areas.json) 읽기 · 쓰기 — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DAreaZoomStore.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Enums\EnumCompositeEventStatus.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Enums\EnumOperationState.cs" />
     <!-- 규약 v2 선 스타일(무늬) — 실코드 링크 -->

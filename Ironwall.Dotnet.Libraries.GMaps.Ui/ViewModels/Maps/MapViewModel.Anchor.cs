@@ -33,7 +33,6 @@ public partial class MapViewModel
             // 앵커 비활성/무효 → 패닝 구역 해제 + 앵커가 올렸던 최소줌을 지도 기본값으로 복원(줌아웃 복구, 사용자 지적)
             MainMap.SetAnchorSite(null);   // 앵커 해제 → 컨트롤이 BoundsOfMap 해제
         NotifyOfPropertyChange(nameof(IsRotationToggleEnabled));   // 회전 토글 버튼 활성/비활성 동기(V-06)
-        NotifyTiltToggleState();                                    // [map-tilt-25d G3] 기울이기 토글 A모드 잠금 동기(파셜)
             RestoreBaseMinZoom();
             return;
         }
@@ -43,7 +42,6 @@ public partial class MapViewModel
         {
             MainMap.SetAnchorSite(null);   // 앵커 해제 → 컨트롤이 BoundsOfMap 해제
         NotifyOfPropertyChange(nameof(IsRotationToggleEnabled));   // 회전 토글 버튼 활성/비활성 동기(V-06)
-        NotifyTiltToggleState();                                    // [map-tilt-25d G3] 기울이기 토글 A모드 잠금 동기(파셜)
             RestoreBaseMinZoom();
             return;
         }
@@ -56,7 +54,6 @@ public partial class MapViewModel
         //   줌/디지털줌/크기 변경 시 라이브 재계산 → 벤더의 드래그 Contains 스킵이 뷰포트-가두기가 됨. 컨테인먼트 상시-ON(FR-6).
         MainMap.SetAnchorSite(rect, anchor.AllowRotation);   // V-06 옵션C: B모드면 회전 유지 잠금
         NotifyOfPropertyChange(nameof(IsRotationToggleEnabled));   // 회전 토글 버튼 활성/비활성 동기(V-06)
-        NotifyTiltToggleState();                                    // [map-tilt-25d G3] 기울이기 토글 A모드 잠금 동기(파셜)
 
         // FR-H1: 앵커 활성인데 홈이 미설정이면 홈=앵커 중심 자동 세팅(최초 적용).
         if (HomePosition == null || !HomePosition.IsAvailable)
@@ -204,6 +201,7 @@ public partial class MapViewModel
     private void EnterAnchorDrawMode()
     {
         if (MainMap == null) return;
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("anchor-draw");   // 「건물 그리기」 표면이 러버밴드 끌기를 가로챈다
         _isMap3DDrawMode = false;   // 3D 영역 그리기(MapViewModel.Map3D)는 이 뒤에 다시 켠다
         if (!_anchorDrawSubscribed)
         {
@@ -212,6 +210,7 @@ public partial class MapViewModel
         }
         MainMap.IsAnchorDrawMode = true;
         MainMap.AnchorDrawLabel = null;   // 크기 표시는 3D 영역 그리기만(MapViewModel.Map3D 가 이 뒤에 켠다)
+        MainMap.AnchorDrawCornersLabel = null;
         SyncMap3DWithInputModes();   // 3D 중이면 먼저 2D 로(MapViewModel.Map3D)
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         EnsureAimEscWindowHook();
@@ -227,6 +226,7 @@ public partial class MapViewModel
         {
             MainMap.IsAnchorDrawMode = false;
             MainMap.AnchorDrawLabel = null;
+            MainMap.AnchorDrawCornersLabel = null;
             // ⚠ 플래그만 끄면 취소가 취소가 되지 않는다(VF-17). 릴리스 핸들러는
             //   IsAnchorDrawMode 가 아니라 내부 _rubberForAnchor 로 분기하므로,
             //   ESC 를 눌러도 버튼을 떼는 순간 AnchorAreaDrawn 이 발화해 앵커 폼이 채워졌다.

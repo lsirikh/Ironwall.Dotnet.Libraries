@@ -12,9 +12,13 @@ using System.Windows.Media.Imaging;
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
    Purpose      : 지도 3D 굽기 방식 고르기(오버레이 이미지 포함 여부) — 영역 그리기 · 배지 「다시 만들기」 직후, 굽기 시작 전.
-                  "3D 만들기 — ○ 위성 타일만 ○ 오버레이 이미지 포함(그림 합성) ○ 오버레이 이미지 포함 + 건물 추출" + [만들기] [취소]
+                  "3D 만들기 — ○ 오버레이 영역은 이미지에서 건물 찾기(기본) ○ 오버레이를 바닥 사진으로만(지도 건물 유지)
+                  ○ 오버레이로 가리기(보안 · 건물 없음) ○ 위성 타일만(오버레이 안 넣음)"
+                  + [만들기] [취소](2026-10-18 방식 넷 — 요청 본문 · mask 는 Map3DBake.ServerOverlayMode · MaskFor)
                   (MapView.xaml "GMaps.Map3D.BakeOptions"). 기본은 마지막 고른 값(appsettings Map3D.OverlayMode).
-   Note         : ★ 영역과 겹치는(회전 포함) 보이는 오버레이 이미지가 하나도 없으면 묻지 않고 tiles 로 굽는다.
+   Note         : ★ 영역과 겹치는(회전 포함) 보이는 오버레이 이미지가 하나도 없으면 방식은 묻지 않고(라디오 숨김) tiles 로 굽는다.
+                  ★ 영역마다 3D 줌(2026-10-18): 패널은 늘 띄워 "3D 로 바뀌는 줌"(15~19, 0.5 단위, 기본 = 세팅의 3D 최소 줌)을 고른다 —
+                    고른 줌은 굽기 요청 enter_zoom 으로 간다. 배지 「3D 줌 바꾸기…」도 같은 패널(줌만, [바꾸기])을 쓴다.
                   ★ overlays = 이미지 마커(GMapImageMarker, FilePath → 절대 경로) + 지도 CustomImages(TIF 등, 원본 파일이 있을 때만).
                     서버가 그대로 받지 못하는 파일(TIF · 50 MB 초과)은 PNG/JPG 캐시 파일로 바꿔 보낸다(Map3DImageCache.GetOrEncodeFile).
                   ★ id 는 3D 스냅샷과 같은 값(이미지 마커 = 모델 Id, CustomImages = 다리의 음수 id) — 3D 화면이 overlays_baked 와 맞춰 다시 그리지 않는다.
@@ -23,19 +27,42 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
  ****************************************************************************/
 public partial class MapViewModel
 {
-    private double[]? _map3DBakeOptionsBbox;
+    private Map3DArea? _map3DBakeOptionsArea;
     private List<Map3DBakeOverlay> _map3DBakeOptionsOverlays = new();
     private string _map3DBakeMode = Map3DBake.ModeTiles;
+    private double _map3DBakeEnterZoom = Map3DMath.EnterZoom;
+    /// <summary>「3D 줌 바꾸기…」로 연 패널이면 그 영역(줌만 고른다), 만들기면 null.</summary>
+    private Map3DAreaItem? _map3DZoomEditArea;
 
     private bool _isMap3DBakeOptionsOpen;
     /// <summary>굽기 방식 선택 패널이 열려 있는가.</summary>
     public bool IsMap3DBakeOptionsOpen { get => _isMap3DBakeOptionsOpen; private set { _isMap3DBakeOptionsOpen = value; NotifyOfPropertyChange(); } }
 
-    /// <summary>패널 상태 한 줄 — 영역 안 오버레이 이미지 수.</summary>
-    public string Map3DBakeOptionsSummary => $"영역 안 오버레이 이미지 {_map3DBakeOptionsOverlays.Count}개";
+    /// <summary>패널 상태 한 줄 — 영역 안 오버레이 이미지 수(줌 바꾸기면 영역 이름).</summary>
+    public string Map3DBakeOptionsSummary => _map3DZoomEditArea is { } area ? $"영역: {area.Title}" : $"영역 안 오버레이 이미지 {_map3DBakeOptionsOverlays.Count}개";
+
+    /// <summary>패널 제목 — 「3D 만들기」 또는 「3D 줌 바꾸기」.</summary>
+    public string Map3DBakeOptionsTitle => _map3DZoomEditArea == null ? "3D 만들기" : "3D 줌 바꾸기";
+
+    /// <summary>확인 단추 글 — 만들기 · 바꾸기.</summary>
+    public string Map3DBakeOptionsConfirmText => _map3DZoomEditArea == null ? "만들기" : "바꾸기";
+
+    /// <summary>만들기 방식(라디오)을 보일까 — 만들기이고 영역 안에 오버레이 이미지가 있을 때만.</summary>
+    public bool IsMap3DBakeModeVisible => _map3DZoomEditArea == null && Map3DBake.ShouldAsk(_map3DBakeOptionsOverlays.Count);
+
+    /// <summary>"3D 로 바뀌는 줌" 선택지(15 · 15.5 · … · 19).</summary>
+    public IReadOnlyList<double> Map3DEnterZoomChoices => Map3DGuide.EnterZoomChoices;
+
+    /// <summary>고른 "3D 로 바뀌는 줌".</summary>
+    public double Map3DBakeEnterZoom { get => _map3DBakeEnterZoom; set { _map3DBakeEnterZoom = Map3DGuide.EnterZoomChoiceFor(value); NotifyOfPropertyChange(); } }
 
     public bool IsMap3DBakeTiles { get => _map3DBakeMode == Map3DBake.ModeTiles; set { if (value) SetMap3DBakeMode(Map3DBake.ModeTiles); } }
-    public bool IsMap3DBakeComposite { get => _map3DBakeMode == Map3DBake.ModeComposite; set { if (value) SetMap3DBakeMode(Map3DBake.ModeComposite); } }
+    /// <summary>오버레이를 사진으로(건물 유지).</summary>
+    public bool IsMap3DBakePhoto { get => _map3DBakeMode == Map3DBake.ModePhoto; set { if (value) SetMap3DBakeMode(Map3DBake.ModePhoto); } }
+    /// <summary>오버레이로 가리기(보안).</summary>
+    public bool IsMap3DBakeMask { get => _map3DBakeMode == Map3DBake.ModeMask; set { if (value) SetMap3DBakeMode(Map3DBake.ModeMask); } }
+    /// <summary>옛 이름 — 예전 "그림 합성"은 늘 가렸으므로 <see cref="IsMap3DBakeMask"/> 와 같다.</summary>
+    public bool IsMap3DBakeComposite { get => IsMap3DBakeMask; set => IsMap3DBakeMask = value; }
     public bool IsMap3DBakeExtract { get => _map3DBakeMode == Map3DBake.ModeExtract; set { if (value) SetMap3DBakeMode(Map3DBake.ModeExtract); } }
 
     private RelayCommand? _confirmMap3DBakeOptionsCommand;
@@ -47,6 +74,7 @@ public partial class MapViewModel
     public RelayCommand CancelMap3DBakeOptionsCommand => _cancelMap3DBakeOptionsCommand ??= new RelayCommand(_ =>
     {
         _log?.Info("[Map3D] 굽기 방식 고르기 취소");
+        _map3DBakeReplaces = null; _map3DBakeOptionsSourceId = null;   // 「다시 만들기」 표지도 버린다(다음 굽기로 새지 않게)
         CloseMap3DBakeOptions();
     });
 
@@ -54,36 +82,62 @@ public partial class MapViewModel
     {
         _map3DBakeMode = Map3DBake.NormalizeMode(mode);
         NotifyOfPropertyChange(nameof(IsMap3DBakeTiles));
+        NotifyOfPropertyChange(nameof(IsMap3DBakePhoto));
+        NotifyOfPropertyChange(nameof(IsMap3DBakeMask));
         NotifyOfPropertyChange(nameof(IsMap3DBakeComposite));
         NotifyOfPropertyChange(nameof(IsMap3DBakeExtract));
     }
 
-    /// <summary>영역이 정해졌다 — 겹치는 오버레이 이미지가 있으면 방식을 묻고, 없으면 바로 tiles 로 굽는다.</summary>
-    private void RequestMap3DBake(double[] bbox)
+    /// <summary>영역이 정해졌다 — 만들기 패널을 띄운다(줌 고르기 · 겹치는 오버레이 이미지가 있으면 방식도).</summary>
+    /// <param name="enterZoom">처음 골라 둘 줌 — 비우면 세팅의 3D 최소 줌(「다시 만들기」는 그 영역의 지금 줌).</param>
+    /// <param name="area">영역 — 회전 영역이면 겹치는 이미지는 감싸는 bbox 로 고르고(map-3d 가 회전 사각형 밖 이미지는 굽지 않는다), 굽기 요청에 rect 를 함께 보낸다.</param>
+    private void RequestMap3DBake(Map3DArea area, double? enterZoom = null)
     {
         List<Map3DBakeOverlay> overlays;
-        try { overlays = CollectMap3DBakeOverlays(bbox); }
+        try { overlays = CollectMap3DBakeOverlays(area.Bbox); }
         catch (Exception ex)
         {
             _log?.Warning($"[Map3D] 영역 안 오버레이 이미지 찾기 실패(타일만으로 굽는다): {ex.Message}");
             overlays = new();
         }
-        if (!Map3DBake.ShouldAsk(overlays.Count))
-        {
-            _ = BakeMap3DAsync(bbox);
-            return;
-        }
-        _map3DBakeOptionsBbox = bbox;
+        _map3DZoomEditArea = null;
+        _map3DBakeOptionsSourceId = null;   // 「다시 만들기」면 부른 쪽(RebakeMap3DArea)이 다시 정한다
+        _map3DBakeOptionsArea = area;
         _map3DBakeOptionsOverlays = overlays;
         SetMap3DBakeMode(Map3DBake.DefaultMode(_map3DSettings.OverlayMode, overlays.Count));
+        OpenMap3DBakeOptions(enterZoom ?? _map3DSettings.EnterZoom);
+        _log?.Info($"[Map3D] 만들기 패널 — 영역 안 오버레이 이미지 {overlays.Count}개, 기본={_map3DBakeMode}, 줌={_map3DBakeEnterZoom}");
+    }
+
+    /// <summary>배지 · 목록 「3D 줌 바꾸기…」 — 같은 패널을 줌만 고르게 연다(지금 그 영역의 줌을 골라 둔다).</summary>
+    private void OpenMap3DAreaZoomEditor(Map3DAreaItem item)
+    {
+        CloseMap3DBakeOptions();
+        _map3DZoomEditArea = item;
+        OpenMap3DBakeOptions(item.EnterZoom);
+        _log?.Info($"[Map3D] 3D 줌 바꾸기 패널 id={item.Id} 지금={item.EnterZoom}");
+    }
+
+    private void OpenMap3DBakeOptions(double enterZoom)
+    {
+        Map3DBakeEnterZoom = enterZoom;
         NotifyOfPropertyChange(nameof(Map3DBakeOptionsSummary));
+        NotifyOfPropertyChange(nameof(Map3DBakeOptionsTitle));
+        NotifyOfPropertyChange(nameof(Map3DBakeOptionsConfirmText));
+        NotifyOfPropertyChange(nameof(IsMap3DBakeModeVisible));
         IsMap3DBakeOptionsOpen = true;
-        _log?.Info($"[Map3D] 굽기 방식 고르기 — 영역 안 오버레이 이미지 {overlays.Count}개, 기본={_map3DBakeMode}");
     }
 
     private void ConfirmMap3DBakeOptions()
     {
-        if (_map3DBakeOptionsBbox is not { } bbox) { CloseMap3DBakeOptions(); return; }
+        double enterZoom = _map3DBakeEnterZoom;
+        if (_map3DZoomEditArea is { } area)
+        {
+            CloseMap3DBakeOptions();
+            _ = ChangeMap3DAreaZoomAsync(area, enterZoom);
+            return;
+        }
+        if (_map3DBakeOptionsArea is not { } bakeArea) { CloseMap3DBakeOptions(); return; }
         var overlays = _map3DBakeOptionsOverlays;
         string mode = _map3DBakeMode;
         CloseMap3DBakeOptions();
@@ -93,7 +147,7 @@ public partial class MapViewModel
             _map3DSettings.OverlayMode = mode;   // 다음 패널의 기본값(마지막 고른 값)
             _ = SaveMap3DOverlayModeAsync();
         }
-        _ = BakeMap3DAsync(bbox, mode, mode == Map3DBake.ModeTiles ? null : overlays);
+        _ = BakeMap3DAsync(bakeArea, mode, mode == Map3DBake.ModeTiles ? null : overlays, enterZoom);
     }
 
     private async System.Threading.Tasks.Task SaveMap3DOverlayModeAsync()
@@ -104,8 +158,9 @@ public partial class MapViewModel
 
     private void CloseMap3DBakeOptions()
     {
-        _map3DBakeOptionsBbox = null;
+        _map3DBakeOptionsArea = null;
         _map3DBakeOptionsOverlays = new();
+        _map3DZoomEditArea = null;
         if (IsMap3DBakeOptionsOpen) IsMap3DBakeOptionsOpen = false;
     }
 

@@ -104,7 +104,7 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
 
     #region - 보기(View) 가시성 (D-12/FR-14~17) -
     private bool _isCompassVisible = true;
-    public bool IsCompassVisible { get => _isCompassVisible; set { _isCompassVisible = value; NotifyOfPropertyChange(nameof(IsCompassVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
+    public bool IsCompassVisible { get => _isCompassVisible; set { _isCompassVisible = value; NotifyOfPropertyChange(nameof(IsCompassVisible)); NotifyOfPropertyChange(nameof(IsCompassShown)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
     private bool _isWindyIndicatorVisible = true;
     public bool IsWindyIndicatorVisible { get => _isWindyIndicatorVisible; set { _isWindyIndicatorVisible = value; NotifyOfPropertyChange(nameof(IsWindyIndicatorVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
     private bool _isDetFaultVisible = true;

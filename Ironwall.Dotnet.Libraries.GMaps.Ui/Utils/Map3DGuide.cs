@@ -9,7 +9,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
                   ① 전환 안내 패널 문구 · 최소 표시 시간 · 로그인 뒤 안내(R5)
                   ② 영역 크기 · 2 km 판정 · 크기 글(R6)
                   ③ 영역 테두리 표시 줌 · "3D 가능" 칩 · 영역 가운데 · 툴팁 글(R4)
-                  ④ 창을 열 때 2D 로 돌아올지(R7)
+                  ④ 창을 열 때 2D 로 돌아올지(R7 · 2026-10-18 WPF 안 3D 면 3D 유지)
                   ⑤ 펼침 시점(rendered · 1.5 s 시간 초과) · 진입 한 번의 전환 시간 로그 줄
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
 ****************************************************************************/
@@ -45,8 +45,22 @@ public static class Map3DGuide
         "ready" => "3D 화면 준비됨",
         "rendering" => "3D 화면을 그리는 중…",
         "login" => "지금 3D 지도를 보고 있습니다 (줌 16.5 밑 · ESC = 2D)",
+        // 3D 위에 뜨는 로그인 직후 안내 — 3D 는 줌으로 나가지 않으므로 줌 표기 없이(2026-10-18).
+        // WPF 안 3D 는 Esc 로 나가지 않으므로 「나가기」 단추만 말한다(2026-10-19 사용자 결정 — 네이티브 창 3D 는 ShownText)
+        "shown" => "지금 3D 지도를 보고 있습니다 (「나가기」 = 2D)",
         _ => "3D 화면을 여는 중…",
     };
+
+    /// <summary>안내 패널 단계 글 — "login" 글의 이탈 줌을 설정(Map3DModel.ExitZoom)에서 받는다.</summary>
+    public static string StageText(string? stage, double exitZoom)
+        => stage == "login" ? $"지금 3D 지도를 보고 있습니다 (줌 {Zoom(exitZoom)} 밑 · ESC = 2D)" : StageText(stage);
+
+    /// <summary>로그인 직후 3D 위 안내 — Esc 로 3D 를 나가는 네이티브 창 3D(hwnd)만 Esc 를 함께 말한다(<see cref="EscExitsMap3D"/>).</summary>
+    public static string ShownText(string hostMode)
+        => EscExitsMap3D(hostMode) ? "지금 3D 지도를 보고 있습니다 (나가기 · ESC = 2D)" : StageText("shown");
+
+    /// <summary>줌 글 — 17 · 16.5.</summary>
+    public static string Zoom(double zoom) => zoom.ToString("0.##", CultureInfo.InvariantCulture);
 
     /// <summary>글 뒤에 " n %"(percent 가 없으면 글 그대로).</summary>
     public static string WithPercent(string text, double? percent)
@@ -100,6 +114,21 @@ public static class Map3DGuide
     /// <summary>로그인 직후 3D 안내를 한 번 보일까 — 로그인 화면 뒤에서 3D 를 펼쳤고 지금도 3D 가 보일 때.</summary>
     public static bool ShouldGuideAfterLogin(bool revealedBehindLogin, bool isShown) => revealedBehindLogin && isShown;
 
+    // ── 만들기 취소(2026-10-19) ──
+
+    /// <summary>진행 판 「만들기 취소」 보임 — 만드는 중 · 작업 id 를 받음 · 판이 굽기 진행을 보이는 중, 그리고 취소를 보내는 중이 아니고 서버가 취소를 안다.</summary>
+    public static bool IsCancelBakeVisible(bool baking, bool hasJob, bool panelShowsBake, bool cancelling, bool unsupported)
+        => baking && hasJob && panelShowsBake && !cancelling && !unsupported;
+
+    /// <summary>취소함 알림 — 같은 영역의 이전 3D 는 그대로.</summary>
+    public const string CancelledBakeText = "3D 만들기를 취소했습니다 — 이전에 만든 3D 는 그대로입니다";
+
+    /// <summary>옛 map-3d(취소 API 없음).</summary>
+    public const string CancelBakeUnsupportedText = "이 3D 서버는 취소를 지원하지 않습니다 — 다 만들 때까지 기다려 주세요";
+
+    /// <summary>GLB 쓰는 중(거의 다 만듦) — 취소하지 않고 곧 끝난다.</summary>
+    public const string CancelBakeTooLateText = "거의 다 만들어 취소하지 않습니다 — 곧 끝납니다";
+
     // ── ② 영역 크기 ──
 
     /// <summary>3D 로 만들 수 있는 영역 한 변 최대(m) — map-3d 서버 제한과 같다.</summary>
@@ -118,7 +147,16 @@ public static class Map3DGuide
     }
 
     /// <summary>한 변이라도 2 km 를 넘는가.</summary>
-    public static bool IsAreaTooLarge(double widthM, double heightM) => widthM > MaxAreaSideM || heightM > MaxAreaSideM;
+    public static bool IsAreaTooLarge(double widthM, double heightM) => IsAreaTooLarge(widthM, heightM, MaxAreaSideM);
+
+    /// <summary>한 변이라도 설정의 최대 크기(Map3DModel.MaxAreaSideM)를 넘는가.</summary>
+    public static bool IsAreaTooLarge(double widthM, double heightM, double maxSideM) => widthM > maxSideM || heightM > maxSideM;
+
+    /// <summary>최대 크기 글 — 2000 → "2 km", 1500 → "1.5 km", 800 → "800 m".</summary>
+    public static string LimitText(double maxSideM)
+        => maxSideM >= 1000d
+            ? (maxSideM / 1000d).ToString("0.##", CultureInfo.InvariantCulture) + " km"
+            : maxSideM.ToString("0", CultureInfo.InvariantCulture) + " m";
 
     /// <summary>길이 글 — 1 km 이상 "1.25 km", 밑으로 "850 m".</summary>
     public static string FormatLength(double meters)
@@ -130,16 +168,30 @@ public static class Map3DGuide
     public static string FormatAreaSize(double widthM, double heightM) => $"{FormatLength(widthM)} × {FormatLength(heightM)}";
 
     /// <summary>그리는 중 크기 표시 — (글, 경고). 2 km 를 넘으면 글 뒤에 " — 2 km 초과" 와 경고.</summary>
-    public static (string Text, bool IsWarning) AreaDrawLabel(IReadOnlyList<double> bbox)
+    public static (string Text, bool IsWarning) AreaDrawLabel(IReadOnlyList<double> bbox) => AreaDrawLabel(bbox, MaxAreaSideM);
+
+    /// <summary>그리는 중 크기 표시 — 최대 크기를 설정에서 받는다.</summary>
+    public static (string Text, bool IsWarning) AreaDrawLabel(IReadOnlyList<double> bbox, double maxSideM)
     {
         var (w, h) = AreaSizeMeters(bbox);
-        bool warn = IsAreaTooLarge(w, h);
-        return (FormatAreaSize(w, h) + (warn ? " — 2 km 초과" : ""), warn);
+        bool warn = IsAreaTooLarge(w, h, maxSideM);
+        return (FormatAreaSize(w, h) + (warn ? $" — {LimitText(maxSideM)} 초과" : ""), warn);
+    }
+
+    /// <summary>그리는 중 크기 표시 — 3D 영역(회전 영역이면 회전 사각형의 실제 가로 · 세로, 아니면 bbox)으로.</summary>
+    public static (string Text, bool IsWarning) AreaDrawLabel(Map3DArea area, double maxSideM)
+    {
+        var (w, h) = area.SizeMeters;
+        bool warn = IsAreaTooLarge(w, h, maxSideM);
+        return (FormatAreaSize(w, h) + (warn ? $" — {LimitText(maxSideM)} 초과" : ""), warn);
     }
 
     /// <summary>놓았을 때 너무 크면 배너에 띄우는 이유.</summary>
-    public static string AreaTooLargeText(double widthM, double heightM)
-        => $"영역이 너무 큽니다({FormatAreaSize(widthM, heightM)}) — 한 변 2 km 이하로 다시 그리세요 (ESC = 취소)";
+    public static string AreaTooLargeText(double widthM, double heightM) => AreaTooLargeText(widthM, heightM, MaxAreaSideM);
+
+    /// <summary>놓았을 때 너무 크면 배너에 띄우는 이유 — 최대 크기를 설정에서 받는다.</summary>
+    public static string AreaTooLargeText(double widthM, double heightM, double maxSideM)
+        => $"영역이 너무 큽니다({FormatAreaSize(widthM, heightM)}) — 한 변 {LimitText(maxSideM)} 이하로 다시 그리세요 (ESC = 취소)";
 
     // ── ③ 영역 표시 ──
 
@@ -151,11 +203,51 @@ public static class Map3DGuide
     public const string ChipText = "3D 가능 — 줌 17 이상";
 
     /// <summary>영역 테두리 · 배지를 보일까(실효줌 ≥ 13). NaN 은 false.</summary>
-    public static bool ShouldShowAreaOutlines(double effectiveZoom) => !double.IsNaN(effectiveZoom) && effectiveZoom >= AreaOutlineMinZoom;
+    public static bool ShouldShowAreaOutlines(double effectiveZoom) => ShouldShowAreaOutlines(effectiveZoom, AreaOutlineMinZoom);
+
+    /// <summary>영역 테두리 · 배지를 보일까 — 최소 줌을 설정(Map3DModel.AreaShowZoom)에서 받는다.</summary>
+    public static bool ShouldShowAreaOutlines(double effectiveZoom, double minZoom) => !double.IsNaN(effectiveZoom) && effectiveZoom >= minZoom;
 
     /// <summary>"3D 가능 — 줌 17 이상" 칩 — 3D 가 꺼져 있고 화면 가운데가 3D 영역 안이며 실효줌 &lt; 17.</summary>
     public static bool ShouldShowChip(double effectiveZoom, bool centerInsideArea, bool is3DOff)
-        => is3DOff && centerInsideArea && double.IsFinite(effectiveZoom) && effectiveZoom < Map3DMath.EnterZoom;
+        => ShouldShowChip(effectiveZoom, centerInsideArea, is3DOff, Map3DMath.EnterZoom);
+
+    /// <summary>"3D 가능" 칩 판정 — 진입 줌을 설정에서 받는다.</summary>
+    public static bool ShouldShowChip(double effectiveZoom, bool centerInsideArea, bool is3DOff, double enterZoom)
+        => is3DOff && centerInsideArea && double.IsFinite(effectiveZoom) && effectiveZoom < enterZoom;
+
+    /// <summary>칩 글 — 진입 줌을 설정에서 받는다("3D 가능 — 줌 17 이상").</summary>
+    public static string ChipTextFor(double enterZoom) => $"3D 가능 — 줌 {Zoom(enterZoom)} 이상";
+
+    /// <summary>「이 영역 3D 로 보기」가 옮겨 갈 실효줌 — 17.5, 진입 줌이 그보다 높으면 진입 줌.</summary>
+    public static double AreaViewZoomFor(double enterZoom) => Math.Max(AreaViewZoom, enterZoom);
+
+    // ── 영역마다 3D 줌(2026-10-18) ──
+
+    /// <summary>3D 만들기 패널 · 「3D 줌 바꾸기」에서 고를 수 있는 3D 로 바뀌는 줌 — 지도 디지털 줌과 같은 0.5 단위.</summary>
+    public const double EnterZoomChoiceMin = 15d, EnterZoomChoiceMax = 19d;
+
+    /// <summary>줌 선택지 15 · 15.5 · … · 19.</summary>
+    public static IReadOnlyList<double> EnterZoomChoices { get; } = BuildEnterZoomChoices();
+
+    private static double[] BuildEnterZoomChoices()
+    {
+        var list = new List<double>();
+        for (double z = EnterZoomChoiceMin; z <= EnterZoomChoiceMax; z += 0.5) list.Add(z);
+        return list.ToArray();
+    }
+
+    /// <summary>처음 골라 둘 줌 — 세팅 · 영역 값을 가장 가까운 선택지(0.5 단위, 15~19)로. 수가 아니면 17.</summary>
+    public static double EnterZoomChoiceFor(double zoom)
+        => double.IsFinite(zoom) ? Math.Clamp(Math.Round(zoom * 2d, MidpointRounding.AwayFromZero) / 2d, EnterZoomChoiceMin, EnterZoomChoiceMax)
+                                 : Map3DMath.EnterZoom;
+
+    /// <summary>배지 툴팁 · 목록 툴팁 — 이름 · 만든 날짜 · 건물 수 · 그 영역의 3D 줌.</summary>
+    public static string AreaToolTip(string title, DateTime? created, int? buildings, double enterZoom)
+        => $"{AreaToolTip(title, created, buildings)}\n3D 로 바뀌는 줌: {Zoom(enterZoom)} 이상";
+
+    /// <summary>지도 메뉴 「3D 영역 목록」 한 줄 — "이름 · 줌 17 이상".</summary>
+    public static string AreaMenuHeader(string title, double enterZoom) => $"{title} · 줌 {Zoom(enterZoom)} 이상";
 
     /// <summary>bbox 가운데(위도, 경도).</summary>
     public static (double Lat, double Lon) AreaCenter(IReadOnlyList<double> bbox)
@@ -171,9 +263,24 @@ public static class Map3DGuide
     // ── ④ 창 열기 ──
 
     /// <summary>
-    /// 3D 위에서 창(카메라 상자 · 조립 카드 · 상세 창)을 열 때 2D 로 돌아올까. 상세 창(symbol-detail)은 WPF 안 3D(composition)면
-    /// 3D 위에 그대로 보이므로 돌아오지 않는다. 카메라 상자 · 카드는 2D 심볼 화면 위치에 붙으므로 늘 돌아온다.
+    /// 3D 위에서 창(카메라 상자 · 조립 카드 · 상세 창)을 열 때 2D 로 돌아올까(2026-10-18 — 3D 화면 자리 따라가기).
+    /// WPF 안 3D(composition)면 창이 3D 위에 그대로 보이고, 카메라 상자 · 카드는 3D 가 알려 주는 마커 화면 자리(overlay.screen)를
+    /// 따라가므로 돌아오지 않는다. 네이티브 창 3D(hwnd)는 WPF 창을 덮으므로(공역) 늘 돌아온다.
     /// </summary>
-    public static bool ShouldLeave3DForPanel(string cause, string hostMode)
-        => !(cause == "symbol-detail" && hostMode == "composition");
+    public static bool ShouldLeave3DForWindow(string hostMode) => hostMode != "composition";
+
+    /// <summary>Esc 로 3D 를 나가는가 — WPF 안 3D(composition)는 「나가기」 단추로만, 네이티브 창 3D 는 그 창이 단추를 가려 Esc 를 남긴다.</summary>
+    public static bool EscExitsMap3D(string hostMode) => hostMode == "hwnd";
+
+    // ── ⑤ 장면 불러오기 실패(3D 화면의 error 메시지, 2026-10-19) ──
+
+    /// <summary>3D 화면이 알린 "장면이 지워졌다(scene.json 404)" 이유.</summary>
+    public const string SceneMissingReason = "scene-missing";
+
+    /// <summary>지워진 장면을 보려다 2D 로 돌아왔을 때 안내.</summary>
+    public const string SceneMissingText = "이 3D 장면은 지워졌습니다 — 2D 지도로 돌아왔고 3D 영역 목록을 새로 고칩니다";
+
+    /// <summary>그 밖의 불러오기 실패 안내(깨진 장면 · 서버에 닿지 않음).</summary>
+    public static string SceneLoadFailedText(string? reason)
+        => reason == "server-unreachable" ? "3D 서버(map-3d)가 꺼져 있습니다" : "이 3D 장면을 읽지 못했습니다 — 영역을 다시 만들어 보세요";
 }
