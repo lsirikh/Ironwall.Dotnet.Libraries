@@ -281,6 +281,93 @@
 										ToolTip="위아래로 끌어 높이 바꾸기 (Esc = 끌기 전으로)" />
 								</Grid>
 
+								<!--  외관(2026-10-21) — 외벽 무늬 · 외벽 색 · 지붕 색(자동 = 엔진이 고름) → [외관 적용], [이 건물 숨기기](확인 한 번).
+								      옛 엔진이면 칸을 끄고 이유 한 줄. 쓰는 법은 판 "?"  -->
+								<Border
+									Height="1"
+									Margin="0,10,0,8"
+									Background="{DynamicResource DividerBrush}" />
+								<TextBlock
+									Margin="0,0,0,6"
+									AutomationProperties.AutomationId="Map.BuildingHeight.LookUnsupported"
+									FontSize="11"
+									Foreground="{DynamicResource StatusWarningBrush}"
+									Text="{Binding BuildingLookUnsupportedText}"
+									TextWrapping="Wrap"
+									Visibility="{Binding IsBuildingLookUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
+								<Grid IsEnabled="{Binding IsBuildingLookAvailable}">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="8" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="8" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<StackPanel Grid.Column="0">
+										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 무늬" />
+										<ComboBox
+											AutomationProperties.AutomationId="Map.BuildingHeight.Facade"
+											AutomationProperties.Name="외벽 무늬"
+											DisplayMemberPath="Value"
+											IsEnabled="{Binding IsBuildingHeightEditable}"
+											ItemsSource="{Binding BuildingFacades}"
+											SelectedValue="{Binding BuildingFacade, Mode=TwoWay}"
+											SelectedValuePath="Key" />
+									</StackPanel>
+									<StackPanel Grid.Column="2">
+										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 색" />
+										<ComboBox
+											AutomationProperties.AutomationId="Map.BuildingHeight.WallColor"
+											AutomationProperties.Name="외벽 색"
+											DisplayMemberPath="Value"
+											IsEnabled="{Binding IsBuildingHeightEditable}"
+											ItemsSource="{Binding BuildingColors}"
+											SelectedValue="{Binding BuildingWallColor, Mode=TwoWay}"
+											SelectedValuePath="Key" />
+									</StackPanel>
+									<StackPanel Grid.Column="4">
+										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="지붕 색" />
+										<ComboBox
+											AutomationProperties.AutomationId="Map.BuildingHeight.RoofColor"
+											AutomationProperties.Name="지붕 색"
+											DisplayMemberPath="Value"
+											IsEnabled="{Binding IsBuildingHeightEditable}"
+											ItemsSource="{Binding BuildingColors}"
+											SelectedValue="{Binding BuildingRoofColor, Mode=TwoWay}"
+											SelectedValuePath="Key" />
+									</StackPanel>
+								</Grid>
+								<Grid Margin="0,8,0,0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Button
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.BuildingHeight.ApplyLook"
+										Command="{Binding ApplyBuildingLookCommand}"
+										Content="외관 적용"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="외벽 무늬 · 색 저장 — 3D 에 바로 보이고 다시 만들어도 유지됩니다" />
+									<Button
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.BuildingHeight.Hide"
+										Command="{Binding HideBuildingCommand}"
+										Content="{Binding BuildingHideButtonText}"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="이상하게 만들어진 건물을 3D 에서 뺍니다(확인 뒤 · 되돌리기 가능)" />
+								</Grid>
+								<!--  다시 만들어야 보이는 것(되살린 건물 · 외벽 무늬) 안내 한 줄  -->
+								<TextBlock
+									Margin="2,6,2,0"
+									AutomationProperties.AutomationId="Map.BuildingHeight.LookNotice"
+									FontSize="11"
+									Foreground="{DynamicResource StatusWarningBrush}"
+									Text="{Binding BuildingLookNotice}"
+									TextWrapping="Wrap"
+									Visibility="{Binding HasBuildingLookNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 								<TextBlock
 									Margin="2,6,2,0"
 									AutomationProperties.AutomationId="Map.BuildingHeight.Error"
@@ -356,6 +443,66 @@
 										</StackPanel>
 									</Button>
 								</Grid>
+
+								<!--  「숨긴 건물 N개」(2026-10-21) — 숨긴 건물은 3D 에서 누를 수 없어 여기서 되살린다  -->
+								<Border
+									Height="1"
+									Margin="0,12,0,8"
+									Background="{DynamicResource DividerBrush}" />
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+									<TextBlock
+										VerticalAlignment="Center"
+										AutomationProperties.AutomationId="Map.BuildingHeight.HiddenCount"
+										Style="{StaticResource BuildingHeightSectionLabel}"
+										Text="{Binding BuildingHiddenCountText}" />
+									<Button
+										Grid.Column="1"
+										AutomationProperties.AutomationId="Map.BuildingHeight.RestoreAll"
+										Command="{Binding RestoreAllHiddenBuildingsCommand}"
+										Content="모두 되살리기"
+										Style="{StaticResource BuildingHeightStepButton}"
+										ToolTip="이 영역의 숨김 · 바꾼 외관을 모두 자동으로 되돌립니다(확인 뒤)" />
+								</Grid>
+								<ItemsControl
+									MaxHeight="120"
+									AutomationProperties.AutomationId="Map.BuildingHeight.HiddenList"
+									ItemsSource="{Binding BuildingHiddenItems}"
+									Visibility="{Binding HasBuildingHidden, Converter={StaticResource BooleanToVisibilityConverter}}">
+									<ItemsControl.Template>
+										<ControlTemplate TargetType="ItemsControl">
+											<ScrollViewer VerticalScrollBarVisibility="Auto">
+												<ItemsPresenter />
+											</ScrollViewer>
+										</ControlTemplate>
+									</ItemsControl.Template>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Grid Margin="0,2">
+												<Grid.ColumnDefinitions>
+													<ColumnDefinition Width="*" />
+													<ColumnDefinition Width="Auto" />
+												</Grid.ColumnDefinitions>
+												<TextBlock
+													VerticalAlignment="Center"
+													FontSize="11"
+													Foreground="{DynamicResource TextPrimaryBrush}"
+													Text="{Binding Text}"
+													TextTrimming="CharacterEllipsis" />
+												<Button
+													Grid.Column="1"
+													AutomationProperties.Name="되살리기"
+													Command="{Binding DataContext.RestoreHiddenBuildingCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+													CommandParameter="{Binding}"
+													Content="되살리기"
+													Style="{StaticResource BuildingHeightStepButton}" />
+											</Grid>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
 							</StackPanel>
 						</Grid>
 					</fb:FrameBorder>

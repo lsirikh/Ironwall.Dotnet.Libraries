@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
@@ -40,42 +38,19 @@ public interface IUserBuildingDrawHost
                   색은 테마 토큰(PrimaryBrush · TintAccentBrush · SurfaceAltBrush · TextMutedBrush) — 라이트/다크.
    Created On   : 2026-10-19 · Sensorway Co., Ltd.
 ****************************************************************************/
-public sealed class UserBuildingAdorner : Adorner, IDisposable
+public sealed class UserBuildingAdorner : GeoSurfaceAdorner
 {
-    private readonly GMapControl _map;
     private readonly IUserBuildingDrawHost _host;
-    private readonly ILogService? _log;
-    private bool _disposed;
 
     private const double VertexRadius = 5.0, MidRadius = 3.5, CornerHalf = 3.5;
 
-    public UserBuildingAdorner(GMapControl map, IUserBuildingDrawHost host, ILogService? log = null) : base(map)
-    {
-        _map = map ?? throw new ArgumentNullException(nameof(map));
-        _host = host;
-        _log = log;
-        Cursor = Cursors.Cross;
-        _map.OnMapZoomChanged += OnMapChanged;
-        _map.OnMapDrag += OnMapChanged;
-        (_map as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);
-    }
+    public UserBuildingAdorner(GMapControl map, IUserBuildingDrawHost host, ILogService? log = null) : base(map, log) => _host = host;
 
-    private void OnMapChanged() => InvalidateVisual();
-    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => InvalidateVisual();
-
-    private UbPoint Screen(UbPoint geo)
-    {
-        var l = _map.FromLatLngToLocal(new PointLatLng(geo.Y, geo.X));
-        return new UbPoint(l.X, l.Y);
-    }
+    private UbPoint Screen(UbPoint geo) { var s = ScreenPoint(geo); return new UbPoint(s.X, s.Y); }
 
     private static Point P(UbPoint p) => new(p.X, p.Y);
 
     // ── 입력(지도 위 전체) ──
-
-    protected override HitTestResult HitTestCore(PointHitTestParameters p) => new PointHitTestResult(this, p.HitPoint);
-
-    private UbPoint At(MouseEventArgs e) { var p = e.GetPosition(_map); return new UbPoint(p.X, p.Y); }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
@@ -110,13 +85,6 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
     {
         base.OnLostMouseCapture(e);
         if (e.LeftButton == MouseButtonState.Pressed) _host.UserBuildingPointerCancel();   // 끄는 중 캡처를 잃음 — 끌기 전으로
-    }
-
-    /// <summary>휠은 지도로 — 그리는 동안에도 줌은 된다.</summary>
-    protected override void OnMouseWheel(MouseWheelEventArgs e)
-    {
-        _map.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = UIElement.MouseWheelEvent, Source = _map });
-        e.Handled = true;
     }
 
     // ── 그리기 ──
@@ -195,30 +163,5 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
     }
 
     private void DrawPolygon(DrawingContext dc, IReadOnlyList<UbPoint> pts, bool closed, Brush? fill, Pen pen)
-    {
-        if (pts.Count < 2) return;
-        var geo = new StreamGeometry();
-        using (var c = geo.Open())
-        {
-            c.BeginFigure(P(Screen(pts[0])), isFilled: closed && fill != null, isClosed: closed);
-            for (int i = 1; i < pts.Count; i++) c.LineTo(P(Screen(pts[i])), isStroked: true, isSmoothJoin: false);
-        }
-        geo.Freeze();
-        dc.DrawGeometry(fill, pen, geo);
-    }
-
-    private Brush Resolve(string key, Color fallback)
-    {
-        if (_map.TryFindResource(key) is Brush b) return b;
-        var s = new SolidColorBrush(fallback); s.Freeze(); return s;
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _map.OnMapZoomChanged -= OnMapChanged;
-        _map.OnMapDrag -= OnMapChanged;
-        (_map as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
-    }
+        => DrawPath(dc, pts.Select(ScreenPoint).ToList(), closed, fill, pen);
 }

@@ -1186,6 +1186,14 @@
 							ToolTip="건물 그리기 — 3D 영역 안에 위에서 본 윤곽을 그려 들어올리기">
 							<md:PackIcon Kind="OfficeBuildingOutline" />
 						</Button>
+						<!--  꾸미기(2026-10-21) — 화면 가운데 3D 영역에 나무 · 바닥 · 소품 · 담장을 놓는다(MapViewModel.Decoration)  -->
+						<Button
+							AutomationProperties.AutomationId="Map.Decoration.Start"
+							Command="{Binding DecorateCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="꾸미기 — 3D 영역 안에 나무 · 바닥 · 소품 · 담장 놓기">
+							<md:PackIcon Kind="PineTree" />
+						</Button>
 					</StackPanel>
 				</Border>
 			</StackPanel>
@@ -1939,6 +1947,14 @@
 					Panel.ZIndex="126"
 					Content="{Binding UserBuildingPanel}"
 					Visibility="{Binding IsUserBuildingDrawing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  「꾸미기」 판(2026-10-21) — 꾸미는 동안 늘 보임. 같은 크롬 · 머리 띠 끌기.  -->
+				<ContentPresenter
+					Canvas.Left="620"
+					Canvas.Top="90"
+					Panel.ZIndex="126"
+					Content="{Binding DecorationPanel}"
+					Visibility="{Binding IsDecorating, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  「이미지 자르기」 판(2026-10-19) — 오버레이 이미지를 처음 불러올 때 · 우클릭 「다각형으로 자르기」. 같은 크롬 · 머리 띠 끌기.  -->
 				<ContentPresenter

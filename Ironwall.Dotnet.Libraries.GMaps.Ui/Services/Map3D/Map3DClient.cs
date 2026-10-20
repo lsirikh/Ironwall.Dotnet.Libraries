@@ -333,10 +333,15 @@ public sealed class Map3DClient : IDisposable
         => PutUserBuildingAsync(job, uid, outline, height, floors, name, Map3DUserBuilding.RoofFlat, Map3DUserBuilding.UseAuto, ct);
 
     /// <summary>넣기 · 고치기 — 지붕 모양(flat · gable · cone · dome) · 외벽 성격(auto · commercial · industrial · residential)까지.</summary>
+    public Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
+                                                            string? name, string roof, string use, CancellationToken ct = default)
+        => PutUserBuildingAsync(job, uid, outline, height, floors, name, roof, use, null, ct);
+
+    /// <summary>넣기 · 고치기 — 외벽 색 · 지붕 색 · 외벽 무늬까지(twin-contract B, null = 그 키를 보내지 않음).</summary>
     public async Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
-                                                                  string? name, string roof, string use, CancellationToken ct = default)
+                                                                  string? name, string roof, string use, Map3DLookState? look, CancellationToken ct = default)
     {
-        var body = Map3DUserBuilding.PutBody(outline, height, floors, name, roof, use).ToString(Formatting.None);
+        var body = Map3DUserBuilding.PutBody(outline, height, floors, name, roof, use, look).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{UserBuildingsUrl(job)}/{Uri.EscapeDataString(uid)}")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -366,9 +371,10 @@ public sealed class Map3DClient : IDisposable
 
     /// <summary>합치기 — 합친 건물의 높이 · 층수 · 이름 · 외벽 성격까지(null = 서버가 정함). uid = 다시 하기에서 처음 합친 건물 uid(null = 서버가 새로).</summary>
     public async Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, double? height, int? floors,
-                                                                            string? name, string? use, string? uid = null, CancellationToken ct = default)
+                                                                            string? name, string? use, string? uid = null, CancellationToken ct = default,
+                                                                            Map3DLookState? look = null)
     {
-        var body = Map3DUserBuilding.MergeBody(uids, height, floors, name, use, uid).ToString(Formatting.None);
+        var body = Map3DUserBuilding.MergeBody(uids, height, floors, name, use, uid, look).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"{UserBuildingsUrl(jobId)}/merge")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -376,6 +382,67 @@ public sealed class Map3DClient : IDisposable
         return Map3DUserBuilding.ParseMergeResult(json!)
                ?? throw new Map3DRequestException(HttpStatusCode.OK, "건물 응답 형식이 올바르지 않습니다");
     }
+
+    // ── 건물 모양 덮어쓰기(map-3d looks, twin-contract A) ──
+
+    /// <summary>
+    /// 숨기기 · 외벽 색 · 지붕 색 · 외벽 무늬(PUT /api/jobs/{id}/buildings/{bid}/look) — 본문은 <see cref="Map3DLook.PutBody"/>(빠진 키는 그대로).
+    /// 직접 그린 건물 숨기기는 409(Message = 서버 문구), 옛 엔진은 404 "Not Found".
+    /// </summary>
+    public async Task<Map3DBuildingLook> PutBuildingLookAsync(string job, int buildingId, JObject body, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{Map3DMath.JobUrl(_server, job)}/buildings/{buildingId.ToString(CultureInfo.InvariantCulture)}/look")
+        {
+            Content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return Map3DLook.ParseSaved(json!) ?? throw new Map3DRequestException(HttpStatusCode.OK, "건물 응답 형식이 올바르지 않습니다");
+    }
+
+    /// <summary>그 장면의 덮어쓰기 목록(GET /api/jobs/{id}/looks) — 옛 엔진(404)이면 null.</summary>
+    public async Task<IReadOnlyList<Map3DLookItem>?> ListLooksAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"{Map3DMath.JobUrl(_server, job)}/looks"), allowNotFound: true, ct).ConfigureAwait(false);
+        return json == null ? null : Map3DLook.ParseList(json);
+    }
+
+    /// <summary>「모두 되살리기」(DELETE /api/jobs/{id}/looks) — 되돌린 수.</summary>
+    public async Task<int> ResetAllLooksAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{Map3DMath.JobUrl(_server, job)}/looks"), allowNotFound: false, ct).ConfigureAwait(false);
+        var o = JObject.Parse(json!);
+        return o["reset"]?.Type == JTokenType.Integer ? o.Value<int>("reset") : 0;
+    }
+
+    // ── 꾸미기 항목(map-3d decorations, twin-contract C) ──
+
+    /// <summary>그 장면 범위의 꾸미기 항목(GET /api/jobs/{id}/decorations) — 옛 엔진(404)이면 null.</summary>
+    public async Task<IReadOnlyList<Map3DDecorationItem>?> ListDecorationsAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, DecorationsUrl(job)), allowNotFound: true, ct).ConfigureAwait(false);
+        return json == null ? null : Map3DDecoration.ParseList(json);
+    }
+
+    /// <summary>넣기 · 고치기(PUT …/decorations/{uid}) — 서버가 저장한 항목. 범위 밖 · 모양 불일치 · 개수 상한은 Map3DRequestException(서버 문구).</summary>
+    public async Task<Map3DDecorationItem> PutDecorationAsync(string job, Map3DDecorationItem item, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{DecorationsUrl(job)}/{Uri.EscapeDataString(item.Uid)}")
+        {
+            Content = new StringContent(Map3DDecoration.PutBody(item).ToString(Formatting.None), Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return Map3DDecoration.ParseItem(JObject.Parse(json!)["item"] as JObject)
+               ?? throw new Map3DRequestException(HttpStatusCode.OK, "꾸미기 응답 형식이 올바르지 않습니다");
+    }
+
+    /// <summary>하나 지우기(DELETE …/decorations/{uid}) — 지웠으면 true, 이미 없으면(404) false.</summary>
+    public async Task<bool> DeleteDecorationAsync(string job, string uid, CancellationToken ct = default)
+        => await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{DecorationsUrl(job)}/{Uri.EscapeDataString(uid)}"), allowNotFound: true, ct)
+               .ConfigureAwait(false) != null;
+
+    /// <summary>「모두 지우기」(DELETE …/decorations).</summary>
+    public Task DeleteAllDecorationsAsync(string job, CancellationToken ct = default)
+        => SendAsync(new HttpRequestMessage(HttpMethod.Delete, DecorationsUrl(job)), allowNotFound: false, ct);
+
+    private string DecorationsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/decorations";
 
     private string UserBuildingsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/user-buildings";
 
