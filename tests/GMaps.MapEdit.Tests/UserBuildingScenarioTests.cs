@@ -74,6 +74,7 @@ public class UserBuildingScenarioTests
                     ["height_source"] = "user", ["height_from"] = "user", ["user_uid"] = "0123456789ab", ["center"] = new JArray(127.0, 37.5) } }.ToString());
             }
             if (!path.StartsWith($"/api/jobs/{Job}/user-buildings")) return Json(HttpStatusCode.NotFound, "{\"detail\":\"없음\"}");
+            if (path == $"/api/jobs/{Job}/user-buildings/merge" && request.Method == HttpMethod.Post) return Merge(JObject.Parse(text!));
             string? uid = path.Split('/').Length == 6 ? path.Split('/')[5] : null;
             if (request.Method == HttpMethod.Get)
                 return Json(HttpStatusCode.OK, new JObject { ["items"] = new JArray(Items), ["count"] = Items.Count }.ToString());
@@ -97,6 +98,37 @@ public class UserBuildingScenarioTests
             }
             int removed = Items.RemoveAll(i => i.Value<string>("uid") == uid);
             return removed == 0 ? Json(HttpStatusCode.NotFound, "{\"detail\":\"그 건물이 없습니다\"}") : Json(HttpStatusCode.OK, "{\"deleted\":1,\"count\":0}");
+        }
+
+        /// <summary>합치기 거절(400 떨어진 도형 등) — (상태, detail).</summary>
+        public (HttpStatusCode Code, string Detail)? FailMergeWith { get; set; }
+        /// <summary>합치기에서 연결 실패(서버 꺼짐).</summary>
+        public bool ThrowOnMerge { get; set; }
+        /// <summary>합친 응답의 holes_filled.</summary>
+        public int HolesFilled { get; set; }
+
+        /// <summary>map-3d 합치기 흉내 — 원래 것을 지우고 감싸는 네모 윤곽 · 새 uid(높이 = 본문 값 또는 가장 높은 것) · 평지붕.</summary>
+        private HttpResponseMessage Merge(JObject body)
+        {
+            if (ThrowOnMerge) throw new HttpRequestException("연결 거부");
+            if (FailMergeWith is { } fail) return Json(fail.Code, new JObject { ["detail"] = fail.Detail }.ToString());
+            var uids = body["uids"]!.Values<string>().ToList();
+            var members = Items.Where(i => uids.Contains(i.Value<string>("uid"))).ToList();
+            if (members.Count != uids.Count) return Json(HttpStatusCode.NotFound, "{\"detail\":\"없는 건물이 있습니다\"}");
+            var pts = members.SelectMany(m => ((JArray)m["outline"]!).Select(p => (X: p[0]!.Value<double>(), Y: p[1]!.Value<double>()))).ToList();
+            double l = pts.Min(p => p.X), r = pts.Max(p => p.X), b = pts.Min(p => p.Y), t = pts.Max(p => p.Y);
+            var item = new JObject
+            {
+                ["uid"] = Map3DUserBuilding.NewUid(),
+                ["outline"] = new JArray(new JArray(l, t), new JArray(r, t), new JArray(r, b), new JArray(l, b)),
+                ["height"] = body["height"]?.Type == JTokenType.Float || body["height"]?.Type == JTokenType.Integer ? body["height"] : members.Max(m => m.Value<double>("height")),
+                ["floors"] = body["floors"], ["name"] = body["name"], ["roof"] = "flat", ["use"] = body["use"]?.Type == JTokenType.String ? body["use"] : "auto",
+                ["baked_id"] = null,
+            };
+            Items.RemoveAll(members.Contains);
+            Items.Add(item);
+            return Json(HttpStatusCode.OK, new JObject { ["item"] = item, ["merged"] = new JArray(uids.Cast<object>().ToArray()), ["holes_filled"] = HolesFilled,
+                                                         ["roof_forced_flat"] = true, ["count"] = Items.Count }.ToString());
         }
 
         private static HttpResponseMessage Json(HttpStatusCode code, string json) => new(code) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
@@ -509,6 +541,8 @@ public class UserBuildingScenarioTests
         Assert.True(rig.Vm.IsUserBuildingToolCircle);
         Assert.True(Press(Key.E, panel));
         Assert.True(rig.Vm.IsUserBuildingToolEllipse);
+        Assert.True(Press(Key.T, panel));
+        Assert.True(rig.Vm.IsUserBuildingToolTriangle);
         Assert.True(Press(Key.R, panel));
         Assert.True(rig.Vm.IsUserBuildingToolRect);
         Assert.False(Press(Key.P, new System.Windows.Controls.TextBox()));   // 입력칸 안 = 글자 그대로
@@ -1148,6 +1182,200 @@ public class UserBuildingScenarioTests
         Assert.False(rig.Vm.IsUserBuildingDrawing);
     });
 
+    // ─────────────── 5-1. 삼각형 도구 ───────────────
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(30)]
+    public void should_draw_isosceles_triangle_apex_up_on_screen_when_box_dragged(double rotation) => RunAsync(async rig =>
+    {
+        rig.W.Map.MapRotation = rotation;
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        rig.Vm.SelectUserBuildingToolCommand.Execute("Triangle");
+        Assert.True(rig.Vm.IsUserBuildingToolTriangle);
+        Assert.False(rig.Vm.IsUserBuildingToolPolygon);
+        var a = rig.ScreenOf(-15, 10);
+        DragOnMap(rig, a, new UbPoint(a.X + 60, a.Y + 40));
+        var d = rig.Vm.UserBuildingDraft!;
+        Assert.True(d.IsClosed);
+        Assert.Equal(UbTool.Triangle, d.CompletedBy);
+        var s = d.Points.Select(g => rig.W.Map.FromLatLngToLocal(new PointLatLng(g.Y, g.X))).ToList();
+        Assert.Equal(3, s.Count);
+        Assert.InRange(s[0].X - a.X, 29, 31); Assert.InRange(s[0].Y - a.Y, -1, 1);   // 꼭대기 = 상자 위 변 가운데(돌린 지도에서도 화면 기준)
+        Assert.InRange(s[1].X - a.X, 59, 61); Assert.InRange(s[1].Y - a.Y, 39, 41);   // 오른쪽 아래
+        Assert.InRange(s[2].X - a.X, -1, 1); Assert.InRange(s[2].Y - a.Y, 39, 41);    // 왼쪽 아래
+        await rig.Apply();
+        Assert.Equal(3, ((JArray)rig.Writes.Single().Body!["outline"]!).Count);
+        Assert.True(rig.Vm.IsUserBuildingToolTriangle);                       // 다음 건물도 같은 도구
+    });
+
+    // ─────────────── 5-2. 여러 개 고르기 · 합치기 ───────────────
+
+    /// <summary>저장된 건물(동 e0 ~ e0+20 m, 북 -20 ~ -40 m) — 둘을 e0 = -30 · -10 으로 두면 맞닿는다.</summary>
+    private static JObject SavedBox(Rig rig, string uid, double e0, double height, string? name, string roof = "flat", string use = "auto")
+        => new()
+        {
+            ["uid"] = uid, ["height"] = height, ["floors"] = (int)(height / 3), ["name"] = name, ["baked_id"] = null, ["roof"] = roof, ["use"] = use,
+            ["outline"] = new JArray(new[] { rig.Geo(e0, -20), rig.Geo(e0 + 20, -20), rig.Geo(e0 + 20, -40), rig.Geo(e0, -40) }
+                                     .Select(p => (object)new JArray(Math.Round(p.X, 7), Math.Round(p.Y, 7)))),
+        };
+
+    private const string UidA = "aaaaaaaaaaaa", UidB = "bbbbbbbbbbbb";
+
+    private static async Task TwoSaved(Rig rig)
+    {
+        rig.Server.Items.Add(SavedBox(rig, UidA, -30, 12, "창고", "gable", "industrial"));
+        rig.Server.Items.Add(SavedBox(rig, UidB, -10, 9, null));
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        await Rig.Until(() => rig.Vm.UserBuildingItems.Count == 2, "저장된 건물 목록");
+    }
+
+    private static void CtrlClick(Rig rig, double eastM, double northM)
+    {
+        var s = rig.ScreenOf(eastM, northM);
+        rig.Host.UserBuildingPointerDown(s, 1, ctrl: true);
+        rig.Host.UserBuildingPointerUp(s, false);
+    }
+
+    private static Task Merge(Rig rig) => (Task)Scenario.Call(rig.Vm, "MergeUserBuildingsAsync")!;
+
+    [Fact]
+    public void should_toggle_saved_buildings_with_ctrl_click_and_offer_merge_only_for_two_or_more() => RunAsync(async rig =>
+    {
+        await TwoSaved(rig);
+        Assert.False(rig.Vm.HasUserBuildingSelection);
+        CtrlClick(rig, -20, -30);                                             // A
+        Assert.Equal(new[] { UidA }, rig.Vm.UserBuildingSelectedUids);
+        Assert.Equal("도형 1개 선택 — Ctrl+클릭으로 더 고르세요", rig.Vm.UserBuildingSelectionText);
+        Assert.True(rig.Vm.HasUserBuildingSelection);
+        Assert.False(rig.Vm.IsUserBuildingMergeVisible);                     // 1개 = [합치기] 없음
+        Assert.False(rig.Vm.MergeUserBuildingsCommand.CanExecute(null));
+        Assert.True(rig.Vm.ClearUserBuildingSelectionCommand.CanExecute(null));
+        Assert.False(rig.Vm.IsUserBuildingEditingSaved);                     // Ctrl+클릭은 고치기로 열지 않는다
+        Assert.Empty(rig.Vm.UserBuildingDraft!.Points);                      // 점도 찍지 않는다
+        CtrlClick(rig, 0, -30);                                               // B
+        Assert.Equal("도형 2개 선택", rig.Vm.UserBuildingSelectionText);
+        Assert.True(rig.Vm.IsUserBuildingMergeVisible);
+        Assert.True(rig.Vm.MergeUserBuildingsCommand.CanExecute(null));
+        CtrlClick(rig, 0, -30);                                               // B 다시 = 빼기
+        Assert.Equal(new[] { UidA }, rig.Vm.UserBuildingSelectedUids);
+        Assert.False(rig.Vm.IsUserBuildingMergeVisible);
+        CtrlClick(rig, 60, 60);                                               // 빈 곳 Ctrl+클릭 = 그대로
+        Assert.Single(rig.Vm.UserBuildingSelectedUids);
+        Assert.Empty(rig.Vm.UserBuildingDraft!.Points);
+        rig.Vm.ClearUserBuildingSelectionCommand.Execute(null);               // [선택 풀기]
+        Assert.False(rig.Vm.HasUserBuildingSelection);
+        // 보통 클릭(고치기로 열림) 뒤 Ctrl+클릭 = 둘 다 고름, 고치기는 닫힘
+        rig.Click(-20, -30);
+        Assert.True(rig.Vm.IsUserBuildingEditingSaved);
+        CtrlClick(rig, 0, -30);
+        Assert.Equal(new[] { UidA, UidB }, rig.Vm.UserBuildingSelectedUids);
+        Assert.False(rig.Vm.IsUserBuildingEditingSaved);
+        // 고름이 있을 때 빈 곳 보통 클릭 = 고름만 풀림(점은 찍지 않음)
+        rig.Click(60, 60);
+        Assert.False(rig.Vm.HasUserBuildingSelection);
+        Assert.Empty(rig.Vm.UserBuildingDraft!.Points);
+        Assert.Empty(rig.Writes);
+    });
+
+    [Fact]
+    public void should_clear_selection_first_on_escape_then_exit_on_next_escape() => RunAsync(async rig =>
+    {
+        await TwoSaved(rig);
+        CtrlClick(rig, -20, -30); CtrlClick(rig, 0, -30);
+        Assert.True(rig.Key(Key.Escape));
+        Assert.False(rig.Vm.HasUserBuildingSelection);
+        Assert.True(rig.Vm.IsUserBuildingDrawing);                            // 그리기는 그대로
+        Assert.True(rig.Key(Key.Escape));
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+    });
+
+    [Fact]
+    public void should_merge_open_result_and_undo_restores_members_and_redo_merges_again() => RunAsync(async rig =>
+    {
+        rig.Server.HolesFilled = 1;
+        await TwoSaved(rig);
+        CtrlClick(rig, -20, -30); CtrlClick(rig, 0, -30);
+        int before = rig.Writes.Count;
+        await Merge(rig);
+
+        var post = rig.Writes.Skip(before).Single();
+        Assert.Equal((HttpMethod.Post, $"/api/jobs/{Job}/user-buildings/merge"), (post.Method, post.Path));
+        Assert.Equal(new[] { UidA, UidB }, post.Body!["uids"]!.Values<string>());
+        Assert.Equal(new[] { "uids", "height", "floors", "name", "use" }, post.Body.Properties().Select(p => p.Name));
+        Assert.All(new[] { "height", "floors", "name", "use" }, k => Assert.Equal(JTokenType.Null, post.Body[k]!.Type));
+        var merged = Assert.Single(rig.Server.Items).Value<string>("uid")!;
+        Assert.Equal(new[] { merged }, rig.Vm.UserBuildingItems.Select(i => i.Uid));          // 목록 다시 받음
+        Assert.Equal(merged, rig.Vm.UserBuildingEditingUid);                                  // 합친 건물 고치기로 열림
+        Assert.Equal("12.0", rig.Vm.UserBuildingHeightText);
+        Assert.Equal(Map3DUserBuilding.RoofFlat, rig.Vm.UserBuildingRoof);
+        Assert.False(rig.Vm.HasUserBuildingSelection);
+        Assert.Equal("2개를 하나로 합쳤습니다 · 지붕은 평지붕 · 안쪽 빈 곳 1개를 채움", rig.Vm.AimStatusMessage);
+        Assert.Equal($"{Map3DUserBuilding.UndoPrefix} 합치기", rig.W.Undo.NextUndoDescription);
+        var previews = rig.Sent("userbuilding.preview");
+        Assert.Equal(new[] { UidA, UidB, merged }, previews.Select(p => p.Value<string>("uid")));   // 원래 상자 지움 → 합친 상자
+        Assert.Equal(JTokenType.Null, previews[0]["height"]!.Type);
+        Assert.Equal(12.0, previews[2].Value<double>("height"));
+
+        // 되돌리기 = 합친 것 지우고 원래 둘을 같은 uid · 모양 · 높이 · 이름 · 지붕 · 외벽으로 다시 저장 — 한 단위
+        before = rig.Writes.Count;
+        Assert.True(rig.Key(Key.Z, ModifierKeys.Control));
+        await Rig.Until(() => rig.Writes.Count == before + 3, "되돌리기 DELETE + PUT 2");
+        var undo = rig.Writes.Skip(before).ToList();
+        Assert.Equal(new[] { $"DELETE /api/jobs/{Job}/user-buildings/{merged}", $"PUT /api/jobs/{Job}/user-buildings/{UidA}", $"PUT /api/jobs/{Job}/user-buildings/{UidB}" },
+                     undo.Select(r => $"{r.Method} {r.Path}"));
+        Assert.Equal((12.0, 4, "창고", "gable", "industrial"),
+                     (undo[1].Body!.Value<double>("height"), undo[1].Body.Value<int>("floors"), undo[1].Body.Value<string>("name"), undo[1].Body.Value<string>("roof"), undo[1].Body.Value<string>("use")));
+        Assert.Equal(SavedBox(rig, UidB, -10, 9, null)["outline"]!.ToString(), undo[2].Body!["outline"]!.ToString());
+        Assert.Equal(new[] { UidA, UidB }, rig.Server.Items.Select(i => i.Value<string>("uid")));
+        await Rig.Until(() => rig.Vm.UserBuildingItems.Count == 2, "되돌린 뒤 목록");
+        Assert.False(rig.W.Undo.CanUndo);                                     // 되돌리기 한 번으로 끝(한 단위)
+        Assert.True(rig.W.Undo.CanRedo);
+
+        // 다시 하기 = 같은 uid 들로 다시 합치기(처음 합친 높이 · 층수 · 이름 · 외벽)
+        before = rig.Writes.Count;
+        await rig.W.Undo.RedoAsync();
+        var again = rig.Writes.Skip(before).Single();
+        Assert.Equal((HttpMethod.Post, $"/api/jobs/{Job}/user-buildings/merge"), (again.Method, again.Path));
+        Assert.Equal(new[] { UidA, UidB }, again.Body!["uids"]!.Values<string>());
+        Assert.Equal(12.0, again.Body.Value<double>("height"));
+        var merged2 = Assert.Single(rig.Server.Items).Value<string>("uid")!;
+        // 그다음 되돌리기는 새 합친 uid 를 지운다
+        before = rig.Writes.Count;
+        await rig.W.Undo.UndoAsync();
+        Assert.Equal($"DELETE /api/jobs/{Job}/user-buildings/{merged2}", $"{rig.Writes[before].Method} {rig.Writes[before].Path}");
+        Assert.Equal(2, rig.Server.Items.Count);
+    });
+
+    [Fact]
+    public void should_show_server_reason_and_change_nothing_when_shapes_are_disjoint() => RunAsync(async rig =>
+    {
+        rig.Server.FailMergeWith = (HttpStatusCode.BadRequest, "서로 떨어진 도형은 합칠 수 없습니다 — 맞닿거나 겹치게 그려 주세요");
+        await TwoSaved(rig);
+        CtrlClick(rig, -20, -30); CtrlClick(rig, 0, -30);
+        await Merge(rig);
+        Assert.Equal("서로 떨어진 도형은 합칠 수 없습니다 — 맞닿거나 겹치게 그려 주세요", rig.Vm.UserBuildingError);
+        Assert.True(rig.Vm.HasUserBuildingError);
+        Assert.Equal(2, rig.Server.Items.Count);
+        Assert.Equal(2, rig.Vm.UserBuildingItems.Count);
+        Assert.Equal(new[] { UidA, UidB }, rig.Vm.UserBuildingSelectedUids);  // 고름 그대로 — 고쳐서 다시
+        Assert.False(rig.W.Undo.CanUndo);
+        Assert.Empty(rig.Sent("userbuilding.preview"));
+        Assert.True(rig.Vm.MergeUserBuildingsCommand.CanExecute(null));
+    });
+
+    [Fact]
+    public void should_say_server_off_and_keep_selection_when_merge_cannot_connect() => RunAsync(async rig =>
+    {
+        rig.Server.ThrowOnMerge = true;
+        await TwoSaved(rig);
+        CtrlClick(rig, -20, -30); CtrlClick(rig, 0, -30);
+        await Merge(rig);
+        Assert.Equal("3D 서버(map-3d)가 꺼져 있습니다", rig.Vm.UserBuildingError);
+        Assert.Equal(2, rig.Vm.UserBuildingSelectedUids.Count);
+        Assert.False(rig.W.Undo.CanUndo);
+    });
+
     // ─────────────── 6. 판 템플릿 ───────────────
 
     [Fact]
@@ -1158,7 +1386,8 @@ public class UserBuildingScenarioTests
                                    "Map.UserBuilding.Apply", "Map.UserBuilding.Cancel", "Map.UserBuilding.Delete", "Map.UserBuilding.Handle",
                                    "Map.UserBuilding.Name", "Map.UserBuilding.Undo", "Map.UserBuilding.Close", "Map.UserBuilding.Error",
                                    "Map.UserBuilding.Tool.Rect", "Map.UserBuilding.Tool.Circle", "Map.UserBuilding.Tool.Ellipse", "Map.UserBuilding.Tool.Polygon",
-                                   "Map.UserBuilding.Roof", "Map.UserBuilding.Use", "Map.UserBuilding.CircleSides", "Map.UserBuilding.RoofStatus" })
+                                   "Map.UserBuilding.Roof", "Map.UserBuilding.Use", "Map.UserBuilding.CircleSides", "Map.UserBuilding.RoofStatus",
+                                   "Map.UserBuilding.Tool.Triangle", "Map.UserBuilding.Merge", "Map.UserBuilding.ClearSelection", "Map.UserBuilding.SelectionCount" })
             Assert.Contains($"AutomationProperties.AutomationId=\"{id}\"", xaml);
         Assert.DoesNotContain("x:Name", xaml);
         Assert.DoesNotContain("#", xaml.Split("<Style TargetType")[1].Replace("✓", ""));   // 색은 토큰만(하드코딩 색 없음)

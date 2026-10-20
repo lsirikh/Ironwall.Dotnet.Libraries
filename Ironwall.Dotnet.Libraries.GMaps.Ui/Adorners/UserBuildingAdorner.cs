@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -20,7 +21,10 @@ public interface IUserBuildingDrawHost
     IReadOnlyList<Map3DUserBuildingItem> UserBuildingItems { get; }
     /// <summary>고치는 중인 건물 uid(새로 그리면 null).</summary>
     string? UserBuildingEditingUid { get; }
-    void UserBuildingPointerDown(UbPoint screen, int clickCount);
+    /// <summary>Ctrl+클릭으로 여러 개 고른 저장된 건물 uid(굵은 실선 + 모서리 네모로 그린다).</summary>
+    IReadOnlyCollection<string> UserBuildingSelectedUids { get; }
+    /// <summary>ctrl = Ctrl+클릭(저장된 건물 고름에 넣기 · 빼기).</summary>
+    void UserBuildingPointerDown(UbPoint screen, int clickCount, bool ctrl = false);
     /// <summary>shift = 정사각형 · 원 · 직각 맞춤.</summary>
     void UserBuildingPointerMove(UbPoint screen, bool shift);
     void UserBuildingPointerUp(UbPoint screen, bool shift);
@@ -43,7 +47,7 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
     private readonly ILogService? _log;
     private bool _disposed;
 
-    private const double VertexRadius = 5.0, MidRadius = 3.5;
+    private const double VertexRadius = 5.0, MidRadius = 3.5, CornerHalf = 3.5;
 
     public UserBuildingAdorner(GMapControl map, IUserBuildingDrawHost host, ILogService? log = null) : base(map)
     {
@@ -77,7 +81,7 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
     {
         _map.Focus();   // 키 초점을 지도로 — 다른 화면 단추에 초점이 남으면 그리기 키(Enter · Delete …)가 그 단추 몫으로 판정된다
         CaptureMouse();
-        _host.UserBuildingPointerDown(At(e), e.ClickCount);
+        _host.UserBuildingPointerDown(At(e), e.ClickCount, (Keyboard.Modifiers & ModifierKeys.Control) != 0);
         e.Handled = true;
     }
 
@@ -130,8 +134,22 @@ public sealed class UserBuildingAdorner : Adorner, IDisposable
 
             // 저장된 건물 — 흐린 점선(눌러서 고치기)
             var savedPen = new Pen(muted, 1.5) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) }; savedPen.Freeze();
+            // 여러 개 고른 건물 — 색이 아니라 모양으로: 굵은 실선 + 감싸는 네모의 네 모서리 네모 손잡이(꼭짓점 원 · 회전 손잡이와 다른 모양)
+            var selected = _host.UserBuildingSelectedUids;
+            var selPen = new Pen(primary, 3) { LineJoin = PenLineJoin.Round }; selPen.Freeze();
+            var cornerPen = new Pen(primary, 1.5); cornerPen.Freeze();
             foreach (var it in _host.UserBuildingItems)
-                if (it.Uid != _host.UserBuildingEditingUid) DrawPolygon(dc, it.Outline, closed: true, fill: null, savedPen);
+            {
+                if (it.Uid == _host.UserBuildingEditingUid) continue;
+                if (!selected.Contains(it.Uid)) { DrawPolygon(dc, it.Outline, closed: true, fill: null, savedPen); continue; }
+                DrawPolygon(dc, it.Outline, closed: true, fill: null, selPen);
+                var s = new List<Point>();
+                foreach (var g in it.Outline) s.Add(P(Screen(g)));
+                double l = double.MaxValue, t = double.MaxValue, r = double.MinValue, b = double.MinValue;
+                foreach (var p in s) { l = Math.Min(l, p.X); t = Math.Min(t, p.Y); r = Math.Max(r, p.X); b = Math.Max(b, p.Y); }
+                foreach (var c in new[] { new Point(l, t), new Point(r, t), new Point(r, b), new Point(l, b) })
+                    dc.DrawRectangle(core, cornerPen, new Rect(c.X - CornerHalf, c.Y - CornerHalf, CornerHalf * 2, CornerHalf * 2));
+            }
 
             if (_host.UserBuildingDraft is not { } d) return;
             var line = new Pen(primary, 2.5) { LineJoin = PenLineJoin.Round }; line.Freeze();

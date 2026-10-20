@@ -81,6 +81,7 @@ public partial class MapViewModel
         NotifyOfPropertyChange(nameof(IsMap3DEnterButtonVisible));
         NotifyOfPropertyChange(nameof(IsCompassShown));   // 3D 에서는 방향 링이 나침반 대신(MapViewModel.Map3DNav)
         if (state != Map3DState.Shown) StopAllMap3DMoves();   // 누르고 있던 이동을 멈춘다
+        SyncMap3DEngineWatch();   // 3D 가 보이는 동안만 10 초마다 엔진 확인(MapViewModel.Map3DReconnect)
     }
 
     private RelayCommand? _exitMap3DCommand;
@@ -299,7 +300,7 @@ public partial class MapViewModel
             _map3DLoginSubscribed = true;
         }
         QueueMap3DGate();
-        if (!_map3DSettings.IsEnabled) return;
+        if (!_map3DSettings.IsEnabled) { StopMap3DEngineWatchers(); return; }   // 3D 를 끄면 엔진 확인도 하지 않는다
         _ = RefreshMap3DAreasAsync();   // 2D 지도 3D 영역 표시(R4)
         // 첫 3D 진입의 WebView2 기동(실측 4.36 s)을 지도가 그려진 뒤 한가할 때 미리 해 둔다
         MainMap.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => _ = PrewarmMap3DAsync()));
@@ -345,6 +346,7 @@ public partial class MapViewModel
         SetMap3DBusy(null);             // 복귀 안내 패널 · 안내 타이머
         System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
         StopAllMap3DMoves();
+        StopMap3DEngineWatchers();      // 다시 연결 감시 · 3D 중 엔진 확인
         _map3DLookupTimer?.Stop();
         _map3DLookupCts?.Cancel();
         MapSettingsHelper.Map3DSaved -= OnMap3DSettingsSaved;
@@ -543,6 +545,7 @@ public partial class MapViewModel
         {
             _log?.Warning($"[Map3D] 만들기 취소 — 서버 닿지 않음: {ex.Message}");
             SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("cancel-bake");
         }
         catch (Map3DRequestException ex) { SetAimStatus($"3D 만들기를 취소할 수 없습니다: {ex.Message}", autoHide: true); }
         catch (Exception ex)
@@ -644,6 +647,7 @@ public partial class MapViewModel
         {
             _log?.Warning($"[Map3D] 서버 닿지 않음: {ex.Message}");
             SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("bake");
         }
         catch (Map3DRequestException ex)
         {
@@ -784,8 +788,12 @@ public partial class MapViewModel
         bool remote = IsRemoteSession();
         if (remote) _log?.Info("[Map3D] 원격 세션 — 3D 저사양(low=1)");
         // 위에서 내려다본 같은 축척으로 연다(animate=0) — 펼칠 때(Reveal3D) 기울기 애니메이션을 보낸다.
-        _ = Map3DHost.LoadAsync(job, Map3DMath.ViewUrl(_map3DSettings.ServerUrl, job, Current2DCamera(0d), animate: false, lowQuality: remote));
+        var url = Map3DMath.ViewUrl(_map3DSettings.ServerUrl, job, Current2DCamera(0d), animate: false, lowQuality: remote);
+        _ = _map3DSceneLoader is { } load ? load(job, url) : Map3DHost.LoadAsync(job, url);
     }
+
+    /// <summary>장면 페이지 열기 이음매 — null 이면 3D 호스트(WebView2). 시험은 WebView2 없이 열기 요청(job · 주소)만 받는다.</summary>
+    private Func<string, string, Task>? _map3DSceneLoader;
 
     /// <summary>지도 중심이 바뀌었을 때만 400 ms 뒤 /api/scenes/at 을 묻는다(같은 중심은 다시 묻지 않음).</summary>
     private void QueueMap3DSceneLookup(PointLatLng center)
@@ -823,6 +831,7 @@ public partial class MapViewModel
             _map3DLastLookupCenter = null;   // 서버가 다시 켜지면 같은 자리에서도 다시 묻는다
             _log?.Warning($"[Map3D] 장면 조회 — 서버 닿지 않음: {ex.Message}");
             if (MainMap.EffectiveZoom >= _map3DSettings.EnterZoom) SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("scene-lookup");
         }
         catch (Exception ex) { _log?.Warning($"[Map3D] 장면 조회 실패: {ex.Message}"); }
     }
@@ -1137,10 +1146,15 @@ public partial class MapViewModel
     {
         _log?.Warning($"[Map3D] {reason}");
         if (_map3DState == Map3DState.Off) return;
+        // 엔진에 닿지 않음 — 탐색 실패(CannotConnect · ConnectionAborted) 또는 3D 화면의 server-unreachable(Map3DGuide.SceneLoadFailedText)
+        bool unreachable = reason.Contains("ConnectionAborted") || reason.Contains("CannotConnect") || reason == Map3DUnavailableText;
         _map3DEntrySuppressed = true;   // 같은 줌에서 계속 다시 시도하지 않게
         if (_map3DState == Map3DState.Shown) Leave3D(Map3DExitCamera, "load-failed");
         else CancelMap3DPending();
-        SetAimStatus(reason.Contains("ConnectionAborted") || reason.Contains("CannotConnect") ? Map3DUnavailableText : reason, autoHide: true);
+        SetAimStatus(unreachable ? Map3DUnavailableText : reason, autoHide: true);
+        // 엔진이 다시 켜지면 3D 를 다시 연다(MapViewModel.Map3DReconnect). 그 밖의 실패는 엔진을 한 번 물어 꺼졌을 때만
+        if (unreachable) NoteMap3DEngineDown("load-failed", wasIn3D: true);
+        else _ = CheckMap3DEngineAfterLoadFailureAsync();
     }
 
     // ── 입력 모드 충돌(1단계) ──

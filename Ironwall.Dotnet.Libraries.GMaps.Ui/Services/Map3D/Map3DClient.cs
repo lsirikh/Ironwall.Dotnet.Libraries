@@ -114,6 +114,33 @@ public sealed class Map3DClient : IDisposable
     /// </summary>
     public TimeSpan BakeStartTimeout { get; init; } = TimeSpan.FromMinutes(3);
 
+    /// <summary>엔진 살아 있는지 묻기(<see cref="IsHealthyAsync"/>)의 응답 시간 제한 — 짧게(다시 연결 감시가 5 · 10 초마다 묻는다).</summary>
+    public TimeSpan HealthTimeout { get; init; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// 엔진이 살아 있는가 — GET /api/health 200 이면 true. 그 주소가 없는 옛 map-3d(404)면 GET /api/config 200 으로 본다.
+    /// 닿지 않음 · 시간 초과 · 그 밖의 응답은 false. 예외를 던지지 않는다(감시 타이머에서 부른다).
+    /// </summary>
+    public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var status = await ProbeAsync("/api/health", ct).ConfigureAwait(false);
+            if (status == HttpStatusCode.NotFound) status = await ProbeAsync("/api/config", ct).ConfigureAwait(false);   // 옛 map-3d
+            return status == HttpStatusCode.OK;
+        }
+        catch (Exception) { return false; }   // 닿지 않음 · 시간 초과 · 취소 · 닫힌 창구 — 모두 "살아 있지 않음"
+    }
+
+    private async Task<HttpStatusCode> ProbeAsync(string path, CancellationToken ct)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(HealthTimeout);
+        using var response = await _http.SendAsync(new HttpRequestMessage(HttpMethod.Get, _server + path),
+                                                   HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
+        return response.StatusCode;
+    }
+
     /// <summary>굽기 시작(POST /api/jobs) → 202 작업.</summary>
     public Task<Map3DJob> StartBakeAsync(double[] bbox, CancellationToken ct = default)
         => StartBakeAsync(bbox, Map3DBake.ModeTiles, null, ct);
@@ -328,6 +355,26 @@ public sealed class Map3DClient : IDisposable
     {
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, UserBuildingsUrl(job)), allowNotFound: false, ct).ConfigureAwait(false);
         return JObject.Parse(json!)["deleted"]?.Type == JTokenType.Integer ? JObject.Parse(json!).Value<int>("deleted") : 0;
+    }
+
+    /// <summary>
+    /// 합치기(POST /api/jobs/{id}/user-buildings/merge {"uids":[…],"height","floors","name","use"}) — 여러 건물을 하나로(서버가 원래 것은 지운다).
+    /// 서로 떨어진 도형(400) · 없는 uid(404)는 Map3DRequestException(Message = 서버 detail), 닿지 않으면 Map3DServerUnavailableException.
+    /// </summary>
+    public Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, CancellationToken ct = default)
+        => MergeUserBuildingsAsync(jobId, uids, null, null, null, null, null, ct);
+
+    /// <summary>합치기 — 합친 건물의 높이 · 층수 · 이름 · 외벽 성격까지(null = 서버가 정함). uid = 다시 하기에서 처음 합친 건물 uid(null = 서버가 새로).</summary>
+    public async Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, double? height, int? floors,
+                                                                            string? name, string? use, string? uid = null, CancellationToken ct = default)
+    {
+        var body = Map3DUserBuilding.MergeBody(uids, height, floors, name, use, uid).ToString(Formatting.None);
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"{UserBuildingsUrl(jobId)}/merge")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return Map3DUserBuilding.ParseMergeResult(json!)
+               ?? throw new Map3DRequestException(HttpStatusCode.OK, "건물 응답 형식이 올바르지 않습니다");
     }
 
     private string UserBuildingsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/user-buildings";

@@ -29,8 +29,11 @@ public sealed record Map3DUserBuildingItem(string Uid, IReadOnlyList<UbPoint> Ou
     public string Use { get; init; } = Map3DUserBuilding.UseAuto;
 }
 
-/// <summary>윤곽 그리기 도구 — 다각형(선 클릭) · 사각형 · 원 · 타원.</summary>
-public enum UbTool { Polygon, Rect, Circle, Ellipse }
+/// <summary>합치기(POST …/user-buildings/merge) 응답 — 합친 건물 · 합쳐진(지워진) uid · 채운 안쪽 빈 곳 수 · 지붕을 평지붕으로 바꿨는가.</summary>
+public sealed record Map3DUserBuildingMergeResult(Map3DUserBuildingItem Item, IReadOnlyList<string> Merged, int HolesFilled, bool RoofForcedFlat);
+
+/// <summary>윤곽 그리기 도구 — 다각형(선 클릭) · 사각형 · 원 · 타원 · 삼각형.</summary>
+public enum UbTool { Polygon, Rect, Circle, Ellipse, Triangle }
 
 /// <summary>손잡이 종류 — 꼭짓점 · 선분 가운데(끌면 점이 생긴다) · 회전 손잡이 · 몸통(끌면 통째로 옮김).</summary>
 public enum UbHandleKind { None, Vertex, Midpoint, Rotate, Body }
@@ -81,6 +84,17 @@ public static class Map3DUserBuilding
             b = new UbPoint(a.X + (b.X >= a.X ? s : -s), a.Y + (b.Y >= a.Y ? s : -s));
         }
         return new[] { a, new UbPoint(b.X, a.Y), b, new UbPoint(a.X, b.Y) };
+    }
+
+    /// <summary>
+    /// 이등변 삼각형(끈 상자의 대각 두 점, 화면 기준) — 꼭대기 = 상자 위 변 가운데, 밑변 = 상자 아래 변. 꼭대기 → 오른쪽 아래 → 왼쪽 아래 순서.
+    /// equilateral = 정삼각형(높이를 밑변 폭 × √3/2 로, a 쪽 높이에서 끈 방향으로).
+    /// </summary>
+    public static IReadOnlyList<UbPoint> TrianglePoints(UbPoint a, UbPoint b, bool equilateral = false)
+    {
+        if (equilateral) b = new UbPoint(b.X, a.Y + (b.Y >= a.Y ? 1 : -1) * Math.Abs(b.X - a.X) * Math.Sqrt(3) / 2);
+        double left = Math.Min(a.X, b.X), right = Math.Max(a.X, b.X), top = Math.Min(a.Y, b.Y), bottom = Math.Max(a.Y, b.Y);
+        return new[] { new UbPoint((left + right) / 2, top), new UbPoint(right, bottom), new UbPoint(left, bottom) };
     }
 
     /// <summary>타원(가운데 · 가로 반지름 · 세로 반지름 · 회전 rad, 화면 기준)을 n 각형으로.</summary>
@@ -366,6 +380,33 @@ public static class Map3DUserBuilding
         return list;
     }
 
+    /// <summary>POST …/user-buildings/merge 본문 — {"uids":[…],"height","floors","name","use"}(null = 서버가 정함).</summary>
+    public static JObject MergeBody(IReadOnlyList<string> uids, double? height = null, int? floors = null, string? name = null, string? use = null,
+                                    string? uid = null)
+    {
+        var body = new JObject
+        {
+            ["uids"] = new JArray(uids.Cast<object>().ToArray()),
+            ["height"] = height is double h ? Map3DBuilding.ClampHeight(h) : JValue.CreateNull(),
+            ["floors"] = floors is int f ? f : JValue.CreateNull(),
+            ["name"] = string.IsNullOrWhiteSpace(name) ? JValue.CreateNull() : name.Trim().Length > MaxName ? name.Trim()[..MaxName] : name.Trim(),
+            ["use"] = use != null && Uses.Any(u => u.Key == use) ? use : JValue.CreateNull(),
+        };
+        // 다시 하기 — 처음 합친 건물 uid 그대로(그 뒤 높이 고치기 기록이 같은 건물을 가리키게). 처음 합칠 때는 보내지 않는다(옛 엔진 호환).
+        if (!string.IsNullOrEmpty(uid)) body["uid"] = uid;
+        return body;
+    }
+
+    /// <summary>합치기 응답 {"item":{…},"merged":[uid…],"holes_filled":n,"roof_forced_flat":bool} — item 이 틀리면 null.</summary>
+    public static Map3DUserBuildingMergeResult? ParseMergeResult(string json)
+    {
+        var o = JObject.Parse(json);
+        if (ParseItem(o["item"] as JObject) is not { } item) return null;
+        var merged = o["merged"] is JArray m ? m.Where(t => t.Type == JTokenType.String).Select(t => t.Value<string>()!).ToList() : new List<string>();
+        int holes = o["holes_filled"]?.Type == JTokenType.Integer && o.Value<long>("holes_filled") is long n && n is > 0 and < int.MaxValue ? (int)n : 0;
+        return new Map3DUserBuildingMergeResult(item, merged, holes, o["roof_forced_flat"]?.Type == JTokenType.Boolean && o.Value<bool>("roof_forced_flat"));
+    }
+
     private static double? Num(JToken? t)
         => t != null && (t.Type == JTokenType.Float || t.Type == JTokenType.Integer) && double.IsFinite(t.Value<double>()) ? t.Value<double>() : null;
 
@@ -380,6 +421,14 @@ public static class Map3DUserBuilding
          : count == 0 ? "지도를 눌러 첫 꼭짓점을 찍으세요"
          : count < MinPoints ? $"꼭짓점 {count}개 — 3개 이상 찍으세요"
          : $"꼭짓점 {count}개 — 첫 점을 누르거나 Enter 로 닫기";
+
+    /// <summary>판의 여러 개 고름 한 줄 — 1개면 더 고르는 법, 2개 이상이면 합칠 수 있음.</summary>
+    public static string SelectionText(int count)
+        => count <= 0 ? "" : count == 1 ? "도형 1개 선택 — Ctrl+클릭으로 더 고르세요" : $"도형 {count}개 선택";
+
+    /// <summary>합친 뒤 상태 글 — "N개를 하나로 합쳤습니다 · 지붕은 평지붕"(+ 채운 안쪽 빈 곳).</summary>
+    public static string MergedText(int count, int holesFilled)
+        => $"{count}개를 하나로 합쳤습니다 · 지붕은 평지붕" + (holesFilled > 0 ? $" · 안쪽 빈 곳 {holesFilled}개를 채움" : "");
 
     /// <summary>저장 뒤 상태 글.</summary>
     public static string SavedText(double height, int floors)
@@ -623,15 +672,17 @@ public sealed class Map3DUserBuildingDraft
     private IReadOnlyList<UbPoint> ShapeFromDrag(UbPoint a, UbPoint b, bool shift) => Tool switch
     {
         UbTool.Rect => Map3DUserBuilding.RectPoints(a, b, shift),
+        UbTool.Triangle => Map3DUserBuilding.TrianglePoints(a, b, shift),
         UbTool.Circle => Map3DUserBuilding.CirclePoints(a, Map3DUserBuilding.Dist(a, b), _circleSides),
         _ => shift ? Map3DUserBuilding.CirclePoints(a, Map3DUserBuilding.Dist(a, b), _circleSides)
                    : Map3DUserBuilding.EllipsePoints(a, Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y), 0, _circleSides),
     };
 
-    /// <summary>클릭 점(마지막은 커서일 수 있다)으로 형상 — 사각형 2점 · 원 2점 · 타원 3점(2점이면 원으로 미리보기).</summary>
+    /// <summary>클릭 점(마지막은 커서일 수 있다)으로 형상 — 사각형 · 삼각형 2점(대각) · 원 2점 · 타원 3점(2점이면 원으로 미리보기).</summary>
     private IReadOnlyList<UbPoint> ShapeFromClicks(IReadOnlyList<UbPoint> c, bool shift) => Tool switch
     {
         UbTool.Rect => Map3DUserBuilding.RectPoints(c[0], c[1], shift),
+        UbTool.Triangle => Map3DUserBuilding.TrianglePoints(c[0], c[1], shift),
         UbTool.Circle => Map3DUserBuilding.CirclePoints(c[0], Map3DUserBuilding.Dist(c[0], c[1]), _circleSides),
         _ => c.Count >= 3 ? Map3DUserBuilding.EllipseFrom3(c[0], c[1], c[2], _circleSides)
                           : Map3DUserBuilding.CirclePoints(c[0], Map3DUserBuilding.Dist(c[0], c[1]), _circleSides),

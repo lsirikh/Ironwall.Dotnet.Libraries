@@ -335,6 +335,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         {
             _log?.Warning($"[Map3D] 건물 높이 저장 — 서버 닿지 않음: {ex.Message}");
             SetBuildingHeightError(Map3DUnavailableText);
+            NoteMap3DEngineDown("building-height");
         }
         catch (Map3DRequestException ex) { SetBuildingHeightError($"저장하지 못했습니다: {ex.Message}"); }
         catch (Exception ex)
@@ -440,6 +441,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         {
             _log?.Warning($"[Map3D] 건물 높이 모두 자동으로 — 서버 닿지 않음: {ex.Message}");
             SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("building-height-reset");
         }
         catch (Map3DRequestException ex) { SetAimStatus($"건물 높이를 되돌릴 수 없습니다: {ex.Message}", autoHide: true); }
         catch (Exception ex)

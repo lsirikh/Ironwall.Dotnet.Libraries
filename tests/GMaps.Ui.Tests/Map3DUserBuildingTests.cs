@@ -681,4 +681,89 @@ public class Map3DUserBuildingTests
         Assert.True(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofGable, square));
         Assert.True(Map3DUserBuilding.CanBuildRoof(Map3DUserBuilding.RoofFlat, octagon));   // 평지붕은 늘 된다
     }
+
+    // ── 삼각형 도구 ──
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]     // 아래 오른쪽 → 위 왼쪽으로 끌어도 같은 삼각형
+    [InlineData(40, false)]   // 돌린 지도에서도 화면에 보이는 대로
+    public void should_make_isosceles_triangle_with_apex_at_box_top_middle_when_dragged(double rot, bool reverse)
+    {
+        var d = ToolDraft(UbTool.Triangle, rot);
+        var a = new UbPoint(400, 300); var b = new UbPoint(500, 380);
+        if (reverse) Drag(d, b, a); else Drag(d, a, b);
+        Assert.True(d.IsClosed);
+        Assert.Equal(UbTool.Triangle, d.CompletedBy);
+        var s = ScreenOf(d, rot);
+        Assert.Equal(new[] { (450.0, 300.0), (500.0, 380.0), (400.0, 380.0) },   // 꼭대기 → 오른쪽 아래 → 왼쪽 아래
+                     s.Select(p => (Math.Round(p.X, 6), Math.Round(p.Y, 6))));
+        Assert.Null(d.Validate());
+        if (rot != 0) Assert.NotEqual(Math.Round(d.Points[1].Y, 9), Math.Round(d.Points[2].Y, 9));   // 위경도로는 돌아간 밑변
+    }
+
+    [Fact]
+    public void should_make_triangle_by_two_clicks_and_equilateral_with_shift()
+    {
+        var clicks = ToolDraft(UbTool.Triangle);
+        Click(clicks, 400, 300);
+        clicks.PointerMove(new UbPoint(460, 360));
+        Assert.Equal(3, clicks.Preview.Count);                             // 두 번째 클릭 전 미리보기
+        Click(clicks, 460, 360);
+        Assert.True(clicks.IsClosed);
+        Assert.Equal(new[] { (430.0, 300.0), (460.0, 360.0), (400.0, 360.0) }, ScreenOf(clicks).Select(p => (Math.Round(p.X, 6), Math.Round(p.Y, 6))));
+
+        var eq = ToolDraft(UbTool.Triangle);
+        eq.PointerDown(new UbPoint(400, 300));
+        eq.PointerMove(new UbPoint(450, 310), shift: true);
+        eq.PointerUp(new UbPoint(500, 310), shift: true);                  // Shift = 정삼각형(높이 = 100 × √3/2)
+        var q = ScreenOf(eq);
+        Assert.Equal(100 * Math.Sqrt(3) / 2, q[1].Y - q[0].Y, 6);
+        Assert.Equal(Map3DUserBuilding.Dist(q[0], q[1]), Map3DUserBuilding.Dist(q[1], q[2]), 6);
+    }
+
+    // ── 합치기 ──
+
+    [Fact]
+    public void should_build_merge_body_with_null_defaults_and_parse_merge_result()
+    {
+        var body = Map3DUserBuilding.MergeBody(new[] { "a1b2c3d4e5f6", "0123456789ab" });
+        Assert.Equal(@"{""uids"":[""a1b2c3d4e5f6"",""0123456789ab""],""height"":null,""floors"":null,""name"":null,""use"":null}",
+                     body.ToString(Newtonsoft.Json.Formatting.None));
+        var filled = Map3DUserBuilding.MergeBody(new[] { "a1b2c3d4e5f6" }, 12, 4, " 창고 ", "industrial");
+        Assert.Equal((12.0, 4, "창고", "industrial"), (filled.Value<double>("height"), filled.Value<int>("floors"), filled.Value<string>("name"), filled.Value<string>("use")));
+        Assert.Equal(JTokenType.Null, Map3DUserBuilding.MergeBody(new[] { "x" }, use: "palace")["use"]!.Type);   // 모르는 외벽은 서버가 정함
+        Assert.Null(body["uid"]);                                                                               // 처음 합치기 — uid 를 보내지 않는다(옛 엔진 호환)
+        Assert.Equal("0123456789ab", Map3DUserBuilding.MergeBody(new[] { "x", "y" }, uid: "0123456789ab").Value<string>("uid"));   // 다시 하기 — 처음 uid 그대로
+
+        var r = Map3DUserBuilding.ParseMergeResult("{\"item\":" + Item + ",\"merged\":[\"0123456789ab\",\"a1b2c3d4e5f6\"],\"holes_filled\":2,\"roof_forced_flat\":true}")!;
+        Assert.Equal("a1b2c3d4e5f6", r.Item.Uid);
+        Assert.Equal(new[] { "0123456789ab", "a1b2c3d4e5f6" }, r.Merged);
+        Assert.Equal(2, r.HolesFilled);
+        Assert.True(r.RoofForcedFlat);
+        Assert.Null(Map3DUserBuilding.ParseMergeResult("{\"item\":{\"uid\":\"x\"}}"));
+        Assert.Equal("3개를 하나로 합쳤습니다 · 지붕은 평지붕", Map3DUserBuilding.MergedText(3, 0));
+        Assert.Equal("2개를 하나로 합쳤습니다 · 지붕은 평지붕 · 안쪽 빈 곳 1개를 채움", Map3DUserBuilding.MergedText(2, 1));
+        Assert.Equal("도형 2개 선택", Map3DUserBuilding.SelectionText(2));
+    }
+
+    [Fact]
+    public async Task should_post_merge_to_job_user_buildings_merge_url_and_raise_server_detail()
+    {
+        var fake = new Fake();
+        var c = new Map3DClient("http://127.0.0.1:8765/", fake);
+        fake.Reply = _ => (HttpStatusCode.OK, "{\"item\":" + Item + ",\"merged\":[\"0123456789ab\",\"fedcba987654\"],\"holes_filled\":0,\"roof_forced_flat\":true}");
+        var r = await c.MergeUserBuildingsAsync("j1", new[] { "0123456789ab", "fedcba987654" });
+        Assert.Equal("a1b2c3d4e5f6", r.Item.Uid);
+        var req = Assert.Single(fake.Requests);
+        Assert.Equal("POST /api/jobs/j1/user-buildings/merge", $"{req.Method} {req.Path}");
+        Assert.Equal(@"{""uids"":[""0123456789ab"",""fedcba987654""],""height"":null,""floors"":null,""name"":null,""use"":null}", req.Body);
+
+        fake.Reply = _ => (HttpStatusCode.BadRequest, "{\"detail\":\"서로 떨어진 도형은 합칠 수 없습니다\"}");
+        var ex = await Assert.ThrowsAsync<Map3DRequestException>(() => c.MergeUserBuildingsAsync("j1", new[] { "0123456789ab", "fedcba987654" }));
+        Assert.Equal((HttpStatusCode.BadRequest, "서로 떨어진 도형은 합칠 수 없습니다"), (ex.StatusCode, ex.Message));
+        fake.Reply = _ => (HttpStatusCode.NotFound, "{\"detail\":\"없는 건물: fedcba987654\"}");
+        ex = await Assert.ThrowsAsync<Map3DRequestException>(() => c.MergeUserBuildingsAsync("j1", new[] { "0123456789ab", "fedcba987654" }));
+        Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
+    }
 }
