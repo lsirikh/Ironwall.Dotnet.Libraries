@@ -381,8 +381,10 @@ public static class Map3DUserBuilding
     }
 
     /// <summary>POST …/user-buildings/merge 본문 — {"uids":[…],"height","floors","name","use"}(null = 서버가 정함).</summary>
-    public static JObject MergeBody(IReadOnlyList<string> uids, double? height = null, int? floors = null, string? name = null, string? use = null)
-        => new()
+    public static JObject MergeBody(IReadOnlyList<string> uids, double? height = null, int? floors = null, string? name = null, string? use = null,
+                                    string? uid = null)
+    {
+        var body = new JObject
         {
             ["uids"] = new JArray(uids.Cast<object>().ToArray()),
             ["height"] = height is double h ? Map3DBuilding.ClampHeight(h) : JValue.CreateNull(),
@@ -390,6 +392,10 @@ public static class Map3DUserBuilding
             ["name"] = string.IsNullOrWhiteSpace(name) ? JValue.CreateNull() : name.Trim().Length > MaxName ? name.Trim()[..MaxName] : name.Trim(),
             ["use"] = use != null && Uses.Any(u => u.Key == use) ? use : JValue.CreateNull(),
         };
+        // 다시 하기 — 처음 합친 건물 uid 그대로(그 뒤 높이 고치기 기록이 같은 건물을 가리키게). 처음 합칠 때는 보내지 않는다(옛 엔진 호환).
+        if (!string.IsNullOrEmpty(uid)) body["uid"] = uid;
+        return body;
+    }
 
     /// <summary>합치기 응답 {"item":{…},"merged":[uid…],"holes_filled":n,"roof_forced_flat":bool} — item 이 틀리면 null.</summary>
     public static Map3DUserBuildingMergeResult? ParseMergeResult(string json)

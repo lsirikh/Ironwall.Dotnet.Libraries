@@ -733,6 +733,8 @@ public class Map3DUserBuildingTests
         var filled = Map3DUserBuilding.MergeBody(new[] { "a1b2c3d4e5f6" }, 12, 4, " 창고 ", "industrial");
         Assert.Equal((12.0, 4, "창고", "industrial"), (filled.Value<double>("height"), filled.Value<int>("floors"), filled.Value<string>("name"), filled.Value<string>("use")));
         Assert.Equal(JTokenType.Null, Map3DUserBuilding.MergeBody(new[] { "x" }, use: "palace")["use"]!.Type);   // 모르는 외벽은 서버가 정함
+        Assert.Null(body["uid"]);                                                                               // 처음 합치기 — uid 를 보내지 않는다(옛 엔진 호환)
+        Assert.Equal("0123456789ab", Map3DUserBuilding.MergeBody(new[] { "x", "y" }, uid: "0123456789ab").Value<string>("uid"));   // 다시 하기 — 처음 uid 그대로
 
         var r = Map3DUserBuilding.ParseMergeResult("{\"item\":" + Item + ",\"merged\":[\"0123456789ab\",\"a1b2c3d4e5f6\"],\"holes_filled\":2,\"roof_forced_flat\":true}")!;
         Assert.Equal("a1b2c3d4e5f6", r.Item.Uid);

@@ -362,13 +362,13 @@ public sealed class Map3DClient : IDisposable
     /// 서로 떨어진 도형(400) · 없는 uid(404)는 Map3DRequestException(Message = 서버 detail), 닿지 않으면 Map3DServerUnavailableException.
     /// </summary>
     public Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, CancellationToken ct = default)
-        => MergeUserBuildingsAsync(jobId, uids, null, null, null, null, ct);
+        => MergeUserBuildingsAsync(jobId, uids, null, null, null, null, null, ct);
 
-    /// <summary>합치기 — 합친 건물의 높이 · 층수 · 이름 · 외벽 성격까지(null = 서버가 정함).</summary>
+    /// <summary>합치기 — 합친 건물의 높이 · 층수 · 이름 · 외벽 성격까지(null = 서버가 정함). uid = 다시 하기에서 처음 합친 건물 uid(null = 서버가 새로).</summary>
     public async Task<Map3DUserBuildingMergeResult> MergeUserBuildingsAsync(string jobId, IReadOnlyList<string> uids, double? height, int? floors,
-                                                                            string? name, string? use, CancellationToken ct = default)
+                                                                            string? name, string? use, string? uid = null, CancellationToken ct = default)
     {
-        var body = Map3DUserBuilding.MergeBody(uids, height, floors, name, use).ToString(Formatting.None);
+        var body = Map3DUserBuilding.MergeBody(uids, height, floors, name, use, uid).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"{UserBuildingsUrl(jobId)}/merge")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),

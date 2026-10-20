@@ -704,7 +704,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             var r = like == null
                 ? await _map3DClient.MergeUserBuildingsAsync(job, uids)
-                : await _map3DClient.MergeUserBuildingsAsync(job, uids, like.Height, like.Floors, like.Name, like.Use);
+                : await _map3DClient.MergeUserBuildingsAsync(job, uids, like.Height, like.Floors, like.Name, like.Use, like.Uid);   // 다시 하기 — 처음 합친 uid 그대로
             foreach (var uid in r.Merged.Count > 0 ? r.Merged : uids) PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(uid, null, null));
             PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(r.Item.Uid, r.Item.Outline, r.Item.Height));
             _log?.Info($"[UserBuilding] 합침 {string.Join(",", uids)} → {r.Item.Uid} 빈곳={r.HolesFilled} job={job}");
