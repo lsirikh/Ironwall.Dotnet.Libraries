@@ -61,7 +61,11 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
                 ApplyMap3DAreas(scenes);
             }).ConfigureAwait(false);
         }
-        catch (Map3DServerUnavailableException ex) { _log?.Warning($"[Map3D] 영역 목록 — 서버 닿지 않음: {ex.Message}"); }
+        catch (Map3DServerUnavailableException ex)
+        {
+            _log?.Warning($"[Map3D] 영역 목록 — 서버 닿지 않음: {ex.Message}");
+            await OnUiAsync(() => NoteMap3DEngineDown("area-list"));   // 다시 켜지면 영역 목록을 다시 받는다(MapViewModel.Map3DReconnect)
+        }
         catch (Exception ex) { _log?.Warning($"[Map3D] 영역 목록 실패: {ex.Message}"); }
     }
 
@@ -302,6 +306,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         {
             _log?.Warning($"[Map3D] 영역 줌 바꾸기 — 서버 닿지 않음: {ex.Message}");
             SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("area-zoom");
         }
         catch (Map3DRequestException ex) { SetAimStatus($"3D 줌을 바꿀 수 없습니다: {ex.Message}", autoHide: true); }
         catch (Exception ex)
@@ -366,6 +371,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
         {
             _log?.Warning($"[Map3D] 영역 지우기 — 서버 닿지 않음: {ex.Message}");
             SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("area-delete");
         }
         catch (Map3DRequestException ex) { SetAimStatus($"3D 영역을 지울 수 없습니다: {ex.Message}", autoHide: true); }
         catch (Exception ex)

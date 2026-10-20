@@ -377,6 +377,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             _log?.Warning($"[UserBuilding] 목록 — 서버 닿지 않음: {ex.Message}");
             SetUserBuildingError(Map3DUnavailableText);
+            NoteMap3DEngineDown("user-building-list");
         }
         catch (Exception ex) { _log?.Warning($"[UserBuilding] 목록 실패: {ex.Message}"); }
     }
@@ -638,6 +639,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             _log?.Warning($"[UserBuilding] 저장 — 서버 닿지 않음: {ex.Message}");
             SetUserBuildingError(Map3DUnavailableText);
+            NoteMap3DEngineDown("user-building-save");
         }
         catch (Map3DRequestException ex) when (ex.Message is "Not Found" or "Method Not Allowed")   // 옛 map-3d — 그 주소가 없다(FastAPI 기본 문구)
         {
@@ -704,6 +706,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             _log?.Warning($"[UserBuilding] 모두 지우기 — 서버 닿지 않음: {ex.Message}");
             SetAimStatus(Map3DUnavailableText, autoHide: true);
+            NoteMap3DEngineDown("user-building-clear");
         }
         catch (Map3DRequestException ex) { SetAimStatus($"직접 그린 건물을 지울 수 없습니다: {ex.Message}", autoHide: true); }
         catch (Exception ex)

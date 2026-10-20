@@ -114,6 +114,33 @@ public sealed class Map3DClient : IDisposable
     /// </summary>
     public TimeSpan BakeStartTimeout { get; init; } = TimeSpan.FromMinutes(3);
 
+    /// <summary>엔진 살아 있는지 묻기(<see cref="IsHealthyAsync"/>)의 응답 시간 제한 — 짧게(다시 연결 감시가 5 · 10 초마다 묻는다).</summary>
+    public TimeSpan HealthTimeout { get; init; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// 엔진이 살아 있는가 — GET /api/health 200 이면 true. 그 주소가 없는 옛 map-3d(404)면 GET /api/config 200 으로 본다.
+    /// 닿지 않음 · 시간 초과 · 그 밖의 응답은 false. 예외를 던지지 않는다(감시 타이머에서 부른다).
+    /// </summary>
+    public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var status = await ProbeAsync("/api/health", ct).ConfigureAwait(false);
+            if (status == HttpStatusCode.NotFound) status = await ProbeAsync("/api/config", ct).ConfigureAwait(false);   // 옛 map-3d
+            return status == HttpStatusCode.OK;
+        }
+        catch (Exception) { return false; }   // 닿지 않음 · 시간 초과 · 취소 · 닫힌 창구 — 모두 "살아 있지 않음"
+    }
+
+    private async Task<HttpStatusCode> ProbeAsync(string path, CancellationToken ct)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(HealthTimeout);
+        using var response = await _http.SendAsync(new HttpRequestMessage(HttpMethod.Get, _server + path),
+                                                   HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
+        return response.StatusCode;
+    }
+
     /// <summary>굽기 시작(POST /api/jobs) → 202 작업.</summary>
     public Task<Map3DJob> StartBakeAsync(double[] bbox, CancellationToken ct = default)
         => StartBakeAsync(bbox, Map3DBake.ModeTiles, null, ct);
