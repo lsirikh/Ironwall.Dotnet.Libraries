@@ -34,37 +34,14 @@ public interface IDecorationHost
                   재질 · 나무 색은 자료 색(고정), 고름 · 그리는 선은 테마 토큰(PrimaryBrush · SurfaceAltBrush).
    Created On   : 2026-10-21 · Sensorway Co., Ltd.
 ****************************************************************************/
-public sealed class DecorationAdorner : Adorner, IDisposable
+public sealed class DecorationAdorner : GeoSurfaceAdorner
 {
-    private readonly GMapControl _map;
     private readonly IDecorationHost _host;
-    private readonly ILogService? _log;
     private Point? _hover;
-    private bool _disposed;
 
-    public DecorationAdorner(GMapControl map, IDecorationHost host, ILogService? log = null) : base(map)
-    {
-        _map = map ?? throw new ArgumentNullException(nameof(map));
-        _host = host;
-        _log = log;
-        Cursor = Cursors.Cross;
-        _map.OnMapZoomChanged += OnMapChanged;
-        _map.OnMapDrag += OnMapChanged;
-        (_map as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);
-    }
+    public DecorationAdorner(GMapControl map, IDecorationHost host, ILogService? log = null) : base(map, log) => _host = host;
 
-    private void OnMapChanged() => InvalidateVisual();
-    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => InvalidateVisual();
-
-    private Point Screen(UbPoint geo)
-    {
-        var l = _map.FromLatLngToLocal(new PointLatLng(geo.Y, geo.X));
-        return new Point(l.X, l.Y);
-    }
-
-    protected override HitTestResult HitTestCore(PointHitTestParameters p) => new PointHitTestResult(this, p.HitPoint);
-
-    private UbPoint At(MouseEventArgs e) { var p = e.GetPosition(_map); return new UbPoint(p.X, p.Y); }
+    private Point Screen(UbPoint geo) => ScreenPoint(geo);
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
@@ -83,12 +60,6 @@ public sealed class DecorationAdorner : Adorner, IDisposable
     protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
     {
         _host.DecorationRightClick(At(e));
-        e.Handled = true;
-    }
-
-    protected override void OnMouseWheel(MouseWheelEventArgs e)
-    {
-        _map.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = UIElement.MouseWheelEvent, Source = _map });
         e.Handled = true;
     }
 
@@ -180,33 +151,5 @@ public sealed class DecorationAdorner : Adorner, IDisposable
         v.Normalize();
         var pen = new Pen(brush, 2); pen.Freeze();
         dc.DrawLine(pen, at, at + v * 13);
-    }
-
-    private static void DrawPath(DrawingContext dc, IReadOnlyList<Point> pts, bool closed, Brush? fill, Pen pen)
-    {
-        if (pts.Count < 2) return;
-        var geo = new StreamGeometry();
-        using (var c = geo.Open())
-        {
-            c.BeginFigure(pts[0], isFilled: closed && fill != null, isClosed: closed);
-            for (int i = 1; i < pts.Count; i++) c.LineTo(pts[i], isStroked: true, isSmoothJoin: false);
-        }
-        geo.Freeze();
-        dc.DrawGeometry(fill, pen, geo);
-    }
-
-    private Brush Resolve(string key, Color fallback)
-    {
-        if (_map.TryFindResource(key) is Brush b) return b;
-        var s = new SolidColorBrush(fallback); s.Freeze(); return s;
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _map.OnMapZoomChanged -= OnMapChanged;
-        _map.OnMapDrag -= OnMapChanged;
-        (_map as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
     }
 }

@@ -44,6 +44,8 @@ public class TwinContractScenarioTests
         public double[] Bbox { get; set; } = Array.Empty<double>();
         /// <summary>looks · decorations 주소가 없는 옛 엔진(FastAPI 기본 404 "Not Found").</summary>
         public bool OldEngine { get; set; }
+        /// <summary>look 응답에 needs_rebake=true(다시 굽기에서 숨겨 장면에 없는 건물).</summary>
+        public bool NeedsRebake { get; set; }
         public List<JObject> UserBuildings { get; } = new();
         public Dictionary<int, JObject> Looks { get; } = new();
         public List<JObject> Decorations { get; } = new();
@@ -81,6 +83,7 @@ public class TwinContractScenarioTests
                     Looks[id] = look;
                     var b = (JObject)look.DeepClone();
                     b["id"] = id; b["origin"] = "photo";
+                    if (NeedsRebake) b["needs_rebake"] = true;
                     return Json(HttpStatusCode.OK, new JObject { ["building"] = b, ["looks"] = new JObject { ["count"] = Looks.Count } }.ToString());
                 case "looks":
                     if (OldEngine) return Json(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}");
@@ -298,6 +301,7 @@ public class TwinContractScenarioTests
         var msg = rig.Sent("building.look").Single();
         Assert.Equal(("#f2f2f2", "#4a4a4a", false), (msg.Value<string>("wall_color"), msg.Value<string>("roof_color"), msg.Value<bool>("hidden")));
         Assert.Equal("glass", rig.Vm.BuildingFacade);
+        Assert.Equal(Map3DLook.FacadeRebakeText, rig.Vm.BuildingLookNotice);                // 외벽 무늬는 다시 만들 때 바뀐다
         // 되돌리기 = 앞 색 · 무늬로
         rig.Vm.UndoBuildingHeightCommand.Execute(null);
         await Rig.Until(() => rig.Writes.Count == 2, "되돌리기");
@@ -318,6 +322,20 @@ public class TwinContractScenarioTests
         rig.Vm.BuildingFacade = "brick";
         Assert.False(rig.Vm.ApplyBuildingLookCommand.CanExecute(null));
         Assert.True(rig.Vm.ApplyBuildingHeightCommand.CanExecute(null) || !rig.Vm.IsBuildingHeightChanged);   // 높이 칸은 그대로 쓸 수 있다
+    });
+
+    [Fact]
+    public void should_not_try_to_show_revived_building_missing_from_scene_and_say_rebake() => RunAsync(async rig =>
+    {
+        rig.Server.Looks[9] = new JObject { ["hidden"] = true, ["wall_color"] = null, ["roof_color"] = null, ["facade"] = "auto" };
+        rig.Enter3D();
+        rig.PickBuilding(7);
+        await Rig.Until(() => rig.Vm.HasBuildingHidden, "숨긴 건물 목록");
+        rig.Server.NeedsRebake = true;
+        rig.Vm.RestoreHiddenBuildingCommand.Execute(rig.Vm.BuildingHiddenItems.Single());
+        await Rig.Until(() => !rig.Vm.HasBuildingHidden, "되살리기");
+        Assert.Empty(rig.Sent("building.look"));                                         // 장면(GLB)에 없는 건물 — 보이게 하려 하지 않는다
+        Assert.Equal(Map3DLook.NeedsRebakeText, rig.Vm.BuildingLookNotice);
     });
 
     // ─────────────── B. 3D 에서 직접 그린 건물 고름 → 2D 고치기 판 ───────────────

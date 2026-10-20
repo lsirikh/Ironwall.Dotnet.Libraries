@@ -194,6 +194,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhJob = _map3DJob;
         _bhPreview = pick.Height;
         _bhLookEdit = null;
+        _bhLookNotice = null;
         _bhError = null;
         _bhInputError = false;
         _log?.Info($"[Map3D] 건물 고름 id={pick.Id} 높이={pick.Height} 출처={pick.HeightFrom ?? "-"} job={_map3DJob}");
@@ -215,6 +216,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         catch (Exception ex) { _log?.Error($"[Map3D] 「건물 높이」 판 닫기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
         _bhBuilding = null;
         _bhLookEdit = null;
+        _bhLookNotice = null;
         _bhDragStart = null;
         _bhError = null;
         _bhInputError = false;
@@ -264,7 +266,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
                      nameof(BuildingHeightError), nameof(HasBuildingHeightError), nameof(BuildingHeightUndoCount),
                      nameof(BuildingFacade), nameof(BuildingWallColor), nameof(BuildingRoofColor), nameof(IsBuildingLookChanged),
                      nameof(IsBuildingLookAvailable), nameof(IsBuildingLookUnsupported), nameof(BuildingHideButtonText), nameof(IsBuildingHidden),
-                     nameof(BuildingHiddenItems), nameof(BuildingHiddenCountText), nameof(HasBuildingHidden),
+                     nameof(BuildingHiddenItems), nameof(BuildingHiddenCountText), nameof(HasBuildingHidden), nameof(BuildingLookNotice), nameof(HasBuildingLookNotice),
                  })
             NotifyOfPropertyChange(name);
         StepBuildingFloorCommand.RaiseCanExecuteChanged();

@@ -79,6 +79,7 @@ public class Map3DTwinContractTests
         Assert.Equal((HttpMethod.Put, "/api/jobs/j1/buildings/12/look"), (h.Requests[0].Method, h.Requests[0].Path));
         Assert.Equal("{\"hidden\":true}", h.Requests[0].Body);
         Assert.Equal(new Map3DBuildingLook(12, new Map3DLookState(true, "#c8c8c8", null, "concrete"), "photo", null), saved);
+        Assert.True(Map3DLook.ParseSaved("{\"building\":{\"id\":3,\"hidden\":false,\"needs_rebake\":true}}")!.NeedsRebake);   // 되살렸지만 장면에 없음
     }
 
     [Fact]

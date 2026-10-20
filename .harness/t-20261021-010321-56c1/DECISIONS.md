@@ -53,3 +53,21 @@
 - chosen: (a)
 - why: 계약 B "빠지면 null/auto(옛 GIS 호환)" 이고 기존 시험(본문 키 목록)이 옛 호출의 본문 모양을 고정한다. 판 저장 경로는 늘 외관을 넘긴다.
 - effect: 없음(엔진은 키가 없으면 null/auto).
+
+## 10. 엔진 판(184925c · cd943f6)의 needs_rebake · 외벽 무늬 안내를 어디에 보이나
+- options: (a) 「건물 높이」 판 외관 칸 밑 경고색 한 줄 + 상태 띠 (b) 상태 띠만 (c) 오류 줄
+- chosen: (a)
+- why: 사용자 지시가 "판에 안내" 이고, 오류가 아니라 다음 할 일(다시 만들기) 안내라 오류 줄(빨강)은 맞지 않는다. needs_rebake=true 면 building.look 을 보내지 않는다(장면 GLB 에 없는 건물).
+- effect: 판을 닫거나 다른 건물을 고르면 안내는 지워진다. 글은 Map3DLook.NeedsRebakeText · FacadeRebakeText.
+
+## 11. GET looks 의 새 `uid` 키 · 닫지 않은 outline
+- options: (a) 지금은 쓰지 않는다(해석은 모르는 키를 무시, outline 은 받은 꼭짓점 그대로) (b) 직접 그린 건물 표시에 쓴다
+- chosen: (a)
+- why: 숨긴 목록은 hidden 항목만 보이고, 직접 그린 건물은 숨기지 않으므로(409) 목록에 나오지 않는다. outline 은 이미 닫는 점을 덧붙이지 않고 넓이만 셈한다.
+- effect: 필요해지면 Map3DLook.ParseList 에 uid 를 읽어 Map3DLookItem 에 더하면 된다.
+
+## 12. 품질 검사가 짚은 중복 중 남긴 것 — 파일 머리의 using 지시문
+- options: (a) 파일마다 using 을 둔다(C# 은 파일 단위) (b) global using 으로 옮긴다 (c) partial 파일을 합친다
+- chosen: (a)
+- why: DecorationAdorner · MapViewModel.Decoration · MapViewModel.BuildingLook 의 "중복" 1-19 줄은 using 지시문(과 namespace 줄)뿐이다. global using 은 프로젝트 전체 이름 해석을 바꾸고, partial 을 합치면 이미 큰 파일이 더 커진다. 실제 코드 중복(어도너 구독 · 그리기 · 정리, 편집 기록 본문)은 공용 바탕 GeoSurfaceAdorner · AreaStateCommand 로 옮겨 두 쪽이 함께 쓴다.
+- effect: 없음. 바꾸려면 GMaps.Ui 에 GlobalUsings.cs 를 두면 된다.

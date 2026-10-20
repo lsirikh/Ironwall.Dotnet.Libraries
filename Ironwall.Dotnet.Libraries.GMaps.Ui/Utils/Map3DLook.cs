@@ -23,7 +23,11 @@ public sealed record Map3DLookState(bool Hidden, string? WallColor, string? Roof
 }
 
 /// <summary>저장 응답의 건물(PUT/DELETE …/look 의 building) — Origin = map · national · photo · user, UserUid = 직접 그린 건물 uid.</summary>
-public sealed record Map3DBuildingLook(int Id, Map3DLookState State, string? Origin, string? UserUid);
+public sealed record Map3DBuildingLook(int Id, Map3DLookState State, string? Origin, string? UserUid)
+{
+    /// <summary>다시 굽기에서 숨겨 장면(GLB)에 없는 건물을 되살렸다(needs_rebake) — 다시 만들어야 화면에 보인다.</summary>
+    public bool NeedsRebake { get; init; }
+}
 
 /// <summary>저장된 덮어쓰기 하나(GET …/looks) — Id = 지금 장면 건물 id(null = 지금 장면에 못 붙인 것).</summary>
 public sealed record Map3DLookItem(int? Id, IReadOnlyList<UbPoint> Outline, Map3DLookState State)
@@ -56,7 +60,9 @@ public static class Map3DLook
     public static readonly JsonMergeSettings KeepNulls = new() { MergeNullValueHandling = MergeNullValueHandling.Merge };
 
     public const string OldEngineText = "엔진이 옛 판이라 외관 바꾸기 · 숨기기를 쓸 수 없습니다";
-    public const string UndoPrefix = "건물 외관";
+    /// <summary>되살렸지만 장면에 없는 건물(needs_rebake) · 외벽 무늬를 바꿨을 때 — 엔진은 다시 굽기에서만 그린다.</summary>
+    public const string NeedsRebakeText = "되살렸습니다 — 3D 를 다시 만들면 보입니다";
+    public const string FacadeRebakeText = "저장했습니다 — 3D 를 다시 만들면 외벽 무늬가 바뀝니다";
 
     /// <summary>"#RRGGBB" · "rrggbb" → "#rrggbb", 빈 값 · 틀린 값 → null(자동).</summary>
     public static string? NormalizeColor(string? text)
@@ -105,7 +111,8 @@ public static class Map3DLook
     public static Map3DBuildingLook? ParseSaved(string json)
     {
         if (JObject.Parse(json)["building"] is not JObject b || b["id"]?.Type != JTokenType.Integer || b.Value<long>("id") is not (> 0 and <= int.MaxValue)) return null;
-        return new Map3DBuildingLook(b.Value<int>("id"), StateOf(b), Str(b["origin"]), Str(b["user_uid"]));
+        return new Map3DBuildingLook(b.Value<int>("id"), StateOf(b), Str(b["origin"]), Str(b["user_uid"]))
+               { NeedsRebake = b["needs_rebake"]?.Type == JTokenType.Boolean && b.Value<bool>("needs_rebake") };
     }
 
     /// <summary>GET …/looks 응답 {"items":[…]} — 형식이 틀린 항목은 뺀다.</summary>

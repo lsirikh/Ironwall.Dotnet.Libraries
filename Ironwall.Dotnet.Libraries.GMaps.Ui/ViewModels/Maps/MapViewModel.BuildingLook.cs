@@ -22,6 +22,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 public partial class MapViewModel
 {
     private Map3DLookState? _bhLookEdit;   // 판에서 고친 외관(null = 저장된 값 그대로)
+    private string? _bhLookNotice;          // "다시 만들면 보입니다" 류 안내(판 한 줄)
+    /// <summary>외관 저장 뒤 판 안내 — 다시 만들어야 보이는 것(되살린 건물 · 외벽 무늬).</summary>
+    public string? BuildingLookNotice => IsBuildingHeightPanelOpen ? _bhLookNotice : null;
+    public bool HasBuildingLookNotice => BuildingLookNotice != null;
     private IReadOnlyList<Map3DLookItem>? _bhLooks;
     private bool _bhLooksUnsupported;
     private (string Job, Map3DBuildingPick Building)? _pendingBuildingHide;
@@ -133,9 +137,14 @@ public partial class MapViewModel
         SetBuildingHeightBusy(true);
         try
         {
+            var prev = _bhBuilding?.Id == id && _bhJob == job ? _bhBuilding.Look : undoBefore;
             var saved = await _map3DClient.PutBuildingLookAsync(job, id, Map3DLook.PutBody(hidden, look));
             if (undoBefore != null && session == _bhSession) BhUndo.Add(new BuildingHeightUndoStep(job, id, null, null) { Look = undoBefore });
-            PostUserBuilding3D(job, Map3DLook.LookMessageJson(id, saved.State));   // 그 장면을 띄워 둔 3D 에만
+            // 바로 반영은 숨김 · 색만 — 장면에 없는 건물을 되살렸으면(needs_rebake) 3D 에 보이게 하려 하지 않고, 외벽 무늬는 다시 만들 때 바뀐다
+            if (!saved.NeedsRebake) PostUserBuilding3D(job, Map3DLook.LookMessageJson(id, saved.State));   // 그 장면을 띄워 둔 3D 에만
+            bool facadeChanged = look != null && prev != null && prev.Facade != saved.State.Facade;
+            _bhLookNotice = saved.NeedsRebake ? Map3DLook.NeedsRebakeText : facadeChanged ? Map3DLook.FacadeRebakeText : null;
+            if (_bhLookNotice != null) done = _bhLookNotice;
             if (_bhBuilding?.Id == id && _bhJob == job)
             {
                 if (saved.State.Hidden && !_bhBuilding.Look.Hidden) PostBuilding3D(Map3DBuilding.SelectMessageJson(null));   // 사라진 건물의 강조 윤곽도 지운다
