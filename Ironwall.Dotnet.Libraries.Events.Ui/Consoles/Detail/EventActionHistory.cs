@@ -107,7 +107,7 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
         FailureReason = string.Empty;
         _last = (kind, originId, hasActions);
 
-        if (originId <= 0 || !hasActions || kind is not (EventDetailKind.Detection or EventDetailKind.Malfunction))
+        if (originId <= 0 || !hasActions || kind is not (EventDetailKind.Detection or EventDetailKind.Malfunction or EventDetailKind.Connection))
         {
             State = ActionHistoryState.NotRequested;
             return;
@@ -126,9 +126,13 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
 
         try
         {
-            var response = kind == EventDetailKind.Detection
-                ? await api.GetDetectionActionsAsync(originId, token).ConfigureAwait(true)
-                : await api.GetMalfunctionActionsAsync(originId, token).ConfigureAwait(true);
+            // 연결 이벤트는 원본별 하위 경로가 없다 — 공용 목록을 from_event_id 로 거른다(G42, 명세 §6.4.2).
+            var response = kind switch
+            {
+                EventDetailKind.Detection => await api.GetDetectionActionsAsync(originId, token).ConfigureAwait(true),
+                EventDetailKind.Malfunction => await api.GetMalfunctionActionsAsync(originId, token).ConfigureAwait(true),
+                _ => await api.GetActionEventsAsync(null, null, 1, ConnectionActionLimit, originId, null, token).ConfigureAwait(true),
+            };
 
             if (mine != _token) return;      // 그 사이 다른 행을 골랐다 — 낡은 응답은 버린다
 
@@ -159,6 +163,9 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
 
     /// <summary>불러오지 못했을 때의 안내 — 서버 · 예외 원문은 싣지 않는다.</summary>
     public const string FailureText = "조치 내역을 불러오지 못했습니다. [다시 불러오기]를 누르세요.";
+
+    /// <summary>연결 이벤트 조치 한 번에 받는 최대 건수(서버 limit 상한 100).</summary>
+    private const int ConnectionActionLimit = 100;
 
     private (EventDetailKind Kind, int OriginId, bool HasActions)? _last;
 

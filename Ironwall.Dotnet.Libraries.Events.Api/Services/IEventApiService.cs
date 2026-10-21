@@ -303,6 +303,32 @@ public interface IEventApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// <see cref="GetActionEventsAsync(string?, string?, int, int, CancellationToken)"/> 에 원본 이벤트 · 작성자 필터를 더한 것(G42).
+    /// <para><paramref name="fromEventId"/> = <c>from_event_id</c>(탐지 · 장애 · 연결 · 운영 공통 <c>events.id</c>),
+    /// <paramref name="user"/> = <c>user</c>(정확히 일치). 연결 이벤트는 원본별 하위 경로가 없어 이것이 유일한 조회 입구다(명세 §6.4.2).
+    /// 6.3.2 서버도 두 쿼리를 받는다(v6.3.2 <c>app/routers/actions.py</c> get_action_events) — 판본 게이트 없음.</para>
+    /// <para>기존 메서드에 선택 인자를 붙이지 않고 오버로드로 둔 까닭: 시험 · 미리보기의 Moq 식 트리는 선택 인자를 생략할 수 없어 20여 곳이 깨진다.</para>
+    /// <para>기본 구현은 이 인터페이스를 직접 구현한 다른 저장소의 가짜(앱 시험의 <c>MockEventApiService</c>)가 깨지지 않게 하는 폴백이다 —
+    /// 필터 없이 받아 받은 쪽만 거른다. 실제 구현(<see cref="EventApiService"/>)은 서버 쿼리로 거른다.</para>
+    /// </summary>
+    async Task<ApiListResponse<ActionEventDto>> GetActionEventsAsync(
+        string? startDate,
+        string? endDate,
+        int page,
+        int limit,
+        int? fromEventId,
+        string? user,
+        CancellationToken token = default)
+    {
+        var response = await GetActionEventsAsync(startDate, endDate, page, limit, token).ConfigureAwait(false);
+        if (response?.Data is { } rows)
+            response.Data = rows.Where(a => (fromEventId is not > 0 || a.FromEvent?.Id == fromEventId)
+                                            && (string.IsNullOrWhiteSpace(user) || string.Equals(a.User, user, StringComparison.Ordinal)))
+                                .ToList();
+        return response!;
+    }
+
+    /// <summary>
     /// GOP API를 통해 특정 ID의 Action Event를 조회합니다.
     /// </summary>
     /// <param name="id">Action Event의 데이터베이스 ID</param>

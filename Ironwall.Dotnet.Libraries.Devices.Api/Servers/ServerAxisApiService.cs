@@ -2,6 +2,8 @@
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -21,7 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 ****************************************************************************/
 
 /// <summary>한 번의 호출 결과 — 실패는 <b>문장</b>으로 돌아온다(예외로 새지 않는다).</summary>
-public sealed record ServerAxisResult(bool IsSuccess, string Message, int StatusCode = 0, int Id = 0);
+public sealed record ServerAxisResult(bool IsSuccess, string Message, int StatusCode = 0, int Id = 0, bool IsRetryable = false);
 
 /// <summary>목록 한 번의 결과.</summary>
 public sealed record ServerAxisListResult(
@@ -167,8 +169,14 @@ public sealed class ServerAxisApiService : IServerAxisApiService
                     ["page"] = page.ToString(),
                     ["limit"] = PageLimit.ToString(),
                 };
-                // view=full 은 7.0+ 파라미터다. 6.3 은 모르는 쿼리를 조용히 버린다.
-                if (IsAxisEra) parameters["view"] = "full";
+                // 7.0+ 목록은 view=basic(자격증명 제외) + include=server_config(modes · thresholds)로 받는다(G28).
+                // 계정 이름(credentials.user_name)은 상세가 단건 조회(view=full)로 따로 읽으므로 목록에는 필요 없다.
+                // 6.3 은 모르는 쿼리를 조용히 버리지만 보내지 않는다.
+                if (IsAxisEra)
+                {
+                    parameters["view"] = "basic";
+                    parameters["include"] = "server_config";
+                }
                 if (Contract >= EnumServerContract.V8_0 && unitId is > 0)
                 {
                     parameters["unit_id"] = unitId.Value.ToString();
@@ -244,10 +252,12 @@ public sealed class ServerAxisApiService : IServerAxisApiService
                 return new ServerAxisResult(true, string.Empty, (int)response.StatusCode,
                     (envelope["data"] as JObject)?.Value<int?>("id") ?? 0);
 
-            var reason = (int)response.StatusCode == 409
+            var reason = IsRetryableConflict(response, envelope)
+                ? ApiStatusHelper.RetryableConflictMessage
+                : (int)response.StatusCode == 409
                 ? $"같은 이름의 서버가 이미 있습니다 — {Message(envelope)}"
                 : Message(envelope) ?? $"HTTP {(int)response.StatusCode}";
-            return new ServerAxisResult(false, $"등록하지 못했습니다 — {reason}", (int)response.StatusCode);
+            return new ServerAxisResult(false, $"등록하지 못했습니다 — {reason}", (int)response.StatusCode, IsRetryable: IsRetryableConflict(response, envelope));
         }
         catch (OperationCanceledException) { return new ServerAxisResult(false, "등록을 취소했습니다"); }
         catch (Exception ex)
@@ -273,10 +283,12 @@ public sealed class ServerAxisApiService : IServerAxisApiService
             if (envelope?.Value<bool?>("success") == true)
                 return new ServerAxisResult(true, string.Empty, (int)response.StatusCode, id);
 
-            var reason = (int)response.StatusCode == 409
+            var reason = IsRetryableConflict(response, envelope)
+                ? ApiStatusHelper.RetryableConflictMessage
+                : (int)response.StatusCode == 409
                 ? $"같은 이름의 서버가 이미 있습니다 — {Message(envelope)}"
                 : Message(envelope) ?? $"HTTP {(int)response.StatusCode}";
-            return new ServerAxisResult(false, $"저장하지 못했습니다 — {reason}", (int)response.StatusCode);
+            return new ServerAxisResult(false, $"저장하지 못했습니다 — {reason}", (int)response.StatusCode, IsRetryable: IsRetryableConflict(response, envelope));
         }
         catch (OperationCanceledException) { return new ServerAxisResult(false, "저장을 취소했습니다"); }
         catch (Exception ex)
@@ -306,7 +318,8 @@ public sealed class ServerAxisApiService : IServerAxisApiService
 
             return envelope?.Value<bool?>("success") == true
                 ? new ServerAxisResult(true, string.Empty, (int)response.StatusCode, deviceId)
-                : new ServerAxisResult(false, Message(envelope) ?? $"HTTP {(int)response.StatusCode}", (int)response.StatusCode);
+                : new ServerAxisResult(false, Message(envelope) ?? $"HTTP {(int)response.StatusCode}", (int)response.StatusCode,
+                    IsRetryable: IsRetryableConflict(response, envelope));
         }
         catch (OperationCanceledException) { return new ServerAxisResult(false, "배정을 취소했습니다"); }
         catch (Exception ex)
@@ -422,5 +435,9 @@ public sealed class ServerAxisApiService : IServerAxisApiService
         var message = envelope?.Value<string>("message");
         return string.IsNullOrWhiteSpace(message) ? null : message;
     }
+
+    /// <summary>동시 쓰기 경합 409(8.0.15 <c>error.details.retryable=true</c>) — 고정 문구(같은 이름)보다 먼저 본다(G01).</summary>
+    private static bool IsRetryableConflict(HttpResponseMessage response, JObject? envelope)
+        => ApiStatusHelper.IsRetryableConflict((int)response.StatusCode, (envelope?["error"] as JObject)?.ToObject<ApiError>());
     #endregion
 }

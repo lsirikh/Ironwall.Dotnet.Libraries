@@ -41,6 +41,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 /// </remarks>
 public class AccountConsolePanelViewModel : BasePanelViewModel
                                          , IHandle<CallCloseAccountConsoleMessageModel>
+                                         , Ironwall.Dotnet.Libraries.Accounts.Ui.Services.IAccountSyncTarget
 {
     public const string ConsoleKey = AccountConsoleKeys.ConsoleKey;
 
@@ -429,6 +430,24 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         }
         RefreshRailCounts();
         RefreshStatus();
+    }
+
+    /// <inheritdoc/>
+    public bool IsSyncTargetOpen => IsActive;
+
+    /// <summary>
+    /// 서버가 계정 · 그룹이 바뀌었다고 알렸다(NATS SYNC_USER · SYNC_USER_GROUP, G08) — 목록만 다시 읽는다.
+    /// 고치던 칸이 있으면 덮지 않는다(다른 운영자의 변경이 내 미적용 편집을 조용히 지우면 안 된다).
+    /// </summary>
+    public async Task ReloadFromServerAsync(bool users, bool groups)
+    {
+        if (!IsActive || DetailIsDirty) return;
+        if (users && CanSeeAccounts)
+            AccountManagerPanelViewModel.OnClickReloadButton(this, new System.Windows.RoutedEventArgs());
+        if (groups && CanSeePermission)
+            await PermissionMatrixPanelViewModel.ReloadForConsoleAsync();
+        if (users || groups) await LoadGroupsAsync(CancellationToken.None);
+        RefreshRailCounts();
     }
 
     public bool CanAdd => (IsUsersRail && CanEditUsers) || (IsPermissionsRail && CanEditUsers) || (IsGrantsRail && CanSeeGrants);

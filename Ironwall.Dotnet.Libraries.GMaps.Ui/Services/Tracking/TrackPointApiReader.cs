@@ -15,7 +15,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
 /// <summary>
 /// 서버 REST API(<c>GET /api/tracking/points</c>, cursor) 기반 <see cref="ITrackPointReader"/>.
 /// <para><see cref="ITrackingApiService"/>로 구간 전체를 적재 → 매퍼(KST→UTC) → ObservedAt ASC 정렬.
-/// 실패/오프라인 시 빈 목록(seam 계약 — throw 안 함, 비블로킹).</para>
+/// 실패/오프라인 시 빈 목록(seam 계약 — throw 안 함, 비블로킹). 실패 종류는 <see cref="LastFetchNotice"/> 로 알린다.</para>
 /// </summary>
 public sealed class TrackPointApiReader : ITrackPointReader
 {
@@ -30,9 +30,12 @@ public sealed class TrackPointApiReader : ITrackPointReader
     /// <inheritdoc/>
     public async Task<List<ITrackPointModel>> FetchAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
     {
+        LastFetchNotice = null;
         try
         {
-            var dtos = await _api.GetTrackPointsAsync(fromUtc, toUtc, cameraId, ct).ConfigureAwait(false);
+            var fetched = await _api.GetTrackPointsWithStatusAsync(fromUtc, toUtc, cameraId, ct).ConfigureAwait(false);
+            var dtos = fetched.Points;
+            LastFetchNotice = NoticeOf(fetched);
             var result = dtos
                 .Select(d => d.ToTrackPointModel())
                 .OfType<ITrackPointModel>()           // null(무효 점) 필터
@@ -44,11 +47,30 @@ public sealed class TrackPointApiReader : ITrackPointReader
         }
         catch (Exception ex)
         {
-            // empty vs offline 구분은 로그로(둘 다 UI에선 "데이터 없음")
             _log?.Warning($"[TrackPointApiReader] 조회 실패(빈 반환) — /tracking/points: {ex.Message}");
+            LastFetchNotice = PartialNotice;
             return new List<ITrackPointModel>();
         }
     }
+
+    /// <inheritdoc/>
+    public string? LastFetchNotice { get; private set; }
+
+    /// <inheritdoc/>
+    public async Task<string?> CheckAvailabilityAsync(CancellationToken ct = default)
+        => await _api.GetHealthAsync(ct).ConfigureAwait(false) == EnumTrackingHealth.Unavailable
+            ? "추적 이력 저장소를 쓸 수 없습니다"
+            : null;   // 옛 판(경로 없음) · 판단 불가는 막지 않는다
+
+    /// <summary>결과 종류 → 운영자 알림. 403 은 권한 안내, 그 밖의 실패 · 부분은 "일부만"(앞 페이지 점은 그대로 보인다).</summary>
+    private static string? NoticeOf(TrackPointsResult fetched) => fetched.Outcome switch
+    {
+        EnumTrackFetchOutcome.Success => null,
+        EnumTrackFetchOutcome.Forbidden => "추적 이력을 볼 권한이 없습니다(지도 보기 권한 필요)",
+        _ => PartialNotice,
+    };
+
+    private const string PartialNotice = "일부만 불러왔습니다";
 
     #region - Attributes -
     private readonly ITrackingApiService _api;

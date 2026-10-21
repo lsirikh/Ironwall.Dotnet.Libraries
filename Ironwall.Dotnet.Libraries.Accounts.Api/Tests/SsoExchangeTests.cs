@@ -354,9 +354,67 @@ public class SsoExchangeTests
         Assert.False(store.IsAuthenticated);
     }
 
+    /// <summary>
+    /// ★ G04 — 재교환 훅 안의 교환 요청(<c>POST /auth/sso-exchange</c>)도 같은 핸들러를 지난다.
+    /// 교환이 401 <c>TOKEN_REPLAYED</c>(details.retryable=true, v8.0.15)를 받으면, 교환 경로를 auth 엔드포인트로 보지 않던 때는
+    /// 그 401 로 다시 refresh 경로에 들어가 <b>이미 쥔 전역 락을 또 기다려</b> 멈췄다(재진입 데드락 → 시간 초과 → Terminal).
+    /// 교환은 401 을 그대로 돌려받아 즉시 Transient 여야 하고, 교환 요청에는 옛 Bearer 가 실리면 안 된다.
+    /// </summary>
+    [Fact]
+    public async Task should_return_transient_at_once_when_exchange_inside_reauth_gets_token_replayed()
+    {
+        const string replayedBody = @"{""success"":false,""error"":{""code"":""TOKEN_REPLAYED"",""message"":""token already used"",
+                                    ""details"":{""reason"":""jti"",""retryable"":true}}}";
+        var store = new TokenStorageService();
+        store.SetTokens("old", refreshToken: null);
+        var inner = new ScriptedHandler((HttpStatusCode.Unauthorized, null), (HttpStatusCode.Unauthorized, replayedBody));
+        var client = BuildClient(inner, store, out var handler);
+        var expired = false;
+        handler.SessionExpired += () => expired = true;
+        SsoReauthOutcome? outcome = null;
+        var timedOut = false;
+        try
+        {
+            // 실제 훅(SsoSessionCoordinator)과 같은 판정 — 교환 결과의 retryable 로 Transient/Terminal.
+            BearerAuthHandler.SsoReauthenticator = async _ =>
+            {
+                // 데드락이면 이 요청이 끝나지 않는다 — 짧게 끊어 전역 락을 풀고 시험 러너가 멈추지 않게 한다.
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                try
+                {
+                    using var res = await client.PostAsync("auth/sso-exchange",
+                        new StringContent(@"{""sso_access_token"":""t""}", Encoding.UTF8, "application/json"), cts.Token);
+                    var body = await res.Content.ReadAsStringAsync();
+                    var r = SsoExchangeErrorClassifier.FromErrorBody(body, (int)res.StatusCode);
+                    outcome = r.Retryable ? SsoReauthOutcome.Transient : SsoReauthOutcome.Terminal;
+                }
+                catch (OperationCanceledException)
+                {
+                    timedOut = true;
+                    outcome = SsoReauthOutcome.Terminal;
+                }
+                return outcome.Value;
+            };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var call = client.GetAsync("res");
+            var finished = await Task.WhenAny(call, Task.Delay(TimeSpan.FromSeconds(5)));
+            Assert.Same(call, finished);   // 바깥 요청도 반드시 끝난다
+
+            Assert.False(timedOut, "교환 요청이 전역 락 재진입으로 멈췄다(데드락)");
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), $"즉시 끝나야 한다(걸린 시간 {sw.Elapsed.TotalMilliseconds:0}ms)");
+            Assert.Equal(SsoReauthOutcome.Transient, outcome);
+            Assert.False(expired);                       // 일시 실패 — 세션 유지
+            Assert.Equal("old", store.AccessToken);
+            Assert.Equal(2, inner.SeenAuth.Count);       // 원요청 + 교환 한 번(재시도 없음)
+            Assert.Null(inner.SeenAuth[1]);              // 교환 요청에는 Authorization 이 없다
+        }
+        finally { BearerAuthHandler.SsoReauthenticator = null; }
+    }
+
     // ══ 가짜들 ════════════════════════════════════════════════════════
 
-    private const string RevokedBody = @"{""success"":false,""error"":{""code"":""SESSION_REVOKED"",""message"":""session revoked""}}";
+    private const string RevokedBody =@"{""success"":false,""error"":{""code"":""SESSION_REVOKED"",""message"":""session revoked""}}";
 
     /// <summary>정해진 순서로 (상태, 본문) 을 돌려주고, 받은 Bearer 를 기록한다.</summary>
     private sealed class ScriptedHandler : HttpMessageHandler

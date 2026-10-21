@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
@@ -384,7 +385,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "문구를 삭제했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = MapError(res.StatusCode, "문구를 삭제하지 못했습니다.") };
+                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = MapError(res.StatusCode, "문구를 삭제하지 못했습니다.", res.Error) };
         }
         catch (Exception ex)
         {
@@ -508,7 +509,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 if (!res.Success || res.Data is null)
                 {
                     _log?.Warning($"[ActionReportTemplate] 등록 실패({res.StatusCode}): {res.ErrorText()}");
-                    FailApply(MapError(res.StatusCode, "문구를 등록하지 못했습니다."));
+                    FailApply(MapError(res.StatusCode, "문구를 등록하지 못했습니다.", res.Error));
                     return;
                 }
                 IsBusy = false;   // LoadAsync 가 자기 재진입 가드로 스스로 막지 않도록 먼저 내린다.
@@ -532,7 +533,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                         await OnApplyTargetGoneAsync();
                         return;
                     }
-                    FailApply(MapError(res.StatusCode, "문구를 고치지 못했습니다."));
+                    FailApply(MapError(res.StatusCode, "문구를 고치지 못했습니다.", res.Error));
                     return;
                 }
                 IsBusy = false;
@@ -808,10 +809,12 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     }
 
     /// <summary>서버 detail(영문) → 화면 문구(와이어프레임 §6 표).</summary>
-    private string MapError(int statusCode, string fallback)
+    private string MapError(int statusCode, string fallback, ApiError? error = null)
     {
         // 서버가 이 기능을 모르는데 "다른 곳에서 삭제된 문구" 라고 말하면 거짓이다.
         if (IsUnsupported) return UnsupportedText;
+        // v8.0.15 — 409 중 동시 쓰기 경합은 중복이 아니다(잠시 뒤 다시 하면 된다). 고정 문구보다 먼저 본다.
+        if (ApiStatusHelper.IsRetryableConflict(statusCode, error)) return ApiStatusHelper.RetryableConflictMessage;
         return statusCode switch
         {
             409 => "이미 등록된 문구입니다.",

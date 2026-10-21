@@ -123,6 +123,17 @@ public class ApiError
     public string? DetailsErrorCode
         => SubCodeOf(DetailsToken) ?? SubCodeOf(MessageToken);
 
+    /// <summary>
+    /// 서버가 "같은 요청을 다시 보내면 될 수 있다"고 알렸는가 — <c>details</c> 가 <b>객체</b>이고 <c>retryable == true</c>.
+    /// <para>v8.0.15: 동시 쓰기 경합(행 잠금 · 고유 키 경합)의 409 와 sso-exchange 401 <c>TOKEN_REPLAYED</c> 에 실린다.
+    /// 옛 판(6.3 · 8.0.11)은 details 가 null 이라 늘 false 다.</para>
+    /// </summary>
+    [JsonIgnore]
+    public bool IsRetryable
+        => DetailsToken is JObject obj
+           && obj["retryable"] is { Type: JTokenType.Boolean } flag
+           && flag.Value<bool>();
+
     #region - 내부 헬퍼 -
     /// <summary>토큰에서 사람이 읽을 문장을 뽑는다. 객체면 내부 <c>message</c>(문자열) 우선, 없으면 압축 JSON.</summary>
     private static string? TextOf(JToken? token)

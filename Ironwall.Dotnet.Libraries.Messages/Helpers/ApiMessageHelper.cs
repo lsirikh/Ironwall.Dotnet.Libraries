@@ -64,6 +64,7 @@ public static class ApiMessageHelper
                 if (errorResult != null && (errorResult.Error != null || !string.IsNullOrEmpty(errorResult.Message)))
                 {
                     errorResult.StatusCode = (int)response.StatusCode;
+                    LogFailure(response, errorResult.Error?.Code, StampRequestId(errorResult.Meta ??= new MetaDto(), response));
                     return errorResult;
                 }
 
@@ -72,6 +73,7 @@ public static class ApiMessageHelper
                     $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
                     content);   // ← 422 detail 등 서버 본문 전문 보존
                 fallback.StatusCode = (int)response.StatusCode;
+                LogFailure(response, fallback.Error?.Code, StampRequestId(fallback.Meta ??= new MetaDto(), response));
                 return fallback;
             }
         }
@@ -134,6 +136,7 @@ public static class ApiMessageHelper
                 if (errorResult != null && (errorResult.Error != null || !string.IsNullOrEmpty(errorResult.Message)))
                 {
                     errorResult.StatusCode = (int)response.StatusCode;
+                    LogFailure(response, errorResult.Error?.Code, StampRequestId(errorResult.Meta ??= new MetaDto(), response));
                     return errorResult;
                 }
 
@@ -142,6 +145,7 @@ public static class ApiMessageHelper
                     $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
                     content);
                 fallback.StatusCode = (int)response.StatusCode;
+                LogFailure(response, fallback.Error?.Code, StampRequestId(fallback.Meta ??= new MetaDto(), response));
                 return fallback;
             }
         }
@@ -260,6 +264,7 @@ public static class ApiMessageHelper
                 if (errorResult != null && (errorResult.Error != null || !string.IsNullOrEmpty(errorResult.Message)))
                 {
                     errorResult.StatusCode = (int)response.StatusCode;
+                    LogFailure(response, errorResult.Error?.Code, StampRequestId(errorResult.Meta ??= new MetaDto(), response));
                     return errorResult;
                 }
 
@@ -268,6 +273,7 @@ public static class ApiMessageHelper
                     $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
                     content);
                 fallback.StatusCode = (int)response.StatusCode;
+                LogFailure(response, fallback.Error?.Code, StampRequestId(fallback.Meta ??= new MetaDto(), response));
                 return fallback;
             }
         }
@@ -321,7 +327,38 @@ public static class ApiMessageHelper
 
     #region - 헬퍼 메서드 -
     /// <summary>
-    /// HTTP 상태 코드 → 에러 코드 변환 — <b>서버 닫힌 16종</b>(명세 §12.2) 안에서만 고른다.
+    /// 실패 응답 한 줄 로그를 받을 곳(<c>ApiService</c> 가 앱 로거로 연결한다). null 이면 남기지 않는다.
+    /// <para>줄 끝에 <c>req=&lt;id&gt;</c> 를 붙인다 — 서버 요청 로그(<c>/api/logs</c>)와 같은 값이라 문의 때 그대로 맞춰 볼 수 있다(명세 §12.2 500 행).
+    /// 화면 문구에는 넣지 않는다.</para>
+    /// </summary>
+    public static Action<string>? FailureLog { get; set; }
+
+    /// <summary>
+    /// 요청 id 를 정한다 — 봉투의 <c>meta.request_id</c> 우선, 없으면 응답 헤더 <c>X-Request-ID</c>(봉투 없는 응답).
+    /// 헤더에서 찾았으면 <paramref name="meta"/> 에도 채워 호출부가 같은 값을 쓰게 한다.
+    /// </summary>
+    internal static string? StampRequestId(MetaDto meta, HttpResponseMessage response)
+    {
+        if (!string.IsNullOrWhiteSpace(meta.RequestId)) return meta.RequestId;
+        if (response.Headers.TryGetValues("X-Request-ID", out var values))
+        {
+            var id = values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+            if (id != null) meta.RequestId = id;
+        }
+        return meta.RequestId;
+    }
+
+    private static void LogFailure(HttpResponseMessage response, string? code, string? requestId)
+    {
+        var sink = FailureLog;
+        if (sink is null) return;
+        var request = response.RequestMessage;
+        try { sink($"[API] 실패 {(int)response.StatusCode} {code} {request?.Method} {request?.RequestUri?.AbsolutePath} req={requestId ?? "-"}"); }
+        catch { /* 로그 실패가 응답 변환을 깨면 안 된다 */ }
+    }
+
+    /// <summary>
+    /// HTTP 상태 코드 → 에러 코드 변환 — <b>서버 닫힌 22종</b>(명세 §12.2 · v8.0.6) 안에서만 고른다.
     /// <para>
     /// ⚠ 이 폴백은 <b>봉투가 없는 응답</b>에만 쓰인다(프록시 502, 우리 쪽 타임아웃 합성 504, 비표준 본문).
     /// 서버 봉투가 오면 <c>error.code</c> 원본이 그대로 쓰인다.

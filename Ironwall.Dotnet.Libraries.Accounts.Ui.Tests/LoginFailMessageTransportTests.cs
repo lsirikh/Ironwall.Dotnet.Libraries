@@ -43,4 +43,11 @@ public class LoginFailMessageTransportTests
         // 무회귀 — 서버가 준 상위 코드의 종전 문구는 그대로다.
         Assert.Equal(expected, LoginPanelViewModel.FailMessage(AuthOutcome.Fail(code)));
     }
+
+    [Theory]
+    [InlineData("비활성화된 계정입니다", "비활성화된 계정입니다")]   // G07 — 서버가 403 사유를 알려 주면 그대로
+    [InlineData("   ", "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.")]
+    [InlineData(null, "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.")]
+    public void should_show_the_server_reason_for_forbidden_login_when_it_is_given(string? serverMessage, string expected)
+        => Assert.Equal(expected, LoginPanelViewModel.FailMessage(AuthOutcome.Fail("FORBIDDEN", serverMessage)));
 }

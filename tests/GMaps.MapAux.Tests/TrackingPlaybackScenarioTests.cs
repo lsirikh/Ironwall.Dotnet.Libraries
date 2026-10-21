@@ -199,7 +199,56 @@ public class TrackingPlaybackScenarioTests
         public List<ITrackPointModel> Points = new();
         public Task<List<ITrackPointModel>> FetchAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
         { Calls.Add((fromUtc, toUtc)); return Task.FromResult(Points); }
+        public string? Notice;
+        public string? Unavailable;
+        public int AvailabilityChecks;
+        public string? LastFetchNotice => Notice;
+        public Task<string?> CheckAvailabilityAsync(CancellationToken ct = default) { AvailabilityChecks++; return Task.FromResult(Unavailable); }
     }
+
+    [Theory]
+    [InlineData("추적 이력을 볼 권한이 없습니다(지도 보기 권한 필요)")]
+    [InlineData("일부만 불러왔습니다")]
+    [Trait("Scenario", "G12")]
+    public void should_show_the_fetch_notice_instead_of_no_data_when_the_server_refused_or_failed(string notice) => OneSta.StaAsync(async () =>
+    {
+        var (vm, reader) = Playback();
+        reader.Notice = notice;
+        vm.PresetCommand.Execute("30");
+        await Until(() => reader.Calls.Count > 0 && vm.Status.Length > 0);
+        Assert.Equal(notice, vm.Status);   // 예전엔 "해당 기간 데이터 없음"
+    });
+
+    [Fact]
+    [Trait("Scenario", "G12")]
+    public void should_keep_loaded_points_and_append_partial_notice() => OneSta.StaAsync(async () =>
+    {
+        var (vm, reader) = Playback(Pt("a", DateTime.UtcNow.AddMinutes(-10)), Pt("a", DateTime.UtcNow.AddMinutes(-9)));
+        reader.Notice = "일부만 불러왔습니다";
+        vm.PresetCommand.Execute("30");
+        await Until(() => vm.HasData);
+        Assert.EndsWith("— 일부만 불러왔습니다", vm.Status);
+        Assert.StartsWith("2점", vm.Status);
+    });
+
+    [Fact]
+    [Trait("Scenario", "G13")]
+    public void should_not_query_and_say_so_when_tracking_store_is_unavailable_then_check_only_once_after_it_recovers() => OneSta.StaAsync(async () =>
+    {
+        var (vm, reader) = Playback();
+        reader.Unavailable = "추적 이력 저장소를 쓸 수 없습니다";
+        vm.PresetCommand.Execute("30");
+        await Until(() => vm.Status.Length > 0);
+        Assert.Equal("추적 이력 저장소를 쓸 수 없습니다", vm.Status);
+        Assert.Empty(reader.Calls);
+
+        reader.Unavailable = null;
+        vm.PresetCommand.Execute("30");
+        await Until(() => reader.Calls.Count == 1);
+        vm.PresetCommand.Execute("30");
+        await Until(() => reader.Calls.Count == 2);
+        Assert.Equal(2, reader.AvailabilityChecks);   // 막혔던 1회 + 회복 뒤 1회, 그다음은 다시 묻지 않는다
+    });
 
     private static (PlaybackViewModel vm, Reader reader) Playback(params ITrackPointModel[] points)
     {

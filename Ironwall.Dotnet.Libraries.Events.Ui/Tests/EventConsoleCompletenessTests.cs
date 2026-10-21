@@ -282,6 +282,30 @@ public class EventRowLabelTests : IDisposable
         Assert.Equal(EventActionHistoryViewModel.FailureText, history.FailureReason);
         Assert.DoesNotContain("sqlalchemy", history.FailureReason);
     }
+
+    [Fact]
+    public void should_fill_connection_event_actions_from_the_common_list_filtered_by_origin()
+    {
+        // G42 — 연결 이벤트는 원본별 하위 경로가 없다 → GET /events/actions?from_event_id= 로 채운다.
+        var api = new Mock<IEventApiService>(MockBehavior.Loose) { DefaultValue = DefaultValue.Empty };
+        api.Setup(a => a.GetActionEventsAsync(null, null, 1, 100, 41, null, It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new ApiListResponse<ActionEventDto>
+           {
+               Success = true,
+               Data = new List<ActionEventDto>
+               {
+                   new() { Id = 2, User = "op2", Content = "재연결 확인", CreatedAt = "2026-10-21T10:05:00+09:00" },
+                   new() { Id = 1, User = "op1", Content = "회선 점검", CreatedAt = "2026-10-21T10:00:00+09:00" },
+               },
+           });
+        var history = new EventActionHistoryViewModel(() => api.Object);
+
+        history.LoadAsync(EventDetailKind.Connection, 41, hasActions: true).GetAwaiter().GetResult();
+
+        Assert.Equal(ActionHistoryState.Loaded, history.State);
+        Assert.Equal(new[] { "회선 점검", "재연결 확인" }, history.Lines.Select(l => l.Content));
+        api.Verify(a => a.GetActionEventsAsync(null, null, 1, 100, 41, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
 #endregion
 
