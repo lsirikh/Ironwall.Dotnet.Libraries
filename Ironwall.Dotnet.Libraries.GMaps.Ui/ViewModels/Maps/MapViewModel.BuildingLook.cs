@@ -143,7 +143,7 @@ public partial class MapViewModel
             // 바로 반영은 숨김 · 색만 — 장면에 없는 건물을 되살렸으면(needs_rebake) 3D 에 보이게 하려 하지 않고, 외벽 무늬는 다시 만들 때 바뀐다
             if (!saved.NeedsRebake) PostUserBuilding3D(job, Map3DLook.LookMessageJson(id, saved.State));   // 그 장면을 띄워 둔 3D 에만
             bool facadeChanged = look != null && prev != null && prev.Facade != saved.State.Facade;
-            _bhLookNotice = saved.NeedsRebake ? Map3DLook.NeedsRebakeText : facadeChanged ? Map3DLook.FacadeRebakeText : null;
+            _bhLookNotice = saved.NeedsRebake ? Map3DLook.NeedsRebakeText : facadeChanged && !saved.FacadeLive ? Map3DLook.FacadeRebakeText : null;
             if (_bhLookNotice != null) done = _bhLookNotice;
             if (_bhBuilding?.Id == id && _bhJob == job)
             {

@@ -61,8 +61,9 @@ public class Map3DTwinContractTests
     public void should_build_building_look_message_with_contract_keys()
     {
         var m = JObject.Parse(Map3DLook.LookMessageJson(7, new Map3DLookState(true, "#ffffff", null, "brick")));
-        Assert.Equal(new[] { "type", "id", "hidden", "wall_color", "roof_color" }, m.Properties().Select(p => p.Name));
+        Assert.Equal(new[] { "type", "id", "hidden", "wall_color", "roof_color", "facade" }, m.Properties().Select(p => p.Name));
         Assert.Equal("building.look", m.Value<string>("type"));
+        Assert.Equal("brick", m.Value<string>("facade"));   // 엔진이 외벽 무늬도 바로 바꾸게(옛 엔진은 무시)
         Assert.True(m.Value<bool>("hidden"));
         Assert.Equal(JTokenType.Null, m["roof_color"]!.Type);
     }

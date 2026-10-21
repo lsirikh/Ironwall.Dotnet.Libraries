@@ -27,6 +27,8 @@ public sealed record Map3DBuildingLook(int Id, Map3DLookState State, string? Ori
 {
     /// <summary>다시 굽기에서 숨겨 장면(GLB)에 없는 건물을 되살렸다(needs_rebake) — 다시 만들어야 화면에 보인다.</summary>
     public bool NeedsRebake { get; init; }
+    /// <summary>엔진이 외벽 무늬를 지금 장면에 바로 반영했다(facade_live) — 「다시 만들면 바뀝니다」 안내가 필요 없다. 옛 엔진은 키가 없어 false.</summary>
+    public bool FacadeLive { get; init; }
 }
 
 /// <summary>저장된 덮어쓰기 하나(GET …/looks) — Id = 지금 장면 건물 id(null = 지금 장면에 못 붙인 것).</summary>
@@ -102,13 +104,14 @@ public static class Map3DLook
         return o;
     }
 
-    /// <summary>3D 에 바로 보이게(다시 불러오지 않음) — {"type":"building.look","id","hidden","wall_color","roof_color"}.</summary>
+    /// <summary>3D 에 바로 보이게(다시 불러오지 않음) — {"type":"building.look","id","hidden","wall_color","roof_color","facade"}(옛 엔진은 facade 를 모르고 무시).</summary>
     public static string LookMessageJson(int id, Map3DLookState s)
         => new JObject
         {
             ["type"] = "building.look", ["id"] = id, ["hidden"] = s.Hidden,
             ["wall_color"] = NormalizeColor(s.WallColor) is { } w ? w : JValue.CreateNull(),
             ["roof_color"] = NormalizeColor(s.RoofColor) is { } r ? r : JValue.CreateNull(),
+            ["facade"] = NormalizeFacade(s.Facade),
         }.ToString(Formatting.None);
 
     /// <summary>건물 줄(3D building 메시지 · 서버 건물 줄)의 모양 키 — 없으면 자동.</summary>
@@ -123,7 +126,10 @@ public static class Map3DLook
     {
         if (JObject.Parse(json)["building"] is not JObject b || b["id"]?.Type != JTokenType.Integer || b.Value<long>("id") is not (> 0 and <= int.MaxValue)) return null;
         return new Map3DBuildingLook(b.Value<int>("id"), StateOf(b), Str(b["origin"]), Str(b["user_uid"]))
-               { NeedsRebake = b["needs_rebake"]?.Type == JTokenType.Boolean && b.Value<bool>("needs_rebake") };
+               {
+                   NeedsRebake = b["needs_rebake"]?.Type == JTokenType.Boolean && b.Value<bool>("needs_rebake"),
+                   FacadeLive = b["facade_live"]?.Type == JTokenType.Boolean && b.Value<bool>("facade_live"),
+               };
     }
 
     /// <summary>GET …/looks 응답 {"items":[…]} — 형식이 틀린 항목은 뺀다.</summary>

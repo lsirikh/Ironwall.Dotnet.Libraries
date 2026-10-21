@@ -46,6 +46,8 @@ public class TwinContractScenarioTests
         public bool OldEngine { get; set; }
         /// <summary>look 응답에 needs_rebake=true(다시 굽기에서 숨겨 장면에 없는 건물).</summary>
         public bool NeedsRebake { get; set; }
+        /// <summary>look 응답에 facade_live=true(엔진이 외벽 무늬를 바로 반영).</summary>
+        public bool FacadeLive { get; set; }
         public List<JObject> UserBuildings { get; } = new();
         public Dictionary<int, JObject> Looks { get; } = new();
         public List<JObject> Decorations { get; } = new();
@@ -84,6 +86,7 @@ public class TwinContractScenarioTests
                     var b = (JObject)look.DeepClone();
                     b["id"] = id; b["origin"] = "photo";
                     if (NeedsRebake) b["needs_rebake"] = true;
+                    if (FacadeLive) b["facade_live"] = true;
                     return Json(HttpStatusCode.OK, new JObject { ["building"] = b, ["looks"] = new JObject { ["count"] = Looks.Count } }.ToString());
                 case "looks":
                     if (OldEngine) return Json(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}");
@@ -307,6 +310,19 @@ public class TwinContractScenarioTests
         await Rig.Until(() => rig.Writes.Count == 2, "되돌리기");
         Assert.Equal(("auto", JTokenType.Null), (rig.Writes[1].Body!.Value<string>("facade"), rig.Writes[1].Body!["roof_color"]!.Type));
         Assert.Equal("auto", rig.Vm.BuildingFacade);
+    });
+
+    [Fact]
+    public void should_send_facade_live_and_skip_rebake_notice_when_engine_applies_facade_now() => RunAsync(async rig =>
+    {
+        rig.Server.FacadeLive = true;
+        rig.Enter3D();
+        rig.PickBuilding(8);
+        rig.Vm.BuildingFacade = "brick";
+        rig.Vm.ApplyBuildingLookCommand.Execute(null);
+        await Rig.Until(() => rig.Writes.Count == 1 && !rig.Vm.IsBuildingLookChanged, "외관 저장");
+        Assert.Equal("brick", rig.Sent("building.look").Single().Value<string>("facade"));   // 3D 가 바로 무늬를 바꾸게
+        Assert.Null(rig.Vm.BuildingLookNotice);                                               // 바로 반영됐으니 「다시 만들면」 안내 없음
     });
 
     [Fact]
