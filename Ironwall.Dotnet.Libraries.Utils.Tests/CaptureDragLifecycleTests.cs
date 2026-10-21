@@ -9,6 +9,7 @@ using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Microsoft.Xaml.Behaviors;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -345,7 +346,7 @@ public class CaptureDragLifecycleTests
                 ShowInTaskbar = false, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
             };
-            window.Show();
+            QuietWindow.Show(window);
             try
             {
                 window.UpdateLayout();
@@ -397,13 +398,12 @@ public class CaptureDragLifecycleTests
                 Width = 600, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
             };
-            window.Show();
+            QuietWindow.Show(window);
             var stage = new Stage { Window = window, Source = source, Target = target, Viewer = viewer, Items = items, Handler = handler };
             DragPointer.Override = relativeTo => window.TranslatePoint(stage.Pointer, (UIElement)relativeTo);
             DragHandle? handle = null;
             try
             {
-                window.Activate();
                 window.UpdateLayout();
                 handle = stage.HandleOf(0);
                 return body(stage, handle);

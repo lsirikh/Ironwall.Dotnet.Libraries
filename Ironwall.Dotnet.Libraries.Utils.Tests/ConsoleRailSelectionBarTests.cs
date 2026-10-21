@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -29,7 +30,7 @@ public class ConsoleRailSelectionBarTests
                 Content = rail, Width = 240, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowActivated = false,
             };
-            window.Show();
+            QuietWindow.Show(window);
             rail.SelectedItem = entries[1];
             Pump(DispatcherPriority.Loaded);
 

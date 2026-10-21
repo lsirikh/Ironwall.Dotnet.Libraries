@@ -4,6 +4,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -49,7 +50,7 @@ public class DragHitTestTests
             var content = new Border { Background = Brushes.White, Width = 200, Height = 200 };
             var decorator = new AdornerDecorator { Child = content };
             var window = new Window { Content = decorator, Width = 300, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Left = -10000, Top = -10000 };
-            window.Show();
+            QuietWindow.Show(window);
             try
             {
                 var layer = AdornerLayer.GetAdornerLayer(content)!;
@@ -175,7 +176,7 @@ public class DragHitTestTests
             var outer = new ListBox { Width = 300 };
             outer.Items.Add(section);
             var window = new Window { Content = outer, Width = 400, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Left = -10000, Top = -10000 };
-            window.Show();
+            QuietWindow.Show(window);
             try
             {
                 window.UpdateLayout();
@@ -235,7 +236,7 @@ public class DragHitTestTests
             list.Items.Add(row);
         }
         var window = new Window { Content = list, Width = 500, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Left = -10000, Top = -10000 };
-        window.Show();
+        QuietWindow.Show(window);
         try
         {
             window.UpdateLayout();

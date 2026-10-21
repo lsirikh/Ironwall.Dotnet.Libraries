@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Markup;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -101,7 +102,7 @@ public class EventToolbarChipAutomationTests
                     Content = group, Width = 520, Height = 120, Left = -20000, Top = -20000,
                     ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
                 };
-                window.Show();
+                QuietWindow.Show(window);
                 window.UpdateLayout();
                 var peer = UIElementAutomationPeer.CreatePeerForElement(group)!;
                 foreach (var child in peer.GetChildren() ?? new List<AutomationPeer>())

@@ -14,6 +14,7 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -102,7 +103,7 @@ public class SuppressionRecurrenceRadioTests : IDisposable
             Content = content, Width = 400, Height = 200, Left = -20000, Top = -20000,
             ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None,
         };
-        w.Show();
+        QuietWindow.Show(w);
         w.UpdateLayout();
         return w;
     }

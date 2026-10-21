@@ -14,6 +14,7 @@ using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Media;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -88,7 +89,7 @@ public class SuppressionRowSelectBindingTests
                 Content = grid, Width = 300, Height = 160, Left = -20000, Top = -20000,
                 ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
             };
-            window.Show();
+            QuietWindow.Show(window);
             window.UpdateLayout();
 
             var box = Find<CheckBox>(grid, "Console.Suppression.RowSelect.309");

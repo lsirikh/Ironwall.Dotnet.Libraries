@@ -12,6 +12,7 @@ using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Microsoft.Xaml.Behaviors;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -605,10 +606,9 @@ public class HelpTipTests
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
             };
             if (!useDefaultTemplate) window.Resources.Add(typeof(HelpTip), XamlReader.Parse(NoPopupStyle));
-            window.Show();
+            QuietWindow.Show(window);
             try
             {
-                window.Activate();
                 window.UpdateLayout();
                 Pump();
                 if (focusTip && root is HelpTip tip) tip.Focus();
@@ -645,8 +645,11 @@ public class HelpTipTests
         Exception? error = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — 진짜 F1 키는 키보드 초점이 있는 섹션의 "?" 를 연다. 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { body(); }
             catch (Exception ex) { error = ex; }
+            finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }   // 숨은 데스크톱 스레드는 디스패처를 닫고 끝낸다 — TSF · 창 정리가 살아 있는 개체에서 돈다
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

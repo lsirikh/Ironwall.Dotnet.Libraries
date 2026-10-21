@@ -19,6 +19,7 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Moq;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace GMaps.PropertyPanel.Tests;
 
@@ -112,7 +113,7 @@ public class ComponentCardScreenSizeTests
             ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
             Content = root,
         };
-        window.Show();
+        QuietWindow.Show(window);
         using var marker = Marker();
         ComponentCardAdorner? adorner = null;
         try
@@ -230,7 +231,7 @@ public class ComponentCardScreenSizeTests
             Width = 500, Height = 600, Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false,
             WindowStyle = WindowStyle.None, Content = card,
         };
-        window.Show();
+        QuietWindow.Show(window);
         try
         {
             Pump();

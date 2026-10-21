@@ -14,6 +14,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -408,7 +409,7 @@ internal static class UnitMapCanvasHarness
             };
             window.Resources.MergedDictionaries.Add(Tokens());
             canvas.Scene = scene ?? Scene();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try { return body(canvas); }
             finally { window.Close(); }

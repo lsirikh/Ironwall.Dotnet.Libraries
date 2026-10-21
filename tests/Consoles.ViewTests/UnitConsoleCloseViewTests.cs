@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
 using Moq;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Consoles.ViewTests;
 
@@ -76,7 +77,7 @@ public class UnitConsoleCloseViewTests
         var shell = new WindowInteropHelper(env.Shell).Handle;
         var console = new WindowInteropHelper(env.ConsoleWindow).Handle;
 
-        var probe = Task.Run(() =>
+        var probe = QuietWindow.RunOnHiddenDesktop(() =>   // 창들이 숨은 데스크톱(AppHost)에 있다 — UIA 클라이언트도 거기서
         {
             var shellElement = AutomationElement.FromHandle(shell);
             var windows = shellElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window))
@@ -135,7 +136,7 @@ public class UnitConsoleCloseViewTests
                 Title = "셸", Width = 600, Height = 400, ShowInTaskbar = false, ShowActivated = false,
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000,
             };
-            _shell.Show();
+            QuietWindow.Show(_shell);
             Launcher = new UnitConsoleLauncher(Windows, Units(), Devices(), events: events,
                                                host: new WpfUnitConsoleWindowHost(() => _shell), prefs: () => null);
         }
@@ -162,7 +163,7 @@ public class UnitConsoleCloseViewTests
         {
             var hwnd = new WindowInteropHelper(ConsoleWindow).Handle;
             Exception? failure = null;
-            var call = Task.Run(() =>
+            var call = QuietWindow.RunOnHiddenDesktop(() =>   // 창이 숨은 데스크톱(AppHost)에 있다 — UIA 클라이언트도 거기서
             {
                 try
                 {
@@ -283,7 +284,7 @@ public class UnitConsoleCloseViewTests
                 timer.Stop();
                 var hwnd = new WindowInteropHelper(window).Handle;
                 // 자동화가 읽는 그대로 — 다른 스레드의 UIA 클라이언트로 제목(창 이름) · 문장을 읽고 단추를 누른다.
-                var result = Task.Run(() =>
+                var result = QuietWindow.RunOnHiddenDesktop(() =>   // 창이 숨은 데스크톱(AppHost)에 있다 — UIA 클라이언트도 거기서
                 {
                     var root = AutomationElement.FromHandle(hwnd);
                     var message = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "Devices.Assembly.Confirm.Message"));

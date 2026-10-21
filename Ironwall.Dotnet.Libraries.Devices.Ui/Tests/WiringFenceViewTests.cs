@@ -21,6 +21,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Xunit;
 using Xunit.Abstractions;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -61,7 +62,7 @@ public class WiringFenceViewTests
     {
         var watch = Stopwatch.StartNew();
         var window = NewWindow(vm, dark: false);
-        window.Show();
+        QuietWindow.Show(window);
         Pump();
         var total = watch.Elapsed.TotalMilliseconds;
         var canvas = CanvasOf(window);
@@ -972,7 +973,7 @@ public class WiringFenceViewTests
         => OnSta(() =>
         {
             var window = NewWindow(vm, dark);
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             vm.IsSoftwareRendering = false;          // 시험 창의 렌더 tier 와 무관하게 입체로 시작
             vm.IsFlatChosen = false;
@@ -1056,6 +1057,8 @@ public class WiringFenceViewTests
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — Shift+화살표 · Shift+F10 · Esc 는 키보드 초점이 있는 칩을 따라간다. 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { result = body(); }
             catch (Exception ex) { failure = ex; }
             finally { StaCleanup.ShutdownDispatcher(); }

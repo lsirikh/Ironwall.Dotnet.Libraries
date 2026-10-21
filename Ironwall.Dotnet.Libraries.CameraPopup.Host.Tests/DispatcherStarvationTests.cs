@@ -302,8 +302,11 @@ public sealed class DispatcherFloodScenario : IDisposable
 
     private void SleepUntil(double atMs)
     {
-        double left = atMs - _watch.Elapsed.TotalMilliseconds;
-        if (left > 0) Thread.Sleep(TimeSpan.FromMilliseconds(left));
+        // Thread.Sleep 은 밀리초 미만을 버리고 타이머 해상도 탓에 조금 일찍 깰 수 있다 — 목표 시각에 닿을 때까지 다시 잔다
+        // (2026-10-21 .sln 실행: 홍수가 19.99초로 재져 시험 장치 확인이 실패).
+        double left;
+        while ((left = atMs - _watch.Elapsed.TotalMilliseconds) > 0)
+            Thread.Sleep(TimeSpan.FromMilliseconds(Math.Ceiling(left)));
     }
 
     // ───────── 가짜 ─────────

@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -110,7 +111,7 @@ public class DialogFrameWindowRootTests
             var frame = NewFrame(out _);
             frame.Backdrop = Brushes.DarkSlateGray;
             var window = NewWindow(new Grid { Children = { frame } }, ResizeMode.CanResize, 420);
-            window.Show();
+            QuietWindow.Show(window);
             Pump(DispatcherPriority.ApplicationIdle);
             var snapshot = (
                 Root: frame.IsWindowRoot,
@@ -144,7 +145,7 @@ public class DialogFrameWindowRootTests
                 Content = new ContentControl { Content = frame }, Width = 600, Height = 420, WindowStartupLocation = WindowStartupLocation.Manual,
                 Left = -20000, Top = -20000, ShowInTaskbar = false, ShowActivated = false,
             };
-            window.Show();
+            QuietWindow.Show(window);
             Pump(DispatcherPriority.ApplicationIdle);
             var snapshot = (Root: frame.IsWindowRoot, Close: Part(frame, ConsoleDialogFrame.PartClose)?.IsVisible, Redirect: ConsoleWindowChrome.GetCloseRedirect(window), Height: window.ActualHeight);
             window.Close();
@@ -167,7 +168,7 @@ public class DialogFrameWindowRootTests
             var frame = NewFrame(out _);
             var window = NewWindow(new UserControl { Content = frame }, ResizeMode.NoResize, 420);
             window.WindowStyle = WindowStyle.None;     // 제목 줄 없는 창 — 틀의 머리가 유일한 제목 · ✕ 다
-            window.Show();
+            QuietWindow.Show(window);
             Pump(DispatcherPriority.ApplicationIdle);
             var snapshot = (Title: Part(frame, ConsoleDialogFrame.PartTitle)?.IsVisible, Close: Part(frame, ConsoleDialogFrame.PartClose)?.IsVisible);
             window.Close();
@@ -186,7 +187,7 @@ public class DialogFrameWindowRootTests
             var frame = NewFrame(out _);
             frame.Kind = "제1중대 · 편제 3건";
             var window = NewWindow(new UserControl { Content = frame }, ResizeMode.NoResize, 420);
-            window.Show();
+            QuietWindow.Show(window);
             Pump(DispatcherPriority.ApplicationIdle);
             var kind = Descendants<ConsoleDialogText>(frame).FirstOrDefault(t => t.Text == frame.Kind);
             var snapshot = (Kind: kind?.IsVisible, Title: Part(frame, ConsoleDialogFrame.PartTitle)?.IsVisible);
@@ -219,7 +220,7 @@ public class DialogFrameWindowRootTests
         var frame = NewFrame(out var body);
         var window = NewWindow(new UserControl { Content = frame }, mode, height);
         window.Title = "창 제목(런처)";
-        window.Show();
+        QuietWindow.Show(window);
         Pump(DispatcherPriority.ApplicationIdle);
         Pump(DispatcherPriority.ContextIdle);
         return (window, frame, body);
