@@ -27,6 +27,8 @@
   sln3 실패 9(전부 CameraPopup.Tests.Survival — 실제 호스트 프로세스 · LibVLC · 시간 상한 시험).
 - SupervisorSurvivalTests 단독 3회: 실패 2 · 3 · 1 — 매번 다른 충돌 종류(dispatcher-exception · fail-fast · native-access-violation · unhandled-exception)가 상한을 넘김, 재시작 3.5~6.7초 · 감지 0.7~3.4초로 흩어짐.
 - 그때 PC: dotnet.exe 약 1000개 · testhost.exe 약 10개(다른 하네스 작업 동시 실행), Get-Counter 가 120초 안에 끝나지 않음.
+- 이어서(중단 뒤 재개): dotnet.exe 약 1580개(부하 그대로). MapNav 70 · MapAux 95 · MapLayer 102 모두 통과(sky=1 배선 뒤).
+  sln 다시 1회: 실패 1 — 같은 시험 native-access-violation running=3272 ms(상한 3000). `git diff --name-only 1e12f873 HEAD` 에 CameraPopup 파일 없음 = 시험 대상 코드는 작업 전과 같다.
 - 결론: 이 작업 · v2.6 변경이 닿지 않는 CameraPopup 감독자(Supervisor) 시간 시험이 PC 부하로 흔들린 것. 시험은 고치지 않았다(약화 금지). 부하 없는 때 다시 돌려 확인 필요.
 
 ## 앱 쪽 붙일 자리(사용자가 직접)
