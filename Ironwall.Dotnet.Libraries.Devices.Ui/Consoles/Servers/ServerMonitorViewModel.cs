@@ -56,7 +56,7 @@ public sealed class ServerAssignCandidateViewModel : PropertyChangedBase
 /// <para><b>이 콘솔은 상태를 쓰지 않는다.</b> 상태는 관측 값이고 보고 입구는 서버 매니저의 것이다.</para>
 /// <para>싱글턴이다 — 닫을 때 선택 · 미적용 변경 · 구독을 전부 내려놓고, <b>돌고 있던 상세 적재를 취소</b>한다.</para>
 /// </remarks>
-public class ServerMonitorViewModel : Screen
+public partial class ServerMonitorViewModel : Screen, IHandle<ServerSystemEventMessage>, IHandle<ServersChangedMessage>
 {
     public const string ConsoleKey = "Servers";
 
@@ -67,7 +67,8 @@ public class ServerMonitorViewModel : Screen
         IServerConsoleService service,
         DeviceProvider deviceProvider,
         IClock clock,
-        Lazy<IServerConsoleDialogs>? dialogs = null)
+        Lazy<IServerConsoleDialogs>? dialogs = null,
+        Ironwall.Dotnet.Libraries.Messages.Dto.Systems.ISystemEventSource? systemEvents = null)
     {
         _events = eventAggregator;
         _log = log;
@@ -75,6 +76,7 @@ public class ServerMonitorViewModel : Screen
         _devices = deviceProvider ?? throw new ArgumentNullException(nameof(deviceProvider));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _dialogs = dialogs;
+        _systemEvents = systemEvents;   // 있으면 레일에 "시스템 이벤트" 칸을 붙인다(G52)
 
         DisplayName = "서버";
         Detail = new ConsoleDetailPresenter { TypeName = "서버" };
@@ -109,6 +111,7 @@ public class ServerMonitorViewModel : Screen
             NotifyOfPropertyChange(name);
 
         RefreshCandidates();
+        _events?.SubscribeOnUIThread(this);   // 시스템 이벤트 수신 · 서버 변경 알림(G52 · G54)
         await ReloadAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -117,6 +120,8 @@ public class ServerMonitorViewModel : Screen
         _devices.CollectionEntity.CollectionChanged -= OnDevicesChanged;
         Assign.Completed -= OnAssignCompleted;
         Detail.Guard.Blocked -= OnNavigationBlocked;
+        _events?.Unsubscribe(this);
+        SystemEventRows.Clear();
 
         // 돌고 있던 상세 적재를 끊는다 — 닫힌 싱글턴에 늦은 응답이 들어차면 다음에 열 때 남의 값이 보인다.
         CancelDetailLoad();
@@ -202,13 +207,14 @@ public class ServerMonitorViewModel : Screen
             return false;
         }
 
-        _railKey = ServerTypeCatalog.SpecOf(key) is null ? ServerTypeCatalog.AllKey : key;
+        _railKey = ServerTypeCatalog.SpecOf(key) is not null || IsSystemEventsRail(key) ? key : ServerTypeCatalog.AllKey;
         ClearSelection();
         ApplyFilter();
 
         foreach (var name in new[] { nameof(SelectedRail), nameof(IsServerList), nameof(IsSystemEvents), nameof(CanAdd) })
             NotifyOfPropertyChange(name);
         RefreshStatus();
+        if (IsSystemEvents) _ = LoadSystemEventsAsync(CancellationToken.None);
         return true;
     }
 
@@ -227,6 +233,16 @@ public class ServerMonitorViewModel : Screen
                 ShowCount = spec.ShowCount,
                 HasSeparatorAbove = spec.HasSeparatorAbove,
             });
+        // "시스템 이벤트" 칸은 공급자(REST)가 있을 때만 붙인다(G52) — 없으면 예전처럼 내지 않는다.
+        if (_systemEvents is not null)
+        {
+            var spec = ServerTypeCatalog.SystemEventsSpec;
+            RailEntries.Add(new ConsoleRailEntry(spec.Key, spec.Label, new ConsoleIconToken(spec.Icon))
+            {
+                ShowCount = spec.ShowCount,
+                HasSeparatorAbove = spec.HasSeparatorAbove,
+            });
+        }
     }
 
     private void RefreshRailCounts()
@@ -324,7 +340,7 @@ public class ServerMonitorViewModel : Screen
     /// "시스템 이벤트" 칸의 안내. 그 칸과 상세 절은 지금 <b>내지 않는다</b>(서버 API 에 입구가 없다 — U-18 감사 D-7 7.1).
     /// 입구가 생겨 다시 켤 때 쓸 운영자 문장만 남긴다. 생존 신호 안내(REST · NATS 설계 메모)는 화면에서 뺐다(7.2).
     /// </summary>
-    public string SystemEventsNote => "시스템 이벤트를 아직 제공하지 않습니다.";
+    public string SystemEventsNote => SystemEventsNoteText();
 
     private void ApplyFilter()
     {
@@ -351,7 +367,7 @@ public class ServerMonitorViewModel : Screen
 
     private void RefreshStatus()
     {
-        if (IsSystemEvents) { ListStatusText = "시스템 이벤트"; return; }
+        if (IsSystemEvents) { ListStatusText = SystemEventsStatusText(); return; }
 
         var shown = Rows.Count;
         var fault = Rows.Count(r => r.IsFault);

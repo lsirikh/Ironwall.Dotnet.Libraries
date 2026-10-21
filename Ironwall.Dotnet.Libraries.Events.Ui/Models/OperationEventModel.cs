@@ -23,6 +23,12 @@ public class OperationEventModel : ExEventModel
     /// <summary>심각도 원문(<c>INFO</c> · <c>WARNING</c> · <c>CRITICAL</c>). 없으면 null.</summary>
     public string? Severity { get; set; }
 
+    /// <summary>
+    /// 장비 카테고리 원문(<c>enclosure</c> · <c>camera</c> …, 서버 <c>device.category_device</c>). 사유 글자의 장비 종류를 가른다(G19).
+    /// 6.3 처럼 없으면 null.
+    /// </summary>
+    public string? CategoryDevice { get; set; }
+
     /// <summary>상세(JSONB)를 한 줄로 편 것 — 사유마다 키가 달라 강타입으로 두지 않는다. 없으면 null.</summary>
     public string? DetailText { get; set; }
 }

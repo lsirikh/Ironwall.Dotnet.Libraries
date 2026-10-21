@@ -82,7 +82,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                     Content = Contents,
                     FromEventId = Model.Id
                 };
-                var response = await apiService.CreateActionEventAsync(dto, token);
+                var response = await apiService.CreateActionEventAsync(ActionReportRules.ApplyCreatedAtPolicy(dto), token);
                 if (!response.Success)
                 {
                     _log?.Error($"[ACTION_REPORT] Detection INSERT 실패: {response.Message}");
