@@ -116,9 +116,16 @@ public sealed class FakeReportApiService : IReportApiService
     public Task<ApiResponse<ReportTemplateDto>> GetTemplateByIdAsync(int id, CancellationToken token = default)
         => Task.FromResult(new ApiResponse<ReportTemplateDto> { Success = true, Data = Templates.FirstOrDefault(t => t.Id == id) });
 
+    /// <summary>템플릿 등록 · 수정이 돌려줄 실패 응답(서버 422 등 모양을 흉내 낼 때). null 이면 평소대로.</summary>
+    public ApiResponse<ReportTemplateDto>? WriteFailureResponse { get; set; }
+
+    /// <summary>생성 요청이 돌려줄 실패 응답. null 이면 평소대로.</summary>
+    public ApiResponse<ReportGenerationDto>? GenerateFailureResponse { get; set; }
+
     public Task<ApiResponse<ReportTemplateDto>> CreateTemplateAsync(ReportTemplateCreateDto dto, CancellationToken token = default)
     {
         LastCreate = dto;
+        if (WriteFailureResponse != null) return Task.FromResult(WriteFailureResponse);
         if (FailWrite) return Task.FromResult(new ApiResponse<ReportTemplateDto> { Success = false });
         var created = new ReportTemplateDto
         {
@@ -136,6 +143,7 @@ public sealed class FakeReportApiService : IReportApiService
     public Task<ApiResponse<ReportTemplateDto>> UpdateTemplateAsync(int id, ReportTemplateUpdateDto dto, CancellationToken token = default)
     {
         LastUpdate = dto;
+        if (WriteFailureResponse != null) return Task.FromResult(WriteFailureResponse);
         if (FailWrite) return Task.FromResult(new ApiResponse<ReportTemplateDto> { Success = false });
 
         var target = Templates.FirstOrDefault(t => t.Id == id);
@@ -160,6 +168,7 @@ public sealed class FakeReportApiService : IReportApiService
     public Task<ApiResponse<ReportGenerationDto>> GenerateAsync(ReportGenerateRequestDto dto, CancellationToken token = default)
     {
         LastGenerate = dto;
+        if (GenerateFailureResponse != null) return Task.FromResult(GenerateFailureResponse);
         if (FailWrite) return Task.FromResult(new ApiResponse<ReportGenerationDto> { Success = false });
         var created = new ReportGenerationDto
         {

@@ -419,7 +419,8 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
 
     public bool DetailCanApply => IsCreateRail
         ? CreateViewModel.CanGenerate && CreateViewModel.HasInput && CanEditReports
-        : IsTemplateRail && CanEditReports && (Detail.CanApply || (EditViewModel.IsCreate && EditViewModel.Board.EnabledCount > 0));
+        : IsTemplateRail && CanEditReports && !EditViewModel.IsMissingEnabledComponent   // 구성 0개는 서버(v8.0.15)가 422 로 막는다
+          && (Detail.CanApply || (EditViewModel.IsCreate && EditViewModel.Board.EnabledCount > 0));
 
     public bool DetailCanRevert => IsCreateRail
         ? CreateViewModel.HasInput && !CreateViewModel.IsGenerating
@@ -432,6 +433,8 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         {
             if (IsCreateRail)
                 return string.IsNullOrEmpty(CreateViewModel.StatusText) ? CreateFormFooter : CreateViewModel.StatusText;
+            // [적용] 이 꺼진 까닭을 말한다 — 꺼진 단추만 두면 왜 안 눌리는지 모른다.
+            if (IsTemplateRail && EditViewModel.IsMissingEnabledComponent) return ReportTemplateEditViewModel.NoEnabledComponentText;
             if (IsTemplateRail && EditViewModel.HasStatus && !Detail.IsDirty) return EditViewModel.StatusText;
             // 생성 이력 칸은 고칠 것이 없는 미리보기다 — "변경 없음" 은 뜻이 없다(적용 막대도 없다).
             if (IsListRail) return string.Empty;

@@ -4,6 +4,8 @@ using Ironwall.Dotnet.Libraries.Accounts.Ui.Common;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
@@ -84,7 +86,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 강제로그아웃 후 첫 페이지부터 재조회
             else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중(401→teardown)이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = ExplainFailure("세션 종료", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message) });
+                { Title = "세션 관리", Explain = ExplainFailure("세션 종료", res.StatusCode, res.Error, res.Error?.Message ?? res.Message) });
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 강제로그아웃 실패: {ex.Message}"); }
     }
@@ -117,7 +119,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 전체종료 후 첫 페이지부터 재조회
             else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = ExplainFailure("전체 세션 종료", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message) });   // (R-2) 409 ADMIN 락아웃 안내
+                { Title = "세션 관리", Explain = ExplainFailure("전체 세션 종료", res.StatusCode, res.Error, res.Error?.Message ?? res.Message) });   // (R-2) 409 ADMIN 락아웃 안내
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 전체세션 종료 실패: {ex.Message}"); }
     }
@@ -300,9 +302,12 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     /// ("마지막 활성 ADMIN 세션은 강제 로그아웃할 수 없음"). 운영 6.3.2 는 선언이 없어 이 분기에 닿지 않는다(무회귀).</para>
     /// </summary>
     /// <remarks>409 가 아니면 고정 문장 — 서버 원문은 로그로만 남긴다(A-38).</remarks>
-    private string ExplainFailure(string what, int statusCode, string? code, string? serverMessage)
+    private string ExplainFailure(string what, int statusCode, ApiError? error, string? serverMessage)
     {
+        var code = error?.Code;
         _log?.Warning($"[UserSession] {what} 거부: {statusCode} {code} {serverMessage}");
+        // 8.0.15 동시 쓰기 경합(details.retryable=true)은 관리자 보호가 아니다 — 고정 문구보다 먼저 본다(G01).
+        if (ApiStatusHelper.IsRetryableConflict(statusCode, error)) return ApiStatusHelper.RetryableConflictMessage;
         return (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase))
             ? "마지막으로 남은 관리자 세션은 종료할 수 없습니다. 다른 관리자가 로그인한 뒤 다시 시도하세요."
             : $"{what}에 실패했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.";

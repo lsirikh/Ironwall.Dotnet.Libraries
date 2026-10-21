@@ -27,4 +27,13 @@ public interface ITrackingApiService : IService
     /// <param name="token">취소 토큰(페이지 경계에서 협조 취소)</param>
     /// <returns>추적점 DTO 목록. 실패 시 부분/빈 목록(throw 안 함).</returns>
     Task<List<TrackPointDto>> GetTrackPointsAsync(DateTime fromUtc, DateTime toUtc, int? cameraId = null, CancellationToken token = default);
+
+    /// <summary>
+    /// <see cref="GetTrackPointsAsync"/> 와 같되 결과 종류(성공 · 403 · 401 · 실패)와 부분 여부를 함께 돌려준다(G12).
+    /// 예외를 던지지 않는다 — 실패여도 그때까지 읽은 점을 담는다.
+    /// </summary>
+    Task<TrackPointsResult> GetTrackPointsWithStatusAsync(DateTime fromUtc, DateTime toUtc, int? cameraId = null, CancellationToken token = default);
+
+    /// <summary><c>GET /api/tracking/health</c>(무인증) 판정(G13). 예외를 던지지 않는다.</summary>
+    Task<EnumTrackingHealth> GetHealthAsync(CancellationToken token = default);
 }

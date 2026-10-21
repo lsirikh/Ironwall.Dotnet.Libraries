@@ -62,7 +62,7 @@ public class AccountApiService : IAccountApiService
     public async Task<SsoExchangeResult> SsoExchangeAsync(string ssoAccessToken, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(ssoAccessToken))
-            return new SsoExchangeResult { Success = false, ErrorCode = "INVALID_TOKEN", Message = "SSO 토큰이 비었습니다", Retryable = true };
+            return new SsoExchangeResult { Success = false, ErrorCode = ApiErrorCodes.InvalidToken, Message = "SSO 토큰이 비었습니다", Retryable = true };
 
         try
         {
