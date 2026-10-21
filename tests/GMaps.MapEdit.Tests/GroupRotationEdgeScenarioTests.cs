@@ -25,6 +25,8 @@ namespace GMaps.MapEdit.Tests;
 /// 묶음 회전 경계 · 순서 · 조합 시나리오(t-20261019-193448-b2cc 영역 D) — 실제 배선(<see cref="WiredMapRig"/>)으로
 /// 단일 선택 · 전원 잠김 · 구역 · 오버레이 이미지 · 권한 · 미리보기 중 다른 조작(Redo · 방향키 · 묶음 끌기 · 편집 모드 끄기 · 잠금 · 속성 판) ·
 /// 확정 연타 · 판 값 다시 채움 · 지도 회전 상태의 손잡이 각을 본다. 실제 마우스 · Shift 상태 · 화면 그림은 실기 몫.
+/// 모두 숨은 데스크톱에서 돈다(<see cref="Scenario.StaOnHiddenDesktop"/>) — 방향키 · 클릭 · 레이어 판 처리기가 Shift · Ctrl 을 읽어,
+/// 시험 중 사용자가 누른 보조키가 섞이면 결과가 바뀐다(2026-10-21: 3건이 0.5초 사이에 함께 실패 — Ctrl 을 얹으면 그 3건이 모두 깨진다).
 /// </summary>
 public class GroupRotationEdgeScenarioTests
 {
@@ -107,7 +109,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-06")]
-    public void should_not_rotate_or_consume_bracket_key_when_only_one_marker_is_selected() => Scenario.Sta(() =>
+    public void should_not_rotate_or_consume_bracket_key_when_only_one_marker_is_selected() => Scenario.StaOnHiddenDesktop(() =>
     {
         var rig = WiredMapRig.Create();
         var a = AddSymbol(rig, 4001, -60, 0, bearing: 15);
@@ -128,7 +130,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-07")]
-    public void should_refuse_with_notice_when_rotate_is_pressed_and_every_member_is_locked() => Scenario.Sta(() =>
+    public void should_refuse_with_notice_when_rotate_is_pressed_and_every_member_is_locked() => Scenario.StaOnHiddenDesktop(() =>
     {
         var rig = WiredMapRig.Create();
         var a = AddSymbol(rig, 4011, -60, locked: true);
@@ -153,7 +155,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-11")]
-    public void should_rotate_only_zone_vertices_and_leave_zone_bearing_when_pids_zone_is_in_group() => Scenario.StaAsync(async () =>
+    public void should_rotate_only_zone_vertices_and_leave_zone_bearing_when_pids_zone_is_in_group() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -196,7 +198,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-12")]
-    public void should_rotate_overlay_image_with_symbols_and_undo_both_when_image_is_in_group() => Scenario.StaAsync(async () =>
+    public void should_rotate_overlay_image_with_symbols_and_undo_both_when_image_is_in_group() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -238,7 +240,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-26")]
-    public void should_block_rotate_button_and_keys_with_permission_notice_when_account_cannot_edit_map() => Scenario.Sta(() =>
+    public void should_block_rotate_button_and_keys_with_permission_notice_when_account_cannot_edit_map() => Scenario.StaOnHiddenDesktop(() =>
     {
         var rig = WiredMapRig.Create(canEdit: false);
         var (a, _) = Pair(rig, 4041, 4042);
@@ -256,7 +258,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-33")]
-    public void should_put_members_back_without_saving_when_permission_is_revoked_during_preview() => Scenario.StaAsync(async () =>
+    public void should_put_members_back_without_saving_when_permission_is_revoked_during_preview() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -284,7 +286,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-29")]
-    public void should_confirm_preview_first_when_redo_is_pressed_during_rotation_preview() => Scenario.StaAsync(async () =>
+    public void should_confirm_preview_first_when_redo_is_pressed_during_rotation_preview() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -312,7 +314,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-30")]
-    public void should_confirm_then_move_with_two_undo_units_when_arrow_key_is_pressed_during_preview() => Scenario.StaAsync(async () =>
+    public void should_confirm_then_move_with_two_undo_units_when_arrow_key_is_pressed_during_preview() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         RecordSaves(rig);
@@ -341,7 +343,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-31")]
-    public void should_confirm_rotation_when_group_move_drag_starts_during_preview() => Scenario.StaAsync(async () =>
+    public void should_confirm_rotation_when_group_move_drag_starts_during_preview() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -362,7 +364,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-32")]
-    public void should_confirm_save_and_close_panel_when_edit_mode_is_turned_off_during_preview() => Scenario.StaAsync(async () =>
+    public void should_confirm_save_and_close_panel_when_edit_mode_is_turned_off_during_preview() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -386,7 +388,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-35")]
-    public void should_confirm_open_rotation_before_group_lock_so_escape_cannot_split_screen_and_db() => Scenario.StaAsync(async () =>
+    public void should_confirm_open_rotation_before_group_lock_so_escape_cannot_split_screen_and_db() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saved = new Dictionary<int, (double lat, double lng)>();
@@ -416,7 +418,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-36")]
-    public void should_confirm_open_rotation_and_stop_turning_member_when_it_is_locked_from_layer_panel() => Scenario.StaAsync(async () =>
+    public void should_confirm_open_rotation_and_stop_turning_member_when_it_is_locked_from_layer_panel() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -441,7 +443,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-37")]
-    public void should_confirm_open_rotation_before_group_property_change_is_saved() => Scenario.StaAsync(async () =>
+    public void should_confirm_open_rotation_before_group_property_change_is_saved() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -472,7 +474,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-38")]
-    public void should_save_once_and_record_one_undo_when_confirm_is_pressed_repeatedly() => Scenario.StaAsync(async () =>
+    public void should_save_once_and_record_one_undo_when_confirm_is_pressed_repeatedly() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
@@ -496,7 +498,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-41")]
-    public void should_refill_group_panel_bearing_and_view_direction_after_rotation_confirm_and_undo() => Scenario.StaAsync(async () =>
+    public void should_refill_group_panel_bearing_and_view_direction_after_rotation_confirm_and_undo() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         RecordSaves(rig);
@@ -528,7 +530,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-45")]
-    public void should_end_handle_drag_at_once_without_moving_when_every_member_is_locked() => Scenario.Sta(() =>
+    public void should_end_handle_drag_at_once_without_moving_when_every_member_is_locked() => Scenario.StaOnHiddenDesktop(() =>
     {
         var rig = WiredMapRig.Create();
         var a = AddSymbol(rig, 4171, -80, locked: true);
@@ -553,7 +555,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-103")]
-    public void should_move_group_with_plain_up_key_and_never_tilt_map_when_arrow_keys_are_pressed() => Scenario.StaAsync(async () =>
+    public void should_move_group_with_plain_up_key_and_never_tilt_map_when_arrow_keys_are_pressed() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         RecordSaves(rig);
@@ -581,7 +583,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "D-44")]
-    public void should_turn_by_same_geographic_angle_as_drag_when_map_itself_is_rotated_30_degrees() => Scenario.Sta(() =>
+    public void should_turn_by_same_geographic_angle_as_drag_when_map_itself_is_rotated_30_degrees() => Scenario.StaOnHiddenDesktop(() =>
     {
         var rig = WiredMapRig.Create();
         rig.Map.Bearing = 30;                                   // 지도 자체를 30° 돌려 둠
@@ -620,7 +622,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "G1-2")]
-    public void should_undo_pending_rotation_not_earlier_edit_when_undo_is_pressed_while_confirm_save_is_slow() => Scenario.StaAsync(async () =>
+    public void should_undo_pending_rotation_not_earlier_edit_when_undo_is_pressed_while_confirm_save_is_slow() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         RecordSlowSaves(rig, 40);
@@ -650,7 +652,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "G1-2")]
-    public void should_confirm_preview_and_drop_old_redo_when_redo_is_pressed_while_confirm_save_is_slow() => Scenario.StaAsync(async () =>
+    public void should_confirm_preview_and_drop_old_redo_when_redo_is_pressed_while_confirm_save_is_slow() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         RecordSlowSaves(rig, 40);
@@ -680,7 +682,7 @@ public class GroupRotationEdgeScenarioTests
 
     [Fact]
     [Trait("Scenario", "G1-9")]
-    public void should_log_and_not_crash_dispatcher_when_recording_rotation_undo_throws() => Scenario.StaAsync(async () =>
+    public void should_log_and_not_crash_dispatcher_when_recording_rotation_undo_throws() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = WiredMapRig.Create();
         var saves = RecordSaves(rig);
