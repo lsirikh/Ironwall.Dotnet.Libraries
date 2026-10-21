@@ -381,7 +381,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
                 return;
             }
 
-            // ② 넣기는 한 번, 빼기는 서버 상한(100)에 맞춰 나눠서. 장비마다 부르지 않는다.
+            // ② 넣기 · 빼기 모두 서버 상한(100)에 맞춰 나눠서. 장비마다 부르지 않는다.
             var add = plan.Added.Count > 0 ? await SendAssignAsync(plan.Added, token).ConfigureAwait(true) : null;
             var remove = plan.Removed.Count > 0 ? await SendRemoveAsync(plan.Removed, token).ConfigureAwait(true) : null;
 
@@ -416,32 +416,43 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         }
     }
 
-    /// <summary>넣기 — 서버에 상한이 없어 한 번에 보낸다(device_group.py:78).</summary>
+    /// <summary>
+    /// 넣기 — 서버가 한 번에 <b>100대</b>까지만 받는다(명세 §5.6 그룹 할당 <c>device_ids</c> 1~100개, 빼기와 같은 상한 · G31).
+    /// 넘겨 보내면 422 로 <b>한 대도</b> 들어가지 않으므로 잘라서 보낸다. 일부 묶음 실패 규칙은 빼기와 같다.
+    /// </summary>
     private async Task<AssignLegOutcome> SendAssignAsync(IReadOnlyList<int> ids, CancellationToken token)
     {
         _lastAssigned = new List<int>();
         _lastSkippedAssign = new List<int>();
-        var dto = new DeviceGroupAssignRequestDto { DeviceIds = ids.ToList() };
-        try
-        {
-            var response = await _apiService.AssignDevicesToGroupAsync(_groupId, dto, token).ConfigureAwait(true);
-            if (!response.Success)
-            {
-                _log?.Warning($"[Assign] group={_groupId} 넣기 실패 보냄={ids.Count}: {response.Message}");
-                return new AssignLegOutcome(ids.Count, 0, 0, Failed: true);
-            }
+        var anyFailed = false;
 
-            _lastAssigned = (response.Data?.AssignedDeviceIds ?? new List<int>()).ToList();
-            _lastSkippedAssign = (response.Data?.SkippedDeviceIds ?? new List<int>()).ToList();
-            _log?.Info($"[Assign] group={_groupId} 넣기 보냄={ids.Count} 처리={_lastAssigned.Count} 건너뜀={_lastSkippedAssign.Count}");
-            return new AssignLegOutcome(ids.Count, _lastAssigned.Count, _lastSkippedAssign.Count, Failed: false);
-        }
-        catch (OperationCanceledException) { return new AssignLegOutcome(ids.Count, 0, 0, Failed: true); }
-        catch (Exception ex)
+        foreach (var chunk in AssignDelta.ChunkAssigns(ids))
         {
-            _log?.Error($"[Assign] 넣기 오류: {ex.Message}");
-            return new AssignLegOutcome(ids.Count, 0, 0, Failed: true);
+            var dto = new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() };
+            try
+            {
+                var response = await _apiService.AssignDevicesToGroupAsync(_groupId, dto, token).ConfigureAwait(true);
+                if (!response.Success)
+                {
+                    anyFailed = true;
+                    _log?.Warning($"[Assign] group={_groupId} 넣기 실패 보냄={chunk.Count}: {response.Message}");
+                    continue;
+                }
+                _lastAssigned.AddRange(response.Data?.AssignedDeviceIds ?? new List<int>());
+                _lastSkippedAssign.AddRange(response.Data?.SkippedDeviceIds ?? new List<int>());
+            }
+            catch (OperationCanceledException) { anyFailed = true; break; }
+            catch (Exception ex)
+            {
+                anyFailed = true;
+                _log?.Error($"[Assign] 넣기 오류: {ex.Message}");
+            }
         }
+
+        _log?.Info($"[Assign] group={_groupId} 넣기 보냄={ids.Count} 묶음={AssignDelta.AssignCallCount(ids.Count)} 처리={_lastAssigned.Count} 건너뜀={_lastSkippedAssign.Count}");
+        // 한 묶음이라도 됐으면 부분 실패다 — 전부 실패했을 때만 실패로 적는다(그래야 남은 것만 다시 보낸다).
+        var failed = anyFailed && _lastAssigned.Count == 0 && _lastSkippedAssign.Count == 0;
+        return new AssignLegOutcome(ids.Count, _lastAssigned.Count, _lastSkippedAssign.Count, failed);
     }
 
     /// <summary>

@@ -302,6 +302,8 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
             // (8.0 unit_id) 쓰기 직전 소속 부대를 싣는다 — 8.0 미만이면 관문이 키를 지운다(6.3/7.0 은 422).
             await UnitScopeGate.StampAsync(dto, nameof(CreateEnclosureAsync), _log, token);
             var r = await _apiService.CreateEnclosureAsync(dto, token);
+            // (G17) 등록은 됐지만 서버가 남긴 경고(방송 서버 미지정 · 이 장비에 없는 측정 항목)를 쉬운 말로 알린다.
+            if (r.Success && r.Data != null) await SaveWarningNotice.AnnounceAsync(_eventAggregator, r.Warnings, _log);
             // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
             return new ApiResultLite(r.Success && r.Data != null, r.StatusCode,
                 ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)

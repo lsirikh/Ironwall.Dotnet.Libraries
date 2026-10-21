@@ -583,7 +583,7 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
                 {
                     if (pids.EnclosureMetrics is { } metrics)
                         foreach (var (label, value) in EnclosureMetricsText.Rows(metrics, DateTime.Now))
-                            yield return new(label, value, label == "받은 시각" && metrics.IsStale ? "warn" : null);
+                            yield return new(label, value, label == EnclosureMetricsText.TimeLabel && metrics.IsStale ? "warn" : null);
                     else
                         yield return new("계측", "받지 못함");
                 }

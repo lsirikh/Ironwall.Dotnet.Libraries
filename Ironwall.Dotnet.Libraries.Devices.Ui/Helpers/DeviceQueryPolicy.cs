@@ -136,6 +136,12 @@ public sealed class DeviceQueryPolicy
     /// </summary>
     /// <remarks>세대(<see cref="Contract"/>)는 8.0 까지만 가르므로 판본 원문(<see cref="RawVersion"/>)을 <b>순서 비교</b>한다.</remarks>
     public bool AttachesComponentsAnywhere => IsAxisContract && IsAtLeast(RawVersion, ComponentsAnywhereSince);
+
+    /// <summary>
+    /// 함체 안 장비(<c>device_ids</c> · <c>?include=contents</c> · <c>?device_id=</c> 역조회)가 있는가 — 서버 <c>8.0.6</c> <b>이상</b>
+    /// (명세 §5.5.6.1). 판본을 못 읽었으면 <c>false</c>(종전 동작 — 함체째 부대 이동을 하지 않는다, G32).
+    /// </summary>
+    public bool HasEnclosureContents => Contract >= EnumServerContract.V8_0 && IsAtLeast(RawVersion, EnclosureContentsSince);
     #endregion
 
     #region - Processes -
@@ -308,6 +314,9 @@ public sealed class DeviceQueryPolicy
 
     /// <summary>부품 카테고리 제한이 풀린 첫 서버 판본(회신 2026-10-03 · 마이그레이션 v135/v136).</summary>
     private static readonly Version ComponentsAnywhereSince = new(8, 0, 8);
+
+    /// <summary>함체 안 장비 목록이 생긴 첫 서버 판본(명세 §5.5.6.1).</summary>
+    private static readonly Version EnclosureContentsSince = new(8, 0, 6);
 
     /// <summary>판본 원문(<c>"8.0.8"</c> · <c>"v8.0.10-rc1"</c>)의 앞 숫자 부분이 <paramref name="since"/> 이상인가. 못 읽으면 <c>false</c>.</summary>
     private static bool IsAtLeast(string? raw, Version since)

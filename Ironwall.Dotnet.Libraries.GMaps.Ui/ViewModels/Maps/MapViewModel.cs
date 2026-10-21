@@ -6480,7 +6480,8 @@ public partial class MapViewModel : BasePanelViewModel,
             HasDevice: marker.LinkedDevice is not null,
             WebServerEnabled: _deviceDetailUrlService?.IsWebServerEnabled == true,
             HasNetworkEndpoint: hasEndpoint,
-            IsPtzCamera: device is ICameraDeviceModel { Category: EnumCameraType.PTZ },
+            // 형태 축 SPEED_DOME 은 Category 가 NONE 으로 남는다 — 공용 기준으로 판정(8.0.15 G14)
+            IsPtzCamera: CameraDriveKind.IsPtzDrive(device as ICameraDeviceModel),
             CanControlDevice: CanControlDevice(),
             CanBroadcast: CanBroadcast(),
             CanViewEvents: PermissionGate.Resolve(ResolvePermissionService()?.CanView("events"), "view"),
@@ -6641,6 +6642,8 @@ public partial class MapViewModel : BasePanelViewModel,
 
     private Services.Enclosure.IEnclosureMetricsNatsSyncService? _enclosureMetricsSync;
     private System.Windows.Threading.DispatcherTimer? _enclosureMetricsStaleTimer;
+    /// <summary>'오래된 값' 판정 시계 — 시험용(null=지금 시각). 생성자 없이 만든 VM 에서도 null 이라 안전하다.</summary>
+    private Func<DateTime>? _enclosureMetricsNow;
 
     /// <summary>ENCLOSURE_METRICS 구독 시작 — 함체 심볼 툴팁 · 상세 창에 최신 계측을 싣는다.</summary>
     private void StartEnclosureMetricsSync()
@@ -6689,14 +6692,15 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (MainMap == null || _enclosureMetricsSync == null) return;
-            var now = DateTime.Now;
+            var now = _enclosureMetricsNow?.Invoke() ?? DateTime.Now;
             foreach (var marker in MainMap.Markers.OfType<GMapPidsMarker>())
             {
                 if (marker.DeviceType != EnumDeviceType.Enclosure || marker.LinkedDeviceId <= 0) continue;
                 if (enclosureId is { } id && marker.LinkedDeviceId != id) continue;
                 marker.EnclosureAlert = _enclosureMetricsSync.GetAlert(marker.LinkedDeviceId);
                 if (!_enclosureMetricsSync.TryGetLatest(marker.LinkedDeviceId, out var reading)) continue;
-                marker.EnclosureMetrics = reading with { IsStale = Helpers.Components.EnclosureMetricsText.IsStale(reading.ReceivedAt, now) };
+                // 잰 시각 기준(8.0.15 G35) — 같은 행이 반복 발행돼도 받은 시각으로 재지 않는다.
+                marker.EnclosureMetrics = reading with { IsStale = Helpers.Components.EnclosureMetricsText.IsStale(reading, now) };
             }
         }
         catch (Exception ex) { _log?.Error($"[함체 계측] 반영 실패: {ex.Message}"); }
@@ -6907,8 +6911,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     menu.Items.Add(camItem);
 
                     // 특정 위치 확인 (PTZ 카메라 전용) — 지도 클릭 좌표로 회전요청 NATS 발행
-                    if (cameraModel != null
-                        && cameraModel.Category == Ironwall.Dotnet.Libraries.Enums.EnumCameraType.PTZ)
+                    if (CameraDriveKind.IsPtzDrive(cameraModel))   // SPEED_DOME(Category=NONE)도 PTZ 구동(8.0.15 G14)
                     {
                         var aimMarker = pidsMarker as GMapPidsMarker;   // concrete(런타임 PIDS 마커) — 반경=마커 DetectionRange
                         var aimItem = new MenuItem
@@ -9928,11 +9931,37 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         HideBroadcastPlayPanel();
 
-        BroadcastPlayPanel = new BroadcastPlayControl { LinkedDeviceId = linkedDeviceId };
+        // 음량 기본값 = 설정 AppSettings.Broadcast.DefaultVolume(없으면 100) — 8.0.15 G36
+        BroadcastPlayPanel = new BroadcastPlayControl { LinkedDeviceId = linkedDeviceId, Volume = BroadcastControlService.LoadDefaultVolume() };
         BroadcastPlayPanel.SendRequested += OnBroadcastPlaySendRequested;
         BroadcastPlayPanel.CancelRequested += (s, e) => HideBroadcastPlayPanel();
         IsBroadcastPlayPanelVisible = true;
         BroadcastPlayPanel.Loaded += (s, e) => BroadcastPlayPanel?.CenterInCanvas();
+        _ = LoadBroadcastFileGroupsAsync(BroadcastPlayPanel, linkedDeviceId);
+    }
+
+    /// <summary>
+    /// 음원 그룹 목록을 방송 창 콤보에 싣는다(8.0.15 G25) — 스피커의 방송 서버로 거른 GET /api/file-groups.
+    /// 볼 수 없거나(403 · 404) 실패하면 안내 한 줄만 보이고 번호 입력은 그대로 쓴다. 호출 스레드: UI.
+    /// </summary>
+    private async Task LoadBroadcastFileGroupsAsync(BroadcastPlayControl panel, int linkedDeviceId)
+    {
+        try
+        {
+            panel.ShowFileGroupsLoading();
+            var speaker = MainMap?.Markers.OfType<IPidsEditableMarker>()
+                .FirstOrDefault(m => m.LinkedDeviceId == linkedDeviceId)?.LinkedDevice as ISpeakerDeviceModel;
+            int? serverId = speaker?.Server is { Id: > 0 } server ? server.Id : null;
+            var choice = await BroadcastControlService.LoadFileGroupsAsync(ResolveDeviceApiService(), serverId);
+            if (!ReferenceEquals(BroadcastPlayPanel, panel)) return;   // 그사이 창을 닫았거나 새로 열었다
+            panel.ApplyFileGroups(choice);
+            if (choice.Options.Count == 0) _log?.Info($"[방송] 음원 그룹 목록 없음 — {choice.Status}(번호 입력으로 사용)");
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[방송] 음원 그룹 목록 실패: {ex.Message}");
+            panel.ApplyFileGroups(BroadcastFileGroupChoice.Failed);
+        }
     }
 
     public void HideBroadcastPlayPanel()
@@ -9957,10 +9986,10 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             // v1.5.2 §6.4: BROADCAST_PLAY=REQ — 성공 시에만 패널 닫기, 실패 시 팝업+패널 유지(재시도 가능)
-            var result = await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat);
+            var result = await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat, e.Volume);
             if (result.Success)
             {
-                _log?.Info($"음원 실행: DeviceId={e.LinkedDeviceId}, FileGroup={e.FileGroupId}, Repeat={e.Repeat}");
+                _log?.Info($"음원 실행: DeviceId={e.LinkedDeviceId}, FileGroup={e.FileGroupId}, Repeat={e.Repeat}, Volume={e.Volume}");
                 HideBroadcastPlayPanel();
             }
             else
@@ -10005,7 +10034,7 @@ public partial class MapViewModel : BasePanelViewModel,
         _isBroadcastRequestInFlight = true;
         try
         {
-            await _broadcastControlService.PublishTtsAsync(e.LinkedDeviceId, e.Message);
+            await _broadcastControlService.PublishTtsAsync(e.LinkedDeviceId, e.Message, BroadcastControlService.LoadDefaultVolume());
             _log?.Info($"TTS 실행: DeviceId={e.LinkedDeviceId}, Message={e.Message}");
             HideTtsBroadcastPanel();
         }

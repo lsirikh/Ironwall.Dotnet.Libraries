@@ -239,12 +239,12 @@ public class OverlayHelpPlaybackScenarioTests
     public void should_send_play_request_with_typed_group_and_repeat_and_close_panel_without_notice_when_speaker_accepts() => OneSta.StaAsync(async () =>
     {
         var rig = MapVmRig.Create();
-        rig.Broadcast.Setup(b => b.PublishPlayAsync(51, 3, 2)).ReturnsAsync(BrokerRequestResult.Ok("ok", "req-1"));
+        rig.Broadcast.Setup(b => b.PublishPlayAsync(51, 3, 2, 100)).ReturnsAsync(BrokerRequestResult.Ok("ok", "req-1"));
         rig.Vm.ShowBroadcastPlayPanel(51);
         TypeAndSend(PlayPanelTemplated(rig), "3", "2");
         await Task.Delay(20);
 
-        rig.Broadcast.Verify(b => b.PublishPlayAsync(51, 3, 2), Times.Once());   // 그 스피커 · 입력한 파일 그룹 · 반복
+        rig.Broadcast.Verify(b => b.PublishPlayAsync(51, 3, 2, 100), Times.Once());   // 그 스피커 · 입력한 파일 그룹 · 반복
         Assert.False(rig.Vm.IsBroadcastPlayPanelVisible);                         // 성공 = 패널 닫힘
         Assert.Null(rig.Vm.BroadcastPlayPanel);
         Assert.DoesNotContain(rig.Sink.Messages, m => m is Ironwall.Dotnet.Libraries.ViewModel.Models.OpenInfoPopupMessageModel);
@@ -255,7 +255,7 @@ public class OverlayHelpPlaybackScenarioTests
     public void should_keep_panel_and_show_speaker_reason_then_allow_resend_when_play_request_rejected_or_unanswered() => OneSta.StaAsync(async () =>
     {
         var rig = MapVmRig.Create();
-        rig.Broadcast.SetupSequence(b => b.PublishPlayAsync(51, 4, 1))
+        rig.Broadcast.SetupSequence(b => b.PublishPlayAsync(51, 4, 1, 100))
             .ReturnsAsync(BrokerRequestResult.Fail(EnumBrokerFailure.Rejected, "스피커가 다른 방송 중입니다", "busy"))
             .ReturnsAsync(BrokerRequestResult.Fail(EnumBrokerFailure.NoResponse, "응답이 없습니다"))
             .ReturnsAsync(BrokerRequestResult.Ok("ok", "req-3"));
@@ -277,7 +277,7 @@ public class OverlayHelpPlaybackScenarioTests
         TypeAndSend(panel, "4", "1");                                             // 재시도 성공 → 닫힘
         await Task.Delay(20);
         Assert.False(rig.Vm.IsBroadcastPlayPanelVisible);
-        rig.Broadcast.Verify(b => b.PublishPlayAsync(51, 4, 1), Times.Exactly(3));
+        rig.Broadcast.Verify(b => b.PublishPlayAsync(51, 4, 1, 100), Times.Exactly(3));
     });
 
     // ───────────────────────── MAP-173 ─────────────────────────

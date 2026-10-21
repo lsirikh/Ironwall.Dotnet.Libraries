@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows.Threading;
 using GMap.NET;
 using GMap.NET.WindowsPresentation;
@@ -94,7 +94,9 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
         if (_disposed || _map == null) return Task.CompletedTask;
         return DispatcherService.BeginInvoke(() =>
         {
-            var keys = _entries.Keys.Where(k => k.cameraId == cameraId).ToList();
+            // LRF 표식(lrf-…)은 AI 추적의 lost/idle 과 무관하다 — 지우지 않고 자기 ttl_sec 스윕에 맡긴다
+            // (브로커 v2.0.10 LRF 사용 규약 'GIS 결정 사항', DECISIONS #2).
+            var keys = _entries.Keys.Where(k => k.cameraId == cameraId && !IsLrfTrack(k.trackId)).ToList();
             foreach (var key in keys)
                 RemoveEntry(key);
             if (keys.Count > 0) _log?.Info($"추적 만료(lost/idle): camera={cameraId}, {keys.Count}개 제거");
@@ -176,6 +178,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
                 ZIndex = ZTrackingBand,
             };
             marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing: 0d, showArrow: false, speedMps: 0d);
+            if (marker.Shape is System.Windows.FrameworkElement hover) hover.ToolTip = HoverTextFor(t);
             _map!.Markers.Add(marker);
 
             var trail = new GMapTrailMarker(cameraId, t.TrackId, color);
@@ -270,6 +273,22 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
         }
     }
     #endregion
+
+    /// <summary>LRF(레이저 거리측정기) 표적의 track_id 머리말 — 카메라마다 <c>lrf-{camera_id}</c> 하나(브로커 v2.0.10).</summary>
+    internal const string LrfTrackPrefix = "lrf-";
+    /// <summary>LRF 표적의 label 원문.</summary>
+    internal const string LrfLabel = "lrf_target";
+    /// <summary>LRF 표적의 화면 이름.</summary>
+    internal const string LrfDisplayText = "거리 측정 표적";
+
+    internal static bool IsLrfTrack(string? trackId)
+        => trackId?.StartsWith(LrfTrackPrefix, StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>마커 호버 글 — LRF 표적은 "거리 측정 표적"(내부 label · track_id 를 보이지 않는다), 그 밖은 지금처럼 track_id.</summary>
+    internal static string HoverTextFor(TrackingTargetDto t)
+        => string.Equals(t.Label, LrfLabel, StringComparison.OrdinalIgnoreCase) || IsLrfTrack(t.TrackId)
+            ? LrfDisplayText
+            : t.TrackId;
 
     private static EnumColorType ColorOf(TrackingTargetDto t)
         => TrackingEnumExtensions.ParseThreatLevel(t.ThreatLevel).ToColorType();

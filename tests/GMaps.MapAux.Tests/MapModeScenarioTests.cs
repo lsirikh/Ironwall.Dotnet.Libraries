@@ -269,7 +269,7 @@ public class MapModeScenarioTests
     {
         var (vm, _, sink) = Vm();
         var svc = Broadcast(vm);
-        svc.Setup(s => s.PublishTtsAsync(5, "경고")).ThrowsAsync(new InvalidOperationException("NATS 끊김"));
+        svc.Setup(s => s.PublishTtsAsync(5, "경고", 100)).ThrowsAsync(new InvalidOperationException("NATS 끊김"));
 
         vm.ShowTtsBroadcastPanel(5);
         Raise(vm.TtsBroadcastPanel!, "SendRequested", new TtsSendEventArgs("경고", 5));
@@ -289,7 +289,7 @@ public class MapModeScenarioTests
         var (vm, _, _) = Vm();
         var svc = Broadcast(vm);
         var pending = new TaskCompletionSource();
-        svc.Setup(s => s.PublishTtsAsync(5, "경고")).Returns(pending.Task);
+        svc.Setup(s => s.PublishTtsAsync(5, "경고", 100)).Returns(pending.Task);
 
         vm.ShowTtsBroadcastPanel(5);
         var panel = vm.TtsBroadcastPanel!;
@@ -298,7 +298,7 @@ public class MapModeScenarioTests
         pending.SetResult();
         await Task.Delay(50);
 
-        svc.Verify(s => s.PublishTtsAsync(5, "경고"), Times.Once());
+        svc.Verify(s => s.PublishTtsAsync(5, "경고", 100), Times.Once());
     });
 
     [Fact]
@@ -308,7 +308,7 @@ public class MapModeScenarioTests
         var (vm, _, sink) = Vm();
         var svc = Broadcast(vm);
         var pending = new TaskCompletionSource<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Brokers.BrokerRequestResult>();
-        svc.Setup(s => s.PublishPlayAsync(5, 2, 1)).Returns(pending.Task);
+        svc.Setup(s => s.PublishPlayAsync(5, 2, 1, 100)).Returns(pending.Task);
 
         vm.ShowBroadcastPlayPanel(5);
         Raise(vm.BroadcastPlayPanel!, "SendRequested", new BroadcastSendEventArgs(2, 1, 5));
@@ -317,7 +317,7 @@ public class MapModeScenarioTests
         pending.SetResult(Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Brokers.BrokerRequestResult.Fail(
             Enum.GetValues<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Brokers.EnumBrokerFailure>().Last(), "응답 없음"));
         await Task.Delay(50);
-        svc.Verify(s => s.PublishPlayAsync(5, 2, 1), Times.Once());
+        svc.Verify(s => s.PublishPlayAsync(5, 2, 1, 100), Times.Once());
         Assert.True(vm.IsBroadcastPlayPanelVisible);   // 실패 = 패널 유지 + 안내
         Assert.Contains(sink.Messages, m => m.GetType().Name == "OpenInfoPopupMessageModel");
     });
