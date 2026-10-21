@@ -39,6 +39,16 @@ public static class ApiStatusHelper
         => Is(statusCode, error, 409, ApiErrorCodes.Conflict);
 
     /// <summary>
+    /// <c>409</c> 중 <b>동시 쓰기 경합</b>(v8.0.15 <c>details.retryable == true</c>) — 요청이 틀린 게 아니라
+    /// 다른 작업과 겹쳤을 뿐이라 잠시 뒤 다시 하면 된다. 고정 문구(중복 · 참조 남음) 분기보다 <b>먼저</b> 본다.
+    /// </summary>
+    public static bool IsRetryableConflict(int statusCode, ApiError? error)
+        => IsConflict(statusCode, error) && error?.IsRetryable == true;
+
+    /// <summary><see cref="IsRetryableConflict"/> 일 때 운영자에게 보이는 문구(소비처 공통).</summary>
+    public const string RetryableConflictMessage = "다른 작업과 동시에 처리돼 저장하지 못했습니다. 잠시 뒤 다시 시도하세요.";
+
+    /// <summary>
     /// <c>410</c> 중 <b>제거된 경로</b>(<c>ENDPOINT_REMOVED</c>) — <b>클라가 구버전</b>이라는 뜻이다.
     /// 리소스가 지워진 것이 아니므로 사용자에게 "삭제됨"으로 알리면 오진이다.
     /// <c>error.message</c> 가 새 자리를 지목하므로 <b>개발자 경보</b>로 남겨야 한다.

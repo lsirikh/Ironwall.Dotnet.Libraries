@@ -210,6 +210,16 @@ public class ActionReportTemplateApiService : IActionReportTemplateApiService
         if (parsed.Success) { _isSupported = true; return parsed; }
 
         var code = (int)res.StatusCode;
+        // v8.0.15 — 409 중 동시 쓰기 경합(details.retryable=true)은 중복이 아니다. 고정 문구보다 먼저 본다.
+        // 옛 판(6.3 · 8.0.11)은 details 가 null 이라 이 분기에 들지 않는다.
+        if (ApiStatusHelper.IsRetryableConflict(code, parsed.Error))
+        {
+            _log?.Warning($"[{nameof(ActionReportTemplateApiService)}] 409 — 다른 작업과 겹쳤다(다시 시도 가능): {parsed.ErrorText(fallback)}");
+            var retry = ApiResponse<ActionReportTemplateDto>.CreateError("CONFLICT", ApiStatusHelper.RetryableConflictMessage);
+            retry.Error!.DetailsToken = parsed.Error!.DetailsToken;   // 화면이 경합을 알아볼 수 있게 그대로 나른다
+            retry.StatusCode = code;
+            return retry;
+        }
         if (code == 409)
         {
             _log?.Warning($"[{nameof(ActionReportTemplateApiService)}] 409 — 같은 문구가 이미 있다: {parsed.ErrorText(fallback)}");

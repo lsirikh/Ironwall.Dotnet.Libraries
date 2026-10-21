@@ -9,13 +9,14 @@ namespace Ironwall.Dotnet.Libraries.Messages.Tests;
 /// <summary>
 /// 서버 <c>error.code</c> 닫힌 어휘 — 명세 §12.2 v8.0.4 에서 16 → 19종(412 <c>VERSION_CONFLICT</c> · 412 <c>PRECONDITION_FAILED</c> ·
 /// 428 <c>PRECONDITION_REQUIRED</c>). 서버 회신 2026-09-29 §3 「오류 코드를 enum 으로 받으신다면 세 값을 더해 주십시오」.
+/// v8.0.6 에서 19 → 22종(401 <c>INVALID_TOKEN</c> · <c>TOKEN_REPLAYED</c> · <c>UNKNOWN_CLIENT</c> — sso-exchange 전용, 명세 §12.2 :15970 「닫힌 22종」).
 /// </summary>
 public class ApiErrorCodesVocabularyTests
 {
-    /// <summary>명세 §12.2 표의 19종(2026-09-29, 서버 v8.0.4) — 정본 <c>app/schemas/common.py:ERROR_CODES</c>.</summary>
+    /// <summary>명세 §12.2 표의 22종(서버 v8.0.6) — 정본 <c>app/schemas/common.py:ERROR_CODES</c>.</summary>
     private static readonly string[] ServerCodes =
     {
-        "BAD_REQUEST", "UNAUTHORIZED", "SESSION_REVOKED", "FORBIDDEN", "NOT_FOUND", "METHOD_NOT_ALLOWED", "CONFLICT",
+        "BAD_REQUEST", "UNAUTHORIZED", "SESSION_REVOKED", "INVALID_TOKEN", "TOKEN_REPLAYED", "UNKNOWN_CLIENT", "FORBIDDEN", "NOT_FOUND", "METHOD_NOT_ALLOWED", "CONFLICT",
         "ENDPOINT_REMOVED", "GONE", "PRECONDITION_FAILED", "VERSION_CONFLICT", "PAYLOAD_TOO_LARGE", "VALIDATION_ERROR",
         "PRECONDITION_REQUIRED", "TOO_MANY_REQUESTS", "INTERNAL_ERROR", "BAD_GATEWAY", "SERVICE_UNAVAILABLE", "UNKNOWN_ERROR",
     };
@@ -24,7 +25,7 @@ public class ApiErrorCodesVocabularyTests
     private static readonly string[] NotServerCodes = { "PARSE_ERROR", "GATEWAY_TIMEOUT", "PDF_FILE_MISSING" };
 
     [Fact]
-    public void should_declare_exactly_the_19_server_codes_when_spec_is_v8_0_4()
+    public void should_declare_exactly_the_22_server_codes_when_spec_is_v8_0_6()
     {
         // Arrange
         var declared = typeof(ApiErrorCodes)

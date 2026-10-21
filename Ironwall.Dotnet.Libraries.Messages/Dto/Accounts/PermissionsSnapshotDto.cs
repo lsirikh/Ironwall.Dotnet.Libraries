@@ -24,4 +24,10 @@ public class PermissionsSnapshotDto
 
     /// <summary>서버 현재 시각(KST ISO8601 offset). clockSkew = server_time − localNow 산출용(FR-GS-01).</summary>
     [JsonProperty("server_time")] public string? ServerTime { get; set; }
+
+    /// <summary>
+    /// 이 서버가 <b>아는 모듈 전체</b>(v8.0.1+, role · grant 와 무관 — 명세 §9.2.6). 그룹 권한 저장(전체 교체)의 뼈대다.
+    /// 옛 판(6.3.2)은 칸이 없어 null — 그때는 원본 ∪ 세대 어휘로 저장한다.
+    /// </summary>
+    [JsonProperty("available_modules")] public List<string>? AvailableModules { get; set; }
 }

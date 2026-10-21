@@ -73,6 +73,10 @@ public class BearerAuthHandler : DelegatingHandler
         _store = store;
         _accountApiFactory = accountApiFactory;
         _log = log;
+
+        // 실패 응답 한 줄 로그(req=<request_id>)를 앱 로그로 잇는다 — 응답 변환기(ApiMessageHelper)에는 로거가 없고,
+        // 이 핸들러는 모든 도메인 ApiService 파이프라인에 들어가 있어 한 번만 이으면 된다.
+        if (log != null) Messages.Helpers.ApiMessageHelper.FailureLog ??= m => log.Warning(m);
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -158,13 +162,16 @@ public class BearerAuthHandler : DelegatingHandler
         return !string.IsNullOrEmpty(current) && !string.Equals(current, staleToken, StringComparison.Ordinal);
     }
 
-    /// <summary>auth 액션 엔드포인트(로그인/갱신/로그아웃) 여부 — 401 refresh·세션만료 로직 제외 대상.</summary>
+    /// <summary>auth 액션 엔드포인트(로그인/갱신/로그아웃/SSO 교환) 여부 — 401 refresh·세션만료 로직 제외 대상.
+    /// <para>SSO 교환은 재교환 훅이 <see cref="_refreshLock"/> 안에서 부른다 — 교환의 401(<c>TOKEN_REPLAYED</c> 등)을 여기서
+    /// 다시 refresh 경로로 보내면 이미 쥔 락을 또 기다려 멈춘다(재진입 데드락). 401 은 그대로 훅에 돌려준다.</para></summary>
     private static bool IsAuthEndpoint(Uri? uri)
-        => MatchesPath(uri, "/auth/login") || MatchesPath(uri, "/auth/refresh") || MatchesPath(uri, "/auth/logout");
+        => MatchesPath(uri, "/auth/login") || MatchesPath(uri, "/auth/refresh") || MatchesPath(uri, "/auth/logout")
+           || MatchesPath(uri, "/auth/sso-exchange");
 
-    /// <summary>Bearer 미부착 대상 — 로그인(신규 자격)·갱신(바디 refresh_token 사용).</summary>
+    /// <summary>Bearer 미부착 대상 — 로그인(신규 자격)·갱신(바디 refresh_token 사용)·SSO 교환(바디 sso_access_token 사용).</summary>
     private static bool IsLoginOrRefresh(Uri? uri)
-        => MatchesPath(uri, "/auth/login") || MatchesPath(uri, "/auth/refresh");
+        => MatchesPath(uri, "/auth/login") || MatchesPath(uri, "/auth/refresh") || MatchesPath(uri, "/auth/sso-exchange");
 
     private static bool MatchesPath(Uri? uri, string suffix)
         => uri is not null && uri.AbsolutePath.TrimEnd('/').EndsWith(suffix, StringComparison.OrdinalIgnoreCase);

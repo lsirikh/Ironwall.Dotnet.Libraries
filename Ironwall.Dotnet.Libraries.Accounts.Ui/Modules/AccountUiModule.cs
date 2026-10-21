@@ -137,6 +137,25 @@ public class AccountUiModule : Module
                 builder.RegisterType<AuditLogPanelViewModel>().SingleInstance();
                 builder.RegisterType<GrantManagementPanelViewModel>().SingleInstance();   // T4/FR-GS-06: 권한그룹 한시부여 관리(ADMIN)
                 builder.RegisterType<AccountConsolePanelViewModel>().SingleInstance();   // 계정·권한 관리 콘솔(탭 호스트)
+
+                // G08 — NATS SYNC_USER · SYNC_USER_GROUP 자가 필터 수신. NATS 가 없으면(호스트가 안 올림) 조용히 꺼진다.
+                //   콘솔은 열 때만 쓰므로 지연 해석한다(시작 시 VM 을 만들지 않는다).
+                //   ⚠ .As<IService>() 필수 — 빠뜨리면 StopAsync 가 안 불려 NATS 구독이 누수된다.
+                builder.Register(c =>
+                {
+                    var context = c.Resolve<IComponentContext>();
+                    return new AccountSyncNatsService(
+                        c.ResolveOptional<ILogService>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Accounts.Api.Services.IAccountApiService>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Accounts.Api.Services.IPermissionService>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>(),
+                        () => context.ResolveOptional<AccountConsolePanelViewModel>());
+                }).AsSelf()
+                  .As<IService>().WithMetadata("Order", _count)
+                  .SingleInstance();
+                // 시작 루프가 IService 를 늦게 돌려도 구독은 컨테이너가 서는 즉시 건다(멱등).
+                builder.RegisterBuildCallback(scope => scope.Resolve<AccountSyncNatsService>().StartService());
             }
         }
         catch

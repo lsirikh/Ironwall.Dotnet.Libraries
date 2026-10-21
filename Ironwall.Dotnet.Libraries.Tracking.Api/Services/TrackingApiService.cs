@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
@@ -52,10 +52,17 @@ public class TrackingApiService : ITrackingApiService
     /// <inheritdoc/>
     public async Task<List<TrackPointDto>> GetTrackPointsAsync(
         DateTime fromUtc, DateTime toUtc, int? cameraId = null, CancellationToken token = default)
+        => (await GetTrackPointsWithStatusAsync(fromUtc, toUtc, cameraId, token).ConfigureAwait(false)).Points;
+
+    /// <inheritdoc/>
+    public async Task<TrackPointsResult> GetTrackPointsWithStatusAsync(
+        DateTime fromUtc, DateTime toUtc, int? cameraId = null, CancellationToken token = default)
     {
         var all = new List<TrackPointDto>();
         string? cursor = null;
         int pageCount = 0;
+        int status = 0;
+        var outcome = EnumTrackFetchOutcome.Success;
 
         try
         {
@@ -77,10 +84,18 @@ public class TrackingApiService : ITrackingApiService
                     .GetRequestAsync($"{_setupModel.Url}/tracking/points", parameters)
                     .ConfigureAwait(false);
 
+                status = (int)response.StatusCode;
                 var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
-                    _log?.Warning($"[{nameof(GetTrackPointsAsync)}] HTTP {(int)response.StatusCode} " +
+                    // ⚠ 예전에는 여기서 break 만 해 403 · 5xx · 400(Invalid cursor)이 '데이터 없음'으로 보였다(G12).
+                    outcome = status switch
+                    {
+                        403 => EnumTrackFetchOutcome.Forbidden,
+                        401 => EnumTrackFetchOutcome.Unauthorized,
+                        _ => EnumTrackFetchOutcome.Failed,
+                    };
+                    _log?.Warning($"[{nameof(GetTrackPointsAsync)}] HTTP {status} " +
                                   $"({response.ReasonPhrase}) — /tracking/points, 누적={all.Count}");
                     break;
                 }
@@ -101,19 +116,50 @@ public class TrackingApiService : ITrackingApiService
                 {
                     _log?.Error($"[{nameof(GetTrackPointsAsync)}] cursor {MAX_PAGES}페이지 안전차단 " +
                                 $"— 서버 next_cursor 무한 의심. 누적={all.Count}");
+                    outcome = EnumTrackFetchOutcome.Failed;
                     break;
                 }
             }
             while (!string.IsNullOrEmpty(cursor) && !token.IsCancellationRequested);
 
-            _log?.Info($"[{nameof(GetTrackPointsAsync)}] 적재 {all.Count}건 ({pageCount}페이지)");
+            if (outcome == EnumTrackFetchOutcome.Success && !string.IsNullOrEmpty(cursor))
+                outcome = EnumTrackFetchOutcome.Failed;   // 취소로 끝까지 못 읽었다
+
+            _log?.Info($"[{nameof(GetTrackPointsAsync)}] 적재 {all.Count}건 ({pageCount}페이지, {outcome})");
         }
         catch (Exception ex)
         {
+            outcome = EnumTrackFetchOutcome.Failed;
             _log?.Warning($"[{nameof(GetTrackPointsAsync)}] Error(부분반환 {all.Count}): {ex.Message}");
         }
 
-        return all;
+        return new TrackPointsResult { Points = all, Outcome = outcome, StatusCode = status, PagesRead = pageCount };
+    }
+
+    /// <inheritdoc/>
+    public async Task<EnumTrackingHealth> GetHealthAsync(CancellationToken token = default)
+    {
+        try
+        {
+            // 무인증 경로다(명세 §11.4). 503 본문은 봉투가 아닌 평문이라 상태만 본다.
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/tracking/health").ConfigureAwait(false);
+            var status = (int)response.StatusCode;
+            var health = status switch
+            {
+                >= 200 and < 300 => EnumTrackingHealth.Ok,
+                503 => EnumTrackingHealth.Unavailable,
+                404 or 405 => EnumTrackingHealth.NotSupported,
+                _ => EnumTrackingHealth.Unknown,
+            };
+            if (health != EnumTrackingHealth.Ok)
+                _log?.Warning($"[{nameof(GetHealthAsync)}] /tracking/health HTTP {status} → {health}");
+            return health;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(GetHealthAsync)}] /tracking/health 확인 실패: {ex.Message}");
+            return EnumTrackingHealth.Unknown;
+        }
     }
     #endregion
 

@@ -20,4 +20,13 @@ public interface ITrackPointReader
 {
     /// <summary>시간범위(UTC) 좌표 조회 — observed_at ASC. 실패 시 빈 목록(비블로킹).</summary>
     Task<List<ITrackPointModel>> FetchAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+
+    /// <summary>
+    /// 마지막 <see cref="FetchAsync"/> 가 남긴 운영자 알림(권한 없음 · 실패 · 부분). 문제가 없었으면 null(G12).
+    /// 기본 구현(로컬 판독기 등)은 늘 null.
+    /// </summary>
+    string? LastFetchNotice => null;
+
+    /// <summary>Playback 조회 전 점검 — 저장소를 쓸 수 없으면 알림 문구, 아니면 null(G13). 기본 구현은 늘 null.</summary>
+    Task<string?> CheckAvailabilityAsync(CancellationToken ct = default) => Task.FromResult<string?>(null);
 }

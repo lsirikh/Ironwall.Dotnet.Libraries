@@ -29,6 +29,9 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     public bool FailDelete { get; set; }
     public int StatusCodeOnFailure { get; set; } = 500;
 
+    /// <summary>쓰기 실패 응답에 실을 서버 오류(예: 409 <c>details.retryable</c>). null 이면 싣지 않는다.</summary>
+    public ApiError? ErrorOnFailure { get; set; }
+
     /// <summary>실제로 나간 reorder 호출 — "단일 호출·전체 목록" 계약을 단언하는 데 쓴다.</summary>
     public List<List<ActionReportTemplateReorderItemDto>> ReorderCalls { get; } = new();
     public List<ActionReportTemplateCreateDto> CreateCalls { get; } = new();
@@ -73,7 +76,7 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     {
         CreateCalls.Add(dto);
         if (Unsupported) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
-        if (FailWrite) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure });
+        if (FailWrite) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure, Error = ErrorOnFailure });
         if (Templates.Any(t => string.Equals(t.Content.Trim(), dto.Content.Trim(), StringComparison.Ordinal)))
             return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 409, Message = $"content '{dto.Content}' already exists" });
 
@@ -86,7 +89,7 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     {
         UpdateCalls.Add((id, dto));
         if (Unsupported) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
-        if (FailWrite) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure });
+        if (FailWrite) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure, Error = ErrorOnFailure });
         var target = Templates.FirstOrDefault(t => t.Id == id);
         if (target is null) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
         if (dto.Content != null) target.Content = dto.Content;

@@ -323,6 +323,12 @@ public class AccountConsoleScenarioTests
     [InlineData("DUPLICATE", "중복 로그인 축출")]
     [InlineData("EXPIRED", "세션 만료")]
     [InlineData("SELF_LOGOUT", "본인 로그아웃")]
+    [InlineData("PASSWORD_RESET", "비밀번호 초기화")]      // G06 — 8.0.15 서버 종료 사유
+    [InlineData("ACCOUNT_LOCKED", "계정 잠금")]
+    [InlineData("LOCKED", "계정 잠금")]
+    [InlineData("ACCOUNT_DEACTIVATED", "계정 사용 중지")]
+    [InlineData("ACCOUNT_DELETED", "계정 삭제")]
+    [InlineData("MANUAL", "로그아웃")]
     [InlineData("SOMETHING_NEW", "알 수 없음")]
     [InlineData(null, "")]
     public void should_show_the_logout_reason_in_korean_when_the_session_detail_is_drawn(string? code, string expected)

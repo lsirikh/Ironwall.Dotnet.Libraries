@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
@@ -98,6 +99,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
             NotifyOfPropertyChange(nameof(IsPeriodUnset));
 
             await LoadCatalogAsync(src.Components);
+            // 카탈로그에 없는 저장 줄은 저장할 때 빠진다(ToConfig) — 말없이 빼지 않고 미리 알린다.
+            if (Board.DroppedOrphanCount > 0) StatusText = OrphanDropNotice(Board.DroppedOrphanCount);
         }
         finally { _isLoading = false; RaiseBoard(); }
     }
@@ -175,6 +178,9 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
             if (string.IsNullOrEmpty(name)) { StatusText = "이름을 입력하세요."; return null; }
         }
 
+        // 구성을 보내는데 켠 것이 0개면 서버(v8.0.15)가 422 로 막는다 — 보내기 전에 막는다(단추도 꺼져 있다).
+        if (IsMissingEnabledComponent) { StatusText = NoEnabledComponentText; return null; }
+
         try
         {
             IsBusy = true;
@@ -182,7 +188,6 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
 
             if (IsCreate)
             {
-                if (comps.Count == 0) { StatusText = "구성 요소를 1개 이상 고르세요."; return null; }
                 var dto = new ReportTemplateCreateDto
                 {
                     Name = name,
@@ -201,7 +206,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                 }
                 // 서버 원문은 로그로만 — 화면엔 무엇이 안 됐고 무엇을 하면 되는지.
                 _log?.Warning($"[ReportTemplateEdit] 등록 실패: {res.ErrorText()}");
-                StatusText = "템플릿을 등록하지 못했습니다. 입력을 확인하고 잠시 후 다시 시도하세요.";
+                StatusText = IsComponentsRejected(res) ? NoEnabledComponentText : "템플릿을 등록하지 못했습니다. 입력을 확인하고 잠시 후 다시 시도하세요.";
                 return null;
             }
             else
@@ -228,7 +233,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                     return TemplateId;
                 }
                 _log?.Warning($"[ReportTemplateEdit] 저장 실패: {res.ErrorText()}");
-                StatusText = "템플릿을 저장하지 못했습니다. 잠시 후 다시 시도하세요.";
+                StatusText = IsComponentsRejected(res) ? NoEnabledComponentText : "템플릿을 저장하지 못했습니다. 잠시 후 다시 시도하세요.";
                 return null;
             }
         }
@@ -363,6 +368,22 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
     public bool IsBusy { get => _isBusy; set { _isBusy = value; NotifyOfPropertyChange(); } }
 
     public string ComponentSummary => $"구성 {Board.EnabledCount}개 / 전체 {Board.Count}개";
+
+    /// <summary>
+    /// 구성을 보내야 하는데(등록 · 구성을 손댄 수정) 켠 것이 0개 — [적용] · [등록] 을 끄고 까닭을 보인다.
+    /// 구성을 안 보내는 수정(이름만 등)은 서버가 막지 않으므로 막지 않는다.
+    /// </summary>
+    public bool IsMissingEnabledComponent => Board.EnabledCount == 0 && (IsCreate || IsTouched(FieldComponents));
+
+    public const string NoEnabledComponentText = "구성 요소를 1개 이상 켜세요.";
+
+    /// <summary>저장할 때 빠질 고아 줄(제공 중단) 안내.</summary>
+    public static string OrphanDropNotice(int count) => $"더 이상 쓰지 않는 항목 {count}개는 저장할 때 빠집니다.";
+
+    /// <summary>서버가 구성 0개로 거절했다(422 field <c>components</c>, v8.0.15).</summary>
+    private static bool IsComponentsRejected(ApiResponse<ReportTemplateDto> res)
+        => res.IsValidationError()
+           && ApiStatusHelper.FieldErrors(res.Error).Any(f => string.Equals(f.Field?.Trim(), FieldComponents, StringComparison.Ordinal));
 
     // 구성 순서를 끌어 바꿀 수 있다는 안내는 '구성 요소' 절 "?"(Reports.Template.Components)로 옮겼다(help-callout H-3).
 
