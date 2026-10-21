@@ -427,6 +427,10 @@ public static class DtoToModelHelper
             DetailText = OperationEventText.DetailText(dto.Detail),
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
+        // 사유 글자의 장비 종류(G19) — 서버 참조 {id, category_device} 가 먼저, 없으면 캐시 장비의 카테고리.
+        model.CategoryDevice = !string.IsNullOrWhiteSpace(dto.Device?.CategoryDevice)
+            ? dto.Device!.CategoryDevice
+            : model.Device is { CategoryDevice: not EnumDeviceCategory.None } device ? device.CategoryDevice.ToString().ToLowerInvariant() : null;
         EventDeviceSnapshot.Remember(model, dto.DeviceDescription);
         return model;
     }

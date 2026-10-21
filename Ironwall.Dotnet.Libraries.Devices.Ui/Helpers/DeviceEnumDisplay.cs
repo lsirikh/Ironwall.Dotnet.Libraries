@@ -143,6 +143,7 @@ public static class DeviceEnumDisplay
     public static readonly IReadOnlyList<(string Code, string Display)> WeatherModes = new[]
     {
         ("", NotSetDisplay), ("NORMAL", "평시"), ("FOG", "안개"), ("SEA_FOG", "해무"), ("YELLOW_DUST", "황사"), ("RAIN", "강우"), ("SNOW", "강설"),
+        ("HEAT_HAZE", "아지랑이"),   // 서버 EnumWeatherMode 7번째 값(GOP API 8.0.15 대조 G15)
     };
 
     public static readonly IReadOnlyList<(string Code, string Display)> CameraVideoModes = new[]

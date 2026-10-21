@@ -177,6 +177,33 @@ public class EventUiModule : Module
             )).As<IDetectionSyncNatsService>()
               .As<IService>().WithMetadata("Order", _count + 4)   // (EB1) OnExit StopAsync → NATS 구독 해제. Order 고유값(기존 +1/+2/+3 사용 중).
               .SingleInstance();
+            // SYNC_MALFUNCTION · SYNC_ACTION_REPORT · SYNC_OPERATION_EVENT 자가 필터 수신(G45 · G46) — 이미 가진 카드 · 행만 고치거나 닫는다.
+            // ⚠ .As<IService>() 필수 — 빠뜨리면 StopAsync 가 안 불려 NATS 구독이 누수된다.
+            builder.Register(c =>
+            {
+                var context = c.Resolve<IComponentContext>();
+                return new EventSyncNatsService(
+                    c.ResolveOptional<ILogService>(),
+                    c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                    c.Resolve<IEventQueueManager>(),
+                    c.Resolve<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventApiService>(),
+                    c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                    c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>(),   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+                    // 운영 카드가 있을 때만 다시 읽는다 — 카드 목록은 늦게 찾는다(싱글턴, 빌드 콜백에서 이미 섰다).
+                    id => context.ResolveOptional<EventCardListPanelViewModel>()?.HasOperationCard(id) ?? true,
+                    c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>());
+            }).As<IEventSyncNatsService>()
+              .As<IService>().WithMetadata("Order", _count + 9)
+              .SingleInstance();
+            // SYSTEM_EVENT · SYNC_SYSTEM_EVENT 자가 필터 수신(G52) → 서버 콘솔 시스템 이벤트 목록. 목록 REST 는 EventApiModule 의 ISystemEventSource.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerSystemEventNatsService(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+            )).AsSelf()
+              .As<IService>().WithMetadata("Order", _count + 10)
+              .SingleInstance();
             builder.Register(c => new EventQueueManager(
                        c.ResolveOptional<ILogService>(),
                        c.ResolveOptional<IEventSetupModel>()))
@@ -298,6 +325,12 @@ public class EventUiModule : Module
                 // PresetSyncNatsService 시작 — NATS SYNC_PRESET 구독(G9, 프리셋 · 감시금지구역 변경 → 매핑 캐시 비움)
                 var psns = scope.Resolve<IPresetSyncNatsService>();
                 psns.StartService();
+
+                // EventSyncNatsService 시작 — SYNC_MALFUNCTION · SYNC_ACTION_REPORT · SYNC_OPERATION_EVENT(G45 · G46)
+                scope.Resolve<IEventSyncNatsService>().StartService();
+
+                // ServerSystemEventNatsService 시작 — SYSTEM_EVENT · SYNC_SYSTEM_EVENT(G52)
+                scope.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerSystemEventNatsService>().StartService();
 
                 // TrackingStatusNatsSyncService 시작 — NATS TRACKING_STATUS 구독 등록(로그-only stub)
                 var tns = scope.Resolve<ITrackingStatusNatsSyncService>();

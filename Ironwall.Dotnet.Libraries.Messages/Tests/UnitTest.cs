@@ -3035,7 +3035,7 @@ public class EventDtoRestructureTests
         Assert.Equal("WARNING", operation.Severity);
     }
 
-    [Fact(DisplayName = "A6.7-7: 판별자·구조·type_event 모두 미지 → null (예외 없음)")]
+    [Fact(DisplayName = "A6.7-7: 판별자·구조·type_event 모두 미지 → UnknownEventDto (예외 없음, G49)")]
     [Trait("Category", "Event")]
     public void FromEventConverter_ShouldReturnNull_WhenNothingIdentifiesTheCategory()
     {
@@ -3048,7 +3048,10 @@ public class EventDtoRestructureTests
         var dto = JsonConvert.DeserializeObject<ActionEventDto>(json);
 
         Assert.NotNull(dto);
-        Assert.Null(dto!.FromEvent);   // 조치 1건 원본만 미해석 — 목록 전체가 끊기지 않는다.
+        // 조치 1건 원본만 미해석 — 목록 전체가 끊기지 않는다. G49: null 대신 공통 필드만 담은 원본(원본 없음과 구별).
+        var unknown = Assert.IsType<UnknownEventDto>(dto!.FromEvent);
+        Assert.Equal(404, unknown.Id);
+        Assert.Equal("SomethingBrandNew", unknown.TypeEvent);
     }
     #endregion
 }
@@ -4518,7 +4521,8 @@ public class FromEventConverterTests
         // Assert
         Assert.NotNull(dto);
         Assert.Equal(1, dto.Id);
-        Assert.Null(dto.FromEvent);
+        // G49(GOP 8.0.15 대조): 종류를 모르는 원본은 null 이 아니라 공통 필드만 담은 UnknownEventDto — '원본 없음'(from_event: null)과 구별
+        Assert.Equal(100, Assert.IsType<UnknownEventDto>(dto.FromEvent).Id);
     }
 
     [Fact]
@@ -4551,7 +4555,8 @@ public class FromEventConverterTests
         // Assert
         Assert.NotNull(dto);
         Assert.Equal(2, dto.Id);
-        Assert.Null(dto.FromEvent);
+        // G49: 모르는 type_event → UnknownEventDto(공통 필드만)
+        Assert.Equal("SomeFutureTypeEvent", Assert.IsType<UnknownEventDto>(dto.FromEvent).TypeEvent);
     }
 
     [Fact]
@@ -4715,8 +4720,8 @@ public class FromEventConverterTests
         Assert.NotNull(response.Data[0].FromEvent);
         Assert.IsType<DetectionEventDto>(response.Data[0].FromEvent);
 
-        // 두 번째: type_event 없음 → null (이전에는 여기서 throw → 전체 실패)
-        Assert.Null(response.Data[1].FromEvent);
+        // 두 번째: type_event 없음 → UnknownEventDto(G49 — 이전에는 null, 그 전에는 throw → 전체 실패)
+        Assert.IsType<UnknownEventDto>(response.Data[1].FromEvent);
 
         // 세 번째: from_event null → null
         Assert.Null(response.Data[2].FromEvent);

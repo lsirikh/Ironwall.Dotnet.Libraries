@@ -47,6 +47,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 /// </remarks>
 public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptions
                                       , IHandle<CallCloseDeviceConsoleMessageModel>
+                                      , IHandle<ConfirmEnclosureUnitMoveMessageModel>
 {
     public const string ConsoleKey = "Devices";
     public const string GroupsRailKey = "groups";
@@ -133,6 +134,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         // 집계기를 넘긴다 — 소속을 바꾸면 지도의 구역선 조회표가 그 그룹을 다시 등록한다(DeviceGroupMembershipChangedMessage).
         GroupDrop = new DeviceGroupDropHandler(deviceApiService, () => DeviceProvider.OfType<IBaseDeviceModel>(), log, eventAggregator);
         _axisWriter = new DeviceAxisWriter(deviceApiService, _queryPolicy, log);
+        _enclosureMover = new Consoles.Units.Devices.EnclosureUnitMover(deviceApiService, _queryPolicy, log);
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         GroupChips = new ObservableCollection<DeviceGroupViewModel>();
@@ -709,6 +711,13 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     /// </remarks>
     private async Task ApplyAxisEditsAsync(IReadOnlyList<object> rows, IReadOnlyList<(DevicePropertySpec Spec, string Text)> edits, int rowCount, int fieldCount)
     {
+        // (G32) 함체이거나 함체 안 장비의 부대를 바꾸면 한 요청으로는 안 된다(서버 422) — 확인을 받고 함체째 4단계로 옮긴다.
+        if (await TryAskEnclosureMoveAsync(rows, edits, rowCount, fieldCount)) return;
+        await ApplyAxisEditsCoreAsync(rows, edits, rowCount, fieldCount);
+    }
+
+    private async Task ApplyAxisEditsCoreAsync(IReadOnlyList<object> rows, IReadOnlyList<(DevicePropertySpec Spec, string Text)> edits, int rowCount, int fieldCount)
+    {
         var models = DeviceGroupDropHandler.ModelsOf(rows).ToList();
         _pending = new PendingOperation(PendingKind.AxisPatch, rowCount, fieldCount, RowIds(rows), Array.Empty<int>(), edits);
         Detail.Settle("적용하는 중…");
@@ -735,6 +744,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         // 보낸 값이 목록에 보이도록 다시 읽는다 — 끝남(OnSourceBusyEnded)이 다시 고르고, 보낸 값과 맞춰 본다.
         var applied = result.IsSuccess ? ConsoleDetailStateMachine.AppliedMessage(rowCount, fieldCount) : result.Message;
+        // (G17) 저장은 됐지만 서버가 남긴 경고 — 상태 줄에 쉬운 말로 덧붙인다(실패 문구에는 이미 붙어 있다).
+        if (result.IsSuccess && result.WarningText is { } warning) applied = $"{applied} {warning}";
         if (_current?.Reload() == true)
         {
             _pending = new PendingOperation(PendingKind.Reload, rowCount, fieldCount, RowIds(rows), Array.Empty<int>(), edits)
@@ -748,6 +759,79 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         }
         RefreshToolbar();
     }
+
+    #region - 함체째 부대 옮기기 (G32) -
+    /// <summary>
+    /// 소속 부대 칸을 바꾼 장비가 함체(안에 장비가 있는)이거나 함체 안 장비면 확인 대화를 띄우고 <c>true</c>.
+    /// 아니면(8.0.6 미만 · 여러 대 · 함체와 무관 · 읽기 실패) <c>false</c> — 종전 경로로 보낸다.
+    /// </summary>
+    /// <remarks>확인 대화는 닫기 확인과 같은 길(<see cref="OpenConfirmPopupMessageModel"/>)이고, [확인] 이 오면
+    /// <see cref="ConfirmEnclosureUnitMoveMessageModel"/> 로 돌아와 4단계를 돈다. 대화는 기다리지 않는다.</remarks>
+    private async Task<bool> TryAskEnclosureMoveAsync(IReadOnlyList<object> rows, IReadOnlyList<(DevicePropertySpec Spec, string Text)> edits, int rowCount, int fieldCount)
+    {
+        if (_eventAggregator is null || !_enclosureMover.IsAvailable) return false;
+        var unitEdit = edits.FirstOrDefault(e => string.Equals(e.Spec.AxisWritePath, "unit_id", StringComparison.Ordinal));
+        if (unitEdit.Spec is null || !int.TryParse(unitEdit.Text?.Trim(), out var unitId) || unitId <= 0) return false;
+
+        var models = DeviceGroupDropHandler.ModelsOf(rows).ToList();
+        if (models.Count != 1 || models[0].UnitId == unitId) return false;   // 여러 대는 종전 경로 — 서버가 거절하면 그 줄을 보인다
+
+        Consoles.Units.Devices.EnclosureMovePlan? plan;
+        try { plan = await _enclosureMover.PlanAsync(models[0].Id, DeviceAxesMapper.CategoryOf(models[0])); }
+        catch (Exception ex) { _log?.Warning($"[DeviceConsole] 함체 확인 실패 — {ex.Message}"); plan = null; }
+        if (plan is null) return false;
+
+        var others = edits.Where(e => !ReferenceEquals(e.Spec, unitEdit.Spec)).ToList();
+        _pendingEnclosureMove = new PendingEnclosureMove(plan, unitId, rows, others, rowCount, fieldCount);
+        Detail.LastMessage = "함체째 옮길지 확인을 기다립니다.";
+        RefreshToolbar();
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "함체째 부대 옮기기",
+            Explain = plan.ConfirmText("고른 부대"),
+            MessageModel = new ConfirmEnclosureUnitMoveMessageModel(),
+        });
+        return true;
+    }
+
+    /// <summary>함체째 옮기기 확인에서 [확인] — 4단계로 옮기고, 함께 고친 다른 축 칸이 있으면 이어서 보낸다.</summary>
+    public async Task HandleAsync(ConfirmEnclosureUnitMoveMessageModel message, CancellationToken cancellationToken)
+    {
+        var pending = Interlocked.Exchange(ref _pendingEnclosureMove, null);
+        if (pending is null) return;
+        if (_eventAggregator is not null)
+            await _eventAggregator.PublishOnUIThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+
+        Detail.LastMessage = "함체와 안에 든 장비를 옮기는 중…";
+        RefreshToolbar();
+        Consoles.Units.Devices.EnclosureMoveResult result;
+        try { result = await _enclosureMover.MoveAsync(pending.Plan, pending.UnitId); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceConsole] 함체째 부대 옮기기 실패 — {ex.Message}");
+            result = new Consoles.Units.Devices.EnclosureMoveResult(false, "함체를 옮기지 못했습니다. 목록을 [갱신]해 확인하세요.", 0, false);
+        }
+        LastEnclosureMove = result;
+
+        if (result.IsSuccess && pending.OtherEdits.Count > 0)
+        {
+            await ApplyAxisEditsCoreAsync(pending.Rows, pending.OtherEdits, pending.RowCount, pending.FieldCount);
+            return;
+        }
+        Detail.LastMessage = result.Message;
+        _current?.Reload();
+        RefreshToolbar();
+    }
+
+    /// <summary>마지막 함체째 부대 옮기기의 결과(시험 · 진단용).</summary>
+    internal Consoles.Units.Devices.EnclosureMoveResult? LastEnclosureMove { get; private set; }
+
+    private sealed record PendingEnclosureMove(Consoles.Units.Devices.EnclosureMovePlan Plan, int UnitId, IReadOnlyList<object> Rows,
+        IReadOnlyList<(DevicePropertySpec Spec, string Text)> OtherEdits, int RowCount, int FieldCount);
+
+    private PendingEnclosureMove? _pendingEnclosureMove;
+    private readonly Consoles.Units.Devices.EnclosureUnitMover _enclosureMover;
+    #endregion
 
     private static string MismatchMessage(string label) => $"'{label}' 값이 저장되지 않았습니다. 다시 확인한 뒤 [적용]하세요.";
 
@@ -1860,3 +1944,6 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
 /// <summary>장비 창 닫기 확인에서 [확인] — 적용하지 않은 변경을 버리고 창을 닫는다(<see cref="DeviceDashboardViewModel.CanCloseAsync"/>).</summary>
 public sealed class CallCloseDeviceConsoleMessageModel : Ironwall.Dotnet.Libraries.Base.Models.IMessageModel { }
+
+/// <summary>함체째 부대 옮기기 확인에서 [확인] — 함체와 안에 든 장비를 4단계로 옮긴다(G32, <see cref="DeviceDashboardViewModel"/>).</summary>
+public sealed class ConfirmEnclosureUnitMoveMessageModel : Ironwall.Dotnet.Libraries.Base.Models.IMessageModel { }

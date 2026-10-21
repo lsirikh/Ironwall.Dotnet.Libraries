@@ -69,6 +69,18 @@ public sealed record MappingPresetInfo(int Id, int CameraId, string Name, bool I
 /// <param name="Name">표시 이름(<c>group_name</c>).</param>
 public sealed record MappingFileGroupInfo(int Id, string Name);
 
+/// <summary>
+/// 스피커 연동 칸의 음원그룹 후보 공급원(<c>GET /api/file-groups</c>, GOP API 8.0.15 대조 G25).
+/// </summary>
+/// <remarks>
+/// 권한(<c>files:view</c>)이 없거나(403) 경로가 없는 서버(404)면 실패로 돌려준다 — 화면은 "목록을 볼 수 없음" 을 알리고 번호 입력으로 받는다.
+/// </remarks>
+public interface IMappingFileGroupSource
+{
+    /// <summary>음원그룹 전량(내부에서 쪽을 넘겨 끝까지 모은다).</summary>
+    Task<MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>> ListFileGroupsAsync(CancellationToken token = default);
+}
+
 /// <summary>장비그룹 후보 1건.</summary>
 /// <param name="Id">그룹 PK.</param>
 /// <param name="Name">표시 이름.</param>

@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+﻿using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using System;
@@ -193,6 +194,30 @@ public static class SuppressionRequestBuilder
 
     /// <summary>표시 사전에 없는 값의 표기.</summary>
     public const string UnknownLabel = "알 수 없음";
+
+    /// <summary>6.3 서버에서 '운영' 범위를 고른 채 저장하려 할 때의 한 줄(G44).</summary>
+    public const string OperationScopeUnsupportedText = "운영 이벤트 억제는 서버 7.0 이상에서만 만들 수 있습니다. 다른 억제 범위를 고르세요.";
+
+    /// <summary>
+    /// '운영' 억제 범위를 쓸 수 있는 서버인가 — 운영 이벤트 카테고리가 있는 7.0 이상(EventApiService.HasOperationEvents 와 같은 기준, G44).
+    /// 6.3 서버의 억제 범위는 4값이라 <c>operation</c> 을 보내면 422 다.
+    /// </summary>
+    public static bool SupportsOperationScope(EnumServerContract contract) => contract >= EnumServerContract.V7_0;
+
+    /// <summary>저장 전 범위 검사 — 막아야 하면 안내 문구, 아니면 <c>null</c>.</summary>
+    public static string? ScopeGuard(string? eventScope, EnumServerContract contract)
+        => string.Equals(eventScope, "operation", StringComparison.Ordinal) && !SupportsOperationScope(contract)
+            ? OperationScopeUnsupportedText
+            : null;
+
+    /// <summary>
+    /// 지금 서버 계약 — 늦게 찾는다(IoC). 미등록 · 미초기화면 <see cref="EnumServerContract.V6_3"/>(보수적 기본값, EventApiService 와 같다).
+    /// </summary>
+    public static EnumServerContract ContractFromIoC()
+    {
+        try { return Caliburn.Micro.IoC.Get<IServerContractProbe>()?.Contract ?? EnumServerContract.V6_3; }
+        catch { return EnumServerContract.V6_3; }
+    }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

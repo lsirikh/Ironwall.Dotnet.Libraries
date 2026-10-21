@@ -52,6 +52,8 @@ public class EventDashboardViewModel : BasePanelViewModel
                                      , IHandle<CallCloseEventConsoleMessageModel>
                                      , IHandle<ActionReportTemplatesChangedMessage>
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage>
+                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.ActionReportSyncedMessage>
+                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.OperationEventDeletedOnServerMessage>
 {
     public const string ConsoleKey = "Events";
 
@@ -1529,6 +1531,40 @@ public class EventDashboardViewModel : BasePanelViewModel
         if (FindOriginModel(candidate) is not { } model) return Task.CompletedTask;   // 이 목록에 없는 이벤트
         model.Status = Ironwall.Dotnet.Libraries.Enums.EnumTrueFalse.True;
         OnReported(message.EventId, kind);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// SYNC_ACTION_REPORT(G45) — 원본을 알면 그 행의 조치 상태를 서버 값으로 맞추고, 열린 조치 이력을 다시 읽는다.
+    /// 원본을 모르면(조치 삭제 · from_event 비워짐) 고른 한 건의 조치 이력만 다시 읽는다.
+    /// </summary>
+    public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.ActionReportSyncedMessage message, CancellationToken cancellationToken)
+    {
+        if (message is null) return Task.CompletedTask;
+        if (message is { OriginKind: { } kind, OriginId: > 0 } && ActionTrayDrop.IsReportableKind(kind))
+        {
+            var candidate = new ActionTrayCandidate(message.OriginId!.Value, kind, string.Empty, true);
+            if (FindOriginModel(candidate) is not { } model) return Task.CompletedTask;   // 이 목록에 없는 이벤트
+            if (message.OriginActionReported is { } reported)
+                model.Status = reported ? Ironwall.Dotnet.Libraries.Enums.EnumTrueFalse.True : Ironwall.Dotnet.Libraries.Enums.EnumTrueFalse.False;
+            OnReported(message.OriginId, kind);   // 행 다시 그림 · 고른 한 건이면 상세(조치 이력) 다시 읽기
+            return Task.CompletedTask;
+        }
+        if (SelectedRows.Count == 1 && SelectedRows[0] is ExEventViewModel)
+            _ = DetailView.Actions.ReloadAsync();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>SYNC_OPERATION_EVENT{DELETED} · 재조회 404(G46) — '운영' 레일의 그 행을 뺀다.</summary>
+    public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.OperationEventDeletedOnServerMessage message, CancellationToken cancellationToken)
+    {
+        var rows = OperationPanelViewModel?.ViewModelProvider;
+        if (message is null || rows is null) return Task.CompletedTask;
+        var row = rows.FirstOrDefault(r => r.Model?.Id == message.EventId);
+        if (row is null) return Task.CompletedTask;
+        rows.Remove(row);
+        RefreshRailCounts();
+        RaiseListState();
         return Task.CompletedTask;
     }
 

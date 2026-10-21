@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
@@ -44,6 +45,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     private readonly Func<bool> _canEdit;
     private readonly Func<IReadOnlyList<EventSuppressionScheduleDto>> _others;
     private readonly Action<string, Exception>? _onError;
+    private readonly Func<EnumServerContract> _contract;
 
     private SuppressionDraft _draft;
     private string _openedSignature = string.Empty;
@@ -59,7 +61,8 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
                                       Func<SuppressionDraft, CancellationToken, Task<SuppressionSaveOutcome>> save,
                                       Func<bool>? canEdit = null,
                                       Func<IReadOnlyList<EventSuppressionScheduleDto>>? others = null,
-                                      Action<string, Exception>? onError = null)
+                                      Action<string, Exception>? onError = null,
+                                      Func<EnumServerContract>? contract = null)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _devices = devices;
@@ -68,6 +71,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         _canEdit = canEdit ?? (() => true);
         _others = others ?? (() => Array.Empty<EventSuppressionScheduleDto>());
         _onError = onError;
+        _contract = contract ?? SuppressionRequestBuilder.ContractFromIoC;
 
         _draft = SuppressionDraft.NewSchedule(new DateTimeOffset(_clock.Now));
         Tray = new ObservableCollection<SuppressionTargetChip>();
@@ -274,6 +278,9 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
 
     /// <summary>화면이 모르는 억제 범위인가 — 그런 스케줄은 범위를 건드리지 않은 채로도 저장할 수 없다.</summary>
     public bool IsScopeUnknown => !SuppressionRequestBuilder.IsKnownScope(_draft.EventScope);
+
+    /// <summary>억제 범위 콤보에 '운영' 을 보이는가 — 서버 7.0 이상만(G44).</summary>
+    public bool IsOperationScopeAvailable => SuppressionRequestBuilder.SupportsOperationScope(_contract());
 
     /// <summary>모르는 범위 안내. 서버 원문 값은 화면에 싣지 않는다(범위 칸 툴팁 · 로그 몫이다).</summary>
     public string UnknownScopeText => IsScopeUnknown
@@ -617,6 +624,14 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
                 : IsScopeUnknown ? UnknownScopeText
                 : HasUnreadableTime ? UnreadableTimeText
                 : Verdict.CanSave ? "바뀐 것이 없습니다." : Verdict.FirstErrorText;
+            ShakeToken++;
+            return;
+        }
+
+        // 6.3 서버는 '운영' 범위를 모른다(422) — 보내기 전에 막는다(G44).
+        if (SuppressionRequestBuilder.ScopeGuard(_draft.EventScope, _contract()) is { } scopeBlocked)
+        {
+            StatusLine = scopeBlocked;
             ShakeToken++;
             return;
         }

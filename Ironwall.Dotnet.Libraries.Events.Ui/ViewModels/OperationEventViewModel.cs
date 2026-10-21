@@ -20,7 +20,7 @@ public class OperationEventViewModel : ExEventViewModel
     public string Reason => Operation.Reason;
 
     /// <summary>사유 글자("통문 열림"). 모르는 값은 원문.</summary>
-    public string ReasonText => OperationEventText.ReasonText(Operation.Reason);
+    public string ReasonText => OperationEventText.ReasonText(Operation.Reason, Operation.CategoryDevice);
 
     /// <summary>심각도 원문(<c>WARNING</c> …).</summary>
     public string? Severity => Operation.Severity;

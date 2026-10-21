@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Enclosure;
@@ -26,6 +26,12 @@ public interface IEnclosureMetricsNatsSyncService
 
     /// <summary>함체에 걸린 경고 요약 — 없으면 null.</summary>
     EnclosureAlertSummary? GetAlert(int enclosureId);
+
+    /// <summary>
+    /// <c>GET /api/enclosure-metrics</c> 1회로 함체별 최신 계측을 다시 채운다(8.0.15 G24) — 기동 때 자동으로 한 번 부르고,
+    /// NATS 재연결 뒤처럼 빈칸이 생겼을 때 다시 부른다. 404 · 실패는 조용히 0. 반환=새로 채운 함체 수.
+    /// </summary>
+    Task<int> RefreshFromServerAsync(CancellationToken token = default);
 
     Task StartService(CancellationToken token = default);
     Task StopAsync(CancellationToken token = default);

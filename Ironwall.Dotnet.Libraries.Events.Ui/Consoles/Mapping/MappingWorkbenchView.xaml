@@ -677,6 +677,70 @@
 							Visibility="{Binding HasPresetStatus, Converter={StaticResource BoolToVis}}" />
 						</StackPanel>
 					</c:ConsoleSection>
+
+					<!--
+						스피커 연동 설정 — 스피커 행을 하나 고르면 뜬다(카메라 칸과 같은 자리 · 같은 모양). 값 변경은 Draft 이고 [적용] 한 번에 나간다.
+						음원 그룹은 목록(GET /api/file-groups)에서 고르고, 목록을 볼 수 없으면 번호 입력으로 받는다(GOP API 8.0.15 대조 G25).
+					-->
+					<c:ConsoleSection
+						Grid.Row="4"
+						Margin="12,0,12,12"
+						AutomationProperties.AutomationId="Integrations.Board.SpeakerEditor"
+						AxisName="event-mapping-speakers"
+						Header="{Binding SpeakerEditorTitle}"
+						HelpKey="Events.Mapping.Speaker"
+						IsEnabled="{Binding IsBoardEnabled}"
+						Visibility="{Binding HasSpeakerEditor, Converter={StaticResource BoolToVis}}">
+						<StackPanel>
+						<StackPanel IsEnabled="{Binding CanEditSpeakerRow}">
+							<c:ConsoleField ApiName="file_group_id" Header="음원 그룹">
+								<Grid>
+									<ComboBox
+										Height="32"
+										Padding="8,0"
+										VerticalContentAlignment="Center"
+										md:HintAssist.IsFloating="False"
+										AutomationProperties.AutomationId="Integrations.Board.FileGroupCombo"
+										DisplayMemberPath="Display"
+										ItemsSource="{Binding FileGroupOptions}"
+										SelectedItem="{Binding SelectedFileGroup, Mode=TwoWay}"
+										Style="{StaticResource MaterialDesignOutlinedComboBox}"
+										Visibility="{Binding ShowFileGroupCombo, Converter={StaticResource BoolToVis}}" />
+									<TextBox
+										Height="32"
+										Padding="8,0"
+										VerticalContentAlignment="Center"
+										md:HintAssist.IsFloating="False"
+										md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+										AutomationProperties.AutomationId="Integrations.Board.FileGroupNumberBox"
+										MaxLength="9"
+										Style="{StaticResource MaterialDesignOutlinedTextBox}"
+										Text="{Binding EditFileGroupNumber, UpdateSourceTrigger=LostFocus}"
+										Visibility="{Binding ShowFileGroupNumber, Converter={StaticResource BoolToVis}}" />
+								</Grid>
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="repeat_count" Header="반복(회)">
+								<TextBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Board.RepeatBox"
+									MaxLength="4"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditRepeatCount, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+						</StackPanel>
+						<TextBlock
+							Margin="0,4,0,0"
+							FontSize="11"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding FileGroupStatusText}"
+							TextWrapping="Wrap"
+							Visibility="{Binding HasFileGroupStatus, Converter={StaticResource BoolToVis}}" />
+						</StackPanel>
+					</c:ConsoleSection>
 				</Grid>
 			</Grid>
 		</c:ConsoleShell.List>
