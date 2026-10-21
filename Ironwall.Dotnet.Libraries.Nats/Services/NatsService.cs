@@ -82,6 +82,7 @@ internal class NatsService : MessageService<INatsService>, INatsService
             }
 
             Connection = new NatsConnection(opts);
+            WatchReconnect(Connection);
             return this;
         }
         catch (Exception ex)
@@ -144,6 +145,7 @@ internal class NatsService : MessageService<INatsService>, INatsService
             }
 
             Connection = new NatsConnection(opts);
+            WatchReconnect(Connection);
             await Connection.PingAsync();
             return this;
         }
@@ -201,7 +203,37 @@ internal class NatsService : MessageService<INatsService>, INatsService
     }
     #endregion
 
+    #region - Reconnect -
+    /// <summary>
+    /// 새 연결의 열림 사건을 지켜본다(G53). 첫 열림은 처음 연결이라 알리지 않고, 그 뒤 다시 열릴 때마다 <see cref="Reconnected"/> 1회.
+    /// 연결을 새로 만들면(재로그인 등) 다시 '첫 연결' 부터 센다.
+    /// </summary>
+    private void WatchReconnect(NatsConnection connection)
+    {
+        Interlocked.Exchange(ref _openedCount, 0);
+        connection.ConnectionOpened += (_, _) =>
+        {
+            OnConnectionOpened();
+            return ValueTask.CompletedTask;
+        };
+    }
+
+    /// <summary>연결 열림 1회 처리 — 두 번째 열림부터 재연결로 알린다. 받는 쪽 예외는 여기서 막는다(수신 펌프 보호).</summary>
+    internal void OnConnectionOpened()
+    {
+        if (Interlocked.Increment(ref _openedCount) == 1) return;   // 첫 연결
+        _log?.Info("[NatsService] NATS 재연결됨 — Reconnected 알림");
+        try { Reconnected?.Invoke(this, EventArgs.Empty); }
+        catch (Exception ex) { _log?.Error($"[NatsService] Reconnected 처리 오류: {ex.Message}"); }
+    }
+
+    private int _openedCount;
+    #endregion
+
     #region - Properties -
     public string Subject => _defaultSubject;
+
+    /// <inheritdoc/>
+    public event EventHandler? Reconnected;
     #endregion
 }

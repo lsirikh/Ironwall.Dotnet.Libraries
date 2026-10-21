@@ -356,6 +356,13 @@ public partial class ServerMonitorView : UserControl
     private void OnRevert(object sender, RoutedEventArgs e) => ViewModel?.Revert();
     private void OnBeginEdit(object sender, RoutedEventArgs e) => ViewModel?.BeginEdit();
 
+    /// <summary>시스템 이벤트 줄의 [미확인] → 확인(G52).</summary>
+    private void OnAcknowledgeSystemEvent(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is ServerSystemEventRow row && ViewModel is { } vm)
+            _ = vm.AcknowledgeSystemEventAsync(row);
+    }
+
     private async void OnShowHistory(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.ShowHistoryAsync();

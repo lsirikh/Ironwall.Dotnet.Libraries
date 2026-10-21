@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -68,7 +68,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                     Content = Contents,
                     FromEventId = Model.Id
                 };
-                var response = await IoC.Get<IEventApiService>().CreateActionEventAsync(dto, token);
+                var response = await IoC.Get<IEventApiService>().CreateActionEventAsync(ActionReportRules.ApplyCreatedAtPolicy(dto), token);
                 if (!response.Success)
                 {
                     _log?.Error($"[ACTION_REPORT] Operation INSERT 실패: {response.Message}");
@@ -93,13 +93,27 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 if (keyed is not null) keyed.Exit(EventCardKind.Operation, Model.Id); else guard.Exit(Model.Id);
             }
         }
+
+        /// <summary>
+        /// SYNC_OPERATION_EVENT{UPDATED} 다시 읽기 반영(G46) — 운영자가 바꾼 심각도 · 상세 · 조치 상태만 고친다(새 이벤트가 아니다).
+        /// </summary>
+        public void ApplyServerUpdate(OperationEventModel updated)
+        {
+            if (updated is null) return;
+            _model.Severity = updated.Severity;
+            _model.DetailText = updated.DetailText;
+            _model.Status = updated.Status;
+            NotifyOfPropertyChange(nameof(SeverityText));
+            NotifyOfPropertyChange(nameof(IsWarning));
+            NotifyOfPropertyChange(nameof(DetailText));
+        }
         #endregion
         #region - Properties -
         /// <summary>사유 원문(<c>GATE_OPEN</c> …).</summary>
         public string Reason => _model.Reason;
 
         /// <summary>사유 글("통문 열림"). 모르는 사유는 원문.</summary>
-        public string ReasonText => OperationEventText.ReasonText(_model.Reason);
+        public string ReasonText => OperationEventText.ReasonText(_model.Reason, _model.CategoryDevice);
 
         /// <summary>심각도 글("경고"). 없으면 "—".</summary>
         public string SeverityText => OperationEventText.SeverityText(_model.Severity);

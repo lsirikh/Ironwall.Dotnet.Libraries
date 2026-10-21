@@ -50,6 +50,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<DetectionDeletedOnServerMessage>
                                             , IHandle<OperationEventCardMessage>
                                             , IHandle<OperationReportedMessageModel>
+                                            , IHandle<MalfunctionDeletedOnServerMessage>
+                                            , IHandle<DetectionReclassifiedMessage>
+                                            , IHandle<MalfunctionSyncedMessage>
+                                            , IHandle<ActionReportSyncedMessage>
+                                            , IHandle<OperationEventSyncedMessage>
+                                            , IHandle<OperationEventDeletedOnServerMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -665,7 +671,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             FromEventId = eventId
                         };
 
-                        var response = await _apiService.CreateActionEventAsync(dto);
+                        var response = await _apiService.CreateActionEventAsync(ActionReportRules.ApplyCreatedAtPolicy(dto));
                         if (!response.Success)
                             throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
 
@@ -799,7 +805,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     FromEventId = eventId
                 };
 
-                var response = await _apiService.CreateActionEventAsync(dto);
+                var response = await _apiService.CreateActionEventAsync(ActionReportRules.ApplyCreatedAtPolicy(dto));
                 if (!response.Success)
                 {
                     _log?.Warning($"AutoReport API 실패: {response.Message}");
@@ -901,7 +907,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     FromEventId = eventModel.Id
                 };
 
-                var response = await _apiService.CreateActionEventAsync(dto);
+                var response = await _apiService.CreateActionEventAsync(ActionReportRules.ApplyCreatedAtPolicy(dto));
                 if (!response.Success)
                 {
                     // 서버에 조치가 없다 — 카드를 지우거나 ACTION_REPORT 를 내보내면 거짓이 된다.
@@ -976,6 +982,97 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (outcome is RemoteActionReportOutcome.CardClosed or RemoteActionReportOutcome.QueueEntryCleared)
                 _ = PublishSafeAsync(new EventDeletedOnServerNotice(ActionReportKind.Detection, message.EventId));
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// 서버 재분류(G48) — 큐 엔트리 종류를 바꾸고(신호등 · 심볼 색이 그 종류를 따른다) 카드의 종류도 고친다.
+        /// </summary>
+        public Task HandleAsync(DetectionReclassifiedMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || message.EventId <= 0) return Task.CompletedTask;
+            if (_eventQueueManager.FindEntryByEventId(message.EventId, message.From) is { } entry)
+            {
+                entry.EventType = message.To;
+                _symbolEventManager.RefreshDeviceSymbol(entry.DeviceId, entry.DeviceType);
+            }
+            if (FindCard(ActionReportKind.Detection, message.EventId) is DetectionEventCardViewModel card && card.Model is IDetectionEventModel model)
+            {
+                model.MessageType = message.To;
+                card.Refresh();
+            }
+            _log?.Info($"[SYNC_DETECTION] 재분류 반영: {message.EventId} {message.From} → {message.To}");
+            return Task.CompletedTask;
+        }
+
+        /// <summary>SYNC_MALFUNCTION{DELETED} · 재조회 404 — 서버에서 지워진 장애를 탐지와 같은 길로 닫는다(종류+Id, G45).</summary>
+        public Task HandleAsync(MalfunctionDeletedOnServerMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || message.EventId <= 0) return Task.CompletedTask;
+            var outcome = CloseRemotely(ActionReportKind.Malfunction, message.EventId, EnumEventType.Fault, device: null, deletedOnServer: true);
+            _log?.Info($"[SYNC_MALFUNCTION] 서버 삭제 처리: {message.EventId} → {outcome}");
+            if (outcome is RemoteActionReportOutcome.CardClosed or RemoteActionReportOutcome.QueueEntryCleared)
+                _ = PublishSafeAsync(new EventDeletedOnServerNotice(ActionReportKind.Malfunction, message.EventId));
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// SYNC_MALFUNCTION{UPDATED} 재조회 — 다른 곳에서 조치됐으면 원격 조치보고와 같이 닫는다.
+        /// 장애가 아닌 종류로 재분류됐으면 이 목록의 장애가 아니므로 닫는다(서버 삭제와 같은 길, 토스트 없음).
+        /// </summary>
+        public Task HandleAsync(MalfunctionSyncedMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || message.EventId <= 0) return Task.CompletedTask;
+            if (message.ActionReported)
+            {
+                var outcome = CloseRemotely(ActionReportKind.Malfunction, message.EventId, EnumEventType.Fault, device: null, deletedOnServer: false);
+                _log?.Info($"[SYNC_MALFUNCTION] 조치됨 반영: {message.EventId} → {outcome}");
+            }
+            else if (!string.IsNullOrWhiteSpace(message.TypeEvent)
+                     && !string.Equals(message.TypeEvent, nameof(EnumEventType.Fault), StringComparison.OrdinalIgnoreCase))
+            {
+                var outcome = CloseRemotely(ActionReportKind.Malfunction, message.EventId, EnumEventType.Fault, device: null, deletedOnServer: true);
+                _log?.Info($"[SYNC_MALFUNCTION] 재분류(type_event={message.TypeEvent}) — 장애 카드 닫음: {message.EventId} → {outcome}");
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>SYNC_ACTION_REPORT — 원본을 다시 읽어 조치됨이면 그 카드를 원격 조치보고와 같이 닫는다(G45).</summary>
+        public Task HandleAsync(ActionReportSyncedMessage message, CancellationToken cancellationToken)
+        {
+            if (message is { OriginActionReported: true, OriginKind: { } kind, OriginId: > 0 })
+            {
+                var outcome = CloseRemotely(kind, message.OriginId!.Value, eventType: null, device: null, deletedOnServer: false);
+                _log?.Info($"[SYNC_ACTION_REPORT] 원본 조치됨 반영: {kind} {message.OriginId} → {outcome}");
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>SYNC_OPERATION_EVENT{UPDATED} — 카드의 심각도 · 경보 표시만 고친다(G46). 새 카드를 올리지 않는다.</summary>
+        public Task HandleAsync(OperationEventSyncedMessage message, CancellationToken cancellationToken)
+        {
+            if (message?.Model is not { Id: > 0 } model) return Task.CompletedTask;
+            if (FindCard(EventCardKind.Operation, model.Id) is OperationEventCardViewModel card)
+            {
+                card.ApplyServerUpdate(model);
+                _log?.Info($"[SYNC_OPERATION_EVENT] 운영 카드 갱신: {model.Id}, severity={model.Severity}");
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>SYNC_OPERATION_EVENT{DELETED} · 재조회 404 — 운영 카드를 닫는다(G46).</summary>
+        public Task HandleAsync(OperationEventDeletedOnServerMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || message.EventId <= 0) return Task.CompletedTask;
+            var outcome = CloseRemotely(EventCardKind.Operation, message.EventId, eventType: null, device: null, deletedOnServer: true);
+            _log?.Info($"[SYNC_OPERATION_EVENT] 서버 삭제 처리: {message.EventId} → {outcome}");
+            return Task.CompletedTask;
+        }
+
+        /// <summary>운영 카드가 목록에 있는가 — 수신 스레드에서 불릴 수 있어 사본으로 본다. 판정이 안 되면 있다고 본다(다시 읽기는 안전).</summary>
+        internal bool HasOperationCard(int eventId)
+        {
+            try { return ViewModelProvider.ToArray().Any(c => KeyOf(c) == (EventCardKind.Operation, eventId)); }
+            catch (Exception) { return true; }
         }
 
         private RemoteActionReportOutcome CloseRemotely(string? kind, int eventId, EnumEventType? eventType, IBaseDeviceModel? device, bool deletedOnServer)

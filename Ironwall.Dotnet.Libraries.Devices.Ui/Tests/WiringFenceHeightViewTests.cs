@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -590,7 +591,7 @@ public class WiringFenceHeightViewTests
             window.Resources.MergedDictionaries.Add((ResourceDictionary)XamlReader.Parse(File.ReadAllText(
                 Path.Combine(RepoRoot(), "Ironwall.Dotnet.Libraries.Theme", "Themes", "Tokens.Light.xaml"))));
             window.SetResourceReference(Control.BackgroundProperty, "SurfaceBrush");
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             vm.IsSoftwareRendering = false;
             vm.IsFlatChosen = false;
@@ -625,6 +626,8 @@ public class WiringFenceHeightViewTests
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — Ctrl+Space 는 초점을 옮긴 칩을 선택에 더한다(키보드 초점 이동). 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { result = body(); }
             catch (Exception ex) { failure = ex; }
             finally { StaCleanup.ShutdownDispatcher(); }

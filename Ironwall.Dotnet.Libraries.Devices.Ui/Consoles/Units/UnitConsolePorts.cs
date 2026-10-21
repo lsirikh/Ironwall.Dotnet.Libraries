@@ -230,44 +230,12 @@ public sealed class UnitDeviceApiAdapter : IUnitDeviceApi
     }
 
     #region - Helpers -
-    private async Task<BaseDeviceDto?> RefetchAsync(UnitDeviceItem device, CancellationToken token) => device.Category switch
-    {
-        EnumDeviceCategory.Controller => Read(await _api!.GetControllerByIdAsync(device.Id, false, token).ConfigureAwait(false)),
-        EnumDeviceCategory.Sensor => Read(await _api!.GetSensorByIdAsync(device.Id, false, token).ConfigureAwait(false)),
-        EnumDeviceCategory.Camera => Read(await _api!.GetCameraByIdAsync(device.Id, token).ConfigureAwait(false)),
-        EnumDeviceCategory.Speaker => Read(await _api!.GetSpeakerByIdAsync(device.Id, token).ConfigureAwait(false)),
-        EnumDeviceCategory.Enclosure => Read(await _api!.GetEnclosureByIdAsync(device.Id, token).ConfigureAwait(false)),
-        EnumDeviceCategory.Lamp => Read(await _api!.GetLampByIdAsync(device.Id, token).ConfigureAwait(false)),
-        EnumDeviceCategory.Gate => Read(await _api!.GetGateByIdAsync(device.Id, token).ConfigureAwait(false)),
-        _ => null,
-    };
+    // 카테고리별 단건 다시 받기 · 좁은 PATCH 는 함체째 부대 옮기기(EnclosureUnitMover)와 함께 쓰려고 UnitDeviceCalls 로 옮겼다(G32).
+    private Task<BaseDeviceDto?> RefetchAsync(UnitDeviceItem device, CancellationToken token)
+        => UnitDeviceCalls.RefetchAsync(_api!, device.Category, device.Id, token);
 
-    private async Task<ApiResponse<BaseDeviceDto>> PatchAsync(EnumDeviceCategory category, int id, BaseDeviceDto body, CancellationToken token)
-    {
-        return category switch
-        {
-            EnumDeviceCategory.Controller => Up(await _api!.PatchControllerAsync(id, (ControllerDeviceDto)body, token).ConfigureAwait(false)),
-            EnumDeviceCategory.Sensor => Up(await _api!.PatchSensorAsync(id, (SensorDeviceDto)body, token).ConfigureAwait(false)),
-            EnumDeviceCategory.Camera => Up(await _api!.PatchCameraAsync(id, (CameraDeviceDto)body, token).ConfigureAwait(false)),
-            EnumDeviceCategory.Speaker => Up(await _api!.PatchSpeakerAsync(id, (SpeakerDeviceDto)body, token).ConfigureAwait(false)),
-            EnumDeviceCategory.Enclosure => Up(await _api!.PatchEnclosureAsync(id, (EnclosureDeviceDto)body, token).ConfigureAwait(false)),
-            EnumDeviceCategory.Lamp => Up(await _api!.PatchLampAsync(id, (LampDeviceDto)body, token).ConfigureAwait(false)),
-            EnumDeviceCategory.Gate => Up(await _api!.PatchGateAsync(id, (GateDeviceDto)body, token).ConfigureAwait(false)),
-            _ => ApiResponse<BaseDeviceDto>.CreateError(ApiErrorCodes.BadRequest, "소속 부대를 바꿀 수 없는 장비입니다."),
-        };
-
-        static ApiResponse<BaseDeviceDto> Up<T>(ApiResponse<T> response) where T : BaseDeviceDto => new()
-        {
-            Success = response.Success,
-            Message = response.Message,
-            Data = response.Data,
-            Error = response.Error,
-            StatusCode = response.StatusCode,
-        };
-    }
-
-    private static BaseDeviceDto? Read<T>(ApiResponse<T> response) where T : BaseDeviceDto
-        => response.Success ? response.Data : null;
+    private Task<ApiResponse<BaseDeviceDto>> PatchAsync(EnumDeviceCategory category, int id, BaseDeviceDto body, CancellationToken token)
+        => UnitDeviceCalls.PatchAsync(_api!, category, id, body, token);
 
     /// <summary>서버 거절 원문은 로그로 보내고 화면에는 고정 문장을 준다(U-18 공통 규칙).</summary>
     private string Reason<T>(ApiResponse<T> response)

@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.CameraPopup.Frames;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
 using Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Globalization;
 using System.Threading;
@@ -139,7 +140,8 @@ public sealed class HostMappingCameraVideo : IMappingCameraVideo
     /// <inheritdoc/>
     public bool CanGotoPreset(int cameraId)
     {
-        try { return _host is not null && _directory.FindCamera(cameraId)?.Category == EnumCameraType.PTZ; }
+        // 형태 코드 SPEED_DOME(Category=NONE)도 PTZ 다(GOP API 8.0.15 대조 G14).
+        try { return _host is not null && CameraDriveKind.IsPtzDrive(_directory.FindCamera(cameraId)); }
         catch (Exception) { return false; }
     }
 
@@ -151,7 +153,7 @@ public sealed class HostMappingCameraVideo : IMappingCameraVideo
             var camera = _directory.FindCamera(cameraId);
             if (camera is null)
                 return MappingCallResult<bool>.Fail("장비 목록에서 이 카메라를 찾지 못해 이동할 수 없습니다.");
-            if (camera.Category != EnumCameraType.PTZ)
+            if (!CameraDriveKind.IsPtzDrive(camera))
                 return MappingCallResult<bool>.Fail("PTZ 카메라가 아니라 프리셋 자리로 이동할 수 없습니다.");
 
             var control = _control();

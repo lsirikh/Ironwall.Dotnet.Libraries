@@ -582,6 +582,38 @@ public interface IDeviceApiService : IService
         int id,
         CancellationToken token = default);
 
+    /// <summary>
+    /// 이 장비를 담은 함체 — <c>GET /api/devices/enclosures?device_id={id}</c>(v8.0.6, 명세 §5.5.6.1 역조회). 0 또는 1건이다.
+    /// </summary>
+    /// <remarks>
+    /// <para>서버가 8.0.6 미만이면(판본을 못 읽었을 때 포함) <b>서버에 묻지 않고</b> <c>ENDPOINT_UNAVAILABLE</c> 오류를 돌려준다 —
+    /// 옛 서버는 모르는 쿼리를 무시해 <b>전체 함체</b>를 돌려주므로, 물으면 "모든 함체에 들어 있다"로 오판한다.</para>
+    /// <para>기본 구현은 "지원하지 않음" 오류다 — 시험 대역 · 옛 구현이 이 멤버 때문에 깨지지 않게 한다.</para>
+    /// </remarks>
+    /// <param name="deviceId">장비 id(<c>devices.id</c>, 전 카테고리 공통).</param>
+    Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(
+        int deviceId,
+        CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<EnclosureDeviceDto>.CreateError("NOT_SUPPORTED", "이 장비 서비스는 함체 역조회를 지원하지 않습니다."));
+
+    // ────────────────────────── FileGroup (방송 음원 그룹, §5.10) ──────────────────────────
+
+    /// <summary>
+    /// 방송 음원 파일 그룹 목록 — <c>GET /api/file-groups</c>(권한 <c>files:view</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para><paramref name="limit"/> 은 서버 상한 100 으로 자른다(넘기면 422). 페이지 정보는 <see cref="ApiListResponse{T}.Pagination"/>,
+    /// 권한 없음(403) · 없음(404) 은 <see cref="ApiListResponse{T}.StatusCode"/> 로 가른다.</para>
+    /// <para>기본 구현은 "지원하지 않음" 오류다 — 시험 대역 · 옛 구현이 이 멤버 때문에 깨지지 않게 한다.</para>
+    /// </remarks>
+    /// <param name="serverId">방송 서버 id 필터(<c>?server_id=</c>). <c>null</c> 이면 싣지 않는다.</param>
+    Task<ApiListResponse<FileGroupDto>> GetFileGroupsAsync(
+        int? serverId = null,
+        int page = 1,
+        int limit = 100,
+        CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<FileGroupDto>.CreateError("NOT_SUPPORTED", "이 장비 서비스는 음원 그룹 목록을 지원하지 않습니다."));
+
     // ────────────────────────── Lamp Device CRUD ──────────────────────────
 
     /// <param name="typeLamp">7.0 종류축 필터 <c>?type_lamp=</c>(<c>Beacon</c>|<c>Strobe</c>|<c>LedBar</c>|<c>Unknown</c>).</param>
@@ -878,6 +910,18 @@ public interface IDeviceApiService : IService
         int enclosureId,
         string? beforeDate = null,
         CancellationToken token = default);
+
+    /// <summary>
+    /// 전 함체의 최신 계측 1건씩 — <c>GET /api/enclosure-metrics</c>(명세 §5.5.13, 권한 <c>devices:view</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>계측이 없는 함체는 <see cref="EnclosureLatestMetricsDto.LatestMetrics"/> 가 <c>null</c>. 봉투의 <c>pagination</c> 은 <c>null</c> 이다(무시).</para>
+    /// <para>경로가 없는 서버(404) · 권한 없음(403)은 <see cref="ApiListResponse{T}.StatusCode"/> 로 가른다(<c>Error.Code</c> 는 서버 코드).</para>
+    /// <para>기본 구현은 "지원하지 않음" 오류다 — 시험 대역 · 옛 구현이 이 멤버 때문에 깨지지 않게 한다.</para>
+    /// </remarks>
+    Task<ApiListResponse<EnclosureLatestMetricsDto>> GetAllEnclosureLatestMetricsAsync(
+        CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<EnclosureLatestMetricsDto>.CreateError("NOT_SUPPORTED", "이 장비 서비스는 전 함체 최신 계측 조회를 지원하지 않습니다."));
 
     // ────────────────────────── DeviceGroup CRUD (§5.6) ──────────────────────────
 

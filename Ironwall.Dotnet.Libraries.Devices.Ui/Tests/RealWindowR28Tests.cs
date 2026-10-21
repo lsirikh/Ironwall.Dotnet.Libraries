@@ -20,6 +20,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
 using Xunit.Abstractions;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -40,6 +41,8 @@ public class RealWindowR28Tests
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — 진짜 확인 창의 Enter 는 창 입력 원본(HwndSource)의 키보드 초점 요소로 들어간다. 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { result = body(); }
             catch (Exception ex) { failure = ex; }
             finally { StaCleanup.ShutdownDispatcher(); }
@@ -109,7 +112,7 @@ public class RealWindowR28Tests
             ShowActivated = false,
             ShowInTaskbar = false,
         };
-        window.Show();
+        QuietWindow.Show(window);
         Pump();
         try { return body(window); }
         finally { window.Close(); }
@@ -408,7 +411,7 @@ public class RealWindowR28Tests
         };
         window.Resources.MergedDictionaries.Add((ResourceDictionary)XamlReader.Parse(File.ReadAllText(
             Path.Combine(RepoRoot(), "Ironwall.Dotnet.Libraries.Theme", "Themes", "Tokens.Light.xaml"))));
-        window.Show();
+        QuietWindow.Show(window);
         Pump();
         try { return body(window, view); }
         finally { window.Close(); }

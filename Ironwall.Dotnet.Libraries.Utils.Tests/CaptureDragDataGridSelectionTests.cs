@@ -7,6 +7,7 @@ using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Microsoft.Xaml.Behaviors;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -115,10 +116,9 @@ public class CaptureDragDataGridSelectionTests
         Interaction.GetBehaviors(grid).Add(new CaptureDragBehavior { KeyboardFallback = "Ctrl 로 여러 행 · [그룹에 넣기]", IsDragEnabled = dragEnabled });
 
         var window = new Window { Content = grid, Width = 300, Height = 240, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Left = -10000, Top = -10000 };
-        window.Show();
+        QuietWindow.Show(window);
         try
         {
-            window.Activate();
             window.UpdateLayout();
             return body(grid, items);
         }
@@ -139,8 +139,11 @@ public class CaptureDragDataGridSelectionTests
         Exception? error = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — DataGrid 칸은 눌림 때 키보드 초점을 가져가고 그 경로가 선택 규칙에 끼어든다(실제 앱의 활성 창과 같게). 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { result = body(); }
             catch (Exception ex) { error = ex; }
+            finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }   // 숨은 데스크톱 스레드는 디스패처를 닫고 끝낸다 — TSF · 창 정리가 살아 있는 개체에서 돈다
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

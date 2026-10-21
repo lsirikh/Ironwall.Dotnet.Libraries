@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Markup;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -53,7 +54,7 @@ public class SuppressionDayChipAutomationTests
             {
                 var root = (UIElement)XamlReader.Parse(fragment);
                 var w = new Window { Content = root, Width = 400, Height = 120, Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false };
-                w.Show();
+                QuietWindow.Show(w);
                 w.UpdateLayout();
                 void Walk(AutomationPeer p)
                 {

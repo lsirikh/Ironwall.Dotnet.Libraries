@@ -70,7 +70,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
 
             // 내용 게이트 — '기타' + 빈 메모는 서버 422(content min_length=1). 보내기 전에 이유를 알린다.
             var content = (SelectableItemViewModel?.Name == "기타") ? Memo : SelectableItemViewModel?.Name;
-            var invalid = ActionReportRules.ValidateContent(content);
+            var invalid = ActionReportRules.ValidateContent(content) ?? ActionReportRules.ValidateUser(user);   // user 1~100자(G43)
             if (invalid is not null)
             {
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel

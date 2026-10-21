@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -31,7 +32,7 @@ public class StaCleanupTests
                     Left = -20000, Top = -20000, Width = 200, Height = 100,
                     WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false,
                 };
-                window.Show();
+                QuietWindow.Show(window);
                 handle = new WindowInteropHelper(window).Handle;
                 dispatcher = Dispatcher.CurrentDispatcher;
                 aliveBefore = IsWindow(handle);

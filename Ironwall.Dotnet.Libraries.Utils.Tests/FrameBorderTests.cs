@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -217,7 +218,7 @@ public class FrameBorderTests
             Top = -20000,
             UseLayoutRounding = true,
         };
-        window.Show();
+        QuietWindow.Show(window);
         Pump(DispatcherPriority.ContextIdle);
         return window;
     }

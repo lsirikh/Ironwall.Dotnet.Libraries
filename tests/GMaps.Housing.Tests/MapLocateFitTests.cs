@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace GMaps.Housing.Tests;
 
@@ -52,7 +53,7 @@ public class MapLocateFitTests
             ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
             Content = map,
         };
-        window.Show();
+        QuietWindow.Show(window);
         try
         {
             Pump();

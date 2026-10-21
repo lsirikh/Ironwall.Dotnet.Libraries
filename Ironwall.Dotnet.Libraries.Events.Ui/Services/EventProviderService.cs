@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 
@@ -576,6 +577,13 @@ public class EventProviderService
             var dto = model.ToDetectionEventDto();
             var response = await _apiService.CreateDetectionEventAsync(dto, token);
 
+            // 202 억제(G40) — 정비 창에 걸려 서버가 저장하지 않았다. 실패와 다른 결과형으로 알린다.
+            if (response.IsAccepted())
+            {
+                _log?.Info($"InsertDetectionEventAsync(): 억제됨 schedule_id={response.ScheduleId} — {response.Message}");
+                throw new EventSuppressedException(response.ScheduleId, response.Message);
+            }
+
             if (!response.Success || response.Data == null)
             {
                 var errorMsg = $"Failed to create detection event: {response.Error?.Message}";
@@ -587,6 +595,7 @@ public class EventProviderService
             _log?.Info($"InsertDetectionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
+        catch (EventSuppressedException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"InsertDetectionEventAsync() failed: {ex.Message}");
@@ -697,6 +706,10 @@ public class EventProviderService
 
             var response = await _apiService.DeleteDetectionEventAsync(id, token);
 
+            // 409(G41) — 조치보고가 달려 있어 서버가 거절. 일반 실패와 사유가 달라 따로 알린다(재시도형 409 는 일반 실패).
+            if (IsDeleteBlocked(response))
+                throw new DeleteBlockedException(id, response.Error?.Message);
+
             if (!response.Success)
             {
                 _log?.Error($"Failed to delete detection event ID {id}: {response.Error?.Message}");
@@ -706,12 +719,20 @@ public class EventProviderService
             _log?.Info($"DeleteDetectionEventAsync() completed for ID {id}");
             return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
+        catch (DeleteBlockedException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"DeleteDetectionEventAsync() failed: {ex.Message}");
             throw;
         }
     }
+
+    /// <summary>
+    /// 삭제 409 가 '참조(조치보고)가 남음' 인가(G41). 8.0.15 의 동시성 409(<c>details.retryable=true</c>)는 다시 보내면 되는 실패라 뺀다.
+    /// </summary>
+    internal static bool IsDeleteBlocked(Ironwall.Dotnet.Libraries.Messages.Defines.Apis.ApiResponse<bool> response)
+        => response.StatusCode == 409
+           && !(response.Error?.DetailsToken is Newtonsoft.Json.Linq.JObject details && details.Value<bool?>("retryable") == true);
 
     /// <summary>
     /// GOP API를 통해 새로운 Malfunction Event를 생성합니다.
@@ -727,6 +748,13 @@ public class EventProviderService
             var dto = model.ToMalfunctionEventDto();
             var response = await _apiService.CreateMalfunctionEventAsync(dto, token);
 
+            // 202 억제(G40) — 정비 창에 걸려 서버가 저장하지 않았다. 실패와 다른 결과형으로 알린다.
+            if (response.IsAccepted())
+            {
+                _log?.Info($"InsertMalfunctionEventAsync(): 억제됨 schedule_id={response.ScheduleId} — {response.Message}");
+                throw new EventSuppressedException(response.ScheduleId, response.Message);
+            }
+
             if (!response.Success || response.Data == null)
             {
                 var errorMsg = $"Failed to create malfunction event: {response.Error?.Message}";
@@ -738,6 +766,7 @@ public class EventProviderService
             _log?.Info($"InsertMalfunctionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
+        catch (EventSuppressedException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"InsertMalfunctionEventAsync() failed: {ex.Message}");
@@ -790,6 +819,10 @@ public class EventProviderService
 
             var response = await _apiService.DeleteMalfunctionEventAsync(id, token);
 
+            // 409(G41) — 조치보고가 달려 있어 서버가 거절. 일반 실패와 사유가 달라 따로 알린다(재시도형 409 는 일반 실패).
+            if (IsDeleteBlocked(response))
+                throw new DeleteBlockedException(id, response.Error?.Message);
+
             if (!response.Success)
             {
                 _log?.Error($"Failed to delete malfunction event ID {id}: {response.Error?.Message}");
@@ -799,6 +832,7 @@ public class EventProviderService
             _log?.Info($"DeleteMalfunctionEventAsync() completed for ID {id}");
             return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
+        catch (DeleteBlockedException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"DeleteMalfunctionEventAsync() failed: {ex.Message}");
@@ -820,6 +854,13 @@ public class EventProviderService
             var dto = model.ToConnectionEventDto();
             var response = await _apiService.CreateConnectionEventAsync(dto, token);
 
+            // 202 억제(G40) — 정비 창에 걸려 서버가 저장하지 않았다. 실패와 다른 결과형으로 알린다.
+            if (response.IsAccepted())
+            {
+                _log?.Info($"InsertConnectionEventAsync(): 억제됨 schedule_id={response.ScheduleId} — {response.Message}");
+                throw new EventSuppressedException(response.ScheduleId, response.Message);
+            }
+
             if (!response.Success || response.Data == null)
             {
                 var errorMsg = $"Failed to create connection event: {response.Error?.Message}";
@@ -831,6 +872,7 @@ public class EventProviderService
             _log?.Info($"InsertConnectionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
+        catch (EventSuppressedException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"InsertConnectionEventAsync() failed: {ex.Message}");
@@ -883,6 +925,10 @@ public class EventProviderService
 
             var response = await _apiService.DeleteConnectionEventAsync(id, token);
 
+            // 409(G41) — 조치보고가 달려 있어 서버가 거절. 일반 실패와 사유가 달라 따로 알린다(재시도형 409 는 일반 실패).
+            if (IsDeleteBlocked(response))
+                throw new DeleteBlockedException(id, response.Error?.Message);
+
             if (!response.Success)
             {
                 _log?.Error($"Failed to delete connection event ID {id}: {response.Error?.Message}");
@@ -892,6 +938,7 @@ public class EventProviderService
             _log?.Info($"DeleteConnectionEventAsync() completed for ID {id}");
             return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
+        catch (DeleteBlockedException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"DeleteConnectionEventAsync() failed: {ex.Message}");
@@ -919,7 +966,7 @@ public class EventProviderService
                 FromEventId = model.OriginEvent?.Id ?? 0
             };
 
-            var response = await _apiService.CreateActionEventAsync(createDto, token);
+            var response = await _apiService.CreateActionEventAsync(ActionReportRules.ApplyCreatedAtPolicy(createDto), token);
 
             if (!response.Success || response.Data == null)
             {

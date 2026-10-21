@@ -276,6 +276,13 @@ public class DeviceProviderService : IDeviceProviderService
     /// NatsSync SYNC_DEVICE 메시지 수신 시 호출됩니다.
     /// </summary>
     public async Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
+        => (await TryFetchDeviceByIdAsync(typeDevice, resourceId, token).ConfigureAwait(false)).Item;
+
+    /// <summary>
+    /// 단건 재조회 + 결말 — 서버 404 는 <see cref="ProviderFetchStatus.NotFound"/>, 그 밖의 실패는 <see cref="ProviderFetchStatus.Failed"/>
+    /// (GOP API 8.0.15 대조 G39). 어느 실패든 캐시는 건드리지 않는다.
+    /// </summary>
+    public async Task<ProviderFetchResult<IBaseDeviceModel>> TryFetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
     {
         try
         {
@@ -283,7 +290,7 @@ public class DeviceProviderService : IDeviceProviderService
             //   종전엔 옛 종류 이름을 하나하나 나열한 문자열 switch 였고 SmartMultisensor2·Fence_Group 이 빠져 있어
             //   그 센서의 SYNC_DEVICE 가 조용히 무시됐다(device-console-v8 ISSUE-19). 해석은 공용 정본에 맡긴다.
             var category = ResolveSyncCategory(typeDevice);
-            IBaseDeviceModel? updated = category switch
+            SingleFetch fetch = category switch
             {
                 EnumDeviceCategory.Controller => await FetchSingleControllerAsync(resourceId, token),
                 EnumDeviceCategory.Sensor => await FetchSingleSensorAsync(resourceId, token),
@@ -292,10 +299,21 @@ public class DeviceProviderService : IDeviceProviderService
                 EnumDeviceCategory.Enclosure => await FetchSingleEnclosureAsync(resourceId, token),
                 EnumDeviceCategory.Gate => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
                 EnumDeviceCategory.Lamp => await FetchSingleLampAsync(resourceId, token),
-                _ => null
+                _ => SingleFetch.Unknown,
             };
 
-            if (updated != null)
+            if (!fetch.Ok)
+            {
+                if (fetch.IsNotFound)
+                {
+                    _log?.Warning($"FetchDeviceByIdAsync: {typeDevice}({resourceId}) 서버에 없음(404) — 캐시는 그대로");
+                    return ProviderFetchResult<IBaseDeviceModel>.NotFound(fetch.StatusCode, fetch.ErrorCode);
+                }
+                _log?.Warning($"FetchDeviceByIdAsync: {typeDevice}({resourceId}) 재조회 실패 — {fetch.StatusCode} {fetch.ErrorCode}");
+                return ProviderFetchResult<IBaseDeviceModel>.Failed(fetch.StatusCode, fetch.ErrorCode);
+            }
+
+            var updated = fetch.Model!;
             {
                 // (Id, 판별자) 로 찾는다 — (Id, DeviceType) 은 종류축이 바뀐 장비를 못 찾아 중복으로 추가했다(FR-04 와 같은 키).
                 var updatedKey = CategoryKeyOf(updated);
@@ -331,29 +349,46 @@ public class DeviceProviderService : IDeviceProviderService
                     _deviceProvider.Add(updated);
                 _log?.Info($"FetchDeviceByIdAsync: {typeDevice}({resourceId}) 갱신 완료 → Status={updated.Status}");
             }
-            return updated;
+            return ProviderFetchResult<IBaseDeviceModel>.Updated(updated, fetch.StatusCode);
         }
         catch (Exception ex)
         {
             _log?.Error($"FetchDeviceByIdAsync({typeDevice}, {resourceId}) 실패: {ex.Message}");
-            return null;
+            return ProviderFetchResult<IBaseDeviceModel>.Failed(errorCode: "EXCEPTION");
         }
     }
 
+    /// <summary>단건 조회 한 번의 결말(모델 · HTTP 상태 · 오류 코드).</summary>
+    private readonly record struct SingleFetch(IBaseDeviceModel? Model, int StatusCode, string? ErrorCode)
+    {
+        public bool Ok => Model != null;
+        public bool IsNotFound => !Ok && IsNotFoundResponse(StatusCode, ErrorCode);
+        public static SingleFetch Unknown => new(null, 0, "UNKNOWN_CATEGORY");
+    }
+
+    /// <summary>서버가 "없다"고 답했는가 — HTTP 404 또는 봉투 오류 코드 <c>NOT_FOUND</c>.</summary>
+    internal static bool IsNotFoundResponse(int statusCode, string? errorCode)
+        => statusCode == 404 || string.Equals(errorCode, Ironwall.Dotnet.Libraries.Messages.Defines.Apis.ApiErrorCodes.NotFound, StringComparison.OrdinalIgnoreCase);
+
+    private static SingleFetch Single<T>(Ironwall.Dotnet.Libraries.Messages.Defines.Apis.ApiResponse<T> resp, Func<T, IBaseDeviceModel> map) where T : class
+        => resp.Success && resp.Data != null
+            ? new SingleFetch(map(resp.Data), resp.StatusCode, null)
+            : new SingleFetch(null, resp.StatusCode, resp.Error?.Code);
+
     /// <summary>통문 단건 조회 — <c>GET /api/devices/gates/{id}</c>(FR-12).</summary>
-    private async Task<IBaseDeviceModel?> FetchSingleGateAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleGateAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetGateByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToGateDeviceModel().WithResponseMeta(resp.Meta));
     }
 
-    private async Task<IBaseDeviceModel?> FetchSingleControllerAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleControllerAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetControllerByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToControllerDeviceModel().WithResponseMeta(resp.Meta));
     }
 
-    private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleSensorAsync(int id, CancellationToken token)
     {
         // (FR-10) 단건도 동일 — 7.0 에서 include_controller 는 422. 중첩 객체가 없어도
         // FetchDeviceByIdAsync 가 Controller.Id 로 Provider 실제 인스턴스를 재연결한다.
@@ -361,31 +396,31 @@ public class DeviceProviderService : IDeviceProviderService
             id,
             includeController: _queryPolicy.CanUseIncludeControllerFlag,
             token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToSensorDeviceModel().WithResponseMeta(resp.Meta));
     }
 
-    private async Task<IBaseDeviceModel?> FetchSingleCameraAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleCameraAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetCameraByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToCameraDeviceModel().WithResponseMeta(resp.Meta));
     }
 
-    private async Task<IBaseDeviceModel?> FetchSingleSpeakerAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleSpeakerAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetSpeakerByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToSpeakerDeviceModel().WithResponseMeta(resp.Meta));
     }
 
-    private async Task<IBaseDeviceModel?> FetchSingleEnclosureAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleEnclosureAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetEnclosureByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToEnclosureDeviceModel().WithResponseMeta(resp.Meta));
     }
 
-    private async Task<IBaseDeviceModel?> FetchSingleLampAsync(int id, CancellationToken token)
+    private async Task<SingleFetch> FetchSingleLampAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetLampByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel().WithResponseMeta(resp.Meta) : null;
+        return Single(resp, d => d.ToLampDeviceModel().WithResponseMeta(resp.Meta));
     }
 
     /// <summary>
@@ -502,11 +537,28 @@ public class DeviceProviderService : IDeviceProviderService
     /// NatsSync SYNC_DEVICE_GROUP action="CREATED" / "UPDATED" 수신 시 호출됩니다.
     /// </summary>
     public async Task FetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default)
+        => await TryFetchDeviceGroupByIdAsync(resourceId, token).ConfigureAwait(false);
+
+    /// <summary>
+    /// 장비 그룹 단건 재조회 + 결말 — 서버 404 는 <see cref="ProviderFetchStatus.NotFound"/>, 그 밖의 실패는 <see cref="ProviderFetchStatus.Failed"/>(G39).
+    /// 어느 실패든 캐시는 건드리지 않는다.
+    /// </summary>
+    public async Task<ProviderFetchResult<IDeviceGroupModel>> TryFetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default)
     {
         try
         {
             var resp = await _apiService.GetDeviceGroupByIdAsync(resourceId, token: token);
-            if (resp.Success && resp.Data != null)
+            if (!(resp.Success && resp.Data != null))
+            {
+                var code = resp.Error?.Code;
+                if (IsNotFoundResponse(resp.StatusCode, code))
+                {
+                    _log?.Warning($"FetchDeviceGroupByIdAsync: DeviceGroup({resourceId}) 서버에 없음(404) — 캐시는 그대로");
+                    return ProviderFetchResult<IDeviceGroupModel>.NotFound(resp.StatusCode, code);
+                }
+                _log?.Warning($"FetchDeviceGroupByIdAsync: DeviceGroup({resourceId}) 재조회 실패 — {resp.StatusCode} {code}");
+                return ProviderFetchResult<IDeviceGroupModel>.Failed(resp.StatusCode, code);
+            }
             {
                 var model = resp.Data.ToDeviceGroupModel();
                 var existing = _deviceGroupProvider.FirstOrDefault(g => g.Id == resourceId);
@@ -521,11 +573,13 @@ public class DeviceProviderService : IDeviceProviderService
                     _deviceGroupProvider.Add(model);
                 }
                 _log?.Info($"FetchDeviceGroupByIdAsync: DeviceGroup({resourceId}) 갱신 완료");
+                return ProviderFetchResult<IDeviceGroupModel>.Updated(existing ?? model, resp.StatusCode);
             }
         }
         catch (Exception ex)
         {
             _log?.Error($"FetchDeviceGroupByIdAsync({resourceId}) 실패: {ex.Message}");
+            return ProviderFetchResult<IDeviceGroupModel>.Failed(errorCode: "EXCEPTION");
         }
     }
 

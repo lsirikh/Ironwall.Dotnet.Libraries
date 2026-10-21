@@ -22,6 +22,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Xunit;
 using Xunit.Abstractions;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -213,7 +214,7 @@ public class WiringFenceEditorViewTests
                 Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false,
             };
             window.Resources.MergedDictionaries.Add(Theme("Tokens.Light.xaml"));
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try
             {
@@ -254,7 +255,7 @@ public class WiringFenceEditorViewTests
             };
             window.Resources.MergedDictionaries.Add(Theme("Tokens.Light.xaml"));
             vm.GoWiring();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try
             {
@@ -321,7 +322,7 @@ public class WiringFenceEditorViewTests
             };
             window.Resources.MergedDictionaries.Add(Theme("Tokens.Light.xaml"));
             vm.GoWiring();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try
             {
@@ -412,7 +413,7 @@ public class WiringFenceEditorViewTests
             window.Resources.MergedDictionaries.Add(Theme(dark ? "Tokens.Dark.xaml" : "Tokens.Light.xaml"));
             window.SetResourceReference(Control.BackgroundProperty, "SurfaceBrush");
             vm.GoWiring();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try { return body(view); }
             finally { window.Close(); }
@@ -574,7 +575,7 @@ public class WiringFenceEditorViewTests
             };
             window.Resources.MergedDictionaries.Add(Theme(dark ? "Tokens.Dark.xaml" : "Tokens.Light.xaml"));
             window.SetResourceReference(Control.BackgroundProperty, "SurfaceBrush");
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try { return body(vm, view); }
             finally { window.Close(); }

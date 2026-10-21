@@ -20,7 +20,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 /// 적재된 카탈로그는 <b>불변 스냅샷</b>이고 참조 하나를 통째 바꾼다 — 읽는 쪽은 락 없이 일관된 판을 본다.
 /// 진행 중 요청은 <see cref="_gate"/> 안에서 한 개로 합류시키고, 이벤트는 <b>락 밖에서</b> 발화한다.
 /// </remarks>
-public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels
+public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels,
+    Ironwall.Dotnet.Monitoring.Models.Components.IComponentStateLabels
 {
     #region - Ctors -
     public CatalogService(IDeviceApiService apiService, DeviceQueryPolicy? policy = null, ILogService? log = null)
@@ -128,6 +129,21 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
     }
 
     private int _labelLoadKicked;
+
+    /// <summary>
+    /// 부품 상태 한글 이름(GOP API 8.0.15 대조 G18) — 카탈로그 <c>component_state</c> 라벨. 공용 사전은 내장 사전에 없는 상태에만 이것을 쓴다.
+    /// 아직 안 읽혔거나 라벨이 코드와 같으면 <c>null</c>.
+    /// </summary>
+    public string? StateLabel(string? state)
+    {
+        var text = state?.Trim();
+        if (string.IsNullOrEmpty(text) || !IsLoaded) return null;
+        var label = LabelOf(VOCAB_COMPONENT_STATE, text);
+        return string.IsNullOrWhiteSpace(label) || string.Equals(label, text, StringComparison.OrdinalIgnoreCase) ? null : label;
+    }
+
+    /// <summary>카탈로그의 부품 상태 어휘 이름(서버 <c>vocabularies.component_state</c>).</summary>
+    internal const string VOCAB_COMPONENT_STATE = "component_state";
     #endregion
 
     #region - Processes -

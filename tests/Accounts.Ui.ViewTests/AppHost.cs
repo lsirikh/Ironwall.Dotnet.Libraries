@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
@@ -32,6 +33,9 @@ internal static class AppHost
         using var ready = new ManualResetEventSlim(false);
         var thread = new Thread(() =>
         {
+            // 이 UI 스레드는 두 프로젝트(Accounts.Ui.ViewTests · Consoles.ViewTests)의 모든 창 시험이 함께 쓴다 — 레일 키보드 ↓ · 표 칸 초점처럼
+            // 진짜 키보드 초점을 단정하는 반이 있고, 시험 중 제품 코드가 확인 창 · 최소화 창을 연다. 숨은 데스크톱이면 사용자 화면 · 전경에 닿지 않는다.
+            QuietWindow.UseHiddenDesktop();
             try
             {
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -97,7 +101,7 @@ internal static class AppHost
             Left = -20000,
             Top = -20000,
         };
-        window.Show();
+        QuietWindow.Show(window);
         Pump(DispatcherPriority.Loaded);
         Pump();
         return window;

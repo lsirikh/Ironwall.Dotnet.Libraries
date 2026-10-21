@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 
@@ -80,7 +81,7 @@ public sealed class ComponentHealthSummary
         Ironwall.Dotnet.Libraries.Enums.EnumDeviceType deviceType = Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.NONE)
     {
         if (axes is null) return None;
-        return new ComponentHealthSummary(ComponentSnapshot.Build(axes, catalog), ResolveDoorMotion(axes), deviceType);
+        return new ComponentHealthSummary(ComponentSnapshot.Build(axes, catalog), ResolveDoorMotion(axes, deviceType), deviceType);
     }
 
     /// <summary>
@@ -118,15 +119,19 @@ public sealed class ComponentHealthSummary
     private string HeaderLine() => "부품 상태 — " + (ShortText() ?? string.Empty).Replace("부품 ", string.Empty, StringComparison.Ordinal);
 
     /// <summary>
-    /// 문 위치 — 구동부(<c>DOOR_ACTUATOR</c>: OPEN/CLOSED/RUNNING)를 먼저, 없으면 센서(<c>DOOR_SENSOR</c>: OPEN/CLOSED).
+    /// 문 위치 — 통문 등은 구동부(<c>DOOR_ACTUATOR</c>: OPEN/CLOSED/RUNNING) → 센서(<c>DOOR_SENSOR</c>: OPEN/CLOSED),
+    /// 함체는 센서 → 구동부(<see cref="DoorPosition.EnclosureOrder"/>, GOP API 8.0.15 대조 G34).
     /// 선언이 없으면 관례 key(<c>actuator</c> · <c>door</c>)로 폴백한다(<c>BaseDeviceDto.ResolveComponentStatus</c> 와 같은 규칙).
     /// </summary>
-    private static DoorMotionState ResolveDoorMotion(IDeviceAxesModel axes)
+    private static DoorMotionState ResolveDoorMotion(IDeviceAxesModel axes, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType deviceType)
     {
-        var actuator = FindStatus(axes, "DOOR_ACTUATOR", "actuator");
-        var fromActuator = ParseDoor(actuator?.State);
-        if (fromActuator != DoorMotionState.Unknown) return fromActuator;
-        return ParseDoor(FindStatus(axes, "DOOR_SENSOR", "door")?.State);
+        var order = deviceType == Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Enclosure ? DoorPosition.EnclosureOrder : DoorPosition.GateOrder;
+        foreach (var (type, key) in order)
+        {
+            var state = ParseDoor(FindStatus(axes, type, key)?.State);
+            if (state != DoorMotionState.Unknown) return state;
+        }
+        return DoorMotionState.Unknown;
     }
 
     private static ComponentStatusModel? FindStatus(IDeviceAxesModel axes, string type, string conventionalKey)

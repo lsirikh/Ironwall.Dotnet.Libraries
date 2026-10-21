@@ -185,6 +185,17 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
             _log?.Info($"SYNC_DETECTION 재조회 성공: id={detectionId}, thumbnail={(string.IsNullOrEmpty(thumbnail) ? "(없음)" : "갱신")}, frame={frameWidth}x{frameHeight}");
 
             await PublishOnUiAsync(new DetectionThumbnailSyncedMessage(detectionId, thumbnail, frameWidth, frameHeight), detectionId).ConfigureAwait(false);
+
+            // 재분류(G48) — 서버에서 type_event 가 바뀌었으면(침입 → 접점 등) 같은 응답으로 카드 · 큐 종류도 고친다. REST 를 더 부르지 않는다.
+            //   장애(Fault)로 바뀌는 것은 탐지 목록의 일이 아니라 건너뛴다.
+            if (FindQueuedDetectionType(detectionId) is { } queued
+                && Enum.TryParse<EnumEventType>(response.Data.TypeEvent, ignoreCase: true, out var serverType)
+                && Enum.IsDefined(serverType) && serverType is not (EnumEventType.None or EnumEventType.Fault)
+                && serverType != queued)
+            {
+                _log?.Info($"SYNC_DETECTION 재분류: id={detectionId}, {queued} → {serverType}");
+                await PublishOnUiAsync(new DetectionReclassifiedMessage(detectionId, queued, serverType), detectionId).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {

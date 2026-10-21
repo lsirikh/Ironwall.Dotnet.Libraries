@@ -18,14 +18,13 @@ public sealed record AssignPlan(int GroupId, IReadOnlyList<int> Added, IReadOnly
     public bool CanSend => BlockReason is null && HasChanges;
 
     /// <summary>
-    /// 서버를 몇 번 부르는가 — 넣기는 <b>한 번</b>, 빼기는 <b>⌈n/100⌉번</b>이다(장비마다가 아니다).
+    /// 서버를 몇 번 부르는가 — 넣기 · 빼기 모두 <b>⌈n/100⌉번</b>이다(장비마다가 아니다).
     /// </summary>
     /// <remarks>
-    /// 빼기만 나뉘는 까닭: 서버의 <c>DeviceUnassignRequest.device_ids</c> 가
-    /// <c>max_length=100</c> 이다(<c>app/schemas/device_group.py:108</c>). 넣기 쪽에는 상한이 없다(<c>:78</c>).
-    /// 101대를 한 번에 빼려 하면 422 로 <b>한 대도</b> 빠지지 않는다.
+    /// 서버의 넣기 · 빼기 <c>device_ids</c> 가 둘 다 <b>1~100개</b>다(명세 §5.6 "일괄 해제와 같은 상한" — GOP API 8.0.15 대조 G31).
+    /// 101대를 한 번에 보내면 422 로 <b>한 대도</b> 처리되지 않는다.
     /// </remarks>
-    public int CallCount => (Added.Count > 0 ? 1 : 0) + AssignDelta.RemoveCallCount(Removed.Count);
+    public int CallCount => AssignDelta.AssignCallCount(Added.Count) + AssignDelta.RemoveCallCount(Removed.Count);
 }
 
 /// <summary>한 방향(넣기 · 빼기)의 결과 판정.</summary>
@@ -52,9 +51,29 @@ public static class AssignDelta
 {
     /// <summary>
     /// 한 번에 뺄 수 있는 최대 수 — 서버 계약(<c>app/schemas/device_group.py:108</c> <c>max_length=100</c>).
-    /// 넣기 쪽에는 상한이 없다.
     /// </summary>
     public const int RemoveChunkSize = 100;
+
+    /// <summary>
+    /// 한 번에 넣을 수 있는 최대 수 — 넣기도 <c>device_ids</c> <b>1~100개</b>다(명세 §5.6 그룹 할당, 빼기와 같은 상한 · G31).
+    /// 예전 주석의 "넣기 상한 없음"은 틀렸다.
+    /// </summary>
+    public const int AssignChunkSize = 100;
+
+    /// <summary>넣기를 몇 번에 나눠 보내는가.</summary>
+    public static int AssignCallCount(int addedCount)
+        => addedCount <= 0 ? 0 : ((addedCount - 1) / AssignChunkSize) + 1;
+
+    /// <summary>넣기 목록을 서버 상한에 맞춰 자른다(순서 유지). 일부 묶음이 실패하면 된 묶음만 반영한다 — 빼기와 같은 규칙.</summary>
+    public static IReadOnlyList<IReadOnlyList<int>> ChunkAssigns(IReadOnlyList<int> added)
+    {
+        if (added is null || added.Count == 0) return Array.Empty<IReadOnlyList<int>>();
+
+        var chunks = new List<IReadOnlyList<int>>();
+        for (var offset = 0; offset < added.Count; offset += AssignChunkSize)
+            chunks.Add(added.Skip(offset).Take(AssignChunkSize).ToList());
+        return chunks;
+    }
 
     /// <summary>빼기를 몇 번에 나눠 보내는가.</summary>
     public static int RemoveCallCount(int removedCount)

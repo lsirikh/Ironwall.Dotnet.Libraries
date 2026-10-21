@@ -15,6 +15,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Xaml.Behaviors;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 /****************************************************************************
@@ -272,10 +273,9 @@ public class MappingBoardRealListTests
                 Content = list, Width = 320, Height = 240, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
             };
-            window.Show();
+            QuietWindow.Show(window);
             try
             {
-                window.Activate();
                 Pump();
                 var moving = vm.BoardRows[2];
                 list.SelectedItem = moving;                                   // 사람이 고른 것과 같은 길
@@ -318,8 +318,11 @@ public class MappingBoardRealListTests
         Exception? error = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — Alt+↑ 두 번 뒤에도 옮긴 행이 키보드 초점을 갖는지 단정한다. 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { result = body(); }
             catch (Exception ex) { error = ex; }
+            finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }   // 숨은 데스크톱 스레드는 디스패처를 닫고 끝낸다 — TSF · 창 정리가 살아 있는 개체에서 돈다
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

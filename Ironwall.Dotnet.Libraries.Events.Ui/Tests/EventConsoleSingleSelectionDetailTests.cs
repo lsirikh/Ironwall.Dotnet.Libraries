@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -247,7 +248,7 @@ public class EventConsoleSingleSelectionDetailTests : IDisposable
                     Content = grid, Width = 400, Height = 300, ShowInTaskbar = false, WindowStyle = System.Windows.WindowStyle.None,
                     WindowStartupLocation = System.Windows.WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowActivated = false,
                 };
-                window.Show();
+                QuietWindow.Show(window);
 
                 void Pump(System.Windows.Threading.DispatcherPriority priority)
                 {

@@ -125,6 +125,7 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
         bool suppressNotify = false)   // (INV-5) 봉투 경유 시 true — 통지를 ClosePopup 이후로 미룸(Progress 위 중첩 방지)
     {
         _deleteFailures.Clear();
+        _deleteBlocked.Clear();
         foreach (var row in items)
         {
             ct.ThrowIfCancellationRequested();
@@ -133,6 +134,12 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
             bool ok;
             try { ok = await deleteApi(id, ct); }
             catch (OperationCanceledException) { throw; }          // 취소는 실패로 오분류하지 않음(재던지기)
+            catch (DeleteBlockedException ex)                       // 서버가 참조(조치보고) 때문에 거절(G41, 409) — 실패와 사유가 다르다
+            {
+                _log?.Info($"[{_className}] ExecuteDeleteAsync(id={id}) 삭제 거절: {ex.Message}");
+                _deleteBlocked.Add(id);
+                continue;
+            }
             catch (Exception ex) { _log?.Error($"[{_className}] ExecuteDeleteAsync(id={id}) 예외: {ex.Message}"); ok = false; }
             if (ok) removeLocal(row);                              // verify-after-success
             else _deleteFailures.Add(id);
@@ -140,15 +147,24 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
 
         // 부분 삭제 실패 통지(중앙화) — 미통지 시 "삭제했는데 행이 조용히 복귀"가 사용자에게 노출됨
         // (INV-5) suppressNotify=true(봉투 경유)면 여기서 발행하지 않고 봉투가 ClosePopup 이후 단일 통지.
-        if (!suppressNotify && _deleteFailures.Count > 0)
+        if (!suppressNotify && (_deleteFailures.Count > 0 || _deleteBlocked.Count > 0))
         {
+            var lines = new List<string>();
+            if (_deleteFailures.Count > 0)
+                lines.Add($"{_deleteFailures.Count}건 삭제에 실패했습니다. 서버에 남아있는 항목은 재조회 시 다시 표시됩니다.\n(Id: {string.Join(", ", _deleteFailures.Take(10))})");
+            if (_deleteBlocked.Count > 0)
+                lines.Add(DeleteBlockedText(_deleteBlocked));
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
                 Title = "삭제 일부 실패",
-                Explain = $"{_deleteFailures.Count}건 삭제에 실패했습니다. 서버에 남아있는 항목은 재조회 시 다시 표시됩니다.\n(Id: {string.Join(", ", _deleteFailures.Take(10))})"
+                Explain = string.Join("\n", lines)
             }, ct);
         }
     }
+
+    /// <summary>조치보고가 남아 삭제가 거절된 줄(G41).</summary>
+    protected static string DeleteBlockedText(IReadOnlyCollection<int> ids)
+        => $"조치보고가 있는 이벤트는 조치보고를 먼저 지워야 삭제됩니다(Id {string.Join(", ", ids.Take(10))}).";
 
     // ───────────────────────── CRUD 표준 오케스트레이션 봉투 (PRD DataGridPanel_CRUD_Standard_Convention) ─────────────────────────
     /// <summary>process CTS 재생성 — 조건 없이 항상 Dispose 후 new(NRE/ObjectDisposed 방지, INV-3).</summary>
@@ -218,7 +234,7 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
             {
                 await ExecuteDeleteAsync(snapshot, getId, deleteApi, removeLocal, ct, suppressNotify: true);
                 await fetchAndReinit(ct);
-                var failed = _deleteFailures.ToArray();
+                var failed = _deleteFailures.Concat(_deleteBlocked).ToArray();   // 거절(409)도 남은 행이다
                 return new OperationOutcome
                 {
                     FailedIds = failed,
@@ -447,7 +463,20 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
     private bool _isSaving;
     protected readonly SemaphoreSlim _processGate = new(1, 1);
     protected readonly List<int> _deleteFailures = new();
+    protected readonly List<int> _deleteBlocked = new();   // 참조(조치보고)가 남아 서버가 거절한 id(G41)
     #endregion
+}
+
+/// <summary>
+/// 서버가 참조가 남은 행의 삭제를 거절했다(예: 조치보고가 달린 이벤트 DELETE → 409, 명세 §6.1.6).
+/// 삭제 API 위임이 이 예외를 던지면 ExecuteDeleteAsync 가 일반 실패와 따로 모아 사유를 알린다.
+/// </summary>
+public sealed class DeleteBlockedException : Exception
+{
+    public DeleteBlockedException(int id, string? serverMessage)
+        : base($"id={id} 삭제 거절: {serverMessage}") => Id = id;
+
+    public int Id { get; }
 }
 
 /// <summary>

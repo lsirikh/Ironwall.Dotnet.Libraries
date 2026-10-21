@@ -239,6 +239,33 @@ public class EnclosureDeviceDto : BaseDeviceDto
 
     public bool ShouldSerializeDeviceConfigAxis() => UseAxisWrite;
 
+    // ── 함체 안에 든 장비 (v8.0.6, 명세 §5.5.6.1) ──
+    /// <summary>
+    /// 함체 안에 든 장비 — <b>읽기 전용</b>. <c>?include=contents</c> 로 받을 때만 실린다(<c>[{id, category_device, name_device}]</c>, id 오름차순).
+    /// 기본 응답에는 키가 없어 <c>null</c> 이다("모름" — 빈 목록과 구분된다). 쓰기 본문에는 절대 싣지 않는다.
+    /// </summary>
+    [JsonProperty("contents", Order = 33, NullValueHandling = NullValueHandling.Ignore)]
+    public List<EnclosureContentDto>? Contents { get; set; }
+
+    public bool ShouldSerializeContents() => false;
+
+    /// <summary>
+    /// 함체 안에 넣을 장비 id 목록(<c>device_ids</c>, 쓰기) — <b>통째 교체</b>다.
+    /// <c>null</c> = 키를 싣지 않음(서버 값 유지), 빈 목록 = 모두 빼기.
+    /// <para><see cref="UseEnclosureContents"/>(서버 8.0.6 이상)일 때만 직렬화한다 — 그 전 서버는 모르는 키라 422 다.</para>
+    /// <para>서버가 거절하면(없는 id · 이미 다른 함체에 든 장비 · 부대가 다른 장비 등) 422 <c>field: device_ids</c> 이고 아무것도 바뀌지 않는다.</para>
+    /// </summary>
+    [JsonProperty("device_ids", Order = 34, NullValueHandling = NullValueHandling.Ignore)]
+    public List<int>? DeviceIds { get; set; }
+
+    public bool ShouldSerializeDeviceIds() => UseEnclosureContents && DeviceIds != null;
+
+    /// <summary>
+    /// <c>device_ids</c> 를 실어도 되는 서버(8.0.6 이상)인가 — 쓰기 직전에 <c>DeviceApiService</c> 가 판본을 보고 켠다. 직렬화되지 않는다.
+    /// </summary>
+    [JsonIgnore]
+    public bool UseEnclosureContents { get; set; }
+
     // ── 7.0 에서 제거된 평면 키 ──
     /// <summary>문 위치는 쓰기 자리가 달라졌다 — <c>PATCH /{type}/{id}/component-status</c>(D-10·D-30).</summary>
     public bool ShouldSerializeDoorStatus() => !UseAxisWrite && DoorStatus != null;

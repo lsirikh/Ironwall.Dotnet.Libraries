@@ -16,7 +16,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Helpers;
 /// <c>"Operation"</c> 이 클라 어휘에 없어 조치 이력이 통째로 버려졌다(라이브 GIS 파손).</para>
 /// <para><b>미지 값 폴백</b>(명세 VER-03) — 서버는 카테고리 어휘를 계속 늘린다(<c>operation</c> 이 그 예).
 /// 모르는 <c>category_event</c> 나 판별자 부재(운영 6.3.2 응답에는 이 키가 없다)에서는
-/// <b>예외를 내지 않고</b> 종전 구조/<c>type_event</c> 추론으로 내려간다 — 최악이 <c>null</c>(조치 1건 원본 미해석)이고
+/// <b>예외를 내지 않고</b> 종전 구조/<c>type_event</c> 추론으로 내려간다 — 최악이 <see cref="UnknownEventDto"/>(조치 1건 원본 종류 미상, G49)이고
 /// 목록 로딩 전체가 끊기지는 않는다.</para>
 /// </summary>
 public class FromEventConverter : JsonConverter<IEventDto>
@@ -48,7 +48,7 @@ public class FromEventConverter : JsonConverter<IEventDto>
     /// <summary>
     /// 판별자를 못 쓸 때의 추론 경로. <b>구조 → <c>type_event</c></b> 순으로 본다.
     /// </summary>
-    private static IEventDto? ResolveWithoutDiscriminator(JObject jsonObject, JsonSerializer serializer)
+    private static IEventDto ResolveWithoutDiscriminator(JObject jsonObject, JsonSerializer serializer)
     {
         // 운영(operation) 은 `reason` + `severity` 를 함께 싣는 유일한 카테고리다 —
         //   장애(`reason` 만 있음)보다 **먼저** 판정해야 오분류가 나지 않는다.
@@ -75,7 +75,9 @@ public class FromEventConverter : JsonConverter<IEventDto>
                 => jsonObject.ToObject<ConnectionEventDto>(serializer),
             "operation"
                 => jsonObject.ToObject<OperationEventDto>(serializer),
-            _ => null,   // 끝내 모르면 null — 예외로 목록 전체를 끊지 않는다(VER-03).
+            // 끝내 모르면 공통 필드만 담은 UnknownEventDto(G49) — 예외로 목록 전체를 끊지 않고(VER-03),
+            //   '원본 없음'(from_event: null)과 구별되게 한다. 소비자는 종류를 모르니 종류+Id 종결을 하지 않는다.
+            _ => jsonObject.ToObject<UnknownEventDto>(serializer),
         };
     }
 
