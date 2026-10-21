@@ -16,11 +16,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
  ****************************************************************************/
 
 /// <summary>3D 가 알려 준 환경 상태(env.state) — 해 고도 · 방위(도), 해 뜸 · 짐("HH:mm"), 지금 차 · 사람 수. 모르는 칸은 null.</summary>
+/// Sunrise · Sunset 은 극지방(해가 안 뜨거나 안 짐)이면 엔진이 null 을 보낸다.
 public sealed record Map3DEnvState(double? ElevationDeg, double? AzimuthDeg, string? Sunrise, string? Sunset, int? Cars, int? People)
 {
-    /// <summary>"해 뜸 06:41 · 해 짐 17:52"(모르는 쪽은 뺀다, 둘 다 모르면 빈 글).</summary>
+    /// <summary>엔진 장면의 지금 시각 "HH:mm"(env.state time — 빨리 감기 중 흐르는 시각, 옛 엔진은 null).</summary>
+    public string? Time { get; init; }
+
+    /// <summary>"3D 시각 14:30 · 해 뜸 06:41 · 해 짐 17:52"(모르는 쪽은 뺀다, 모두 모르면 빈 글).</summary>
     public string SunText
-        => string.Join(" · ", new[] { Sunrise is { } r ? $"해 뜸 {r}" : null, Sunset is { } s ? $"해 짐 {s}" : null }.Where(x => x != null));
+        => string.Join(" · ", new[] { Time is { } t ? $"3D 시각 {t}" : null, Sunrise is { } r ? $"해 뜸 {r}" : null, Sunset is { } s ? $"해 짐 {s}" : null }
+                                  .Where(x => x != null));
 }
 
 public static class Map3DEnvironment
@@ -96,7 +101,7 @@ public static class Map3DEnvironment
     {
         var sun = o["sun"] as JObject;
         return new Map3DEnvState(Finite(sun?["elevation_deg"]), Finite(sun?["azimuth_deg"]), Clock(sun?["sunrise"]), Clock(sun?["sunset"]),
-                                 Count(o["cars"]), Count(o["people"]));
+                                 Count(o["cars"]), Count(o["people"])) { Time = Clock(o["time"]) };
     }
 
     /// <summary>날씨 요약 — "맑음 · 12℃", "흐림 · 비 · 8.5℃"(기온 모르면 뺀다).</summary>

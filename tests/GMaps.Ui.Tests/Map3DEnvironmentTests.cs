@@ -176,6 +176,25 @@ public class Map3DEnvironmentTests
         Assert.Equal("", Map3DMath.ParseMessage("{\"type\":\"env.state\"}")!.EnvState!.SunText);
     }
 
+    [Fact]
+    public void should_show_scene_time_and_handle_polar_null_sun_times()
+    {
+        // 엔진 05361ed: env.state 에 장면 시각 time 이 붙고, 극지방이면 sunrise · sunset 이 null
+        var s = Map3DMath.ParseMessage("{\"type\":\"env.state\",\"time\":\"14:30\",\"sun\":{\"elevation_deg\":-5,\"sunrise\":null,\"sunset\":null},\"cars\":0,\"people\":0}")!.EnvState!;
+        Assert.Equal(("14:30", (string?)null, (string?)null), (s.Time, s.Sunrise, s.Sunset));
+        Assert.Equal("3D 시각 14:30", s.SunText);
+        Assert.Equal("3D 시각 06:05 · 해 뜸 06:41 · 해 짐 17:52",
+                     Map3DMath.ParseMessage("{\"type\":\"env.state\",\"time\":\"06:05\",\"sun\":{\"sunrise\":\"06:41\",\"sunset\":\"17:52\"}}")!.EnvState!.SunText);
+    }
+
+    [Fact]
+    public void should_add_sky_to_view_url_only_when_environment_is_sent()
+    {
+        var cam = new Map3DCamera(127.5, 37.25, 17, 0, 0);
+        Assert.EndsWith("&animate=0&low=1&sky=1", Map3DMath.ViewUrl("http://h", "j", cam, animate: false, lowQuality: true, sky: true));
+        Assert.DoesNotContain("sky=", Map3DMath.ViewUrl("http://h", "j", cam, animate: false));
+    }
+
     // ── B. 기상청 격자 · 발표 시각 · 값 바꾸기 ──
 
     [Theory]
