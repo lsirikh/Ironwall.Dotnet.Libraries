@@ -16,6 +16,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -600,7 +601,7 @@ public class UnitMapCanvasRenderTests
             };
             window.Resources.MergedDictionaries.Add(Tokens(dark: false));
             canvas.Scene = Scene();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try { return body(canvas); }
             finally { window.Close(); }

@@ -15,6 +15,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -38,7 +39,7 @@ public class UnitMapNodeRenderCostTests
         {
             var (canvas, window) = NewHost();
             canvas.SetView(scale, new Point(3600, 400));            // 크기 전 — 미뤄진다(레일 전환의 저장 뷰 복원과 같은 길)
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try
             {
@@ -60,7 +61,7 @@ public class UnitMapNodeRenderCostTests
         {
             var (canvas, window) = NewHost();
             ((IUnitMapSurface)canvas).Fit();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try { return canvas.Nodes.Select(n => n.TemplateApplyCount).Distinct().ToList(); }
             finally { window.Close(); }
@@ -80,7 +81,7 @@ public class UnitMapNodeRenderCostTests
         var counts = OnSta(() =>
         {
             var (canvas, window) = NewHost();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             canvas.SetView(scale, new Point(3600, 400));
             Pump();
@@ -103,7 +104,7 @@ public class UnitMapNodeRenderCostTests
         var result = OnSta(() =>
         {
             var (canvas, window) = NewHost();
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             canvas.SetView(0.5, new Point(3600, 400));
             Pump();

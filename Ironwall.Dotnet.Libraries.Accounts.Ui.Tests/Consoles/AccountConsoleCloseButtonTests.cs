@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Consoles;
 
@@ -77,7 +78,7 @@ public class AccountConsoleCloseButtonTests
                     Content = host, Width = 400, Height = 200, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
                     WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowActivated = false,
                 };
-                window.Show();
+                QuietWindow.Show(window);
 
                 View.SetModel(host, viewModel);   // 호스트의 ContentControl(cal:View.Model="{Binding ActiveItem}") 과 같은 길
                 Pump(DispatcherPriority.Loaded);

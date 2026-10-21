@@ -11,4 +11,9 @@
   <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2"><PrivateAssets>all</PrivateAssets></PackageReference>
   <PackageReference Include="Moq" Version="4.20.72"/>
  </ItemGroup>
+  <!-- 시험 창이 사용자 화면 · 포커스를 건드리지 않게 하는 공용 도우미(tests/Shared/QuietWindow.cs) -->
+  <ItemGroup>
+    <Compile Include="..\Shared\QuietWindow.cs" Link="Linked\QuietWindow.cs" />
+  </ItemGroup>
+
 </Project>

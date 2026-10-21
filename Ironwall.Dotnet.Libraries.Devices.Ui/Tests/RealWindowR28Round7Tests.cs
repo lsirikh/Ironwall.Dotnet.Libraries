@@ -19,6 +19,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
 using Xunit.Abstractions;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -124,7 +125,7 @@ public class RealWindowR28Round7Tests
             ShowActivated = false,
             ShowInTaskbar = false,
         };
-        window.Show();
+        QuietWindow.Show(window);
         Pump();
         try { return body(window, Descendants<FenceCanvas>(window).Single()); }
         finally { window.Close(); }

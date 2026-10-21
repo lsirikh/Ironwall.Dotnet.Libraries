@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -98,7 +99,7 @@ public class KoreanWordWrapTests
                 ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
                 Content = panel,
             };
-            window.Show();
+            QuietWindow.Show(window);
             window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             var r = (tbBound.Text, tbDirect.Text);
             window.Close();

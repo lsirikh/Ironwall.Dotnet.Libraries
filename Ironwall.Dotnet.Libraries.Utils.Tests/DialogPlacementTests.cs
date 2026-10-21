@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -178,7 +179,6 @@ public class DialogPlacementTests
     {
         var result = OnSta(() => WithFrame((window, frame, move, pointer) =>
         {
-            window.Activate();
             move.Focus();
             Keyboard.Focus(move);
             var focused = move.IsKeyboardFocused;
@@ -242,7 +242,7 @@ public class DialogPlacementTests
                 ShowInTaskbar = false,
                 ShowActivated = false,
             };
-            window.Show();
+            QuietWindow.Show(window);
             Pump(DispatcherPriority.ApplicationIdle);
             Pump(DispatcherPriority.ContextIdle);
             var shown = (frame.IsWindowRoot, Part<Thumb>(frame, ConsoleDialogFrame.PartMove)?.IsVisible);
@@ -275,7 +275,7 @@ public class DialogPlacementTests
         DragPointer.Override = relativeTo => frame.TranslatePoint(pointer.Value, (UIElement)relativeTo);
         try
         {
-            window.Show();
+            QuietWindow.Show(window);
             Pump(DispatcherPriority.ApplicationIdle);
             Pump(DispatcherPriority.ContextIdle);
             var move = Part<Thumb>(frame, ConsoleDialogFrame.PartMove) ?? throw new InvalidOperationException("옮기기 손잡이가 없다");
@@ -341,6 +341,8 @@ public class DialogPlacementTests
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            // 키보드 초점이 필요한 반 — 화살표는 키보드 초점을 가진 옮기기 손잡이에만 닿는다. 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
             try { result = body(); }
             catch (Exception ex) { failure = ex; }
             finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }

@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -155,7 +156,7 @@ public class ConsoleFooterBandAlignmentTests
             ShowActivated = false,
             ShowInTaskbar = false,
         };
-        window.Show();
+        QuietWindow.Show(window);
         Pump();
         Pump();
         if (!window.IsVisible) throw new InvalidOperationException("시험 창이 뜨지 않았다(Application 이 이미 종료 중이면 Show 가 조용히 무시된다)");

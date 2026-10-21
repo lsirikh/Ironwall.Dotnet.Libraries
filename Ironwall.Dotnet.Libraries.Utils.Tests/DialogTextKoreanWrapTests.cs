@@ -65,34 +65,30 @@ public class DialogTextKoreanWrapTests
     }
 
     #region - Fixtures -
-    /// <summary>화면 밖 창에 얹어 배치한다 — 틀 글의 기본 스타일(Generic.xaml → Dialogs.xaml)이 실제 앱처럼 풀린다.</summary>
+    /// <summary>
+    /// 창 없이(헤드리스) 창 내용 칸과 같은 크기로 재고 배치한다 — 틀 글의 기본 스타일(Generic.xaml → Dialogs.xaml)은 창 없이도 풀린다.
+    /// 2026-10-21 창 → 헤드리스로 바꿈: 같은 단정이 그대로 통과하고, 결합자 넣기를 일부러 끄면 창 판과 같은 시험이 같이 실패하는 것을
+    /// 확인했다(작업 기록 t-20261021-132533-f640).
+    /// </summary>
     private static List<string> Lines(ConsoleDialogText text, double width)
     {
         text.Width = width;
         text.HorizontalAlignment = HorizontalAlignment.Left;
         text.VerticalAlignment = VerticalAlignment.Top;
-        var window = new Window
+        var root = new Grid { Children = { text } };
+        root.Measure(new Size(width + 100, 400));
+        root.Arrange(new Rect(0, 0, width + 100, 400));
+        root.UpdateLayout();
+        var tb = Inner(text);
+        var lines = new List<string>();
+        var pos = tb.ContentStart.GetLineStartPosition(0);
+        while (pos is not null && lines.Count < 50)
         {
-            Content = new Grid { Children = { text } },
-            Width = width + 100, Height = 400, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowInTaskbar = false, ShowActivated = false,
-        };
-        window.Show();
-        window.UpdateLayout();
-        try
-        {
-            var tb = Inner(text);
-            var lines = new List<string>();
-            var pos = tb.ContentStart.GetLineStartPosition(0);
-            while (pos is not null && lines.Count < 50)
-            {
-                var next = pos.GetLineStartPosition(1);
-                lines.Add(KoreanWordWrap.Strip(new TextRange(pos, next ?? tb.ContentEnd).Text));
-                pos = next;
-            }
-            return lines;
+            var next = pos.GetLineStartPosition(1);
+            lines.Add(KoreanWordWrap.Strip(new TextRange(pos, next ?? tb.ContentEnd).Text));
+            pos = next;
         }
-        finally { window.Close(); }
+        return lines;
     }
 
     private static TextBlock Inner(ConsoleDialogText text)
