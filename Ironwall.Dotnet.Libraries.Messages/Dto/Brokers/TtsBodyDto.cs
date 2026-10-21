@@ -13,20 +13,14 @@ public class TtsBodyDto : ControlCommandBodyDto
     [JsonProperty("message")]
     public string Message { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 음량(0~100) — <b>늘 싣는다</b>(브로커 명세 §11.5.3 G-21·G-22 · G-36b 음량 명시 의무). <c>0</c> 도 유효한 값이고 "보내지 않음" 과 다르다.
-    /// <para>기본값 100 은 칸을 빼먹었을 때 매니저가 채우던 값(명세: 생략 시 최대 음량)과 같다 — 종전 동작을 바꾸지 않는다.
-    /// 범위 밖 값은 0~100 으로 잘라낸다.</para>
-    /// </summary>
+    /// <summary>음량(0~100) — 늘 싣는다. 기본값 · 범위 규칙은 <see cref="BroadcastPlayBodyDto.Volume"/> 과 같다.</summary>
     [JsonProperty("volume")]
     public int Volume
     {
         get => _volume;
-        set => _volume = Math.Clamp(value, VolumeMin, VolumeMax);
+        set => _volume = BroadcastPlayBodyDto.ClampVolume(value);
     }
 
-    public const int VolumeMin = 0;
-    public const int VolumeMax = 100;
-    public const int VolumeDefault = 100;
+    public const int VolumeDefault = BroadcastPlayBodyDto.VolumeDefault;
     private int _volume = VolumeDefault;
 }

@@ -25,8 +25,11 @@ public class BroadcastPlayBodyDto : ControlCommandBodyDto
     public int Volume
     {
         get => _volume;
-        set => _volume = Math.Clamp(value, VolumeMin, VolumeMax);
+        set => _volume = ClampVolume(value);
     }
+
+    /// <summary>음량을 0~100 으로 자른다 — TTS 본문(<see cref="TtsBodyDto"/>)도 같은 규칙을 쓴다.</summary>
+    public static int ClampVolume(int value) => Math.Clamp(value, VolumeMin, VolumeMax);
 
     public const int VolumeMin = 0;
     public const int VolumeMax = 100;
