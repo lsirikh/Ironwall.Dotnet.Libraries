@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
@@ -40,6 +40,7 @@ public class EventMappingConflictAndChildBodyTests
     }
 
     #region - G01 409 재시도 -
+    [Trait("Scenario", "GOP815-G01")]
     [Fact(DisplayName = "G01-1. 매핑 하위 쓰기 409 + retryable=true → 재시도 문구(카메라 · 스피커 · 경광등)")]
     public async Task G01_RetryableConflict_SaysRetry()
     {
@@ -59,6 +60,7 @@ public class EventMappingConflictAndChildBodyTests
         }
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact(DisplayName = "G01-2. 매핑 하위 쓰기 409 + details=null → 기존 '이미 연동됨' 문구")]
     public async Task G01_DuplicateConflict_KeepsDuplicateText()
     {
@@ -74,6 +76,7 @@ public class EventMappingConflictAndChildBodyTests
     #endregion
 
     #region - G51 카메라 프리셋 0 -
+    [Trait("Scenario", "GOP815-G51")]
     [Fact(DisplayName = "G51-1. 매핑 카메라 POST · PATCH · PUT — 프리셋 0 은 키째 뺀다")]
     public async Task G51_Camera_OmitsZeroPresets()
     {
@@ -100,6 +103,7 @@ public class EventMappingConflictAndChildBodyTests
         Assert.Equal(7, (int?)http.Body["camera_id"]);
     }
 
+    [Trait("Scenario", "GOP815-G51")]
     [Fact(DisplayName = "G51-2. 매핑 카메라 — 실제 프리셋 id 는 그대로 싣는다")]
     public async Task G51_Camera_KeepsRealPresets()
     {
@@ -113,6 +117,7 @@ public class EventMappingConflictAndChildBodyTests
     #endregion
 
     #region - G51 경광등 event_mapping_id -
+    [Trait("Scenario", "GOP815-G51")]
     [Fact(DisplayName = "G51-3. 매핑 경광등 PATCH — event_mapping_id 는 늘 뺀다")]
     public async Task G51_Lamp_PatchNeverSendsMappingId()
     {
@@ -125,6 +130,7 @@ public class EventMappingConflictAndChildBodyTests
         Assert.Equal(8, (int?)http.Body["lamp_id"]);
     }
 
+    [Trait("Scenario", "GOP815-G51")]
     [Theory(DisplayName = "G51-4. 매핑 경광등 POST · PUT — event_mapping_id 는 경로 값으로 맞춘다")]
     [InlineData(0)]
     [InlineData(9)]

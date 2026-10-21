@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
@@ -25,6 +25,7 @@ public class ActionEventsFromEventQueryTests
             new FixedEventContractProbe(contract)), http);
     }
 
+    [Trait("Scenario", "GOP815-G42")]
     [Theory]
     [InlineData(EnumServerContract.V6_3)]
     [InlineData(EnumServerContract.V8_0)]
@@ -40,6 +41,7 @@ public class ActionEventsFromEventQueryTests
         Assert.Equal("100", http.Query["limit"]);
     }
 
+    [Trait("Scenario", "GOP815-G42")]
     [Fact]
     public async Task should_not_send_the_filters_from_the_old_overload()
     {
