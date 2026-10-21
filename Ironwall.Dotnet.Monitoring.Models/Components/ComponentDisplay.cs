@@ -8,7 +8,7 @@ namespace Ironwall.Dotnet.Monitoring.Models.Components;
 /// 모두 이 표 하나를 읽는다 — 같은 부품을 두 화면이 다르게 말하던 네 군데(모름 · RUNNING · 이름 · 순서)를 하나로 합친 자리다.
 /// </summary>
 /// <remarks>
-/// <para><b>어휘의 출처</b>: 서버 카탈로그 <c>api-test-server app/utils/init_component_catalog.py</c>(유형 32 · 상태 10 · 사유 6).
+/// <para><b>어휘의 출처</b>: 서버 카탈로그 <c>api-test-server app/utils/init_component_catalog.py</c>(유형 32 · 상태 19(v8.0.8 확장 9 포함) · 사유 6).
 /// 유형 이름은 서버 카탈로그 한글이 이기고(<see cref="IComponentTypeLabels"/>), 없을 때만 여기 내장 사전을 쓴다.
 /// 상태 · 사유 · 건강은 화면 말투를 맞추려고 여기 표가 정본이다(서버의 RUNNING="동작 중"이 아니라 "구동 중",
 /// POWER_LOSS="전원 상실"이 아니라 "전원 끊김" — 스토리보드 §A 합친 뒤 표).</para>
@@ -67,7 +67,7 @@ public static class ComponentDisplay
         ["NETWORK_INTERFACE"] = "네트워크 인터페이스",
     };
 
-    // ── 상태 10종 — 서버 component_state 어휘(건강 단어는 상태 어휘에 없다 — 서버 D8) ──
+    // ── 상태 19종 — 서버 component_state 어휘(건강 단어는 상태 어휘에 없다 — 서버 D8) ──
     private static readonly IReadOnlyDictionary<string, string> StateNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["IDLE"] = "대기",
@@ -80,6 +80,16 @@ public static class ComponentDisplay
         ["UNLOCKED"] = "풀림",
         ["ACTIVE"] = "추적 중",
         ["LOST"] = "놓침",
+        // v8.0.8 확장 9종(GOP API 8.0.15 대조 G18) — 누수·연기·충격·기울기·안전 빔·루프 검지 · 차단기 · 충전 제어기 · 링크 · 볼라드
+        ["CLEAR"] = "감지 없음",
+        ["DETECTED"] = "감지",
+        ["TRIPPED"] = "차단됨",
+        ["CHARGING"] = "충전 중",
+        ["DISCHARGING"] = "방전 중",
+        ["LINK_UP"] = "연결됨",
+        ["LINK_DOWN"] = "끊김",
+        ["RAISED"] = "올라감",
+        ["LOWERED"] = "내려감",
     };
 
     // ── 고장 사유 6종 — 서버 component_fault 어휘 ──
@@ -93,8 +103,12 @@ public static class ComponentDisplay
         ["ETC"] = "기타",
     };
 
-    /// <summary>"가동"으로 보는 상태 — 지도 칸 줄에서 채운 칸으로 그린다(켜짐 · 구동 중 · 추적 중).</summary>
-    private static readonly HashSet<string> ActiveStates = new(StringComparer.OrdinalIgnoreCase) { "ON", "RUNNING", "ACTIVE" };
+    /// <summary>
+    /// "가동"으로 보는 상태 — 지도 칸 줄에서 채운 칸으로 그린다(켜짐 · 구동 중 · 추적 중 · 연결됨 · 충전 중).
+    /// 연결됨(LINK_UP)은 켜짐처럼 제 일을 하는 중이고, 충전 중(CHARGING)은 구동 중과 같은 뜻이다.
+    /// 방전 중(DISCHARGING)은 넣지 않는다 — 외부 전원 없이 축전지로 버티는 상태라 "가동"으로 칠하면 이상을 가린다.
+    /// </summary>
+    private static readonly HashSet<string> ActiveStates = new(StringComparer.OrdinalIgnoreCase) { "ON", "RUNNING", "ACTIVE", "LINK_UP", "CHARGING" };
 
     /// <summary>내장 사전의 유형 코드들(시험 · 전수 대조용).</summary>
     public static IEnumerable<string> KnownTypes => TypeNames.Keys;
@@ -159,12 +173,19 @@ public static class ComponentDisplay
     #region - 상태 · 사유 -
     /// <summary>
     /// 동작 상태 원문 → 한글. 비었으면 <c>null</c>(상태 축이 없는 유형 — "꺼짐"이 아니다), 어휘 밖이면 "알 수 없음 (원문)".
+    /// 순서: 내장 사전(화면 말투 정본) → 서버 카탈로그 <c>component_state</c> 라벨(<paramref name="catalog"/>) → "알 수 없음 (원문)".
     /// </summary>
-    public static string? StateName(string? state)
+    public static string? StateName(string? state, IComponentStateLabels? catalog = null)
     {
         if (string.IsNullOrWhiteSpace(state)) return null;
         var trimmed = state.Trim();
-        return StateNames.TryGetValue(trimmed, out var name) ? name : $"{UnknownText} ({trimmed})";
+        if (StateNames.TryGetValue(trimmed, out var name)) return name;
+        string? fromCatalog = null;
+        try { fromCatalog = catalog?.StateLabel(trimmed); }
+        catch (Exception) { /* 카탈로그 실패 = 내장 규칙으로 — 표시 경로는 예외로 죽지 않는다 */ }
+        if (!string.IsNullOrWhiteSpace(fromCatalog) && !string.Equals(fromCatalog.Trim(), trimmed, StringComparison.OrdinalIgnoreCase))
+            return fromCatalog.Trim();
+        return $"{UnknownText} ({trimmed})";
     }
 
     /// <summary>상태 원문이 어휘 안인가.</summary>

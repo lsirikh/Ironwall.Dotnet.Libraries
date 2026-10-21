@@ -106,6 +106,8 @@ public class MarkerMenuOpsScenarioTests
         Assert.Equal(51, rig.Vm.TtsBroadcastPanel!.LinkedDeviceId);
         rig.Broadcast.Verify(b => b.PublishPlayAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never());   // 패널만 연다 — 전송 없음
         rig.Broadcast.Verify(b => b.PublishTtsAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never());
+        rig.Broadcast.Verify(b => b.PublishPlayAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never());   // 음량 겹(8.0.15)도 전송 없음
+        rig.Broadcast.Verify(b => b.PublishTtsAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never());
     });
 
     [Fact]

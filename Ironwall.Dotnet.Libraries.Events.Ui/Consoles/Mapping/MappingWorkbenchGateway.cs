@@ -234,12 +234,10 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMapping
     public async Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default)
     {
         if (!IsSupported) return Refuse<IReadOnlyList<MappingPresetInfo>>();
-        var url = $"{_setup.Url}/devices/cameras/{cameraId}/presets";
-        var result = await SendAsync(() => _api.GetRequestAsync(url), "카메라 프리셋을 불러오지 못했습니다.").ConfigureAwait(false);
+        var result = await ReadAllPresetsAsync(cameraId, token).ConfigureAwait(false);
         if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Fail(result.Message, result.RawError, result.StatusCode);
-        if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Fail("취소되었습니다.", "cancelled", 0);
 
-        var presets = ReadList<MappingPresetRefDto>(result.Value)
+        var presets = result.Value!
             .Where(p => p.Id > 0)
             .OrderBy(p => p.PresetIndex)
             .Select(p => new MappingPresetInfo(
@@ -259,16 +257,60 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMapping
     public async Task<MappingCallResult<IReadOnlyList<MappingPresetDetail>>> ListPresetDetailsAsync(int cameraId, CancellationToken token = default)
     {
         if (!IsSupported) return Refuse<IReadOnlyList<MappingPresetDetail>>();
-        var result = await SendAsync(() => _api.GetRequestAsync(PresetRoot(cameraId)), "카메라 프리셋을 불러오지 못했습니다.").ConfigureAwait(false);
+        var result = await ReadAllPresetsAsync(cameraId, token).ConfigureAwait(false);
         if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingPresetDetail>>.Fail(result.Message, result.RawError, result.StatusCode);
-        if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<MappingPresetDetail>>.Fail("취소되었습니다.", "cancelled", 0);
 
-        var presets = ReadList<MappingPresetRefDto>(result.Value)
+        var presets = result.Value!
             .Where(p => p.Id > 0)
             .Select(p => ToDetail(p, cameraId))
             .OrderBy(p => p.PresetIndex)
             .ToList();
         return MappingCallResult<IReadOnlyList<MappingPresetDetail>>.Ok(presets, result.StatusCode);
+    }
+
+    /// <summary>
+    /// 한 카메라의 프리셋을 <b>끝까지</b> 읽는다(GOP API 8.0.15 대조 G21).
+    /// </summary>
+    /// <remarks>
+    /// 서버 기본 한도는 10 이라 쪽을 넘기지 않으면 11번째부터 화면에서 사라졌다. <c>limit=100</c>(최대)으로 보내고,
+    /// 끝은 <c>pagination.total_pages</c> → 없으면 <c>total</c>(<c>data.total</c> 또는 <c>pagination.total</c>) →
+    /// 둘 다 없으면(옛 배열 응답) "받은 수 &lt; 요청 한도" 로 안다. 한 쪽이라도 실패하면 목록 전체를 실패로 돌려준다(일부만 보이면 지워진 것으로 오해한다).
+    /// </remarks>
+    private async Task<MappingCallResult<IReadOnlyList<MappingPresetRefDto>>> ReadAllPresetsAsync(int cameraId, CancellationToken token)
+    {
+        var all = new List<MappingPresetRefDto>();
+        var status = 0;
+        for (var page = 1; page <= MAX_PAGES; page++)
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                ["page"] = page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["limit"] = PAGE_LIMIT.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            };
+            var result = await SendAsync(() => _api.GetRequestAsync(PresetRoot(cameraId), parameters), "카메라 프리셋을 불러오지 못했습니다.").ConfigureAwait(false);
+            if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingPresetRefDto>>.Fail(result.Message, result.RawError, result.StatusCode);
+            if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<MappingPresetRefDto>>.Fail("취소되었습니다.", "cancelled", 0);
+            status = result.StatusCode;
+
+            var rows = ReadList<MappingPresetRefDto>(result.Value);
+            all.AddRange(rows);
+            if (rows.Count == 0) break;
+
+            // data 가 배열(옛 판)이면 문자열 키로 읽을 수 없다 — JObject 일 때만 본다.
+            var pagination = result.Value?["pagination"] as JObject;
+            var data = result.Value?["data"] as JObject;
+            var totalPages = pagination?["total_pages"]?.Type == JTokenType.Integer ? pagination.Value<int>("total_pages") : (int?)null;
+            var total = data?["total"]?.Type == JTokenType.Integer ? data.Value<int>("total")
+                : pagination?["total"]?.Type == JTokenType.Integer ? pagination.Value<int>("total")
+                : (int?)null;
+
+            if (totalPages is int pages) { if (page >= pages) break; }
+            else if (total is int count) { if (all.Count >= count) break; }
+            else if (rows.Count < PAGE_LIMIT) break;
+
+            if (page == MAX_PAGES) _log?.Warning($"[MappingWorkbench] 카메라 {cameraId} 프리셋이 {MAX_PAGES}쪽을 넘어 읽기를 멈췄다.");
+        }
+        return MappingCallResult<IReadOnlyList<MappingPresetRefDto>>.Ok(all, status);
     }
 
     /// <inheritdoc/>

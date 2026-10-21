@@ -97,6 +97,25 @@ public static class UnitRequestBuilder
         return dto.IsEmpty ? null : dto;
     }
 
+    /// <summary>인접 부대가 있는 부대의 제대를 바꾸려 할 때 보이는 글(G33).</summary>
+    public const string EchelonAdjacencyBlockText =
+        "인접 부대와 연결된 부대는 제대를 바꿀 수 없습니다. 인접 연결을 먼저 끊은 뒤 제대를 바꾸세요.";
+
+    /// <summary>
+    /// 제대를 바꾸는 편집인데 그 부대에 인접 부대가 있으면 막을 까닭을, 아니면 <c>null</c>(GOP API 8.0.15 대조 G33).
+    /// </summary>
+    /// <remarks>
+    /// 인접은 같은 제대끼리만 성립한다. 서버는 제대만 PATCH 하면 남는 인접 부대의 제대와 달라져 <b>422</b> 다(감사 F37).
+    /// 원본 <c>adjacent_unit_ids</c> 와 폼이 보이는 인접 칩(<paramref name="formAdjacentIds"/> — 상세가 객체 목록으로만 줄 때) 중
+    /// 하나라도 있으면 막는다. 제대를 바꾸지 않는 편집(이름 · 설명 · 사용)은 막지 않는다.
+    /// </remarks>
+    public static string? EchelonAdjacencyBlock(UnitDto? original, IEnumerable<int>? formAdjacentIds, UnitUpdateDto? dto)
+    {
+        if (dto?.Echelon is null) return null;
+        var hasAdjacent = (original?.AdjacentUnitIds?.Count ?? 0) > 0 || (formAdjacentIds?.Any() ?? false);
+        return hasAdjacent ? EchelonAdjacencyBlockText : null;
+    }
+
     /// <summary>폼이 보낼 수 있는 값인가 — 길이 제약(이름 1~100 · 설명 ≤500)을 지역에서 먼저 본다.</summary>
     public static bool TryValidateEdit(UnitEditValues values, out string? error)
     {
