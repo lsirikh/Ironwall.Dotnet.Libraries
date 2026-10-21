@@ -327,23 +327,35 @@ public class Map3DEntryScenarioTests
             Assert.True(rig.Shown, "나간 뒤 자동 규칙 — 진입 줌에서 다시 들어간다");
         });
 
-    public enum Block { EditMode, AnchorDraw, SymbolPlacement }
+    /// <summary>지도 편집 모드로(세터 없이 — 선택 정리 등 부수 효과 없이). 2026-10-21 부터 건물 고르기 · 그리기 · 꾸미기는 편집 모드에서만.</summary>
+    internal static void UseEditMode(Rig rig)
+    {
+        Scenario.SetField(rig.Vm, "_isEditModeEnabled", true);
+        rig.W.Map.SetEditMode(true);
+    }
+
+    /// <summary>네이티브 창(WebView2 HWND) 3D 인 것처럼(HostMode "hwnd") — 끄면 "none"(기본 WPF 안 3D 로 열린다).</summary>
+    internal static void UseNativeWindowHost(Rig rig, bool on)
+        => typeof(Map3DViewHost).GetField("_el", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(rig.Vm.Map3DHost, on ? new System.Windows.Controls.Border() : null);
+
+    public enum Block { EditModeOnNativeWindow, AnchorDraw, SymbolPlacement }
 
     private static void SetBlock(Rig rig, Block block, bool on)
     {
         switch (block)
         {
-            case Block.EditMode: Scenario.SetField(rig.Vm, "_isEditModeEnabled", on); break;   // 편집 · 묶음 회전은 편집 모드 안
+            // 2026-10-21 — 편집 모드는 네이티브 창 3D 에서만 막는다(WPF 안 3D 는 편집 스트립 · 속성 창이 위에 보여 머문다)
+            case Block.EditModeOnNativeWindow: Scenario.SetField(rig.Vm, "_isEditModeEnabled", on); UseNativeWindowHost(rig, on); break;
             case Block.AnchorDraw: rig.W.Map.IsAnchorDrawMode = on; break;                     // 영역 그리기(드로잉) 진행 중
             case Block.SymbolPlacement: rig.W.Map.IsSymbolPlacementMode = on; break;
         }
     }
 
     [Theory]
-    [InlineData(Map3DModel.EntryAuto, Block.EditMode)]
+    [InlineData(Map3DModel.EntryAuto, Block.EditModeOnNativeWindow)]
     [InlineData(Map3DModel.EntryAuto, Block.AnchorDraw)]
     [InlineData(Map3DModel.EntryAuto, Block.SymbolPlacement)]
-    [InlineData(Map3DModel.EntryManual, Block.EditMode)]
+    [InlineData(Map3DModel.EntryManual, Block.EditModeOnNativeWindow)]
     [InlineData(Map3DModel.EntryManual, Block.AnchorDraw)]
     [InlineData(Map3DModel.EntryManual, Block.SymbolPlacement)]
     public void should_refuse_button_and_area_view_with_reason_when_input_mode_active(string mode, Block block)

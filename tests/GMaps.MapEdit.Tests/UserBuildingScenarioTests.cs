@@ -146,8 +146,10 @@ public class UserBuildingScenarioTests
         public Rig(bool canEdit = true)
         {
             W = WiredMapRig.Create(canEdit);
-            Scenario.SetField(Vm, "_isEditModeEnabled", false);
-            W.Map.SetEditMode(false);
+            // 2026-10-21 사용자 결정 — 건물 고르기 · 그리기 · 외관 · 꾸미기는 지도 편집 모드에서만. 고치기 시험이라 편집 모드로 시작한다
+            // (권한 없는 계정 시험도 켜 둔다 — 편집 모드 중 권한을 잃은 경우의 CanEditMap 막힘을 그대로 본다). 보기 전용 시험은 끈다.
+            Scenario.SetField(Vm, "_isEditModeEnabled", true);
+            W.Map.SetEditMode(true);
             W.Map.SetEffectiveZoom(18d);
             Center = W.Map.Position;
             Server.Bbox = new[] { Center.Lng - 0.002, Center.Lat - 0.002, Center.Lng + 0.002, Center.Lat + 0.002 };
@@ -1008,17 +1010,20 @@ public class UserBuildingScenarioTests
     });
 
     [Fact]
-    public void should_keep_drawing_and_save_when_edit_mode_turns_off_mid_drawing() => RunAsync(async rig =>
+    public void should_end_drawing_and_drop_unsaved_outline_when_edit_mode_turns_off_mid_drawing() => RunAsync(async rig =>
     {
         rig.Vm.IsEditModeEnabled = true;
         rig.Vm.DrawUserBuildingCommand.Execute(null);
         rig.DrawSquare();
-        rig.Vm.IsEditModeEnabled = false;                                         // 편집 모드와 무관(권한만 본다)
-        Assert.True(rig.Vm.IsUserBuildingDrawing);
         Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
-        Assert.True((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
-        await rig.Apply();
-        Assert.Single(rig.Writes);
+        // 2026-10-21 사용자 결정 — 건물 그리기는 편집 모드에서만. 끄면 판을 닫고, 저장 안 한 윤곽은 2D 편집 모드 끄기 규칙대로 묻지 않고 버린다
+        rig.Vm.IsEditModeEnabled = false;
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.False(rig.HasSurface);
+        Assert.False((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
+        await Task.Delay(50);
+        Assert.Empty(rig.Writes);
+        Assert.False(rig.Vm.DrawUserBuildingCommand.CanExecute(null), "편집 모드가 꺼지면 「건물 그리기」 입구도 꺼진다");
     });
 
     [Fact]

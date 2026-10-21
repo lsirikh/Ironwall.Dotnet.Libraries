@@ -307,6 +307,35 @@ public partial class TwinContractScenarioTests
         Assert.Equal(JTokenType.Null, rig.Sent("decoration.select").Last()["uid"]!.Type);
     });
 
+    // 2026-10-21 사용자 요청 — 편집 모드여도 3D 를 떠나지 않는다: 3D 위 판 · 손잡이는 3D 를 나갈 때 닫힌다(EndEdit3DSessions), 편집 모드는 그대로.
+    // (편집 모드를 끄면 판이 닫히는 것은 같은 날 뒤 결정 — should_cancel_3d_drawing_drop_handles_and_close_panels_when_edit_mode_turned_off_in_3d)
+    [Fact]
+    public void should_keep_3d_panel_and_handles_in_edit_mode_and_close_them_only_when_leaving_3d() => RunAsync(async rig =>
+    {
+        rig.AddUserBuilding();
+        rig.Enter3D();
+        rig.From3D(new JObject { ["type"] = "userbuilding.pick", ["uid"] = Uid });
+        await Rig.Until(() => rig.Vm.UserBuildingEditingUid == Uid, "그 건물 고치기");
+        Assert.True(rig.Vm.IsEdit3DTargetActive);
+        rig.Vm.IsEditModeEnabled = true;                                                    // 이미 켜짐 — 다시 켜도 그대로
+        Assert.Equal("3D", rig.Vm.Map3DStatusText);
+        Assert.True(rig.Vm.IsEdit3DMode, "3D 위 판 그대로");
+        Assert.True(rig.Vm.IsEdit3DTargetActive, "3D 손잡이 그대로");
+        Assert.Equal(Uid, rig.Vm.UserBuildingEditingUid);
+        Assert.False((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
+        Assert.Empty(rig.Sent("edit.stop"));
+        Assert.Single(rig.Sent("edit.start"));
+
+        rig.Vm.ExitMap3DCommand.Execute(null);                                              // 편집 모드인 채 나가기 → 3D 세션만 닫힌다
+        Assert.NotEqual("3D", rig.Vm.Map3DStatusText);
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.False(rig.Vm.IsEdit3DMode);
+        Assert.False(rig.Vm.IsEdit3DTargetActive);
+        Assert.True(rig.Vm.IsEditModeEnabled, "편집 모드는 그대로");
+        Assert.False((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
+        rig.Vm.IsEditModeEnabled = false;
+    });
+
     [Fact]
     public void should_go_to_2d_only_by_button_and_close_3d_panel_when_leaving_3d() => RunAsync(async rig =>
     {
@@ -349,5 +378,113 @@ public partial class TwinContractScenarioTests
         AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.Edit3D.Section", "Map.Edit3D.To2D", "Map.UserBuilding.Redo");
         var help = Ironwall.Dotnet.Libraries.GMaps.Ui.Help.MapsHelp.Entries.Single(e => e.Key == "Map.Decoration.Panel");
         Assert.NotNull(help);
+    });
+
+    // ─────────────── 편집 모드 = 고치기 스위치(2026-10-21 사용자 결정 — "맵의 편집모드 켤때만 건물 클릭되게 해라") ───────────────
+
+    private static void ViewMode(Rig rig)
+    {
+        rig.Vm.IsEditModeEnabled = false;
+        Assert.False(rig.W.Map.IsEditMode);
+    }
+
+    [Fact]
+    public void should_ignore_building_drawn_building_and_decoration_picks_and_clear_engine_highlight_in_view_mode() => RunAsync(async rig =>
+    {
+        rig.AddUserBuilding();
+        AddDecoration(rig, Uid2, "tree", new JObject { ["type"] = "Point", ["coordinates"] = Geo(rig, 5, 5) }, new JObject { ["species"] = "palm", ["height_m"] = 8.0 });
+        ViewMode(rig);
+        rig.Enter3D();
+        var requests = rig.Server.Requests.Count;
+
+        rig.PickBuilding(3);                                                                 // 지도 건물(숨기기 · 외관 · 높이 판)
+        Assert.False(rig.Vm.IsBuildingHeightPanelOpen, "보기 전용 — 「건물 높이」 판을 열지 않는다");
+        Assert.Equal(JTokenType.Null, rig.Sent("building.select").Last()["id"]!.Type);      // 엔진이 그린 윤곽은 지운다
+        rig.From3D(new JObject { ["type"] = "userbuilding.pick", ["uid"] = Uid });          // 직접 그린 건물
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.Equal(JTokenType.Null, rig.Sent("userbuilding.select").Last()["uid"]!.Type);
+        rig.PickBuilding(4, origin: "user", extra: new JObject { ["user_uid"] = Uid });     // 다시 만든 직접 그린 건물(building + user_uid)
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        rig.From3D(new JObject { ["type"] = "decoration.pick", ["uid"] = Uid2 });           // 꾸미기 항목
+        Assert.False(rig.Vm.IsDecorating);
+        Assert.Equal(JTokenType.Null, rig.Sent("decoration.select").Last()["uid"]!.Type);
+        await Task.Delay(30);
+        Assert.Equal("3D", rig.Vm.Map3DStatusText);                                         // 보기는 그대로
+        Assert.False(rig.Vm.IsEdit3DMode);
+        Assert.Empty(rig.Sent("edit.start"));
+        Assert.Empty(rig.Writes);
+        Assert.Equal(requests, rig.Server.Requests.Count);                                  // 목록 받기도 하지 않는다
+        Assert.NotEqual(Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps.MapViewModel.EditModeRequiredText, rig.Vm.AimStatusMessage);   // 보기 중 클릭마다 안내하지 않는다
+
+        // 편집 모드를 켜면 같은 고르기가 판을 연다(3D 그대로)
+        rig.Vm.IsEditModeEnabled = true;
+        rig.PickBuilding(3);
+        Assert.True(rig.Vm.IsBuildingHeightPanelOpen);
+        rig.From3D(new JObject { ["type"] = "decoration.pick", ["uid"] = Uid2 });
+        await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid2, "꾸미기 고름");
+        Assert.True(rig.Vm.IsEdit3DMode);
+        Assert.Equal("3D", rig.Vm.Map3DStatusText);
+    });
+
+    [Fact]
+    public void should_cancel_3d_drawing_drop_handles_and_close_panels_when_edit_mode_turned_off_in_3d() => RunAsync(async rig =>
+    {
+        AddDecoration(rig, Uid, "tree", new JObject { ["type"] = "Point", ["coordinates"] = Geo(rig, 0, 0) }, new JObject { ["species"] = "palm", ["height_m"] = 8.0 });
+        rig.Enter3D();
+        rig.From3D(new JObject { ["type"] = "decoration.pick", ["uid"] = Uid });
+        await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid, "고름");
+        Assert.True(rig.Vm.IsEdit3DTargetActive);
+        ViewMode(rig);                                                                       // 손잡이가 떠 있는 채 끄기
+        Assert.Single(rig.Sent("edit.stop"));
+        Assert.Equal(JTokenType.Null, rig.Sent("decoration.select").Last()["uid"]!.Type);
+        Assert.False(rig.Vm.IsDecorating);
+        Assert.False(rig.Vm.IsEdit3DMode);
+        Assert.Equal("3D", rig.Vm.Map3DStatusText, StringComparer.Ordinal);                 // 3D 는 떠나지 않는다
+
+        // 3D 그리기 중(꾸미기 도구 → draw.start) 끄기 → draw.cancel
+        rig.Vm.IsEditModeEnabled = true;
+        rig.Vm.DecorateCommand.Execute(null);
+        Assert.True(rig.Vm.IsEdit3DMode);
+        rig.Vm.SelectDecorationToolCommand.Execute("TreePoint");
+        Assert.NotNull(rig.Vm.Edit3DDrawMode);
+        ViewMode(rig);
+        Assert.Single(rig.Sent("draw.cancel"));
+        Assert.Null(rig.Vm.Edit3DDrawMode);
+        Assert.False(rig.Vm.IsDecorating);
+
+        // 「건물 높이」 판에서 바꾼 값(미리보기) 채 끄기 → 판 닫고 미리보기 원래대로(저장 없음)
+        rig.Vm.IsEditModeEnabled = true;
+        rig.PickBuilding(3);
+        Assert.True(rig.Vm.IsBuildingHeightPanelOpen);
+        rig.Vm.BuildingHeightFloorsText = "12";
+        ViewMode(rig);
+        Assert.False(rig.Vm.IsBuildingHeightPanelOpen);
+        Assert.Equal(JTokenType.Null, rig.Sent("building.preview").Last()["height"]!.Type);
+        Assert.Empty(rig.Writes);
+        Assert.Equal("3D", rig.Vm.Map3DStatusText);
+    });
+
+    [Fact]
+    public void should_enable_draw_and_decorate_entries_only_in_edit_mode_and_explain_when_forced() => RunAsync(async rig =>
+    {
+        ViewMode(rig);
+        Assert.False(rig.Vm.DrawUserBuildingCommand.CanExecute(null), "보기 전용 — 「건물 그리기」 꺼짐");
+        Assert.False(rig.Vm.DecorateCommand.CanExecute(null), "보기 전용 — 「꾸미기」 꺼짐");
+        rig.Vm.DrawUserBuildingCommand.Execute(null);                                        // 단축 경로로 억지로 눌러도
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.Equal(Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps.MapViewModel.EditModeRequiredText, rig.Vm.AimStatusMessage);
+        rig.Vm.DecorateCommand.Execute(null);
+        Assert.False(rig.Vm.IsDecorating);
+        var area = rig.Vm.Map3DAreas.Single();
+        area.Actions.Single(a => a.Header == "건물 그리기").Command.Execute(null);            // 영역 배지 메뉴도 같은 입구
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        await Task.Delay(30);
+        Assert.Empty(rig.Writes);
+
+        rig.Vm.IsEditModeEnabled = true;
+        Assert.True(rig.Vm.DrawUserBuildingCommand.CanExecute(null));
+        Assert.True(rig.Vm.DecorateCommand.CanExecute(null));
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        Assert.True(rig.Vm.IsUserBuildingDrawing);
     });
 }

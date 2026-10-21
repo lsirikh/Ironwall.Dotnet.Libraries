@@ -96,6 +96,7 @@ public class Map3DStaleJobScenarioTests
             R.PressEnter(); Map3DEntryScenarioTests.SettleEntry(R);
             Assert.True(R.Shown);
             Assert.Equal(job, R.Job);
+            Map3DEntryScenarioTests.UseEditMode(R);   // 2026-10-21 — 건물 고르기 · 그리기는 지도 편집 모드에서만
             From3D(new JObject { ["type"] = "building", ["id"] = 172, ["origin"] = "map", ["height"] = 9.0, ["height_source"] = "levels", ["height_from"] = "levels",
                                  ["levels"] = null, ["area_m2"] = 120.0, ["lon"] = 127.0, ["lat"] = 37.5, ["manual"] = false });
             Assert.True(Vm.IsBuildingHeightPanelOpen);

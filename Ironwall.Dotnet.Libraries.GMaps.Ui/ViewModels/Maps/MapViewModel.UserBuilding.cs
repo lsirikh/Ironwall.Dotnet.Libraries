@@ -20,7 +20,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Purpose      : 「건물 그리기」(2026-10-19 사용자 요청) — 3D 영역 안 지도 위에 위에서 본 건물 윤곽을 그리고 높이를 넣어 들어올린다.
                   map-3d 가 다시 만들기에서 그 건물을 출처 "user" 로 우선 굽고(겹친 자동 건물 뺌) 옥상 · 외벽을 사진으로 꾸민다(userbuildings.py).
    Note         : ★ 들어가기 = 툴바(Map.UserBuilding.Draw — 화면 가운데 영역) · 영역 배지 우클릭 · 「3D 영역 목록」의 「건물 그리기」.
-                    지도 편집 권한(CanEditMap)이 없으면 들어가지 않는다. 그리는 동안은 독점 입력 모드라 3D 에 들어가지 않는다(IsMap3DBlockedByInputMode).
+                    지도 편집 모드가 아니거나(꺼짐 = 보기 전용, 2026-10-21) 지도 편집 권한(CanEditMap)이 없으면 들어가지 않는다. 그리는 동안은 독점 입력 모드라 3D 에 들어가지 않는다(IsMap3DBlockedByInputMode).
                     단, 3D 중에 시작하면(3D 에서 고름 · 툴바) 3D 위 판으로 3D 에 머문다(그리기 · 손잡이 = draw.* · edit.*, MapViewModel.Edit3D).
                   ★ 그리기 = 지도 표면(UserBuildingAdorner) → 상태 기계(Map3DUserBuildingDraft): 클릭 = 점 · 첫 점/더블클릭/Enter = 닫기 ·
                     꼭짓점 끌기 · 선분 가운데 손잡이 끌기 = 점 넣기 · 오른쪽 클릭/Delete = 지우기 · Backspace · Esc 두 단계(그리던 점 → 그리기 끝내기) ·
@@ -186,6 +186,13 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     private void OnMap3DUserBuildingPicked(string uid)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob is not { } job || Map3DAreas.FirstOrDefault(a => a.Id == job) is not { } area) return;
+        if (!RequireMapEditMode(notify: false))
+        {
+            // 보기 전용 — 판 · 강조 없음. 엔진에 고르기를 끄는 메시지는 없어 GIS 가 무시하고, 엔진이 그렸을 수 있는 강조만 지운다
+            _log?.Info($"[UserBuilding] 3D 에서 고름 — 편집 모드 아님(무시) uid={uid}");
+            PostUserBuilding3D(job, Map3DUserBuilding.SelectMessageJson(null));
+            return;
+        }
         _log?.Info($"[UserBuilding] 3D 에서 고름 uid={uid} job={job}");
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         CloseBuildingHeightPanel(clearUndo: false);
@@ -285,7 +292,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         }
         if (item == null) { SetAimStatus("3D 영역 안에서 시작하세요 — 화면 가운데를 3D 영역 안에 두고 다시 누르세요", autoHide: true); return; }
         StartUserBuildingDraw(item, in3D: ShouldEditIn3D && item.Id == _map3DJob);
-    });
+    }, _ => IsEditModeEnabled || IsUserBuildingDrawing);   // 편집 모드에서만 시작(그리는 중이면 끝내기는 늘)
 
     private RelayCommand? _exitUserBuildingDrawCommand;
     public RelayCommand ExitUserBuildingDrawCommand => _exitUserBuildingDrawCommand ??= new RelayCommand(_ => ExitUserBuildingDraw("close"));
@@ -383,6 +390,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     private void StartUserBuildingDraw(Map3DAreaItem item, bool in3D = false)
     {
         if (MainMap == null) return;
+        if (!RequireMapEditMode(notify: true)) return;   // 꺼짐 = 보기 전용(툴바 · 영역 배지 · 3D 고르기 모두 여기로)
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         if (item.IsBaking) { SetAimStatus("이 영역은 다시 만드는 중입니다 — 다 만든 뒤 그리세요", autoHide: true); return; }
         if (IsUserBuildingDrawing) ExitUserBuildingDraw("switch");
@@ -952,6 +960,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     /// <summary>「직접 그린 건물 n개 — 모두 지우기…」 — 표준 확인 팝업. "확인" → HandleAsync(CallClearUserBuildingsProcessMessageModel).</summary>
     private async Task RequestClearUserBuildingsAsync(Map3DAreaItem item)
     {
+        if (!RequireMapEditMode(notify: true)) return;   // 영역 배지 메뉴도 고치기 입구 — 편집 모드에서만
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         try
         {

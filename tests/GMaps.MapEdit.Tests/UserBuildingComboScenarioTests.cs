@@ -296,7 +296,7 @@ public class UserBuildingComboScenarioTests
 
     [Fact]
     [Trait("Scenario", "B-05")]
-    public void should_keep_outline_and_carry_panel_rows_to_map_when_edit_mode_turns_off_and_on_while_drawing() => Scenario.StaAsync(async () =>
+    public void should_end_drawing_and_carry_panel_rows_to_map_when_edit_mode_turns_off_and_on_while_drawing() => Scenario.StaAsync(async () =>
     {
         var rig = new Rig();
         rig.Symbols(991, 992);
@@ -309,15 +309,16 @@ public class UserBuildingComboScenarioTests
         rig.Vm.IsEditModeEnabled = false;
         await Task.Delay(30);
         Assert.False(rig.Group.HasSelection);
-        Assert.True(rig.Vm.IsUserBuildingDrawing);               // 그리기는 편집 모드와 무관
-        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        // 2026-10-21 사용자 결정 — 건물 그리기는 편집 모드에서만: 끄면 그리기도 끝나고 저장 안 한 윤곽은 버린다(2D 편집 모드 끄기 규칙)
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
         rig.Vm.IsEditModeEnabled = true;
         await Task.Delay(30);
         Assert.Equal(2, rig.Group.Selection.Count);              // 패널 선택이 다시 지도로
-        Assert.True(rig.Vm.UserBuildingDraft!.IsClosed);
+        Assert.False(rig.Vm.IsUserBuildingDrawing);              // 그리기는 다시 눌러야 시작
 
-        Assert.True(rig.Key(K.Enter));                           // 닫힌 윤곽 Enter = 저장
-        await Rig.Until(() => rig.Server.Items.Count == 1, "Enter 저장");
+        rig.Vm.DrawUserBuildingCommand.Execute(null);
+        Assert.False(rig.Vm.UserBuildingDraft!.IsClosed);        // 옛 윤곽이 되살아나지 않는다
+        Assert.Empty(rig.Server.Items);
         Assert.Equal(2, rig.Group.Selection.Count);
         Assert.Empty(rig.Saves);                                 // 심볼은 저장 안 함
         rig.Done();

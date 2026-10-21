@@ -147,7 +147,16 @@ public class Map3DCompositeScenarioTests
             Assert.Equal(job, R.Job);
         }
 
+        /// <summary>건물을 고른다 — 2026-10-21 부터 「건물 높이」 판은 지도 편집 모드에서만 열려, 고르기 전에 편집 모드로 둔다(세터 없이 — 마커 선택 정리 등 부수 효과 없이).</summary>
         public void PickBuilding(int id, double height)
+        {
+            Scenario.SetField(Vm, "_isEditModeEnabled", true);
+            R.W.Map.SetEditMode(true);
+            PickBuildingAsIs(id, height);
+        }
+
+        /// <summary>지금 편집 모드 그대로 건물을 고른다(보기 전용 시험).</summary>
+        public void PickBuildingAsIs(int id, double height)
             => From3D(new JObject { ["type"] = "building", ["id"] = id, ["origin"] = "map", ["height"] = height, ["height_source"] = "levels", ["height_from"] = "levels",
                                     ["levels"] = null, ["area_m2"] = 120.0, ["lon"] = 127.0, ["lat"] = 37.5, ["manual"] = false });
 
@@ -326,6 +335,7 @@ public class Map3DCompositeScenarioTests
         {
             rig.R.Areas(rig.R.AreaAround(A));
             rig.Enter(A);
+            Map3DEntryScenarioTests.UseEditMode(rig.R);                  // 2026-10-21 — 건물 고르기 · 그리기는 지도 편집 모드에서만
             rig.Vm.DrawUserBuildingCommand.Execute(null);                // 툴바 「건물 그리기」 — 3D 중이면 3D 위 판(edit3d-contract 2단계)
             try
             {
@@ -370,6 +380,7 @@ public class Map3DCompositeScenarioTests
             rig.R.Gate();
             rig.R.PressEnter();
             Assert.Equal("Pending", rig.R.State);
+            Map3DEntryScenarioTests.UseEditMode(rig.R);                  // 2026-10-21 — 건물 고르기 · 그리기는 지도 편집 모드에서만
             rig.Vm.DrawUserBuildingCommand.Execute(null);
             try
             {
@@ -800,10 +811,12 @@ public class Map3DCompositeScenarioTests
         => rig.From3D(new JObject { ["type"] = "pick", ["action"] = action, ["kind"] = kind, ["id"] = id });
 
     [Fact]
-    public void should_leave_3d_revert_preview_and_open_card_when_marker_clicked_over_building_while_height_preview()
+    // 2026-10-21 사용자 결정 — 「건물 높이」 판은 편집 모드에서만 열리고, 편집 모드의 마커 클릭은 조립 카드가 아니라 편집 선택이다.
+    // 예전 "카드를 열려고 2D 로 나가며 미리보기 되돌림"은 이제 일어날 수 없는 조합이라, 편집 모드 그대로 3D 에 머무는지를 본다.
+    public void should_stay_in_3d_without_card_and_keep_preview_when_marker_clicked_over_building_while_height_preview_in_edit_mode()
         => Run(rig =>
         {
-            var cam = AddCamera(rig, 1);
+            AddCamera(rig, 1);
             rig.R.Areas(rig.R.AreaAround(A));
             rig.Enter(A);
             rig.PickBuilding(7, 9.0);
@@ -813,13 +826,11 @@ public class Map3DCompositeScenarioTests
             Pick(rig, "click", "pids", 1);                                // 마커가 건물보다 먼저 — pick 만 온다
 
             var card = Scenario.GetField<ComponentCardService>(rig.Vm, "_componentCard");
-            Assert.Same(cam, card.Current);
-            Assert.False(rig.R.Shown, "이 호스트는 WPF 를 덮는다 — 카드를 보려고 2D 로");
-            Assert.False(rig.Vm.IsBuildingHeightPanelOpen);
-            rig.AssertPreviewReverted(7, "마커 클릭으로 나감");
-            Assert.True(rig.Suppressed);
-            rig.PickBuilding(7, 9.0);                                     // 2D 로 늦게 온 건물 메시지 — 판을 열지 않는다
-            Assert.False(rig.Vm.IsBuildingHeightPanelOpen);
+            Assert.Null(card.Current);                                    // 편집 모드 — 조립 카드 없음
+            Assert.True(rig.R.Shown, "편집 모드는 3D 를 떠나지 않는다");
+            Assert.True(rig.Vm.IsBuildingHeightPanelOpen);
+            Assert.Equal(36.0, rig.Vm.BuildingHeightPreview);             // 넣던 값 그대로
+            Assert.False(rig.Suppressed);
             Assert.Empty(rig.Server.Requests.Where(r => r.Method == HttpMethod.Put));
         });
 
@@ -1011,7 +1022,9 @@ public class Map3DCompositeScenarioTests
     // ─────────────── 24. 편집 모드 + 판 + 다시 들어가기 ───────────────
 
     [Fact]
-    public void should_reopen_fresh_height_panel_after_edit_mode_cycle_and_button_reentry_when_manual()
+    // 2026-10-21 사용자 결정 — 「건물 높이」 판은 편집 모드에서만: 편집 모드를 끄면 판을 닫고 미리보기를 되돌린다(3D 는 그대로),
+    // 다시 켜고 고르면 새 판(옛 미리보기 없음). 편집 모드 켜기 · 끄기로 3D 를 떠나지 않는다(WPF 안 3D).
+    public void should_close_panel_revert_preview_and_stay_in_3d_when_edit_mode_turned_off_then_reopen_fresh_panel_when_on_again()
         => Run(rig =>
         {
             rig.R.Areas(rig.R.AreaAround(A));
@@ -1022,25 +1035,21 @@ public class Map3DCompositeScenarioTests
             rig.Posts.Clear();
             try
             {
-                rig.Vm.IsEditModeEnabled = true;
-                Assert.False(rig.R.Shown);
-                Assert.False(rig.Vm.IsBuildingHeightPanelOpen);
-                rig.AssertPreviewReverted(7, "편집 모드로 나감");
-                rig.R.PressEnter();
-                Assert.Equal("Off", rig.R.State);
-                Assert.Contains("들어가지 않습니다", rig.R.Status);
-            }
-            finally
-            {
                 rig.Vm.IsEditModeEnabled = false;
-                Mouse.OverrideCursor = null;
+                Assert.True(rig.R.Shown, "편집 모드를 꺼도 3D 그대로");
+                Assert.False(rig.Vm.IsBuildingHeightPanelOpen);
+                rig.AssertPreviewReverted(7, "편집 모드 끄기");
+                rig.PickBuildingAsIs(7, 9.0);
+                Assert.False(rig.Vm.IsBuildingHeightPanelOpen, "보기 전용 — 고르기 무시");
+                rig.Vm.IsEditModeEnabled = true;
+                Assert.True(rig.R.Shown);
+                Assert.False(rig.Vm.IsBuildingHeightPanelOpen, "다시 켜기만으로는 판이 열리지 않는다");
             }
-            rig.R.Gate(); rig.R.Tick();
-            Assert.False(rig.R.Shown);
-            rig.Enter(A);
+            finally { Mouse.OverrideCursor = null; }
             rig.PickBuilding(7, 9.0);
             Assert.True(rig.Vm.IsBuildingHeightPanelOpen);
             Assert.Equal(9.0, rig.Vm.BuildingHeightPreview);             // 옛 미리보기(36 m)가 남지 않는다
+            Assert.Empty(rig.Server.Requests.Where(r => r.Method == HttpMethod.Put));
         });
 
     // ─────────────── 25. 나간 뒤 늦게 온 3D 메시지 ───────────────

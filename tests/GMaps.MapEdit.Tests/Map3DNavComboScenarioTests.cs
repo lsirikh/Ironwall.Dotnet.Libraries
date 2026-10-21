@@ -234,7 +234,7 @@ public class Map3DNavComboScenarioTests
     // ─────────────── 다른 기능과 조합 ───────────────
 
     [Fact]
-    public void should_stop_held_move_and_ignore_ring_when_edit_mode_starts_in_3d()
+    public void should_stop_held_move_and_ignore_ring_when_edit_mode_starts_in_native_window_3d()
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
         {
             Enter(rig);
@@ -245,7 +245,8 @@ public class Map3DNavComboScenarioTests
             Assert.True(Moving(rig));
             try
             {
-                rig.Vm.IsEditModeEnabled = true;                    // 3D 중 편집 모드(묶음 회전 등) — 3D 를 먼저 접는다
+                Map3DEntryScenarioTests.UseNativeWindowHost(rig, true);   // 2026-10-21 — 편집 모드가 3D 를 접는 것은 네이티브 창 3D 뿐
+                rig.Vm.IsEditModeEnabled = true;                    // 3D 중 편집 모드 — 네이티브 창 3D 는 3D 를 먼저 접는다
                 Assert.False(rig.Shown);
                 Assert.False(Moving(rig), "3D 를 접으면 누르고 있던 이동도 멈춘다");
                 rig.Vm.NudgeMap3D(new Map3DNudge(40, 0, 0, 0, 0));   // 편집 중 링 = 무시
@@ -255,6 +256,7 @@ public class Map3DNavComboScenarioTests
             finally
             {
                 rig.Vm.IsEditModeEnabled = false;
+                Map3DEntryScenarioTests.UseNativeWindowHost(rig, false);
                 Mouse.OverrideCursor = null;
             }
         });
