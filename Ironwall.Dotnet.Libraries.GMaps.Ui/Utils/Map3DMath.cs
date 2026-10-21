@@ -60,6 +60,9 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>decoration.pick 일 때 3D 에서 누른 꾸미기 항목의 uid(twin-contract C).</summary>
     public string? DecorationUid { get; init; }
+
+    /// <summary>env.state 일 때 3D 의 해 · 차 · 사람 상태(env3d-contract C, <see cref="Map3DEnvironment"/>).</summary>
+    public Map3DEnvState? EnvState { get; init; }
 }
 
 /// <summary>
@@ -386,6 +389,7 @@ public static class Map3DMath
             if (type == "building")
                 return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b } : null;
             if (type == "building.none") return new Map3DMessage(type, null, null, null);   // 건물 아닌 땅을 눌렀다(2026-10-19)
+            if (type == "env.state") return new Map3DMessage(type, null, null, null) { EnvState = Map3DEnvironment.ParseState(o) };   // 해 뜸/짐 · 차 · 사람 수(2026-10-21)
             if (type is "userbuilding.pick" or "decoration.pick")   // 직접 그린 건물 상자 · 꾸미기 항목을 눌렀다(2026-10-21) — uid 가 틀리면 버린다
             {
                 string? uid = o["uid"]?.Type == JTokenType.String ? o.Value<string>("uid") : null;

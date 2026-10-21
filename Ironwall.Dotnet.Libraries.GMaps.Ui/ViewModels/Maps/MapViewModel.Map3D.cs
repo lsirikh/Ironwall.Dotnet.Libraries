@@ -254,6 +254,7 @@ public partial class MapViewModel
     {
         var host = new Map3DViewHost();
         host.MessageReceived += OnMap3DMessage;
+        host.MessageReceived += OnMap3DEnvironmentMessage;   // 해 · 날씨 · 차 · 사람(MapViewModel.Map3DEnvironment)
         host.LoadFailed += OnMap3DLoadFailed;
         host.HostFallback += reason =>
         {

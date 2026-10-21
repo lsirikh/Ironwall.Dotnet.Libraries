@@ -188,6 +188,35 @@ public static class MapSettingsHelper
     public static event Action? Map3DSaved;
 
     /// <summary>
+    /// appsettings(AppSettings.Map3DEnvironment)에서 <b>동기</b> 로드 — 3D 환경(해 · 날씨 · 차 · 사람, env3d-contract A). DI 등록(startup)용.
+    /// 키 없거나 실패면 기본값(날씨 수동 · 지금 시각 · 차 · 사람 켬), 범위 밖 값은 Normalize.
+    /// </summary>
+    public static Map3DEnvironmentModel LoadMap3DEnvironment(ILogService? log = default)
+    {
+        try
+        {
+            var fp = AppSettingsLocation.AppSettingsReadPath;
+            var t = File.Exists(fp) ? JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Map3DEnvironment"] : null;
+            var model = t?.ToObject<Map3DEnvironmentModel>() ?? new Map3DEnvironmentModel();
+            if (model.Normalize()) log?.Warning("[Map3DEnv] 범위 밖 · 모르는 값을 고쳐 씀");
+            log?.Info($"[Map3DEnv] 로드(appsettings.Map3DEnvironment): {model}");
+            return model;
+        }
+        catch (Exception ex)
+        {
+            log?.Warning($"[Map3DEnv] 로드 실패, 기본값 사용: {ex.Message}");
+            return new Map3DEnvironmentModel();
+        }
+    }
+
+    /// <summary>3D 환경 설정 저장(AppSettings.Map3DEnvironment — 절 통째로). 설정 화면 묶음 · 3D 빠른 조절 판이 함께 쓴다.</summary>
+    public static async Task SaveMap3DEnvironmentAsync(Map3DEnvironmentModel model, ILogService? log = default)
+    {
+        model.Normalize();
+        await SaveSettingAsync("Map3DEnvironment", model, log);
+    }
+
+    /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>
     public static async Task SaveMapTypeAsync(string mapType, ILogService? log = default)

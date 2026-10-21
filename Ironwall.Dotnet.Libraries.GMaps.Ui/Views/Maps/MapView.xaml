@@ -1566,6 +1566,13 @@
 							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 				</Border>
+				<!--  「환경」 알약 + 접는 판(해 · 날씨 · 차 · 사람, 2026-10-21 env3d-contract A) — 3D 가 보이는 동안만. VM 이 없으면(미등록) 판도 비어 있다  -->
+				<Border
+					Margin="0,6,0,0"
+					HorizontalAlignment="Left"
+					Visibility="{Binding IsMap3DShown, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<local:Map3DEnvironmentQuickPanel DataContext="{Binding Map3DEnvironment}" />
+				</Border>
 			</StackPanel>
 
 			<!--  화면 정중앙 십자가(비상호작용 시각 기준) — IsCenterCrosshairVisible 토글. AdornerDecorator 형제라 디지털줌 RenderTransform 영향 없이 항상 화면 중앙.
