@@ -254,6 +254,7 @@ public partial class MapViewModel
     {
         var host = new Map3DViewHost();
         host.MessageReceived += OnMap3DMessage;
+        host.MessageReceived += OnMap3DEnvironmentMessage;   // 해 · 날씨 · 차 · 사람(MapViewModel.Map3DEnvironment)
         host.LoadFailed += OnMap3DLoadFailed;
         host.HostFallback += reason =>
         {
@@ -788,7 +789,8 @@ public partial class MapViewModel
         bool remote = IsRemoteSession();
         if (remote) _log?.Info("[Map3D] 원격 세션 — 3D 저사양(low=1)");
         // 위에서 내려다본 같은 축척으로 연다(animate=0) — 펼칠 때(Reveal3D) 기울기 애니메이션을 보낸다.
-        var url = Map3DMath.ViewUrl(_map3DSettings.ServerUrl, job, Current2DCamera(0d), animate: false, lowQuality: remote);
+        var url = Map3DMath.ViewUrl(_map3DSettings.ServerUrl, job, Current2DCamera(0d), animate: false, lowQuality: remote,
+                                     sky: Map3DEnvironment != null);   // 3D 환경을 보내면 하늘 · 구름이 보이게(MapViewModel.Map3DEnvironment)
         _ = _map3DSceneLoader is { } load ? load(job, url) : Map3DHost.LoadAsync(job, url);
     }
 

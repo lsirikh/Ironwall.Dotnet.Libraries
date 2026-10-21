@@ -1,0 +1,164 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps.Map3DEnvironmentQuickPanel"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:help="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+	<!--  3D 위 「환경」 빠른 조절(env3d-contract A) — DataContext = Map3DEnvironmentViewModel(설정 화면 「3D 환경」 묶음과 같은 VM · 같은 원본).
+	      알약 단추(3D 로 보기 · 나가기와 같은 Map3DPillButtonStyle — MapView 자원)로 접는 판을 연다: 시간 · 시각, 날씨 자동/수동 + 수동 고르기, 차 · 사람.
+	      바꾸면 바로 3D 에 보내고 잠시 뒤 설정에 저장한다. 설명은 "?" 말풍선.  -->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</UserControl.Resources>
+	<StackPanel AutomationProperties.AutomationId="GMaps.Map3DEnv.Quick">
+		<StackPanel Orientation="Horizontal">
+			<Button
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickToggle"
+				AutomationProperties.Name="환경"
+				Command="{Binding ToggleQuickPanelCommand}"
+				Style="{DynamicResource Map3DPillButtonStyle}"
+				ToolTip="해 · 날씨 · 차 · 사람을 바꿉니다">
+				<StackPanel Orientation="Horizontal">
+					<md:PackIcon
+						Width="24"
+						Height="24"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource PrimaryBrush}"
+						Kind="WeatherPartlyCloudy" />
+					<StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+						<TextBlock
+							FontSize="13"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="환경" />
+						<TextBlock
+							FontSize="10"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="해 · 날씨 · 차 · 사람" />
+					</StackPanel>
+				</StackPanel>
+			</Button>
+			<help:HelpTip
+				Margin="6,0,0,0"
+				VerticalAlignment="Center"
+				HelpKey="Map.Map3D.Environment"
+				Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
+		</StackPanel>
+
+		<Border
+			Width="270"
+			Margin="0,6,0,0"
+			HorizontalAlignment="Left"
+			AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickPanel"
+			Style="{StaticResource MapFloatingPanelStyle}"
+			Visibility="{Binding IsQuickPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<StackPanel>
+				<!--  해 뜸 · 해 짐(3D 가 env.state 로 알려 줄 때만)  -->
+				<TextBlock
+					Margin="0,0,0,6"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.SunText"
+					Foreground="{DynamicResource TextPrimaryBrush}"
+					Text="{Binding SunText}"
+					Visibility="{Binding HasSunText, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="44" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" Text="시간" />
+					<ComboBox
+						Grid.Column="1"
+						AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickTimeMode"
+						AutomationProperties.Name="시간 모드"
+						DisplayMemberPath="Value"
+						ItemsSource="{Binding TimeModes}"
+						SelectedValue="{Binding TimeMode, Mode=TwoWay}"
+						SelectedValuePath="Key"
+						Style="{StaticResource PropertyComboBox}" />
+				</Grid>
+				<!--  시각 — 막대를 끌어 해를 옮긴다(10분 단위)  -->
+				<Grid Margin="0,4,0,0" Visibility="{Binding IsTimePicked, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="44" />
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="40" />
+					</Grid.ColumnDefinitions>
+					<Slider
+						Grid.Column="1"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickTime"
+						AutomationProperties.Name="시각"
+						IsSnapToTickEnabled="True"
+						LargeChange="60"
+						Maximum="1430"
+						Minimum="0"
+						SmallChange="10"
+						TickFrequency="10"
+						Value="{Binding ManualTimeMinutes, Mode=TwoWay}" />
+					<TextBlock Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" Text="{Binding ManualTime}" />
+				</Grid>
+
+				<Grid Margin="0,8,0,0">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="44" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" Text="날씨" />
+					<ComboBox
+						Grid.Column="1"
+						AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickWeatherMode"
+						AutomationProperties.Name="날씨 모드"
+						DisplayMemberPath="Value"
+						ItemsSource="{Binding WeatherModes}"
+						SelectedValue="{Binding WeatherMode, Mode=TwoWay}"
+						SelectedValuePath="Key"
+						Style="{StaticResource PropertyComboBox}" />
+				</Grid>
+				<Grid Margin="0,4,0,0" Visibility="{Binding IsWeatherManual, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="44" />
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<ComboBox
+						Grid.Column="1"
+						Margin="0,0,4,0"
+						AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickSky"
+						AutomationProperties.Name="하늘"
+						DisplayMemberPath="Value"
+						ItemsSource="{Binding Skies}"
+						SelectedValue="{Binding ManualSky, Mode=TwoWay}"
+						SelectedValuePath="Key"
+						Style="{StaticResource PropertyComboBox}" />
+					<ComboBox
+						Grid.Column="2"
+						AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickPrecip"
+						AutomationProperties.Name="비 · 눈"
+						DisplayMemberPath="Value"
+						ItemsSource="{Binding Precips}"
+						SelectedValue="{Binding ManualPrecip, Mode=TwoWay}"
+						SelectedValuePath="Key"
+						Style="{StaticResource PropertyComboBox}" />
+				</Grid>
+				<TextBlock
+					Margin="44,4,0,0"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickWeatherStatus"
+					FontSize="11"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="{Binding WeatherStatus}"
+					TextWrapping="Wrap"
+					Visibility="{Binding HasWeatherStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<StackPanel Margin="44,8,0,0" Orientation="Horizontal">
+					<CheckBox AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickCars" Content="차" IsChecked="{Binding CarsEnabled, Mode=TwoWay}" />
+					<CheckBox Margin="16,0,0,0" AutomationProperties.AutomationId="GMaps.Map3DEnv.QuickPeople" Content="사람" IsChecked="{Binding PeopleEnabled, Mode=TwoWay}" />
+				</StackPanel>
+			</StackPanel>
+		</Border>
+	</StackPanel>
+</UserControl>
