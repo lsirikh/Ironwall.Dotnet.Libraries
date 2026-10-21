@@ -101,6 +101,18 @@ public enum EnumGopCommand
     SYNC_SYSTEM_EVENT = 38,
     // 함체 계측(온도 · 전압 …) 주기 발행 — GIS 소비처 없음.
     ENCLOSURE_METRICS = 39,
+    // ── 브로커 v2.0.12 · API 8.0.11 Phase 2 수신 cmd (G53, 2026-10-21) — 정수는 유일성만(라우팅은 이름 기반) ──
+    // 재적재 신호(서버 릴레이 재기동 · 발행 실패 뒤) — body.reason(RELAY_STARTED · PUBLISH_FAILED). 처리=호스트 라우터(전량 재적재).
+    SYNC_RESYNC = 40,
+    // 장애 이벤트 수정 · 삭제 알림 — 처리=라이브러리 MalfunctionSyncNatsService(cmd 자가 필터).
+    SYNC_MALFUNCTION = 41,
+    // 조치보고 수정 · 삭제 알림 — 처리=라이브러리 ActionReportSyncNatsService(cmd 자가 필터).
+    SYNC_ACTION_REPORT = 42,
+    // 계정 · 계정 그룹 동기화 알림 — 처리=라이브러리(Accounts.Ui) 자가 필터.
+    SYNC_USER = 43,
+    SYNC_USER_GROUP = 44,
+    // 마이크 방송(페이징) 상태 — body{state, dial, speaker_ids[], mic_device_id, started_at}. 처리=라이브러리 MicPagingNatsSyncService.
+    MIC_PAGING = 45,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

@@ -59,7 +59,12 @@ public class GMapUiModule: Module
         builder.RegisterType<Services.Brokers.BrokerRequestClient>().As<Services.Brokers.IBrokerRequestClient>().SingleInstance();
         builder.RegisterType<BroadcastControlService>().As<IBroadcastControlService>().SingleInstance();
         // BROADCAST_STATUS 수신(FR-24) — 구독 시작·해제는 MapViewModel 활성/비활성이 맡는다(GMapUiModule 에는 IService 기동 블록이 없음).
-        builder.RegisterType<Services.Broadcast.BroadcastStatusNatsSyncService>()
+        // MIC_PAGING(G38) 이 같은 표시 경로를 쓰도록 BROADCAST_STATUS 서비스를 감싸 같은 인터페이스로 낸다 — 지도는 하나만 구독한다.
+        builder.RegisterType<Services.Broadcast.BroadcastStatusNatsSyncService>().AsSelf().SingleInstance();
+        builder.Register(c => new Services.MicPagingNatsSyncService(
+                   c.ResolveOptional<Ironwall.Dotnet.Libraries.Base.Services.ILogService>(),
+                   c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                   c.Resolve<Services.Broadcast.BroadcastStatusNatsSyncService>()))
                .As<Services.Broadcast.IBroadcastStatusNatsSyncService>().SingleInstance();
         // ENCLOSURE_METRICS 수신(이슈 #7-20) — 구독 시작·해제는 MapViewModel 활성/비활성이 맡는다(BROADCAST_STATUS 와 같다).
         builder.RegisterType<Services.Enclosure.EnclosureMetricsNatsSyncService>()

@@ -86,6 +86,16 @@ public class EventApiModule : Module
                 .SingleInstance()
                 .WithMetadata("Order", _count + 1);
 
+            // 5. SystemEventApiService(G52) — 같은 Named IApiService/ApiSetupModel. 서버 콘솔은 ISystemEventSource 로 받는다.
+            builder.Register(ctx => new SystemEventApiService(
+                    _log,
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
+                    ctx.ResolveNamed<ApiSetupModel>(_name)
+                ))
+                .As<ISystemEventApiService>()
+                .As<Ironwall.Dotnet.Libraries.Messages.Dto.Systems.ISystemEventSource>()
+                .SingleInstance();
+
             _log?.Info($"[{nameof(EventApiModule)}] Module loaded successfully with name: {_name}");
         }
         catch (Exception ex)

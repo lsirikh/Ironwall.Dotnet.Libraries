@@ -14,6 +14,7 @@ using Ironwall.Dotnet.Libraries.Utils.Perf;
 using Ironwall.Dotnet.Monitoring.Models.Helpers;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -149,6 +150,11 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
             var state = Resolve(detail?.Value<string>("door_status") ?? detail?.Value<string>("gate_status"), body.Value<string>("reason"));
             if (state is null) return;   // 온도/전압 임계치 등 개폐 무관
 
+            // 한 장비에 문 위치 부품이 둘 이상이면 서버가 부품마다 따로 이벤트를 낸다(detail.component, G47) —
+            //   부품별로 기억하고 '하나라도 열림 = 열림' 으로 합친다. component 가 없으면 지금처럼 장비 단위.
+            if (detail?.Value<string>("component") is { Length: > 0 } component)
+                state = CombineComponentDoors(deviceId, component, state.Value);
+
             _symbolEventManager.SetDoorState(deviceId, deviceType, state.Value);
             _log?.Info($"OPERATION_EVENT 개폐: deviceId={deviceId}, {deviceType}, reason={body.Value<string>("reason")} → {state}");
         }
@@ -177,6 +183,18 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
         return DoorStateMachine.HasDoor(type) ? type : null;
     }
 
+    /// <summary>부품 하나의 문 상태를 기억하고 그 장비의 합친 상태를 돌려준다 — 하나라도 열림이면 열림, 아니면 이번 상태.</summary>
+    internal EnumDoorState CombineComponentDoors(int deviceId, string component, EnumDoorState state)
+    {
+        lock (_componentDoors)
+        {
+            _componentDoors[(deviceId, component)] = state;
+            foreach (var pair in _componentDoors)
+                if (pair.Key.DeviceId == deviceId && pair.Value == EnumDoorState.Open) return EnumDoorState.Open;
+            return state;
+        }
+    }
+
     /// <summary>detail 상태 문자열이 있으면 그것(권위), 없으면 reason 접미(_OPEN/_CLOSED)로 판정. 둘 다 없으면 null.</summary>
     internal static EnumDoorState? Resolve(string? detailStatus, string? reason)
     {
@@ -193,5 +211,6 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
     private readonly ITokenStorageService? _tokenStorage;
     private readonly IEventAggregator? _eventAggregator;
     private readonly DeviceProvider? _deviceProvider;
+    private readonly Dictionary<(int DeviceId, string Component), EnumDoorState> _componentDoors = new();   // 부품별 문 상태(G47)
     #endregion
 }

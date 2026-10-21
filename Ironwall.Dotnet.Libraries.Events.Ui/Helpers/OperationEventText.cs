@@ -45,6 +45,37 @@ public static class OperationEventText
         return Reasons.TryGetValue(reason.Trim(), out var text) ? text : reason.Trim();
     }
 
+    // 함체 밖 장비의 문 위치 부품도 ENCLOSURE_DOOR_* 사유를 쓴다(서버 8.0.15 감사 F24) — 사유 글자의 장비 종류는 category_device 가 정한다(G19).
+    private static readonly IReadOnlyDictionary<string, string> DoorDeviceKinds =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["controller"] = "제어기",
+            ["sensor"] = "센서",
+            ["camera"] = "카메라",
+            ["speaker"] = "스피커",
+            ["lamp"] = "경광등",
+            ["gate"] = "통문",
+        };
+
+    /// <summary>
+    /// 사유 글자 — 장비 종류를 아는 겹(G19). 문 사유(<c>ENCLOSURE_DOOR_OPEN</c> · <c>_CLOSED</c>)인데 장비가 함체가 아니면
+    /// "{장비 종류} 문 열림/닫힘"(예: "카메라 문 열림"). 종류를 모르거나(빈 값 · 6.3) 함체면 <see cref="ReasonText(string?)"/> 와 같다.
+    /// </summary>
+    public static string ReasonText(string? reason, string? categoryDevice)
+    {
+        var r = reason?.Trim();
+        var category = categoryDevice?.Trim();
+        var isOpen = string.Equals(r, "ENCLOSURE_DOOR_OPEN", StringComparison.OrdinalIgnoreCase);
+        if ((isOpen || string.Equals(r, "ENCLOSURE_DOOR_CLOSED", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrEmpty(category)
+            && !string.Equals(category, "enclosure", StringComparison.OrdinalIgnoreCase))
+        {
+            var kind = DoorDeviceKinds.TryGetValue(category, out var label) ? label : "장비";
+            return $"{kind} 문 {(isOpen ? "열림" : "닫힘")}";
+        }
+        return ReasonText(reason);
+    }
+
     /// <summary>심각도 글자. 모르는 값은 원문, 없으면 "—".</summary>
     public static string SeverityText(string? severity)
     {

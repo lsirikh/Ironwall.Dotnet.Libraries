@@ -230,7 +230,8 @@
 									<ComboBoxItem Content="연결" Tag="connection" />
 									<!--  서버 EnumSuppressionEventScope 는 5값이다(app/utils/enums.py:295-302) — 하나라도 빠지면
 									      그 스케줄을 열 때 콤보가 매칭에 실패해 범위가 조용히 '전체' 로 넓어진다  -->
-									<ComboBoxItem Content="운영" Tag="operation" />
+									<!--  '운영' 은 서버 7.0 이상만(G44) — 6.3 의 억제 범위는 4값이라 보내면 422  -->
+									<ComboBoxItem Content="운영" Tag="operation" Visibility="{Binding IsOperationScopeAvailable, Converter={StaticResource BoolToVis}}" />
 								</ComboBox>
 							</Grid>
 

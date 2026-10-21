@@ -1,0 +1,46 @@
+FromEventConverter_ApiListResponse_WithMixedFromEvents_DeserializesAll
+FromEventConverter_NullTypeEvent_ReturnsNull
+FromEventConverter_UnknownTypeEvent_ReturnsNull
+START_는_스피커들을_켜고_STOP_은_끈다
+STOP_에_스피커가_없으면_같은_마이크로_켠_것을_끈다
+SYNC_SYSTEM_EVENT_는_다시_읽기_빼기_메시지_중복_봉투는_한_번
+SYSTEM_EVENT_는_본문_그대로_한_줄_메시지_7_0_과_6_3_모양
+[xUnit.net 00:00:00.30]     A6.7-7: 판별자·구조·type_event 모두 미지 → UnknownEventDto (예외 없음, G49)
+같은_봉투_id_는_한_번만_처리한다
+공급자가_있으면_레일에_시스템_이벤트_칸이_붙는다_없으면_예전처럼_없다
+모르는_원본의_조치는_종류_Id_종결을_하지_않는다
+보고자는_100자까지
+부품_하나라도_열려_있으면_장비는_열림
+빌더_범위_검사(scope: "operation", contract: V6_3, blocked: True)
+삭제_409_는_거절_예외로_구분된다_재시도형_409_는_일반_실패
+삭제_확인_문구는_조치보고를_함께_지운다고_하지_않는다
+새_연결을_만들면_다시_첫_연결부터_센다
+서버_6_3_에서_운영_범위_저장은_보내기_전에_막고_안내한다
+서버_변경_알림은_열려_있을_때만_다시_읽는다
+억제_202_는_세_종류_생성_모두_억제됨_결과형으로_돌아온다
+연결_패널_저장_억제_202_는_실패_통지_대신_정비_창_안내
+운영_DELETED_와_재조회_404_는_닫기_메시지(action: "DELETED", status: 0)
+운영_DELETED_와_재조회_404_는_닫기_메시지(action: "UPDATED", status: 404)
+운영_UPDATED_는_카드가_있으면_다시_읽어_심각도를_싣는다
+운영_카드와_레일_행은_서버_장비_카테고리를_넘긴다
+운영_항목은_7_0_이상에서만_보인다(contract: V6_3, visible: False)
+원본이_지워진_조치는_원본_모름으로_알린다
+인터페이스로도_구독할_수_있다
+장애_DELETED_는_재조회_없이_닫기_메시지
+장애_UPDATED_재조회_404_는_삭제로_본다
+장애_UPDATED_재조회는_조치_상태와_재분류를_싣는다
+장애_삭제는_같은_번호의_탐지_카드를_건드리지_않고_장애_카드만_닫는다
+장애_카드가_없어도_큐_엔트리를_뺀다
+장애_패널_저장_억제_202_는_실패_통지_대신_정비_창_안내
+재조회_type_event_가_큐와_다르면_재분류_메시지를_REST_추가_호출_없이_낸다(serverType: "ContactOn", expected: True)
+조치_DELETED_는_원본_모름으로_알린다
+조치_UPDATED_는_원본을_다시_읽어_조치_상태를_싣는다
+조치_생성_created_at_은_7_0_미만에서만_실린다(contract: V7_0, sent: False)
+조치_생성_created_at_은_7_0_미만에서만_실린다(contract: V8_0, sent: False)
+첫_연결은_알리지_않고_다시_열릴_때만_1회_알린다
+탐지_패널_삭제_409_는_조치보고_사유를_따로_적는다
+탐지_패널_저장_억제_202_는_실패로_세지_않고_Draft_를_치운다
+함체_밖_장비의_문_사유는_장비_종류로_적는다(reason: "ENCLOSURE_DOOR_CLOSED", category: "controller", expected: "제어기 문 닫힘")
+함체_밖_장비의_문_사유는_장비_종류로_적는다(reason: "ENCLOSURE_DOOR_OPEN", category: "camera", expected: "카메라 문 열림")
+함체_밖_장비의_문_사유는_장비_종류로_적는다(reason: "ENCLOSURE_DOOR_OPEN", category: "speaker", expected: "스피커 문 열림")
+확인은_409_와_400_을_둘_다_이미_확인됨으로_본다(status: BadRequest, body: "{ \"success\": false, \"error\": { \"code\": \"BAD"···, expected: AlreadyAcknowledged)

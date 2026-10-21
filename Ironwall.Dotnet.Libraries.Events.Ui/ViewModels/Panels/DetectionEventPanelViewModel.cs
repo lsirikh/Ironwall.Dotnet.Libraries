@@ -189,7 +189,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
-            Explain = "선택한 이벤트를 정말로 삭제하시겠습니까? 해당이벤트의 조치보고도 함께 삭제 됩니다.",
+            Explain = "선택한 이벤트를 정말로 삭제하시겠습니까? 조치보고가 있는 이벤트는 삭제되지 않습니다 — 조치보고를 먼저 지우세요.",   // 서버는 조치보고가 달린 원본 삭제를 409 로 거절한다(G41, §6.1.6)
             MessageModel = new CallDeleteDetectionEventProcessMessageModel()
         });
     }
@@ -272,6 +272,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             // (EA7) 부분 실패 수집 — 한 건 실패로 전체 중단/무응답 방지. 실패/보류 시 재로드 생략해 편집 보존.
             var saveFailures = new List<string>();
             int held = 0;
+            var suppressed = new List<EventSuppressedException>();   // 202 억제 — 실패 집계와 따로
             int succeeded = 0;
 
             foreach (var vm in updateRows)
@@ -291,6 +292,13 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                 if (model.Device == null || model.Device.Id <= 0) { held++; continue; }   // 장비 미선택 Draft 보류(서버 device_id FK 필수)
                 try { var created = await _providerService.InsertDetectionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; succeeded++; }
                 catch (OperationCanceledException) { throw; }
+                catch (EventSuppressedException sx)
+                {
+                    // 202 억제(G40) — 실패가 아니다. 서버에 저장되지 않으니 Draft 행을 치운다(다음 저장에 다시 보내지 않게).
+                    suppressed.Add(sx);
+                    var draft = ViewModelProvider.FirstOrDefault(v => ReferenceEquals(v.Model, model));
+                    if (draft != null) DispatcherService.Invoke(() => ViewModelProvider.Remove(draft));
+                }
                 catch (Exception ex)
                 {
                     saveFailures.Add("새 이벤트 추가");   // 예외 원문은 아래 로그로만
@@ -300,7 +308,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
             // 저장 대상이 0건이면 그 사실을 알린다 — 종전에는 "저장 성공"과 구별이 안 돼,
             // 편집이 dirty로 잡히지 않은 경우(예: 상세 편집 누락)를 사용자가 감지할 수 없었다.
-            if (saveFailures.Count == 0 && held == 0 && succeeded == 0)
+            if (saveFailures.Count == 0 && held == 0 && succeeded == 0 && suppressed.Count == 0)
             {
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
                 {
@@ -318,6 +326,8 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                     sb.AppendLine($"{saveFailures.Count}건을 저장하지 못했습니다({string.Join(", ", saveFailures.Take(5))}). 고친 내용은 그대로 두었습니다. 잠시 뒤 다시 저장하세요.");
                 if (held > 0)
                     sb.AppendLine($"{held}건은 장비 미선택으로 보류했습니다. 장비를 선택한 뒤 다시 저장하세요.");
+                if (EventSuppressedException.Summarize(suppressed) is { } suppressedText)
+                    sb.AppendLine(suppressedText);
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "이벤트 저장 일부 보류/실패",
@@ -329,7 +339,9 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
                 Title = "이벤트 저장",
-                Explain = $"{succeeded}건을 저장했습니다."
+                Explain = EventSuppressedException.Summarize(suppressed) is { } suppressedOnly
+                    ? (succeeded > 0 ? $"{succeeded}건을 저장했습니다.\n{suppressedOnly}" : suppressedOnly)
+                    : $"{succeeded}건을 저장했습니다."
             });
 
             await DataInitialize().ConfigureAwait(false);

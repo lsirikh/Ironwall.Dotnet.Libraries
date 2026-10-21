@@ -77,7 +77,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                     Content = Contents,
                     FromEventId = Model.Id
                 };
-                var response = await apiService.CreateActionEventAsync(dto, token);
+                var response = await apiService.CreateActionEventAsync(Ironwall.Dotnet.Libraries.Events.Ui.Helpers.ActionReportRules.ApplyCreatedAtPolicy(dto), token);
                 if (!response.Success)
                 {
                     _log?.Error($"[ACTION_REPORT] Malfunction INSERT 실패: {response.Message}");
