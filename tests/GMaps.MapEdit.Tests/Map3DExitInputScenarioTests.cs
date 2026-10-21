@@ -142,6 +142,7 @@ public class Map3DExitInputScenarioTests
     /// <summary>「건물 높이」 판을 여는 3D building 메시지(판 입력칸 초기값은 생성자 대신 채운다).</summary>
     private static void PickBuilding(Rig rig, int id = 7)
     {
+        Map3DEntryScenarioTests.UseEditMode(rig);   // 2026-10-21 — 건물 고르기 · 그리기는 지도 편집 모드에서만
         Scenario.SetField(rig.Vm, "_bhFloorHeightText", "3.0");
         Scenario.SetField(rig.Vm, "_bhFloorsText", "");
         Scenario.SetField(rig.Vm, "_bhHeightText", "");

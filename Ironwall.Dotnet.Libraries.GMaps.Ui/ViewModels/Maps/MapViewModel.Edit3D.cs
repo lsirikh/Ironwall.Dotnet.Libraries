@@ -12,7 +12,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
    Purpose      : 3D 를 떠나지 않고 편집(edit3d-contract, 2026-10-21 사용자 요청 — "3D 에서 수정 들어가면 바로 2D 로 풀린다").
                   「건물 만들기」 · 「꾸미기」 세션을 3D 위에서 연다(_ubIn3D · _decoIn3D) — 판은 같은 판(3D 위 캔버스층), 2D 지도 표면은 붙이지 않는다.
-   Note         : ★ 1단계 = 3D 에서 고르기(userbuilding.pick · building+user_uid · decoration.pick) → 3D 위 판. [2D 에서 윤곽 고치기] 로만 2D.
+   Note         : ★ 0단계 = 지도 편집 모드에서만(2026-10-21 — 꺼짐 = 보기 전용: 고르기 무시 · 고치기 입구 막음, 끄면 열린 판 닫기 = CloseMap3DEditPanelsForViewMode).
+                  ★ 1단계 = 3D 에서 고르기(userbuilding.pick · building+user_uid · decoration.pick) → 3D 위 판. [2D 에서 윤곽 고치기] 로만 2D.
                   ★ 2단계 = 판 도구 단추가 draw.start(점 · 선 · 다각형 · 사각형 · 원) → draw.point · draw.done 으로 받은 점을 기존 PUT 저장.
                     draw.end(3D 에서 Esc) = 도구 내려놓기. 판 닫기 · 판 안 Esc = draw.cancel.
                   ★ 3단계 = 고른 항목에 edit.start → 3D 손잡이 · 키로 고친 edit.commit 을 PUT(편집 기록 1단위). 실패 = edit.revert + 판에 서버 문구 + 목록 다시 받기.
@@ -52,6 +53,31 @@ public partial class MapViewModel
     private bool ShouldEditIn3D => _map3DState == Map3DState.Shown && !Map3DGuide.EditModeLeaves3D(Map3DHost.HostMode);
 
     private bool Edit3DBusy => _ubBusy || _decoBusy;
+
+    /// <summary>편집 모드가 꺼진 채 고치기 입구(건물 그리기 · 꾸미기 · 영역 배지 메뉴)를 눌렀을 때 안내.</summary>
+    public const string EditModeRequiredText = "편집 모드에서 쓸 수 있습니다 — 툴바의 「편집」을 켜세요";
+
+    /// <summary>
+    /// 건물 고르기(숨기기 · 외관 · 높이) · 건물 그리기 · 꾸미기는 지도 편집 모드에서만(2026-10-21 사용자 결정 — 꺼짐 = 보기 전용, 2D · 3D 공통).
+    /// 편집 모드는 지도 편집 권한이 있어야 켜지므로 권한 없는 계정은 여기서 함께 막힌다. 막히면 false(notify 면 안내 한 줄).
+    /// </summary>
+    private bool RequireMapEditMode(bool notify)
+    {
+        if (IsEditModeEnabled) return true;
+        if (notify) SetAimStatus(EditModeRequiredText, autoHide: true);
+        return false;
+    }
+
+    /// <summary>
+    /// 편집 모드를 끈다 → 열린 고치기 판을 닫는다(진행 중 3D 그리기 = draw.cancel · 손잡이 = edit.stop — Exit* 안 EndEdit3D).
+    /// 저장 안 한 값은 2D 편집 모드 끄기와 같게 묻지 않고 버린다(이미지 자르기 판 취소 · 선 그리기 취소와 같은 규칙). 「건물 높이」 미리보기는 원래대로.
+    /// </summary>
+    private void CloseMap3DEditPanelsForViewMode()
+    {
+        CloseBuildingHeightPanel(clearUndo: false);
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("edit-mode-off");
+        if (IsDecorating) ExitDecoration("edit-mode-off");
+    }
 
     private RelayCommand? _edit3DKeyCommand;
     /// <summary>

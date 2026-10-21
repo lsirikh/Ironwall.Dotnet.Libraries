@@ -327,6 +327,13 @@ public class Map3DEntryScenarioTests
             Assert.True(rig.Shown, "나간 뒤 자동 규칙 — 진입 줌에서 다시 들어간다");
         });
 
+    /// <summary>지도 편집 모드로(세터 없이 — 선택 정리 등 부수 효과 없이). 2026-10-21 부터 건물 고르기 · 그리기 · 꾸미기는 편집 모드에서만.</summary>
+    internal static void UseEditMode(Rig rig)
+    {
+        Scenario.SetField(rig.Vm, "_isEditModeEnabled", true);
+        rig.W.Map.SetEditMode(true);
+    }
+
     /// <summary>네이티브 창(WebView2 HWND) 3D 인 것처럼(HostMode "hwnd") — 끄면 "none"(기본 WPF 안 3D 로 열린다).</summary>
     internal static void UseNativeWindowHost(Rig rig, bool on)
         => typeof(Map3DViewHost).GetField("_el", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(rig.Vm.Map3DHost, on ? new System.Windows.Controls.Border() : null);

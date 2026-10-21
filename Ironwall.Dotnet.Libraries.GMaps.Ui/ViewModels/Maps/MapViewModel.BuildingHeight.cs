@@ -18,7 +18,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                   ★ map-3d 가 영역 단위 · 건물 자리로 저장해 다시 굽기에도 유지한다(heights.py). [자동으로 되돌리기] = DELETE.
                   ★ 되돌리기: GIS Ctrl+Z(UndoCommand)는 편집 모드 ∧ 권한에서만 켜지고 지도 편집 기록 몫이다(편집 모드여도 WPF 안 3D 는 머문다, 2026-10-21) →
                     판 안 [되돌리기](Ctrl+Z, 판 포커스) — 이 3D 동안 적용 · 자동으로 되돌리기를 하나씩 거꾸로(3D 를 나가면 비움).
-                  ★ 지도 편집 권한(CanEditMap)이 없으면 보기만(입력 비활성 + 이유 한 줄). 규칙 · 글은 순수 함수 Map3DBuilding(헤드리스 시험).
+                  ★ 지도 편집 모드에서만 판을 연다(꺼짐 = 보기 전용 — 고르기를 무시하고 윤곽을 지운다, 2026-10-21). 지도 편집 권한(CanEditMap)이 없으면 보기만(입력 비활성 + 이유 한 줄). 규칙 · 글은 순수 함수 Map3DBuilding(헤드리스 시험).
    Created On   : 2026-10-19 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetMap3DHeightsProcessMessageModel>,
@@ -174,7 +174,15 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private void OnMap3DBuildingPicked(Map3DBuildingPick pick)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
-        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
+        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid); return; }
+        if (!RequireMapEditMode(notify: false))
+        {
+            // 보기 전용 — 「건물 높이」 판(숨기기 · 외관 · 높이)을 열지 않고, 3D 가 그린 윤곽은 지운다(엔진에 고르기를 끄는 메시지는 없다)
+            _log?.Info($"[Map3D] 건물 고름 — 편집 모드 아님(무시) id={pick.Id}");
+            try { PostBuilding3D(Map3DBuilding.SelectMessageJson(null)); }
+            catch (Exception ex) { _log?.Error($"[Map3D] 건물 윤곽 지우기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
+            return;
+        }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
         if (Map3DHost.HostMode == "hwnd")
         {
             // 네이티브 창 3D 는 WPF 판을 덮는다 — 안 보이는 판이 첫 Esc 를 가로채 3D 를 못 나가게 되므로 열지 않고 알린다(3D 가 그린 윤곽은 지운다)
@@ -425,6 +433,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     /// <summary>「모두 자동으로…」 — 표준 확인 팝업(EventAggregator). "확인" → HandleAsync(CallResetMap3DHeightsProcessMessageModel).</summary>
     private async Task RequestResetMap3DHeightsAsync(Map3DAreaItem item)
     {
+        if (!RequireMapEditMode(notify: true)) return;   // 영역 배지 메뉴도 고치기 입구 — 편집 모드에서만
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         try
         {

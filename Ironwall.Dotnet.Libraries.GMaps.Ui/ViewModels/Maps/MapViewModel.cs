@@ -8696,6 +8696,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     IsSymbolPaletteVisible = false;
                     ExitSymbolPlacementMode();
                     CancelImageCropPanel();   // 열린 「이미지 자르기」 판 = 취소(편집 모드가 꺼진 채 DB 를 고치지 않게)
+                    CloseMap3DEditPanelsForViewMode();   // 건물 높이 · 건물 그리기 · 꾸미기 판도 같은 규칙(꺼짐 = 보기 전용, MapViewModel.Edit3D)
 
                     // 진행 중인 라인/구역/PIDS그룹 드로잉도 취소 — 편집 모드 해제 시
                     // 드로잉 HUD·클릭 라우팅·Cross 커서·VM 상태가 orphan으로 잔존하던 버그 수정.
