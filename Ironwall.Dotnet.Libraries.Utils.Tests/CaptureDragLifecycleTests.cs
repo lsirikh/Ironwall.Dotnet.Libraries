@@ -97,7 +97,7 @@ public class CaptureDragLifecycleTests
         public IReadOnlyList<Adorner> DragAdorners() => Descendants<Adorner>(Window).Where(a => a is DragGhostAdorner or InsertionLineAdorner).ToList();
     }
 
-    [Fact]
+    [RealMouseCaptureFact]
     public void should_clean_up_the_drag_when_the_held_row_is_replaced_while_dragging()
     {
         // 끄는 도중 목록을 다시 채운다(서버 재조회 · [되돌리기] · 탭 전환과 같다) — 잡은 행의 컨테이너가 사라진다.
@@ -156,7 +156,7 @@ public class CaptureDragLifecycleTests
         Assert.Equal(-500, rect.X, 3);
     }
 
-    [Fact]
+    [RealMouseCaptureFact]
     public void should_tell_the_handler_when_released_over_a_zone_that_refuses()
     {
         var calls = OnStage((stage, handle) =>
@@ -190,7 +190,7 @@ public class CaptureDragLifecycleTests
         Assert.Equal("", refused.Item2);
     }
 
-    [Fact]
+    [RealMouseCaptureFact]
     public void should_still_drop_when_the_zone_accepts()
     {
         var dropped = OnStage((stage, handle) =>
@@ -248,7 +248,7 @@ public class CaptureDragLifecycleTests
         Assert.Equal((0, false, 0), (after.Item2, after.Item3, after.Item4));
     }
 
-    [Fact]
+    [RealMouseCaptureFact]
     public void should_finish_once_and_commit_nothing_when_escape_cancels_a_real_thumb_drag()
     {
         // Esc → CancelDrag 가 안쪽에서 DragCompleted(취소)를 두 번 내고, 그 뒤 Esc 처리기가 직접 끝내기를 한 번 더 시도한다.
@@ -286,7 +286,7 @@ public class CaptureDragLifecycleTests
         Assert.Equal(1, dropped);
     }
 
-    [Fact]
+    [RealMouseCaptureFact]
     public void should_release_the_thumb_capture_when_the_drag_finishes_on_its_own()
     {
         // 분리(창이 행동을 떼어 냄)로 스스로 끝낸다 — 손잡이가 끌기 · 캡처를 계속 쥐면 다음 클릭을 먹는다(규칙 ④).
@@ -306,7 +306,7 @@ public class CaptureDragLifecycleTests
         Assert.Equal((0, false, 0), (after.Item4, after.Item5, after.Item6));
     }
 
-    [Fact]
+    [RealMouseCaptureFact]
     public void should_clamp_the_insertion_index_to_the_current_item_count_when_the_list_shrank_before_the_drop()
     {
         // 맨 끝(3) 에 놓으려는 사이 목록이 줄었다(재조회) — 담당이 받는 인덱스는 지금 항목 수를 넘지 않는다.
