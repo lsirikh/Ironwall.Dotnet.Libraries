@@ -39,7 +39,7 @@ check_timeout_min: 20
 - **녹화**: 요청할 때만 — 관제 창(또는 그 모니터)만 길게, `C:\Users\gh\Videos` 에.
 
 <!-- harness:begin -->
-## 하네스 — 에이전트 공통 규칙 (이 블록은 `node harness/cli.js install` 이 관리한다)
+## Pilot(하네스) — 에이전트 공통 규칙 (이 블록은 `node harness/cli.js install` 이 관리한다)
 
 ### 자율
 - 되돌릴 수 있는 일(파일 편집 · 로컬 테스트와 빌드 · 읽기 전용 명령)은 묻지 말고 한다.
