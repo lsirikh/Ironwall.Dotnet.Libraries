@@ -35,6 +35,7 @@ public class RetryableConflictMessageTests
 
     // ── 세션 강제 종료(UserSessionPanelViewModel) ──
 
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData(true, ApiStatusHelper.RetryableConflictMessage)]
     [InlineData(false, "마지막으로 남은 관리자 세션은 종료할 수 없습니다. 다른 관리자가 로그인한 뒤 다시 시도하세요.")]
@@ -53,6 +54,7 @@ public class RetryableConflictMessageTests
 
     // ── 권한 그룹 이름 저장(PermissionMatrixPanelViewModel) ──
 
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData(true, ApiStatusHelper.RetryableConflictMessage)]
     [InlineData(false, "같은 이름의 권한 그룹이 이미 있습니다. 다른 이름을 입력해 주세요.")]

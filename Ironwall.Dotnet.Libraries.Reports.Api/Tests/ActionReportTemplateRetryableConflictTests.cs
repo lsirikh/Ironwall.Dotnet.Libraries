@@ -55,6 +55,7 @@ public class ActionReportTemplateRetryableConflictTests
     private static ActionReportTemplateApiService Service(string json)
         => new(null, new CannedApiService { Status = HttpStatusCode.Conflict, Json = json }, new ApiSetupModel { Url = "http://test/api" });
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public async Task should_say_try_again_when_a_409_is_marked_retryable()
     {
@@ -67,6 +68,7 @@ public class ActionReportTemplateRetryableConflictTests
         Assert.True(ApiStatusHelper.IsRetryableConflict(res.StatusCode, res.Error));
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public async Task should_say_try_again_when_a_patch_409_is_marked_retryable()
     {
@@ -75,6 +77,7 @@ public class ActionReportTemplateRetryableConflictTests
         Assert.Equal(ApiStatusHelper.RetryableConflictMessage, res.Message);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public async Task should_keep_the_duplicate_message_when_a_409_has_no_details()
     {

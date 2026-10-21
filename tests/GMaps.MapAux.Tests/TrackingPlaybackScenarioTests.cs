@@ -206,6 +206,7 @@ public class TrackingPlaybackScenarioTests
         public Task<string?> CheckAvailabilityAsync(CancellationToken ct = default) { AvailabilityChecks++; return Task.FromResult(Unavailable); }
     }
 
+    [Trait("Scenario", "GOP815-G12")]
     [Theory]
     [InlineData("추적 이력을 볼 권한이 없습니다(지도 보기 권한 필요)")]
     [InlineData("일부만 불러왔습니다")]
@@ -219,6 +220,7 @@ public class TrackingPlaybackScenarioTests
         Assert.Equal(notice, vm.Status);   // 예전엔 "해당 기간 데이터 없음"
     });
 
+    [Trait("Scenario", "GOP815-G12")]
     [Fact]
     [Trait("Scenario", "G12")]
     public void should_keep_loaded_points_and_append_partial_notice() => OneSta.StaAsync(async () =>
@@ -231,6 +233,7 @@ public class TrackingPlaybackScenarioTests
         Assert.StartsWith("2점", vm.Status);
     });
 
+    [Trait("Scenario", "GOP815-G13")]
     [Fact]
     [Trait("Scenario", "G13")]
     public void should_not_query_and_say_so_when_tracking_store_is_unavailable_then_check_only_once_after_it_recovers() => OneSta.StaAsync(async () =>

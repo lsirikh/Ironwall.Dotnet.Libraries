@@ -318,6 +318,7 @@ public class AccountConsoleScenarioTests
     }
 
     [Trait("Scenario", "ACC-024")]
+    [Trait("Scenario", "GOP815-G06")]
     [Theory]
     [InlineData("FORCED", "강제 종료")]
     [InlineData("DUPLICATE", "중복 로그인 축출")]

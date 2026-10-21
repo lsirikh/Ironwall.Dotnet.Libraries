@@ -24,6 +24,7 @@ public class ApiErrorCodesVocabularyTests
     /// <summary>서버 어휘가 아닌 상수 — 클라 로컬 의사 코드 2 · 안정 sub-code 1.</summary>
     private static readonly string[] NotServerCodes = { "PARSE_ERROR", "GATEWAY_TIMEOUT", "PDF_FILE_MISSING" };
 
+    [Trait("Scenario", "GOP815-G03")]
     [Fact]
     public void should_declare_exactly_the_22_server_codes_when_spec_is_v8_0_6()
     {
