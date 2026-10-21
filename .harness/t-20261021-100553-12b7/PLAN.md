@@ -20,9 +20,16 @@ edit.* 로 손잡이 옮기기 · 꼭짓점 · 판 단추 폴백 · 실패 시 e
 - [x] tests/GMaps.* 7개 프로젝트 전수(창 띄우는 2 클래스 제외) 통과
 - [x] dotnet test sln(하네스 검사) — 전부 통과
 
-## 남은 일 · 엔진 쪽에 알릴 것
-- 판 단추로 고른 꼭짓점은 GIS 판에만 보인다(뷰어 Tab 고름과 따로) — 맞추려면 edit.start 에 선택 키 추가 계약 필요.
-- 실기(WebView2 + 새 map-3d) 확인은 엔진 작업이 들어온 뒤.
+## 2차(엔진 dac1e69 맞춤, 사용자 추가 지시)
+- [x] draw.done rect/circle = polygon 처럼(이미 그렇게 처리 — 시험 추가)
+- [x] edit.commit Polygon 닫지 않은 고리 · heading 은 소품만(시험 추가)
+- [x] 판 단추 → edit.key(화면 기준 ↑↓←→ · ↺↻ · Tab/Shift+Tab · Delete · ✓ 확정=Enter), GIS 쪽 옮기기 · 꼭짓점 계산 삭제
+- [x] edit.end 받기 → 손잡이 · 고름 끄기(edit.stop 되보내지 않음), 판 안 Esc 는 edit.key Escape 로 넘김
+- [x] 도움말 갱신, Map3DEditTests 26 · TwinContract+Composite 53 통과
+- [x] GMaps.Ui 전수 1767 통과 · sln 검사 = CameraPopup 생존 시험 4건만 실패(이 작업과 무관한 프로세스 재시작 타이밍) → 그 두 클래스만 다시 돌려 14/14 통과
+
+## 남은 일
+- 실기(WebView2 + 새 map-3d) 확인은 엔진 판이 GIS 개발 환경에 들어온 뒤.
 
 ## 결정 · 발견
 - DECISIONS.md 참고.

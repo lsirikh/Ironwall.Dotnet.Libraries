@@ -468,6 +468,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         if (!IsDecorating) return false;
         if (key == Key.Escape)
         {
+            if (_decoIn3D && ForwardEscapeToEdit3D()) return true;   // 3D 손잡이 → 뷰어가 원위치 또는 편집 끝(edit.end)
             if (DecoPoints.Count > 0) { DecoPoints.Clear(); _decoAdorner?.InvalidateVisual(); RefreshDecorationPanel(); }
             else if (_decoTool != null) SetDecorationTool(null);
             else if (_decoSelectedUid != null) SelectDecoration(null);

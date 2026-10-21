@@ -1103,7 +1103,7 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 꾸미기 항목 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
-        if (msg.Type is "draw.point" or "draw.done" or "draw.end" or "edit.commit")
+        if (msg.Type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end")
         {
             try { OnMap3DEditMessage(msg); }   // 3D 안에서 놓기 · 그리기 · 손잡이(MapViewModel.Edit3D)
             catch (Exception ex) { _log?.Error($"[Map3D] 3D 편집 메시지 처리 실패(격리): {ex.Message}"); }

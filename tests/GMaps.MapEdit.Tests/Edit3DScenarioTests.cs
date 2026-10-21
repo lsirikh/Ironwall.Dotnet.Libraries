@@ -107,11 +107,20 @@ public partial class TwinContractScenarioTests
         Assert.Equal(writes, rig.Writes.Count);
         Assert.Equal(Map3DUserBuilding.OutsideText, rig.Vm.UserBuildingError);
 
-        // 3D 에서 끄는 중 Esc = 아무 메시지 없음 → 서버도 3D 도 그대로(판 안 Esc 는 고치기만 닫는다 = edit.stop)
+        // 판 안 Esc = 뷰어에 넘김(edit.key Escape — 고친 게 남았으면 뷰어가 원위치, 메시지 없음 · 서버 무호출)
         Assert.True(rig.Vm.HandleUserBuildingKey(Key.Escape, ModifierKeys.None, false));
-        Assert.Single(rig.Sent("edit.stop"));
+        var esc = rig.Sent("edit.key").Single();
+        Assert.Equal(("Escape", false), (esc.Value<string>("key"), esc.Value<bool>("shift")));
+        Assert.Equal(Uid, rig.Vm.UserBuildingEditingUid);
+        // 아무것도 남지 않은 Esc → 뷰어가 edit.end → 판의 고치기 표시를 끈다(edit.stop 을 되보내지 않는다)
+        rig.From3D(new JObject { ["type"] = "edit.end", ["reason"] = "esc" });
+        Assert.Null(rig.Vm.UserBuildingEditingUid);
+        Assert.False(rig.Vm.IsEdit3DTargetActive);
+        Assert.Empty(rig.Sent("edit.stop"));
         Assert.Equal(writes, rig.Writes.Count);
         Assert.True(rig.Vm.IsUserBuildingDrawing);
+        Assert.True(rig.Vm.HandleUserBuildingKey(Key.Escape, ModifierKeys.None, false));   // 손잡이 없음 — 판의 Esc 단계(edit.key 를 더 보내지 않음)
+        Assert.Single(rig.Sent("edit.key"));
     });
 
     // ─────────────── 2단계 — 직접 그린 건물 3D 에서 그리기 ───────────────
@@ -228,6 +237,10 @@ public partial class TwinContractScenarioTests
         await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid, "고름");
         Assert.Equal(("decoration", Uid), (rig.Sent("edit.start").Last()["target"]!.Value<string>("kind"), rig.Sent("edit.start").Last()["target"]!.Value<string>("uid")));
         Assert.False(rig.Vm.IsEdit3DVertexVisible);                                         // 점 항목 — 꼭짓점 단추 없음
+        Assert.True(rig.Vm.IsEdit3DRotateVisible);                                          // 소품 — ↺↻ = 뷰어 '[' · ']'
+        rig.Vm.Edit3DKeyCommand.Execute("]");
+        Assert.Equal("]", rig.Sent("edit.key").Single().Value<string>("key"));
+        Assert.Empty(rig.Writes);
 
         rig.From3D(Commit("decoration", Uid, "Point", Geo(rig, 3, 4), heading: 375));
         await Rig.Until(() => rig.Writes.Count == 1 && rig.W.Undo.CanUndo, "옮기기 저장");
@@ -256,7 +269,7 @@ public partial class TwinContractScenarioTests
     });
 
     [Fact]
-    public void should_move_wall_and_delete_vertex_with_panel_buttons_keeping_minimum() => RunAsync(async rig =>
+    public void should_forward_panel_buttons_as_viewer_keys_and_save_only_on_commit() => RunAsync(async rig =>
     {
         AddDecoration(rig, Uid, "wall", new JObject { ["type"] = "LineString", ["coordinates"] = new JArray(Geo(rig, 0, 0), Geo(rig, 10, 0), Geo(rig, 20, 0)) },
                       new JObject { ["type"] = "fence", ["height_m"] = 2.0 });
@@ -264,32 +277,34 @@ public partial class TwinContractScenarioTests
         rig.From3D(new JObject { ["type"] = "decoration.pick", ["uid"] = Uid });
         await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid, "고름");
         Assert.True(rig.Vm.IsEdit3DTargetActive && rig.Vm.IsEdit3DVertexVisible);
-        Assert.Equal("꼭짓점 3개 — [다음] 으로 고르세요", rig.Vm.Edit3DVertexText);
-        Assert.False(rig.Vm.DeleteEdit3DVertexCommand.CanExecute(null));
+        Assert.False(rig.Vm.IsEdit3DRotateVisible);                                         // 돌리기는 소품만
 
-        // ↑(북 0.5 m) = 모든 점을 옮겨 저장
-        rig.Vm.MoveEdit3DCommand.Execute("N");
-        await Rig.Until(() => rig.Writes.Count == 1, "옮기기");
-        var c = (JArray)rig.Writes[0].Body!["geometry"]!["coordinates"]!;
-        Assert.Equal(rig.Center.Lat + 0.5 / 110540.0, c[0][1]!.Value<double>(), 6);
-        await Rig.Until(() => rig.Vm.DecorationItems.Single().Points[0].Y > rig.Center.Lat, "목록 갱신");
+        // 판 단추 = 뷰어 키(edit.key) — 미리보기만, 서버 호출 없음
+        foreach (var p in new[] { "ArrowUp", "ArrowLeft", "Tab", "Shift+Tab", "Tab", "Delete", "Enter" }) rig.Vm.Edit3DKeyCommand.Execute(p);
+        var keys = rig.Sent("edit.key");
+        Assert.Equal(new[] { "ArrowUp", "ArrowLeft", "Tab", "Tab", "Tab", "Delete", "Enter" }, keys.Select(k => k.Value<string>("key")));
+        Assert.Equal(new[] { false, false, false, true, false, false, false }, keys.Select(k => k.Value<bool>("shift")));
+        rig.Vm.Edit3DKeyCommand.Execute("Space");                                           // 모르는 키는 보내지 않는다
+        Assert.Equal(7, rig.Sent("edit.key").Count);
+        Assert.Empty(rig.Writes);
 
-        // 다음 ▶ 두 번 = 두 번째 꼭짓점 → 지우기 = 2점 선
-        rig.Vm.StepEdit3DVertexCommand.Execute("1");
-        rig.Vm.StepEdit3DVertexCommand.Execute("1");
-        Assert.Equal("꼭짓점 2 / 3", rig.Vm.Edit3DVertexText);
-        rig.Vm.DeleteEdit3DVertexCommand.Execute(null);
-        await Rig.Until(() => rig.Writes.Count == 2, "꼭짓점 지우기");
-        Assert.Equal(2, ((JArray)rig.Writes[1].Body!["geometry"]!["coordinates"]!).Count);
+        // ✓ 확정(Enter) 뒤 뷰어가 보낸 edit.commit(가운데 꼭짓점 지움 · 화면 기준 옮김) = PUT · 편집 기록 1단위
+        rig.From3D(Commit("decoration", Uid, "LineString", new JArray(Geo(rig, -0.5, 0.5), Geo(rig, 19.5, 0.5))));
+        await Rig.Until(() => rig.Writes.Count == 1 && rig.W.Undo.CanUndo, "확정 저장");
+        Assert.Equal(2, ((JArray)rig.Writes[0].Body!["geometry"]!["coordinates"]!).Count);
+        Assert.Equal(("fence", 2.0), (rig.Writes[0].Body!["props"]!.Value<string>("type"), rig.Writes[0].Body!["props"]!.Value<double>("height_m")));
         await Rig.Until(() => rig.Vm.DecorationItems.Single().Points.Count == 2, "목록 갱신");
-        // 선은 2점 아래로 못 줄인다 — 서버 호출 없이 이유
-        rig.Vm.DeleteEdit3DVertexCommand.Execute(null);
-        Assert.Equal(Map3DEdit.MinVertexText(2), rig.Vm.DecorationError);
-        Assert.Equal(2, rig.Writes.Count);
-        // 되돌리기 한 번 = 꼭짓점 지우기 한 번
+        // 되돌리기 한 번 = 확정 한 번
         rig.Vm.UndoDecorationCommand.Execute(null);
-        await Rig.Until(() => rig.Writes.Count == 3, "되돌리기");
-        Assert.Equal(3, ((JArray)rig.Writes[2].Body!["geometry"]!["coordinates"]!).Count);
+        await Rig.Until(() => rig.Writes.Count == 2, "되돌리기");
+        Assert.Equal(3, ((JArray)rig.Writes[1].Body!["geometry"]!["coordinates"]!).Count);
+
+        // 3D 에서 바뀐 것 없이 Esc → edit.end → 판의 고름이 풀린다
+        rig.From3D(new JObject { ["type"] = "edit.end", ["reason"] = "esc" });
+        Assert.Null(rig.Vm.DecorationSelectedUid);
+        Assert.False(rig.Vm.IsEdit3DTargetActive);
+        Assert.Empty(rig.Sent("edit.stop"));
+        Assert.Equal(JTokenType.Null, rig.Sent("decoration.select").Last()["uid"]!.Type);
     });
 
     [Fact]
@@ -328,9 +343,9 @@ public partial class TwinContractScenarioTests
         rig.Enter3D();
         rig.From3D(new JObject { ["type"] = "decoration.pick", ["uid"] = Uid });
         await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid, "고름");
-        AssertRendered(rig.Vm.DecorationPanel, "DecorationPanelStyle.xaml", "Map.Edit3D.Section", "Map.Edit3D.MoveNorth", "Map.Edit3D.MoveSouth",
-                       "Map.Edit3D.MoveWest", "Map.Edit3D.MoveEast", "Map.Edit3D.VertexText", "Map.Edit3D.VertexPrev", "Map.Edit3D.VertexNext",
-                       "Map.Edit3D.VertexDelete", "Map.Edit3D.To2D");
+        AssertRendered(rig.Vm.DecorationPanel, "DecorationPanelStyle.xaml", "Map.Edit3D.Section", "Map.Edit3D.MoveUp", "Map.Edit3D.MoveDown",
+                       "Map.Edit3D.MoveLeft", "Map.Edit3D.MoveRight", "Map.Edit3D.RotateLeft", "Map.Edit3D.RotateRight", "Map.Edit3D.VertexPrev",
+                       "Map.Edit3D.VertexNext", "Map.Edit3D.VertexDelete", "Map.Edit3D.Confirm", "Map.Edit3D.To2D");
         AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.Edit3D.Section", "Map.Edit3D.To2D", "Map.UserBuilding.Redo");
         var help = Ironwall.Dotnet.Libraries.GMaps.Ui.Help.MapsHelp.Entries.Single(e => e.Key == "Map.Decoration.Panel");
         Assert.NotNull(help);

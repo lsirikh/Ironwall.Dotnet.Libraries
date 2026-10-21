@@ -137,35 +137,38 @@ public class Map3DEditTests
     // ── 판 단추 폴백 ──
 
     [Fact]
-    public void should_move_points_by_meters_on_ground()
+    public void should_build_edit_key_with_engine_key_names_and_shift()
     {
-        var pts = new[] { new UbPoint(127.0, 37.5), new UbPoint(127.001, 37.501) };
-        var north = Map3DEdit.Move(pts, 0, 5);
-        Assert.Equal(5.0 / 110_540.0, north[0].Y - 37.5, 7);
-        Assert.Equal(127.0, north[0].X);
-        var east = Map3DEdit.Move(pts, 0.5, 0);
-        double lat = (37.5 + 37.501) / 2;
-        Assert.Equal(0.5 / (111_320.0 * Math.Cos(lat * Math.PI / 180)), east[1].X - 127.001, 7);
-        Assert.Equal((0.0, 0.5), Map3DEdit.MoveStep("N", shift: false));
-        Assert.Equal((-5.0, 0.0), Map3DEdit.MoveStep("W", shift: true));
-        Assert.Null(Map3DEdit.MoveStep("X", false));
+        Assert.Equal("{\"type\":\"edit.key\",\"key\":\"ArrowUp\",\"shift\":false}", Map3DEdit.EditKeyJson("ArrowUp", false));
+        Assert.Equal("{\"type\":\"edit.key\",\"key\":\"[\",\"shift\":true}", Map3DEdit.EditKeyJson("[", true));
+        Assert.Equal("{\"type\":\"edit.key\",\"key\":\"Tab\",\"shift\":true}", Map3DEdit.EditKeyJson("Shift+Tab", false));   // 이전 꼭짓점
+        foreach (var k in new[] { "ArrowDown", "ArrowLeft", "ArrowRight", "]", "Tab", "Delete", "Enter", "Escape" })
+            Assert.Equal(k, JObject.Parse(Map3DEdit.EditKeyJson(k, false)!).Value<string>("key"));
+        Assert.Null(Map3DEdit.EditKeyJson("Space", false));
+        Assert.Null(Map3DEdit.EditKeyJson(null, false));
+        Assert.Equal((1, 2, 3), (Map3DEdit.MinVertices("Point"), Map3DEdit.MinVertices("LineString"), Map3DEdit.MinVertices("Polygon")));
     }
 
     [Fact]
-    public void should_step_and_remove_vertices_keeping_minimum()
+    public void should_parse_edit_end_reason()
     {
-        Assert.Equal(0, Map3DEdit.StepVertex(-1, 4, 1));
-        Assert.Equal(3, Map3DEdit.StepVertex(-1, 4, -1));
-        Assert.Equal(0, Map3DEdit.StepVertex(3, 4, 1));
-        Assert.Equal(3, Map3DEdit.StepVertex(0, 4, -1));
-        Assert.Equal(-1, Map3DEdit.StepVertex(0, 0, 1));
-        var tri = new[] { new UbPoint(0, 0), new UbPoint(1, 0), new UbPoint(1, 1) };
-        Assert.Null(Map3DEdit.RemoveVertex(tri, 1, Map3DEdit.MinVertices("Polygon")));    // 다각형 최소 3
-        var quad = tri.Append(new UbPoint(0, 1)).ToArray();
-        Assert.Equal(new[] { quad[0], quad[2], quad[3] }, Map3DEdit.RemoveVertex(quad, 1, 3));
-        Assert.Null(Map3DEdit.RemoveVertex(quad, 9, 3));
-        Assert.Equal(2, Map3DEdit.MinVertices("LineString"));
-        Assert.Equal("꼭짓점 2 / 4", Map3DEdit.VertexText(1, 4));
-        Assert.Equal("꼭짓점 4개 — [다음] 으로 고르세요", Map3DEdit.VertexText(-1, 4));
+        var m = Parse(new JObject { ["type"] = "edit.end", ["reason"] = "esc" });
+        Assert.Equal(("edit.end", "esc"), (m!.Type, m.Reason));
+        Assert.Null(Parse(new JObject { ["type"] = "edit.end" })!.Reason);
+    }
+
+    [Fact]
+    public void should_parse_unclosed_polygon_commit_with_rect_and_circle_done_modes()
+    {
+        // 엔진 dac1e69: edit.commit 의 Polygon 고리도 닫지 않은 점 목록 · draw.done 의 rect/circle 은 다각형 점 그대로
+        var ring = new JArray(new JArray(127.0, 37.5), new JArray(127.001, 37.5), new JArray(127.001, 37.501), new JArray(127.0, 37.501));
+        var c = Parse(new JObject
+        {
+            ["type"] = "edit.commit", ["target"] = new JObject { ["kind"] = "userbuilding", ["uid"] = Uid },
+            ["geometry"] = new JObject { ["type"] = "Polygon", ["coordinates"] = new JArray((object)ring) },
+        })!.EditCommit!;
+        Assert.Equal(4, c.Points.Count);
+        var circle = Parse(new JObject { ["type"] = "draw.done", ["mode"] = "circle", ["coordinates"] = ring })!.Draw!;
+        Assert.Equal(("circle", 4), (circle.Mode, circle.Points.Count));
     }
 }

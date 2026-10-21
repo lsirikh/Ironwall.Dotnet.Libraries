@@ -33,7 +33,8 @@
 	</Style>
 
 	<!--  3D 위 편집 칸(2026-10-21, edit3d-contract) — 「건물 만들기」 · 「꾸미기」 판이 3D 위에서 열렸을 때만(IsEdit3DMode).
-	      고른 항목 옮기기(↑↓←→ = 0.5 m · Shift = 5 m) · 꼭짓점 이전/다음/지우기(3D 손잡이 · 방향키와 같은 동작의 단추 폴백) · [2D 에서 윤곽 고치기].
+	      단추는 edit.key 로 뷰어 키보드와 똑같이 동작한다(엔진 dac1e69): 화면 기준 ↑↓←→(0.5 m · Shift = 5 m) · ↺↻(소품 15° · Shift = 1°) ·
+	      꼭짓점 이전/다음/지우기는 미리보기만, [✓ 확정](Enter)에서 저장 · 편집 기록. [2D 에서 윤곽 고치기].
 	      DataContext = MapViewModel(판에서 물려받음). 두 판이 같이 쓴다(동시에 열리지 않는다).  -->
 	<ControlTemplate x:Key="Edit3DSectionTemplate" TargetType="ContentControl">
 		<StackPanel AutomationProperties.AutomationId="Map.Edit3D.Section" Visibility="{Binding IsEdit3DMode, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -42,81 +43,108 @@
 				Margin="0,10,0,8"
 				Background="{DynamicResource DividerBrush}" />
 			<StackPanel Visibility="{Binding IsEdit3DTargetActive, Converter={StaticResource BooleanToVisibilityConverter}}">
-				<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="옮기기 (0.5 m · Shift = 5 m)" />
+				<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="옮기기 (화면 기준 0.5 m · Shift = 5 m)" />
 				<UniformGrid Margin="0,0,0,6" Columns="4">
 					<Button
 						Margin="2"
-						AutomationProperties.AutomationId="Map.Edit3D.MoveNorth"
-						AutomationProperties.Name="북쪽으로 옮기기"
-						Command="{Binding MoveEdit3DCommand}"
-						CommandParameter="N"
+						AutomationProperties.AutomationId="Map.Edit3D.MoveUp"
+						AutomationProperties.Name="앞으로 옮기기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="ArrowUp"
 						Content="↑"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="북쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="화면 안쪽(보는 쪽)으로 0.5 m (Shift = 5 m)" />
 					<Button
 						Margin="2"
-						AutomationProperties.AutomationId="Map.Edit3D.MoveSouth"
-						AutomationProperties.Name="남쪽으로 옮기기"
-						Command="{Binding MoveEdit3DCommand}"
-						CommandParameter="S"
+						AutomationProperties.AutomationId="Map.Edit3D.MoveDown"
+						AutomationProperties.Name="뒤로 옮기기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="ArrowDown"
 						Content="↓"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="남쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="화면 바깥쪽으로 0.5 m (Shift = 5 m)" />
 					<Button
 						Margin="2"
-						AutomationProperties.AutomationId="Map.Edit3D.MoveWest"
-						AutomationProperties.Name="서쪽으로 옮기기"
-						Command="{Binding MoveEdit3DCommand}"
-						CommandParameter="W"
+						AutomationProperties.AutomationId="Map.Edit3D.MoveLeft"
+						AutomationProperties.Name="왼쪽으로 옮기기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="ArrowLeft"
 						Content="←"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="서쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="화면 왼쪽으로 0.5 m (Shift = 5 m)" />
 					<Button
 						Margin="2"
-						AutomationProperties.AutomationId="Map.Edit3D.MoveEast"
-						AutomationProperties.Name="동쪽으로 옮기기"
-						Command="{Binding MoveEdit3DCommand}"
-						CommandParameter="E"
+						AutomationProperties.AutomationId="Map.Edit3D.MoveRight"
+						AutomationProperties.Name="오른쪽으로 옮기기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="ArrowRight"
 						Content="→"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="동쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="화면 오른쪽으로 0.5 m (Shift = 5 m)" />
 				</UniformGrid>
-				<StackPanel Visibility="{Binding IsEdit3DVertexVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-					<TextBlock
-						Margin="0,0,0,4"
-						AutomationProperties.AutomationId="Map.Edit3D.VertexText"
-						FontSize="11"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Text="{Binding Edit3DVertexText}" />
-					<UniformGrid Margin="0,0,0,6" Columns="3">
-						<Button
-							Margin="2"
-							AutomationProperties.AutomationId="Map.Edit3D.VertexPrev"
-							AutomationProperties.Name="이전 꼭짓점"
-							Command="{Binding StepEdit3DVertexCommand}"
-							CommandParameter="-1"
-							Content="◀ 이전"
-							Style="{StaticResource PanelSecondaryButtonStyle}"
-							ToolTip="이전 꼭짓점 고르기" />
-						<Button
-							Margin="2"
-							AutomationProperties.AutomationId="Map.Edit3D.VertexNext"
-							AutomationProperties.Name="다음 꼭짓점"
-							Command="{Binding StepEdit3DVertexCommand}"
-							CommandParameter="1"
-							Content="다음 ▶"
-							Style="{StaticResource PanelSecondaryButtonStyle}"
-							ToolTip="다음 꼭짓점 고르기 (3D 에서 Tab)" />
-						<Button
-							Margin="2"
-							AutomationProperties.AutomationId="Map.Edit3D.VertexDelete"
-							AutomationProperties.Name="고른 꼭짓점 지우기"
-							Command="{Binding DeleteEdit3DVertexCommand}"
-							Content="지우기"
-							Style="{StaticResource PanelSecondaryButtonStyle}"
-							ToolTip="고른 꼭짓점 지우기 (3D 에서 Delete · 되돌리기 가능)" />
-					</UniformGrid>
-				</StackPanel>
+				<UniformGrid
+					Margin="0,0,0,6"
+					Columns="2"
+					Visibility="{Binding IsEdit3DRotateVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.RotateLeft"
+						AutomationProperties.Name="왼쪽으로 돌리기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="["
+						Content="↺"
+						Style="{StaticResource BuildingHeightStepButton}"
+						ToolTip="왼쪽으로 15° (Shift = 1°)" />
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.RotateRight"
+						AutomationProperties.Name="오른쪽으로 돌리기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="]"
+						Content="↻"
+						Style="{StaticResource BuildingHeightStepButton}"
+						ToolTip="오른쪽으로 15° (Shift = 1°)" />
+				</UniformGrid>
+				<UniformGrid
+					Margin="0,0,0,6"
+					Columns="3"
+					Visibility="{Binding IsEdit3DVertexVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.VertexPrev"
+						AutomationProperties.Name="이전 꼭짓점"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="Shift+Tab"
+						Content="◀ 이전"
+						Style="{StaticResource PanelSecondaryButtonStyle}"
+						ToolTip="이전 꼭짓점 고르기 (3D 에서 Shift+Tab)" />
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.VertexNext"
+						AutomationProperties.Name="다음 꼭짓점"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="Tab"
+						Content="다음 ▶"
+						Style="{StaticResource PanelSecondaryButtonStyle}"
+						ToolTip="다음 꼭짓점 고르기 (3D 에서 Tab)" />
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.VertexDelete"
+						AutomationProperties.Name="고른 꼭짓점 지우기"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="Delete"
+						Content="지우기"
+						Style="{StaticResource PanelSecondaryButtonStyle}"
+						ToolTip="고른 꼭짓점 지우기 (3D 에서 Delete — 확정해야 저장)" />
+				</UniformGrid>
+				<Button
+					Margin="0,0,0,6"
+					AutomationProperties.AutomationId="Map.Edit3D.Confirm"
+					Command="{Binding Edit3DKeyCommand}"
+					CommandParameter="Enter"
+					Content="✓ 확정"
+					Style="{StaticResource PanelPrimaryButtonStyle}"
+					ToolTip="옮기기 · 돌리기 · 꼭짓점 고친 것을 저장 (3D 에서 Enter · 되돌리기 가능)" />
 			</StackPanel>
 			<Button
 				AutomationProperties.AutomationId="Map.Edit3D.To2D"

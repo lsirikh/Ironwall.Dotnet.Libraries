@@ -24,17 +24,23 @@
 - why: 계약의 mode 는 point · line · polygon · rect · circle 뿐 — 키 이름 · 값을 바꾸지 말라는 지시. 다각형이면 어떤 모양이든 그릴 수 있다.
 - effect: `Map3DEdit.ModeOf(UbTool)`. 엔진이 삼각형 · 타원을 받게 되면 거기서 값만 바꾼다.
 
-## 5. 판 단추(옮기기 · 꼭짓점)를 어떻게 3D 에 반영할지 — 계약에 "단추 → 뷰어" 메시지가 없음
-- options: (a) 새 메시지를 만들어 뷰어가 옮기게 함 (b) GIS 가 직접 새 모양을 셈해 PUT 저장 → userbuilding.preview / decorations.reload + edit.start 로 손잡이를 다시 세움
-- chosen: (b)
-- why: 계약 메시지를 늘리지 않고, 저장 · 편집 기록 · 실패 처리를 edit.commit 과 같은 길로 탄다(단추 한 번 = 편집 기록 1단위).
-- effect: 판 단추로 고른 꼭짓점 번호는 GIS 판에만 보인다(뷰어의 Tab 고름과 따로). 뷰어와 맞추려면 edit.start 에 선택 키를 더하는 계약 변경이 필요 — 보고에 적음.
+## 5. 판 단추(옮기기 · 돌리기 · 꼭짓점)를 어떻게 3D 에 반영할지 — (엔진 dac1e69 뒤 다시 정함)
+- options: (a) GIS 가 직접 새 모양을 셈해 PUT(처음 판) (b) 엔진이 덧붙인 edit.key 로 뷰어 키보드와 똑같이 보내고, 저장은 [✓ 확정](Enter) 뒤 뷰어의 edit.commit 으로
+- chosen: (b) — `Edit3DKeyCommand` 하나(매개변수 = 키 이름, "Shift+Tab" = 이전 꼭짓점)
+- why: 엔진이 방향키를 정북이 아닌 화면 기준으로 정했고 미리보기 → Enter 확정 흐름이라, GIS 가 따로 셈하면 키보드와 결과가 달라진다. 꼭짓점 고름도 뷰어 한 곳에만 있게 된다(처음 판의 "GIS 판에만 보이는 꼭짓점 번호" 문제가 사라짐).
+- effect: GIS 쪽 미터 옮기기 · 꼭짓점 계산(Map3DEdit.Move · StepVertex · RemoveVertex 등)과 꼭짓점 번호 줄은 지웠다. 판에 [✓ 확정] · 소품용 [↺↻](뷰어 '[' · ']')을 더했다. 판 안 Esc 도 손잡이가 떠 있으면 edit.key Escape 로 넘긴다.
 
-## 6. 소품 돌리기 단추(↺↻)
-- options: (a) 3D 에서는 누를 때마다 바로 저장 (b) 지금처럼 값 칸을 바꾸고 [적용]
-- chosen: (b) 그대로
-- why: 이미 판에 있는 동작을 바꾸지 않는다. 3D 의 원호 손잡이 · 대괄호 키는 edit.commit(heading_deg)로 바로 저장된다.
-- effect: 바꾸려면 `StepDecorationHeadingCommand` 에서 3D 일 때 CommitEdit3DAsync 를 부르면 된다.
+## 6. 소품 값 칸의 ↺↻(방향 값)
+- options: (a) 3D 에서는 값 칸 ↺↻ 도 edit.key 로 (b) 값 칸은 그대로(값 + [적용]), 3D 칸에 따로 ↺↻(edit.key)
+- chosen: (b)
+- why: 기존 값 칸 동작을 바꾸지 않는다. 3D 칸의 ↺↻ 은 뷰어 키보드와 같다.
+- effect: 바꾸려면 `StepDecorationHeadingCommand` 에서 3D 일 때 Edit3DKeyCommand 로 넘기면 된다.
+
+## 9. 엔진의 edit.end(바뀐 것 없이 Esc)를 받았을 때 판을 어떻게 할지
+- options: (a) 손잡이 표시만 끔(고름 유지) (b) 고름까지 풀기(꾸미기 = 목록 고름 해제 · 건물 = 빈 윤곽)
+- chosen: (b)
+- why: 3D 에서 손잡이가 사라졌는데 판만 고른 채로 있으면 판 단추가 대상 없이 남는다. Esc 두 번째 = "편집 끝" 이라는 엔진 뜻과 맞다. edit.stop 은 되보내지 않는다.
+- effect: `OnMap3DEditMessage` 의 edit.end 분기. 고름을 남기려면 거기서 SelectDecoration · ResetUserBuildingDraft 를 빼면 된다.
 
 ## 7. 기존 시나리오 시험 두 건의 "2D 로 바뀐다" 단정
 - options: (a) 그대로 둠(새 동작과 충돌해 실패) (b) 새 계약에 맞춰 "3D 에 머문다" 로 바꿈

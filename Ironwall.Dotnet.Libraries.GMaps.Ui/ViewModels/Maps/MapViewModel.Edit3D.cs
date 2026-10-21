@@ -15,8 +15,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Note         : ★ 1단계 = 3D 에서 고르기(userbuilding.pick · building+user_uid · decoration.pick) → 3D 위 판. [2D 에서 윤곽 고치기] 로만 2D.
                   ★ 2단계 = 판 도구 단추가 draw.start(점 · 선 · 다각형 · 사각형 · 원) → draw.point · draw.done 으로 받은 점을 기존 PUT 저장.
                     draw.end(3D 에서 Esc) = 도구 내려놓기. 판 닫기 · 판 안 Esc = draw.cancel.
-                  ★ 3단계 = 고른 항목에 edit.start → 3D 손잡이로 고친 edit.commit 을 PUT(편집 기록 1단위). 실패 = edit.revert + 판에 서버 문구 + 목록 다시 받기.
-                    3D 의 Esc(끄는 중)는 아무 메시지도 오지 않는다(서버 무호출). 판 단추 폴백 = 옮기기 ↑↓←→(0.5 m · Shift 5 m) · 꼭짓점 이전/다음/지우기.
+                  ★ 3단계 = 고른 항목에 edit.start → 3D 손잡이 · 키로 고친 edit.commit 을 PUT(편집 기록 1단위). 실패 = edit.revert + 판에 서버 문구 + 목록 다시 받기.
+                    3D 의 Esc 는 고친 게 남았으면 원위치(메시지 없음 · 서버 무호출), 없으면 edit.end(→ 판 고름 풀기).
+                    판 단추 = edit.key 로 뷰어 키보드와 같게(화면 기준 ↑↓←→ · ↺↻ · 꼭짓점 이전/다음/지우기 · ✓ 확정 = Enter → edit.commit). 판 안 Esc 도 edit.key 로 넘긴다.
                   ★ 네이티브 창 3D(hwnd)는 WPF 판을 덮으므로 예전대로 2D 에서 고친다. 3D 를 나가면(Leave3D) 3D 세션은 끝난다.
    Created On   : 2026-10-21 · Sensorway Co., Ltd.
  ****************************************************************************/
@@ -27,25 +28,24 @@ public partial class MapViewModel
     private string? _draw3DMode;
     /// <summary>3D 손잡이를 띄운 대상(edit.start) — 없으면 null.</summary>
     private (string Kind, string Uid)? _edit3DTarget;
-    /// <summary>판 단추로 고른 꼭짓점 번호(없으면 null — 생성자 없이 만든 시험 VM 에서도 기본값이 "없음").</summary>
-    private int? _edit3DVertex;
 
     // ── 바인딩 ──
 
     /// <summary>「건물 만들기」 · 「꾸미기」 판이 3D 위에서 열려 있는가(판의 3D 칸 · [2D 에서 윤곽 고치기] 보임).</summary>
     public bool IsEdit3DMode => (_ubIn3D && IsUserBuildingDrawing) || (_decoIn3D && IsDecorating);
+    /// <summary>3D 손잡이가 떠 있는가(판의 옮기기 · 확정 단추 보임).</summary>
     public bool IsEdit3DTargetActive => Edit3DTarget != null;
     public bool IsEdit3DVertexVisible => Edit3DTarget is { } t && t.Geometry != Map3DDecoration.GeoPoint;
-    public string Edit3DVertexText => Edit3DTarget is { } t ? Map3DEdit.VertexText(_edit3DVertex ?? -1, t.Points.Count) : "";
-    /// <summary>판 단추로 고른 꼭짓점(시험 · 계측, 없으면 -1).</summary>
-    public int Edit3DVertex => _edit3DVertex ?? -1;
+    /// <summary>돌리기 단추 — 소품만(엔진은 소품에만 heading_deg 를 붙인다).</summary>
+    public bool IsEdit3DRotateVisible => _decoIn3D && IsEdit3DTargetActive && DecoSelected?.Kind == Map3DDecoration.KindProp;
     /// <summary>지금 켠 3D 그리기 방식(시험 · 계측).</summary>
     public string? Edit3DDrawMode => _draw3DMode;
 
-    /// <summary>판 단추가 다루는 대상 — 3D 에서 고친 직접 그린 건물 · 고른 꾸미기 항목.</summary>
-    private (string Kind, string Uid, string Geometry, IReadOnlyList<UbPoint> Points)? Edit3DTarget
-        => _ubIn3D && IsUserBuildingDrawing && _ubEditing is { } e ? (Map3DEdit.TargetUserBuilding, e.Uid, Map3DDecoration.GeoPolygon, e.Outline)
-         : _decoIn3D && IsDecorating && DecoSelected is { } s ? (Map3DEdit.TargetDecoration, s.Uid, s.Geometry, s.Points)
+    /// <summary>손잡이를 띄운 대상의 도형 — 3D 에서 고친 직접 그린 건물 · 고른 꾸미기 항목.</summary>
+    private (string Kind, string Uid, string Geometry)? Edit3DTarget
+        => _edit3DTarget is null ? null
+         : _ubIn3D && IsUserBuildingDrawing && _ubEditing is { } e ? (Map3DEdit.TargetUserBuilding, e.Uid, Map3DDecoration.GeoPolygon)
+         : _decoIn3D && IsDecorating && DecoSelected is { } s ? (Map3DEdit.TargetDecoration, s.Uid, s.Geometry)
          : null;
 
     /// <summary>3D 에서 고른 것을 3D 에 머문 채 고치는가 — 3D 표시 중이고 WPF 판이 3D 위에 보이는 방식(네이티브 창 3D 아님).</summary>
@@ -53,33 +53,17 @@ public partial class MapViewModel
 
     private bool Edit3DBusy => _ubBusy || _decoBusy;
 
-    private RelayCommand? _moveEdit3DCommand;
-    /// <summary>옮기기 단추(매개변수 "N" · "S" · "E" · "W") — 0.5 m, Shift = 5 m. 누를 때마다 저장(편집 기록 1단위).</summary>
-    public RelayCommand MoveEdit3DCommand => _moveEdit3DCommand ??= new RelayCommand(p =>
+    private RelayCommand? _edit3DKeyCommand;
+    /// <summary>
+    /// 판 단추 → 뷰어 키(edit.key) — 매개변수 = 키 이름(ArrowUp · ArrowDown · ArrowLeft · ArrowRight · [ · ] · Tab · Shift+Tab · Delete · Enter).
+    /// 뷰어 키보드와 똑같다: 방향키 = 화면 기준 0.5 m(Shift = 5 m) · [ ] = 15°(Shift = 1°) · Tab = 다음 꼭짓점 · Delete = 그 꼭짓점 지우기는 미리보기만,
+    /// Enter(✓ 확정)에서 뷰어가 edit.commit 을 보낸다(저장 · 편집 기록은 그 뒤 GIS).
+    /// </summary>
+    public RelayCommand Edit3DKeyCommand => _edit3DKeyCommand ??= new RelayCommand(p =>
     {
-        if (Edit3DTarget is not { } t || Map3DEdit.MoveStep(p?.ToString(), Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) is not { } step) return;
-        _ = CommitEdit3DAsync(new Map3DEditCommit(t.Kind, t.Uid, t.Geometry, Map3DEdit.Move(t.Points, step.East, step.North), null), fromViewer: false);
+        if (Edit3DTarget == null || Map3DEdit.EditKeyJson(p?.ToString(), Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) is not { } json) return;
+        PostEdit3D(json);
     }, _ => IsEdit3DTargetActive && !Edit3DBusy);
-
-    private RelayCommand? _stepEdit3DVertexCommand;
-    /// <summary>꼭짓점 이전 · 다음(매개변수 "-1" · "1").</summary>
-    public RelayCommand StepEdit3DVertexCommand => _stepEdit3DVertexCommand ??= new RelayCommand(p =>
-    {
-        if (Edit3DTarget is not { } t || !int.TryParse(p?.ToString(), out var delta)) return;
-        _edit3DVertex = Map3DEdit.StepVertex(_edit3DVertex ?? -1, t.Points.Count, delta);
-        RefreshEdit3D();
-    }, _ => IsEdit3DVertexVisible);
-
-    private RelayCommand? _deleteEdit3DVertexCommand;
-    /// <summary>고른 꼭짓점 지우기 — 최소 개수(선 2 · 다각형 3)는 지킨다.</summary>
-    public RelayCommand DeleteEdit3DVertexCommand => _deleteEdit3DVertexCommand ??= new RelayCommand(_ =>
-    {
-        if (Edit3DTarget is not { } t || _edit3DVertex is not int i) return;
-        int min = Map3DEdit.MinVertices(t.Geometry);
-        if (Map3DEdit.RemoveVertex(t.Points, i, min) is not { } pts) { SetEdit3DError(Map3DEdit.MinVertexText(min)); return; }
-        _edit3DVertex = Math.Min(i, pts.Count - 1);
-        _ = CommitEdit3DAsync(new Map3DEditCommit(t.Kind, t.Uid, t.Geometry, pts, null), fromViewer: false);
-    }, _ => IsEdit3DVertexVisible && _edit3DVertex != null && !Edit3DBusy);
 
     private RelayCommand? _editIn2DCommand;
     /// <summary>[2D 에서 윤곽 고치기] — 같은 판 · 같은 고름 그대로 2D 지도로 옮긴다(3D 를 나가고, 곧바로 다시 들어가지 않는다).</summary>
@@ -138,14 +122,12 @@ public partial class MapViewModel
     private void StartEdit3D(string kind, string uid)
     {
         CancelDraw3D();
-        if (_edit3DTarget?.Uid != uid) _edit3DVertex = null;
         _edit3DTarget = (kind, uid);
         PostEdit3D(Map3DEdit.EditStartJson(kind, uid));
     }
 
     private void StopEdit3D()
     {
-        _edit3DVertex = null;
         if (_edit3DTarget == null) return;
         _edit3DTarget = null;
         PostEdit3D(Map3DEdit.EditStopJson());
@@ -167,13 +149,23 @@ public partial class MapViewModel
 
     // ── 3D → GIS ──
 
-    /// <summary>draw.point · draw.done · draw.end · edit.commit.</summary>
+    /// <summary>draw.point · draw.done · draw.end · edit.commit · edit.end.</summary>
     private void OnMap3DEditMessage(Map3DMessage msg)
     {
         if (msg.EditCommit is { } c)
         {
             _log?.Info($"[Edit3D] edit.commit {c.Kind} uid={c.Uid} {c.Geometry} 점={c.Points.Count} 방향={c.HeadingDeg?.ToString() ?? "-"}");
-            _ = CommitEdit3DAsync(c, fromViewer: true);
+            _ = CommitEdit3DAsync(c);
+            return;
+        }
+        if (msg.Type == "edit.end")
+        {
+            // 바뀐 것 없이 3D 에서 Esc 로 편집이 끝났다 — 3D 가 이미 손잡이를 내렸다(edit.stop 을 되보내지 않는다). 판의 고름도 푼다
+            _log?.Info($"[Edit3D] 3D 에서 편집 끝 reason={msg.Reason ?? "-"}");
+            if (_edit3DTarget == null) return;
+            _edit3DTarget = null;
+            if (_decoIn3D && IsDecorating) SelectDecoration(null);
+            else if (_ubIn3D && IsUserBuildingDrawing) ResetUserBuildingDraft(null);
             return;
         }
         if (msg.Draw is not { } d) return;
@@ -212,14 +204,14 @@ public partial class MapViewModel
         RefreshUserBuildingPanel();
     }
 
-    /// <summary>3D 손잡이 · 판 단추로 고친 모양 저장. 실패면 3D 손잡이로 고친 것은 원위치(edit.revert).</summary>
-    private async Task CommitEdit3DAsync(Map3DEditCommit c, bool fromViewer)
+    /// <summary>3D 손잡이 · 키(판 단추 포함, Enter 확정)로 고친 모양 저장. 실패면 3D 모양을 원위치(edit.revert).</summary>
+    private async Task CommitEdit3DAsync(Map3DEditCommit c)
     {
         string? job = Edit3DJob;
         bool ok;
         try { ok = c.Kind == Map3DEdit.TargetUserBuilding ? await CommitUserBuildingShapeAsync(c) : await CommitDecorationShapeAsync(c); }
         catch (Exception ex) { _log?.Error($"[Edit3D] 모양 저장 실패(격리): {ex.Message}"); ok = false; }
-        if (ok || !fromViewer || job == null) return;
+        if (ok || job == null) return;
         PostUserBuilding3D(job, Map3DEdit.EditRevertJson(c.Kind, c.Uid));
         _log?.Info($"[Edit3D] edit.revert {c.Kind} uid={c.Uid}");
     }
@@ -271,17 +263,22 @@ public partial class MapViewModel
         return true;
     }
 
-    private void SetEdit3DError(string? error)
+    /// <summary>
+    /// 판 안 Esc 를 GIS 가 먼저 받았을 때 손잡이가 떠 있으면 뷰어에 넘긴다(edit.key Escape) — 고친 게 남았으면 뷰어가 원위치,
+    /// 없으면 뷰어가 편집을 끝내고 edit.end 를 보낸다. 넘겼으면 true.
+    /// </summary>
+    private bool ForwardEscapeToEdit3D()
     {
-        if (_ubIn3D) SetUserBuildingError(error);
-        else SetDecorationError(error);
+        if (Edit3DTarget == null) return false;
+        PostEdit3D(Map3DEdit.EditKeyJson("Escape", false)!);
+        return true;
     }
 
     private void RefreshEdit3D()
     {
-        foreach (var name in new[] { nameof(IsEdit3DMode), nameof(IsEdit3DTargetActive), nameof(IsEdit3DVertexVisible), nameof(Edit3DVertexText) })
+        foreach (var name in new[] { nameof(IsEdit3DMode), nameof(IsEdit3DTargetActive), nameof(IsEdit3DVertexVisible), nameof(IsEdit3DRotateVisible) })
             NotifyOfPropertyChange(name);
-        foreach (var c in new[] { MoveEdit3DCommand, StepEdit3DVertexCommand, DeleteEdit3DVertexCommand, EditIn2DCommand })
+        foreach (var c in new[] { Edit3DKeyCommand, EditIn2DCommand })
             c.RaiseCanExecuteChanged();
     }
 

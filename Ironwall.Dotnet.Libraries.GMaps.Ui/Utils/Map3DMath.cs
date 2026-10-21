@@ -399,7 +399,7 @@ public static class Map3DMath
                 return type == "userbuilding.pick" ? new Map3DMessage(type, null, null, null) { UserUid = uid }
                                                    : new Map3DMessage(type, null, null, null) { DecorationUid = uid };
             }
-            if (type is "draw.point" or "draw.done" or "draw.end" or "edit.commit") return Map3DEdit.Parse(type, o);   // 3D 안에서 편집(2026-10-21)
+            if (type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end") return Map3DEdit.Parse(type, o);   // 3D 안에서 편집(2026-10-21)
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;

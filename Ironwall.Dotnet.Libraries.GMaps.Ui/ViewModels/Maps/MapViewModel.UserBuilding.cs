@@ -604,6 +604,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             if (_ubPanel?.CancelHandleDrag() == true) return true;
             if (_ubIn3D && CancelDraw3D()) { RefreshUserBuildingPanel(); return true; }   // 3D 그리기 → 끄기
+            if (_ubIn3D && ForwardEscapeToEdit3D()) return true;   // 3D 손잡이 → 뷰어가 원위치 또는 편집 끝(edit.end)
             if (d.PointerCancel()) return true;   // 꼭짓점 끄는 중 → 끌기 전으로
             if (ClearUserBuildingSelection()) return true;   // 여러 개 고름 → 고름 풀기(그리기는 그대로)
             if (d.IsClosed && (d.CanUndo || _ubEditing != null)) { ResetUserBuildingDraft(null); return true; }   // 닫은(고치던) 윤곽 → 빈 윤곽
