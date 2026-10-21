@@ -1296,7 +1296,8 @@ public partial class MapViewModel : BasePanelViewModel,
         if (ctrlC && IsMapShortcutContextActive())
         {
             if (e.Key == System.Windows.Input.Key.C) { e.Handled = true; CopySelectionToBuffer(); return; }
-            if (e.Key == System.Windows.Input.Key.V) { e.Handled = true; PasteFromBufferAsync(); return; }
+            // 붙여넣기 자리 = 2D 지도 커서 — 편집 모드로 3D 에 머무는 동안은 2D 커서가 없으니 붙이지 않는다(2026-10-21)
+            if (e.Key == System.Windows.Input.Key.V && !IsMap3DShown) { e.Handled = true; PasteFromBufferAsync(); return; }
             if (e.Key == System.Windows.Input.Key.A) { e.Handled = true; SelectAllForGroup(); return; }
         }
 
@@ -1305,7 +1306,8 @@ public partial class MapViewModel : BasePanelViewModel,
         // Ctrl(+Shift)+arrow belongs to the map control (Ctrl+Left/Right = rotation, Ctrl+Up/Down = tilt FR-08) — never consume it here.
         if ((e.Key is System.Windows.Input.Key.Left or System.Windows.Input.Key.Right
             or System.Windows.Input.Key.Up or System.Windows.Input.Key.Down)
-            && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0)
+            && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0
+            && !IsMap3DShown)   // 2D 화소 단위 이동 — 편집 모드로 3D 에 머무는 동안 방향키는 3D 방향 링 몫(2026-10-21)
         {
             // ★ 동기 판정 — 소비 여부를 먼저 정하고 e.Handled를 await보다 앞에 설정한다.
             //   그래야 이 PreviewKeyDown이 계속 터널링(이중 핸들러 재이동)하거나 WPF 기본 방향 포커스

@@ -307,6 +307,37 @@ public partial class TwinContractScenarioTests
         Assert.Equal(JTokenType.Null, rig.Sent("decoration.select").Last()["uid"]!.Type);
     });
 
+    // 2026-10-21 사용자 요청 — 편집 모드를 켜고 꺼도 3D 를 떠나지 않는다: 3D 위 판 · 손잡이는 그대로, 3D 를 나갈 때만 닫힌다(EndEdit3DSessions)
+    [Fact]
+    public void should_keep_3d_panel_and_handles_when_edit_mode_toggled_and_close_them_only_when_leaving_3d() => RunAsync(async rig =>
+    {
+        rig.AddUserBuilding();
+        rig.Enter3D();
+        rig.From3D(new JObject { ["type"] = "userbuilding.pick", ["uid"] = Uid });
+        await Rig.Until(() => rig.Vm.UserBuildingEditingUid == Uid, "그 건물 고치기");
+        Assert.True(rig.Vm.IsEdit3DTargetActive);
+        foreach (var on in new[] { true, false, true })
+        {
+            rig.Vm.IsEditModeEnabled = on;
+            Assert.Equal("3D", rig.Vm.Map3DStatusText);
+            Assert.True(rig.Vm.IsEdit3DMode, $"편집 모드 {on} — 3D 위 판 그대로");
+            Assert.True(rig.Vm.IsEdit3DTargetActive, $"편집 모드 {on} — 3D 손잡이 그대로");
+            Assert.Equal(Uid, rig.Vm.UserBuildingEditingUid);
+            Assert.False((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
+        }
+        Assert.Empty(rig.Sent("edit.stop"));
+        Assert.Single(rig.Sent("edit.start"));
+
+        rig.Vm.ExitMap3DCommand.Execute(null);                                              // 편집 모드인 채 나가기 → 3D 세션만 닫힌다
+        Assert.NotEqual("3D", rig.Vm.Map3DStatusText);
+        Assert.False(rig.Vm.IsUserBuildingDrawing);
+        Assert.False(rig.Vm.IsEdit3DMode);
+        Assert.False(rig.Vm.IsEdit3DTargetActive);
+        Assert.True(rig.Vm.IsEditModeEnabled, "편집 모드는 그대로");
+        Assert.False((bool)Scenario.Call(rig.Vm, "IsMap3DBlockedByInputMode")!);
+        rig.Vm.IsEditModeEnabled = false;
+    });
+
     [Fact]
     public void should_go_to_2d_only_by_button_and_close_3d_panel_when_leaving_3d() => RunAsync(async rig =>
     {

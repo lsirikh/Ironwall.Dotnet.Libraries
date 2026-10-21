@@ -27,6 +27,7 @@ public partial class MapViewModel
     private string? _groupRotationCenterUtm;
     private PointLatLng? _groupRotationGridPivot;   // MGRS · UTM 을 마지막으로 계산한 중심(같으면 다시 안 함)
     private bool _groupRotationWasPicking;
+    private bool _groupRotationWasOpen;
 
     /// <summary>판이 열려 있는가 = 묶음 회전 세션이 열려 있는가.</summary>
     public bool IsGroupRotationPanelOpen => _groupSelection?.IsRotating == true;
@@ -223,6 +224,13 @@ public partial class MapViewModel
         bool picking = _groupSelection?.IsPickingPivot == true;
         if (_groupRotationWasPicking && !picking) IsAimStatusVisible = false;   // 고르기 끝(골랐거나 그만) → 안내 띠 내림
         _groupRotationWasPicking = picking;
+        // 회전 미리보기 · 중심 손잡이 · 「지도에서 고르기」는 2D 지도 몫 — 편집 모드로 3D 에 머물다 (「회전」 · ] [ 로) 열리면 2D 로, 끝나면 게이트 다시 판정(MapViewModel.Map3D)
+        bool rotating = IsGroupRotationPanelOpen;
+        if (rotating != _groupRotationWasOpen)
+        {
+            _groupRotationWasOpen = rotating;
+            SyncMap3DWithInputModes();
+        }
 
         NotifyOfPropertyChange(nameof(IsGroupRotationPanelOpen));
         NotifyOfPropertyChange(nameof(GroupRotationSummary));

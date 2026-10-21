@@ -1011,7 +1011,7 @@ public class Map3DCompositeScenarioTests
     // ─────────────── 24. 편집 모드 + 판 + 다시 들어가기 ───────────────
 
     [Fact]
-    public void should_reopen_fresh_height_panel_after_edit_mode_cycle_and_button_reentry_when_manual()
+    public void should_reopen_fresh_height_panel_after_edit_mode_cycle_on_native_window_and_button_reentry_when_manual()
         => Run(rig =>
         {
             rig.R.Areas(rig.R.AreaAround(A));
@@ -1022,6 +1022,7 @@ public class Map3DCompositeScenarioTests
             rig.Posts.Clear();
             try
             {
+                SetHostElement(rig, new Border());   // 2026-10-21 — 편집 모드가 3D 를 접는 것은 네이티브 창 3D 뿐(WPF 안 3D 는 머문다)
                 rig.Vm.IsEditModeEnabled = true;
                 Assert.False(rig.R.Shown);
                 Assert.False(rig.Vm.IsBuildingHeightPanelOpen);
@@ -1033,6 +1034,7 @@ public class Map3DCompositeScenarioTests
             finally
             {
                 rig.Vm.IsEditModeEnabled = false;
+                SetHostElement(rig, null);
                 Mouse.OverrideCursor = null;
             }
             rig.R.Gate(); rig.R.Tick();

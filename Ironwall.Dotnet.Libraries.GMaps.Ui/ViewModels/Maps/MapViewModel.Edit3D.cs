@@ -49,7 +49,7 @@ public partial class MapViewModel
          : null;
 
     /// <summary>3D 에서 고른 것을 3D 에 머문 채 고치는가 — 3D 표시 중이고 WPF 판이 3D 위에 보이는 방식(네이티브 창 3D 아님).</summary>
-    private bool ShouldEditIn3D => _map3DState == Map3DState.Shown && Map3DHost.HostMode != "hwnd";
+    private bool ShouldEditIn3D => _map3DState == Map3DState.Shown && !Map3DGuide.EditModeLeaves3D(Map3DHost.HostMode);
 
     private bool Edit3DBusy => _ubBusy || _decoBusy;
 

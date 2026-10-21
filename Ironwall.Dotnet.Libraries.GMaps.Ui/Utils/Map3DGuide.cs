@@ -269,6 +269,14 @@ public static class Map3DGuide
     /// </summary>
     public static bool ShouldLeave3DForWindow(string hostMode) => hostMode != "composition";
 
+    /// <summary>
+    /// 지도 편집 모드가 3D 를 접게 하는가(2026-10-21 사용자 요청 — "편집 모드가 돼도 굳이 3D 모드를 떠날 필요가 없어").
+    /// 편집 스트립 · 속성 창 · 레이어 판은 WPF 라 WPF 안 3D(composition) 위에 그대로 보이므로 머문다. 네이티브 창 3D(hwnd)는 그 판들을 덮으므로
+    /// 예전대로 2D 로 간다. "none"(아직 안 만듦)은 기본 방식(composition)으로 열리고, 열다가 네이티브 창으로 바뀌면 HostFallback 이 3D 를 접은 뒤
+    /// 이 판정이 다시 막는다 — 그래서 ShouldLeave3DForWindow 와 달리 "hwnd" 일 때만 true(Edit3D 의 ShouldEditIn3D 와 같은 갈래).
+    /// </summary>
+    public static bool EditModeLeaves3D(string hostMode) => hostMode == "hwnd";
+
     /// <summary>Esc 로 3D 를 나가는가 — WPF 안 3D(composition)는 「나가기」 단추로만, 네이티브 창 3D 는 그 창이 단추를 가려 Esc 를 남긴다.</summary>
     public static bool EscExitsMap3D(string hostMode) => hostMode == "hwnd";
 

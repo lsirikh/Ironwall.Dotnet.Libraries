@@ -1180,10 +1180,13 @@ public partial class MapViewModel
 
     // ── 입력 모드 충돌(1단계) ──
 
-    /// <summary>편집 모드 · 독점 입력 모드 중인가 — 이때는 3D 에 들어가지 않는다(3D 위 판으로 연 「건물 만들기」 · 「꾸미기」는 3D 에 머문다 — MapViewModel.Edit3D).</summary>
+    /// <summary>
+    /// 독점 입력 모드(2D 캔버스 · 어도너가 꼭 필요한 도구) 중인가 — 이때는 3D 에 들어가지 않는다(3D 위 판으로 연 「건물 만들기」 · 「꾸미기」는 3D 에 머문다 — MapViewModel.Edit3D).
+    /// 편집 모드 자체는 네이티브 창 3D(hwnd)에서만 막는다 — WPF 안 3D 는 편집 스트립 · 속성 창이 3D 위에 보인다(Map3DGuide.EditModeLeaves3D, 2026-10-21).
+    /// </summary>
     private bool IsMap3DBlockedByInputMode()
-        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled,
-               ExclusiveInputModeGate.IsActive(MainMap) || (IsUserBuildingDrawing && !_ubIn3D) || (IsDecorating && !_decoIn3D));
+        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled && Map3DGuide.EditModeLeaves3D(Map3DHost.HostMode),
+               ExclusiveInputModeGate.IsActive(MainMap) || IsGroupRotationPanelOpen || (IsUserBuildingDrawing && !_ubIn3D) || (IsDecorating && !_decoIn3D));
 
     /// <summary>
     /// 입력 모드가 켜지거나 꺼진 직후 호출 — 모드 중이면 3D 를 접고(표시 중이면 3D 마지막 카메라를 2D 에 적용),
@@ -1244,7 +1247,7 @@ public partial class MapViewModel
     // ── 3D 클릭(3단계) ──
 
     /// <summary>
-    /// 3D pick → 지도 마커 클릭 경로. 편집 모드에서는 3D 가 열리지 않으므로 운영 모드 동작만 한다.
+    /// 3D pick → 지도 마커 클릭 경로. 편집 모드(WPF 안 3D 에서만 머문다)면 클릭 = 편집 선택(속성 창) — 2D 클릭과 같은 OnMapMarkerClicked.
     /// 화면 좌표(3D 화면 DIP)는 지도 컨트롤 좌표로 바꿔 우클릭 메뉴 · 조립 카드에 쓴다.
     /// </summary>
     /// <summary>

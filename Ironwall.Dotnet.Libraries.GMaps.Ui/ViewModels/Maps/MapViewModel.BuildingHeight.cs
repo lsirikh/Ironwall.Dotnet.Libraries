@@ -16,7 +16,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Note         : ★ 판에서 바꾸면 3D 가 그 건물만 즉시 미리보기(building.preview — 다시 굽지 않고 세로로 늘임). [취소] · 닫기 · Esc · 다른 건물 고르기 ·
                     3D 나가기 = 미리보기를 원래대로. [적용] = map-3d 에 저장(PUT …/buildings/{id}/height) → 3D 에 저장된 줄(building.commit).
                   ★ map-3d 가 영역 단위 · 건물 자리로 저장해 다시 굽기에도 유지한다(heights.py). [자동으로 되돌리기] = DELETE.
-                  ★ 되돌리기: GIS Ctrl+Z(UndoCommand)는 편집 모드 ∧ 권한에서만 켜지고 3D 는 편집 모드에서 열리지 않는다 →
+                  ★ 되돌리기: GIS Ctrl+Z(UndoCommand)는 편집 모드 ∧ 권한에서만 켜지고 지도 편집 기록 몫이다(편집 모드여도 WPF 안 3D 는 머문다, 2026-10-21) →
                     판 안 [되돌리기](Ctrl+Z, 판 포커스) — 이 3D 동안 적용 · 자동으로 되돌리기를 하나씩 거꾸로(3D 를 나가면 비움).
                   ★ 지도 편집 권한(CanEditMap)이 없으면 보기만(입력 비활성 + 이유 한 줄). 규칙 · 글은 순수 함수 Map3DBuilding(헤드리스 시험).
    Created On   : 2026-10-19 · Sensorway Co., Ltd.
