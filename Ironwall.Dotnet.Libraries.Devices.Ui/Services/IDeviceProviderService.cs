@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -74,6 +74,17 @@ public interface IDeviceProviderService : IService
     Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default);
 
     /// <summary>
+    /// <see cref="FetchDeviceByIdAsync"/> 와 같은 재조회지만 결말을 돌려준다 — 서버 404(<see cref="ProviderFetchStatus.NotFound"/>)를
+    /// 다른 실패(<see cref="ProviderFetchStatus.Failed"/>)와 가른다(GOP API 8.0.15 대조 G39). 404 여도 캐시는 지우지 않는다.
+    /// </summary>
+    /// <remarks>기본 구현은 옛 메서드 결과만 본다(가짜 구현 · 다른 구현을 깨지 않으려고) — <c>null</c> 이면 실패로 적는다.</remarks>
+    async Task<ProviderFetchResult<IBaseDeviceModel>> TryFetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
+    {
+        var device = await FetchDeviceByIdAsync(typeDevice, resourceId, token).ConfigureAwait(false);
+        return device != null ? ProviderFetchResult<IBaseDeviceModel>.Updated(device) : ProviderFetchResult<IBaseDeviceModel>.Failed();
+    }
+
+    /// <summary>
     /// Device를 Provider 캐시에서 제거합니다.
     /// NatsSync SYNC_DEVICE action="DELETED" 수신 시 호출됩니다.
     /// </summary>
@@ -86,6 +97,16 @@ public interface IDeviceProviderService : IService
     /// NatsSync SYNC_DEVICE_GROUP action="CREATED" / "UPDATED" 수신 시 호출됩니다.
     /// </summary>
     Task FetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default);
+
+    /// <summary>
+    /// <see cref="FetchDeviceGroupByIdAsync"/> 와 같은 재조회지만 결말을 돌려준다 — 404 를 다른 실패와 가른다(G39).
+    /// </summary>
+    /// <remarks>기본 구현은 결말을 알 수 없어 실패(<c>NOT_SUPPORTED</c>)로 적는다 — 실제 구현(<see cref="DeviceProviderService"/>)이 덮어쓴다.</remarks>
+    async Task<ProviderFetchResult<IDeviceGroupModel>> TryFetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default)
+    {
+        await FetchDeviceGroupByIdAsync(resourceId, token).ConfigureAwait(false);
+        return ProviderFetchResult<IDeviceGroupModel>.Failed(errorCode: "NOT_SUPPORTED");
+    }
 
     /// <summary>
     /// DeviceGroup을 DeviceGroupProvider 캐시에서 제거합니다.

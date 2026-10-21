@@ -80,12 +80,12 @@ public static class EventWindowPlanning
 
     /// <summary>
     /// 카메라 장비 + 배선 → 타일 계약. 제공자는 설정(ONVIF · RTSP 주소), 계정은 장비 값.
-    /// PTZ 는 장비 종류(<see cref="EnumCameraType.PTZ"/>)로 정하고, 권한은 부르는 쪽이 준다(없으면 PTZ 메뉴 비활성, FR-14).
+    /// PTZ 는 <see cref="CameraDriveKind.IsPtzDrive"/>(장비 종류 <see cref="EnumCameraType.PTZ"/> 또는 형태 코드 PTZ/SPEED_DOME)로 정하고, 권한은 부르는 쪽이 준다(없으면 PTZ 메뉴 비활성, FR-14).
     /// 프리셋 토큰은 서버 <c>preset_index</c> 를 그대로 문자열로 쓴다(ONVIF 토큰 = 번호인 카메라 기준 — 실기 확인 필요).
     /// </summary>
     public static EventWindowCamera BuildCamera(ICameraDeviceModel camera, MappingCameraEntry entry, CameraPopupSettings settings, bool ptzAllowed)
     {
-        var isPtz = camera.Category == EnumCameraType.PTZ;
+        var isPtz = CameraDriveKind.IsPtzDrive(camera);   // SPEED_DOME(Category=NONE) 포함 — G14
         var target = isPtz && entry.TargetPresetIndex is int t && t >= 0 ? t.ToString(CultureInfo.InvariantCulture) : null;
         var home = isPtz && entry.HomePresetIndex is int h && h >= 0 ? h.ToString(CultureInfo.InvariantCulture) : null;
         return new EventWindowCamera

@@ -1,9 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 
@@ -29,7 +31,20 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
         _log = log;
         _natsService = natsService;
     }
+
+    /// <summary>
+    /// REST 일괄 초깃값(G24)을 함께 쓰는 생성자 — 장비 API 가 등록돼 있으면 Autofac 이 인자가 더 많은 이쪽을 고른다
+    /// (GMapUiModule 의 RegisterType 그대로, 배선 변경 없음).
+    /// </summary>
+    public EnclosureMetricsNatsSyncService(ILogService? log, INatsService natsService, IDeviceApiService deviceApi)
+        : this(log, natsService)
+    {
+        _deviceApi = deviceApi;
+    }
     #endregion
+
+    /// <summary>받은 시각을 정하는 시계 — 시험이 가짜 시계를 끼운다(기본 지금 시각).</summary>
+    internal Func<DateTime> Clock { get; set; } = () => DateTime.Now;
 
     public event System.Action<EnclosureMetricsReading>? MetricsReceived;
 
@@ -48,7 +63,48 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
         _started = true;
         _natsService.NatsSubscribeEventAsync += OnNatsAsync;
         _log?.Info($"{nameof(EnclosureMetricsNatsSyncService)} started — ENCLOSURE_METRICS 구독 등록");
+        // 기동 때 1회 REST 로 빈칸을 채운다(다음 주기 발행까지 최대 10초 '받지 못함' 방지). 기다리지 않는다.
+        _ = RefreshFromServerAsync(token);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// <c>GET /api/enclosure-metrics</c> 1회로 함체별 최신 계측을 채운다(G24). 기동 때 부르고, 재연결 뒤 다시 부를 수 있다.
+    /// <c>latest_metrics: null</c> 은 건너뛰고, 이미 든 값보다 오래된 값은 덮지 않는다. 404(이 경로가 없는 서버)는 조용히 넘긴다.
+    /// </summary>
+    /// <returns>새로 채운 함체 수.</returns>
+    public async Task<int> RefreshFromServerAsync(CancellationToken token = default)
+    {
+        if (_deviceApi == null) return 0;
+        try
+        {
+            var resp = await _deviceApi.GetAllEnclosureLatestMetricsAsync(token).ConfigureAwait(false);
+            if (resp == null || resp.StatusCode == 404) return 0;   // 이 경로가 없는 서버 — NATS 만으로 동작
+            if (!resp.Success)
+            {
+                _log?.Warning($"[함체 계측] 일괄 조회 실패 — 상태 {resp.StatusCode} {resp.Error?.Code}(NATS 만으로 동작)");
+                return 0;
+            }
+
+            var filled = 0;
+            var receivedAt = Clock();
+            foreach (var entry in resp.Data ?? new())
+            {
+                if (FromDto(entry, receivedAt) is not { } reading) continue;   // latest_metrics:null — 계측 없음
+                // 기동 직후 NATS 로 이미 더 새 값을 받았으면 덮지 않는다.
+                if (_latest.TryGetValue(reading.EnclosureId, out var held) && held.MeasuredAt >= reading.MeasuredAt) continue;
+                _latest[reading.EnclosureId] = reading;
+                filled++;
+                MetricsReceived?.Invoke(reading);
+            }
+            _log?.Info($"[함체 계측] 일괄 조회로 {filled}대 채움");
+            return filled;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[함체 계측] 일괄 조회 오류(NATS 만으로 동작): {ex.Message}");
+            return 0;
+        }
     }
 
     public Task StopAsync(CancellationToken token = default)
@@ -69,8 +125,14 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
             ApplyAlerts(e.Data);
             if (e.Subject?.Contains(EnclosureMetricsPayload.SubjectSuffix) != true) return Task.CompletedTask;
 
-            var reading = EnclosureMetricsPayload.TryParse(e.Data, DateTime.Now);
+            var reading = EnclosureMetricsPayload.TryParse(e.Data, Clock());
             if (reading == null) return Task.CompletedTask;
+
+            // 새 측정이 없으면 서버가 같은 행(같은 id · observed_at)을 주기마다 다시 보낸다(브로커 §6.6 재발행).
+            // 같은 행이면 처음 받은 것을 그대로 두고 알리지도 않는다 — 잰 시각 기준으로 '오래된 값' 이 된다.
+            if (reading.MetricId is { } rowId
+                && _latest.TryGetValue(reading.EnclosureId, out var held) && held.MetricId == rowId)
+                return Task.CompletedTask;
 
             // 10초마다 함체마다 오므로 로그는 남기지 않는다(로그 폭증 방지).
             _latest[reading.EnclosureId] = reading;
@@ -109,11 +171,35 @@ public class EnclosureMetricsNatsSyncService : IEnclosureMetricsNatsSyncService
             }
         }
     }
+
+    /// <summary>
+    /// REST 최신 계측 한 줄 → 계측(브로커 §6.6 과 같은 항목). <c>latest_metrics</c> 가 없으면 null.
+    /// 잰 시각은 observed_at → measured_at → created_at(<see cref="EnclosureMetricDto.ObservedAtEffective"/>).
+    /// </summary>
+    internal static EnclosureMetricsReading? FromDto(EnclosureLatestMetricsDto? entry, DateTime receivedAt)
+    {
+        if (entry?.LatestMetrics is not { } m) return null;
+        var enclosureId = entry.EnclosureId > 0 ? entry.EnclosureId : m.EnclosureId;
+        if (enclosureId <= 0) return null;
+        return new EnclosureMetricsReading(
+            enclosureId,
+            m.TemperatureValue,
+            m.HumidityValue,
+            m.VoltageValue,
+            m.CurrentValue,
+            m.Vibration,
+            m.UpsBatteryLevel,
+            m.UpsCharging,
+            receivedAt,
+            MetricId: m.Id > 0 ? m.Id : null,
+            ObservedAt: EnclosureMetricsPayload.ParseTime(m.ObservedAtEffective));
+    }
     #endregion
 
     #region - Attributes -
     private readonly ILogService? _log;
     private readonly INatsService _natsService;
+    private readonly IDeviceApiService? _deviceApi;
     private readonly ConcurrentDictionary<int, EnclosureMetricsReading> _latest = new();
     private readonly ConcurrentDictionary<int, EnclosureAlert> _alerts = new();   // 운영 이벤트 id → 경고
     private bool _started;

@@ -17,7 +17,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// <summary>
 /// 장비 배정 창의 차분 계산 — 순수 함수라 창도 서버도 없이 돈다.
 /// 정본: window-layout-system-storyboard.html #h-dlg L1436 · all-windows-drag-wireframe.html L392-396 · L424.
-/// 서버 계약: app/schemas/device_group.py:78(넣기 상한 없음) · :108(빼기 max_length=100).
+/// 서버 계약: 넣기 · 빼기 모두 device_ids 1~100개(명세 §5.6 · app/schemas/device_group.py:108).
 /// </summary>
 public class AssignDeltaTests
 {
@@ -104,24 +104,25 @@ public class AssignDeltaTests
     }
 
     [Fact]
-    public void should_not_chunk_the_assign_leg_because_the_server_has_no_cap()
+    public void should_chunk_the_assign_leg_by_a_hundred_like_the_remove_leg()
     {
-        // 넣기 상한은 없다(device_group.py:78) — 250대도 한 번이다.
+        // 넣기도 device_ids 1~100개다(명세 §5.6 그룹 할당 "일괄 해제와 같은 상한" — GOP API 8.0.15 대조 G31).
+        //   예전 기대값(250대도 한 번)은 "넣기 상한 없음"이라는 틀린 전제였다 — 250대는 세 번이다.
         var plan = AssignDelta.Plan(10, Array.Empty<int>(), Enumerable.Range(1, 250));
 
         Assert.Equal(250, plan.Added.Count);
-        Assert.Equal(1, plan.CallCount);
+        Assert.Equal(3, plan.CallCount);
     }
 
     [Fact]
     public void should_count_both_legs_when_the_set_is_large()
     {
-        // 넣기 250(1회) + 빼기 250(3회)
+        // 넣기 250(3회) + 빼기 250(3회) — 넣기도 100 단위(G31)
         var plan = AssignDelta.Plan(10, Enumerable.Range(1, 500), Enumerable.Range(251, 500));
 
         Assert.Equal(250, plan.Added.Count);
         Assert.Equal(250, plan.Removed.Count);
-        Assert.Equal(4, plan.CallCount);
+        Assert.Equal(6, plan.CallCount);
     }
 
     [Fact]

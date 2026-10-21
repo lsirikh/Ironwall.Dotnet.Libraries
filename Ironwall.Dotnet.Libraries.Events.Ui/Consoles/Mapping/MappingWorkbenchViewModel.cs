@@ -31,7 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 서버로 나가는 것은 [적용] 한 번뿐이다. 서버에 재정렬 API 가 없어서
 /// 드롭마다 보내면 20행 재배치가 20회 PATCH 가 되고 API 타임아웃이 곱해진다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler, IHandle<EventMappingsChangedMessage>, IHandle<CameraPresetsChangedMessage>
+public sealed partial class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler, IHandle<EventMappingsChangedMessage>, IHandle<CameraPresetsChangedMessage>
 {
     /// <summary>콘솔 키 — 자동화 식별자와 설정 저장의 접두사.</summary>
     public const string ConsoleKeyName = "Mapping";
@@ -743,6 +743,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
 
         NotifyOfPropertyChange(nameof(BoardRows));
         UpdateCameraEditor();
+        UpdateSpeakerEditor();
         RaiseCommandStates();
     }
 
@@ -947,12 +948,14 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         NotifyOfPropertyChange(nameof(CanSaveMapping));
         NotifyOfPropertyChange(nameof(CanEditCameraRow));
         NotifyOfPropertyChange(nameof(CanManagePresets));
+        NotifyOfPropertyChange(nameof(CanEditSpeakerRow));
     }
 
     /// <summary>보드 선택이 바뀌었다(뷰가 알려 준다).</summary>
     public void OnSelectionChanged()
     {
         UpdateCameraEditor();
+        UpdateSpeakerEditor();
         RaiseCommandStates();
     }
     #endregion
@@ -1511,6 +1514,8 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
             // 서버 원문은 화면에 내지 않는다 — 진단용으로만 남긴다.
             foreach (var raw in outcome.RawFailureDetails)
                 System.Diagnostics.Trace.WriteLine($"[MappingWorkbench] apply item failed: {raw}");
+            foreach (var note in outcome.Diagnostics)
+                System.Diagnostics.Trace.WriteLine($"[MappingWorkbench] apply note: {note}");
 
             StatusText = outcome.ToMessage();
         }

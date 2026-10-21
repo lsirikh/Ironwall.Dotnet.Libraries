@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json.Linq;
 using System;
@@ -27,6 +28,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
 public sealed record DeviceAxisWriteResult(int SentCount, int FailedCount, string Message)
 {
     public bool IsSuccess => SentCount > 0 && FailedCount == 0;
+
+    /// <summary>
+    /// 저장은 됐지만 서버가 남긴 경고(이 장비에 없는 측정 항목 · 방송 서버 미지정)의 쉬운 말 — 없으면 <c>null</c>
+    /// (GOP API 8.0.15 대조 G17). <see cref="Message"/> 끝에도 이미 붙어 있다.
+    /// </summary>
+    public string? WarningText { get; init; }
 }
 
 /// <summary>
@@ -67,6 +74,7 @@ public sealed class DeviceAxisWriter
         var labels = string.Join(", ", edits.Select(e => e.Spec.Label).Distinct());
         var sent = 0;
         var failed = 0;
+        var warnings = new List<ResponseWarningDto>();
         foreach (var device in devices)
         {
             token.ThrowIfCancellationRequested();
@@ -90,7 +98,12 @@ public sealed class DeviceAxisWriter
             try
             {
                 var response = await _api.PatchDeviceAxesAsync(path, device.Id, body, token).ConfigureAwait(false);
-                if (response?.Success == true) { sent++; continue; }
+                if (response?.Success == true)
+                {
+                    sent++;
+                    if (response.Warnings != null) warnings.AddRange(response.Warnings);   // G17 — 저장 성공 응답의 경고
+                    continue;
+                }
                 failed++;
                 _log?.Warning($"[{nameof(DeviceAxisWriter)}] 장비 {device.Id} 저장 거부 — {response?.Error?.Code} {response?.Error?.Message ?? response?.Message}");
             }
@@ -107,7 +120,10 @@ public sealed class DeviceAxisWriter
             : sent == 0
                 ? $"{labels} 값을 저장하지 못했습니다. 값을 확인한 뒤 다시 [적용]하세요."
                 : $"{sent}대는 저장했고 {failed}대는 저장하지 못했습니다. 값을 확인한 뒤 다시 [적용]하세요.";
-        return new DeviceAxisWriteResult(sent, failed, message);
+        // (G17) 여러 대가 같은 경고를 내도 한 번만 — 해석기가 같은 종류를 한 줄로 묶는다.
+        var warningText = SaveWarnings.ToText(SaveWarnings.Collect(warnings));
+        if (warningText != null) message = $"{message} {warningText}";
+        return new DeviceAxisWriteResult(sent, failed, message) { WarningText = warningText };
     }
 
     private readonly IDeviceApiService _api;

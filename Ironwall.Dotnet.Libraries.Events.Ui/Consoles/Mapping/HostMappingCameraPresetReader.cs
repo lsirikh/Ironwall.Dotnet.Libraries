@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.CameraPopup.EventWindows;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
 using Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -82,7 +83,8 @@ public sealed class HostMappingCameraPresetReader : IMappingCameraPresetReader
             var camera = _directory.FindCamera(cameraId);
             if (camera is null)
                 return Fail("장비 목록에서 이 카메라를 찾지 못해 카메라 프리셋을 읽을 수 없습니다.");
-            if (camera.Category != EnumCameraType.PTZ)
+            // 형태 코드 SPEED_DOME(Category=NONE)도 PTZ 다(GOP API 8.0.15 대조 G14).
+            if (!CameraDriveKind.IsPtzDrive(camera))
                 return Fail("PTZ 카메라가 아니라 카메라 프리셋이 없습니다.");
 
             var control = _control();

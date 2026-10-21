@@ -48,11 +48,13 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
     private readonly IEventAggregator? _events;
     private readonly IMappingCameraPresetReader? _cameraPresets;
     private readonly IMappingCameraVideo? _cameraVideo;
+    private readonly IMappingFileGroupSource? _fileGroups;
 
     /// <summary>생성자.</summary>
     /// <param name="events">있으면 열린 창이 서버 <c>SYNC_EVENT_MAPPING</c>(<see cref="Ironwall.Dotnet.Libraries.ViewModel.Models.EventMappingsChangedMessage"/>)으로 목록을 다시 읽는다.</param>
     /// <param name="cameraPresets">있으면 프리셋 관리 창이 카메라 ONVIF 프리셋을 함께 읽는다.</param>
     /// <param name="cameraVideo">있으면 프리셋 관리 · ROI 설정 창에 카메라 실시간 영상을 보인다.</param>
+    /// <param name="deviceApi">있으면 스피커 연동 칸이 음원 그룹 목록(<c>GET /api/file-groups</c>)을 콤보로 보인다. 없으면 번호 입력.</param>
     public MappingWorkbenchLauncher(
         IWindowManager windows,
         IMappingWorkbenchGateway gateway,
@@ -62,8 +64,10 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         ILogService? log = null,
         IEventAggregator? events = null,
         IMappingCameraPresetReader? cameraPresets = null,
-        IMappingCameraVideo? cameraVideo = null)
+        IMappingCameraVideo? cameraVideo = null,
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.IDeviceApiService? deviceApi = null)
     {
+        _fileGroups = deviceApi is null ? null : new DeviceApiMappingFileGroupSource(deviceApi, log);
         _cameraPresets = cameraPresets;
         _cameraVideo = cameraVideo;
         _windows = windows;
@@ -102,6 +106,7 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
                 ShowRoiEditor = editor => _windows.ShowDialogAsync(editor, null, RoiEditorSettings()),
                 CameraPresetReader = _cameraPresets,
                 CameraVideo = _cameraVideo,
+                FileGroupSource = _fileGroups,
             };
             await _windows.ShowDialogAsync(model, null, WindowSettings());
         }

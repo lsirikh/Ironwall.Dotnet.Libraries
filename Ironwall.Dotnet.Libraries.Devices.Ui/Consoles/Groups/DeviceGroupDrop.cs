@@ -77,7 +77,7 @@ public static class DeviceGroupDrop
 }
 
 /// <summary>
-/// 그룹 칩 드롭존의 처리기. 그룹 하나에 <b>호출 한 번</b>(배치 엔드포인트) — 장비 수만큼 부르지 않는다.
+/// 그룹 칩 드롭존의 처리기. 그룹 하나에 <b>100대마다 호출 한 번</b>(배치 엔드포인트) — 장비 수만큼 부르지 않는다.
 /// </summary>
 /// <remarks>
 /// 실패하면 로컬 모델을 건드리지 않는다(서버가 실제로 넣었다고 답한 Id 만 반영). 되돌리기는 방금 넣은 것만 일괄 제거 한 번.
@@ -127,20 +127,38 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         IsBusy = true;
         try
         {
-            var response = await _api.AssignDevicesToGroupAsync(groupId, new DeviceGroupAssignRequestDto { DeviceIds = plan.DeviceIds.ToList() }, token).ConfigureAwait(true);
-            if (!response.Success)
-                // 오류 봉투에서는 Message 가 비고 까닭은 Error 에 있다 — 예전엔 "넣지 못했다 — " 로 끝나 사람이 까닭을 몰랐다
-                // (라이브 하네스 dl.2c: 부대 범위 밖 장비 422 "그룹의 부대(1) 또는 그 예하 부대의 장비만 …" 이 사라졌다).
-                return Finish($"'{groupName}'에 넣지 못했습니다 — {ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 받지 않았습니다")}", null);
+            // 넣기도 서버가 한 번에 100대까지만 받는다(명세 §5.6 그룹 할당 device_ids 1~100개 · G31) — 넘기면 422 로 한 대도 안 들어간다.
+            //   빼기(UndoAsync)와 같은 크기로 나눠 보내고, 된 묶음만 반영한다.
+            var assigned = new List<int>();
+            var skipped = new List<int>();
+            var notSent = 0;
+            string? failure = null;
+            foreach (var chunk in AssignDelta.ChunkAssigns(plan.DeviceIds))
+            {
+                var response = await _api.AssignDevicesToGroupAsync(groupId, new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() }, token).ConfigureAwait(true);
+                if (!response.Success)
+                {
+                    // 오류 봉투에서는 Message 가 비고 까닭은 Error 에 있다 — 예전엔 "넣지 못했다 — " 로 끝나 사람이 까닭을 몰랐다
+                    // (라이브 하네스 dl.2c: 부대 범위 밖 장비 422 "그룹의 부대(1) 또는 그 예하 부대의 장비만 …" 이 사라졌다).
+                    failure ??= ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 받지 않았습니다");
+                    notSent += chunk.Count;
+                    continue;
+                }
+                // 서버가 실제로 넣었다고 답한 것만 로컬에 반영한다(응답에 없으면 보낸 것 전부).
+                assigned.AddRange(response.Data?.AssignedDeviceIds ?? chunk.ToList());
+                skipped.AddRange(response.Data?.SkippedDeviceIds ?? new List<int>());
+            }
 
-            // 서버가 실제로 넣었다고 답한 것만 로컬에 반영한다(응답에 없으면 보낸 것 전부).
-            var assigned = response.Data?.AssignedDeviceIds ?? plan.DeviceIds.ToList();
-            var skipped = response.Data?.SkippedDeviceIds ?? new List<int>();
+            if (assigned.Count == 0 && skipped.Count == 0 && failure != null)
+                return Finish($"'{groupName}'에 넣지 못했습니다 — {failure}", null);
+
             Reflect(groupId, assigned, add: true);
             if (assigned.Count > 0) await AnnounceAsync(groupId).ConfigureAwait(true);
 
             var undo = assigned.Count > 0 ? new GroupDropUndo(groupId, groupName, assigned.ToList()) : null;
-            return Finish(DeviceGroupDrop.ResultLine(groupName, plan, assigned, skipped), undo, groupId, assigned.ToList(), assigned.Count);
+            var line = DeviceGroupDrop.ResultLine(groupName, plan, assigned, skipped);
+            if (failure != null) line += $" · {notSent}대는 넣지 못했습니다 — {failure}";
+            return Finish(line, undo, groupId, assigned.ToList(), assigned.Count);
         }
         catch (OperationCanceledException) { return Finish("그룹 넣기를 취소했습니다.", null); }
         catch (Exception ex)

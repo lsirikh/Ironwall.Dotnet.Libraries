@@ -46,6 +46,24 @@ public class EnclosureMetricDto : BaseDto
     [JsonProperty("observed_at", Order = 11, NullValueHandling = NullValueHandling.Ignore)]
     public string? ObservedAt { get; set; }
 
+    /// <summary>
+    /// 측정 시각 — NATS <c>ENCLOSURE_METRICS</c> 본문의 키(브로커 명세). REST 응답에는 없고 <c>observed_at</c> 이 그 자리다.
+    /// <b>읽기 전용</b> — 쓰기 본문에는 싣지 않는다(REST 쓰기 스키마에 없는 키라 422).
+    /// </summary>
+    [JsonProperty("measured_at", Order = 12, NullValueHandling = NullValueHandling.Ignore)]
+    public string? MeasuredAt { get; set; }
+
+    public bool ShouldSerializeMeasuredAt() => false;
+
+    /// <summary>
+    /// 저장 응답(7.0+)의 임계 초과 판정 — <c>data.threshold_exceeded[]</c>(<c>{field, value, threshold, direction, severity}</c>, 명세 §5.5.9).
+    /// <b>읽기 전용</b> — 쓰기 본문에는 싣지 않는다.
+    /// </summary>
+    [JsonProperty("threshold_exceeded", Order = 13, NullValueHandling = NullValueHandling.Ignore)]
+    public List<ThresholdExceededItemDto>? ThresholdExceeded { get; set; }
+
+    public bool ShouldSerializeThresholdExceeded() => false;
+
     #region - 서버 계약 세대 분기 (FR-09 · A-devices D-23) -
     /// <summary>
     /// 7.0 이상의 <c>EnclosureMetricCreate</c> 스키마로 직렬화할지 여부. <c>false</c>(기본)면 6.3 본문 그대로.
@@ -146,7 +164,9 @@ public class EnclosureMetricDto : BaseDto
     /// </remarks>
     [JsonIgnore]
     public string? ObservedAtEffective
-        => string.IsNullOrWhiteSpace(ObservedAt) ? CreatedAt : ObservedAt;
+        => !string.IsNullOrWhiteSpace(ObservedAt) ? ObservedAt
+         : !string.IsNullOrWhiteSpace(MeasuredAt) ? MeasuredAt
+         : CreatedAt;
 
     /// <summary>수치 문자열을 InvariantCulture 로만 파싱한다(실패·공백은 <c>null</c>).</summary>
     private static double? ParseNumber(string? text)

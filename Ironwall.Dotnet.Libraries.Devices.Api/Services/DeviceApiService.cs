@@ -106,7 +106,25 @@ public class DeviceApiService : IDeviceApiService
         dto.UseAxisWrite = IsAxisContract;
         if (!IsUnitScopedContract) dto.UnitId = null;
         if (IsAxisContract) LinkVersionToFirmware(dto);
+        // 함체 안 장비(device_ids)는 8.0.6 부터의 키다 — 그 전 서버에는 싣지 않는다(모르는 키는 422).
+        if (dto is EnclosureDeviceDto enclosure) enclosure.UseEnclosureContents = IsEnclosureContentsContract;
         return dto;
+    }
+
+    /// <summary>함체 안 장비(<c>device_ids</c> · <c>contents</c> · <c>?device_id=</c> 역조회)가 있는 첫 서버 판본(명세 §5.5.6.1).</summary>
+    private static readonly Version EnclosureContentsSince = new(8, 0, 6);
+
+    /// <summary>함체 안 장비 계약(8.0.6 이상)인가. 세대(<see cref="Contract"/>)는 8.0 까지만 가르므로 판본 원문을 순서 비교한다.</summary>
+    private bool IsEnclosureContentsContract => IsUnitScopedContract && IsAtLeastVersion(_contractProbe?.RawVersion, EnclosureContentsSince);
+
+    /// <summary>판본 원문(<c>"8.0.11"</c> · <c>"v8.0.10-rc1"</c>)의 앞 숫자 부분이 <paramref name="since"/> 이상인가. 못 읽으면 <c>false</c>(안전한 쪽).</summary>
+    /// <remarks><c>Devices.Ui</c> <c>DeviceQueryPolicy.IsAtLeast</c> 와 같은 규칙이다.</remarks>
+    internal static bool IsAtLeastVersion(string? raw, Version since)
+    {
+        var text = raw?.Trim().TrimStart('v', 'V') ?? string.Empty;
+        var end = 0;
+        while (end < text.Length && (char.IsDigit(text[end]) || text[end] == '.')) end++;
+        return Version.TryParse(text[..end].TrimEnd('.'), out var version) && version >= since;
     }
 
     /// <summary>
@@ -1071,15 +1089,67 @@ public class DeviceApiService : IDeviceApiService
     #endregion
 
     #region - Camera Preset API -
+    /// <summary>프리셋 쪽 순회 상한 — 100건 × 50쪽(5,000건). 서버가 끝을 알려 주지 않을 때 무한 순회를 막는다.</summary>
+    private const int PRESET_PAGE_GUARD = 50;
 
+    /// <summary>봉투의 <c>pagination.total_pages</c> 를 읽는다(없거나 <c>null</c> 이면 <c>null</c>). 본문은 버퍼에 올려 두어 다시 읽을 수 있다.</summary>
+    private static async Task<int?> ReadTotalPagesAsync(System.Net.Http.HttpResponseMessage response)
+    {
+        try
+        {
+            await response.Content.LoadIntoBufferAsync();
+            var text = await response.Content.ReadAsStringAsync();
+            if (Newtonsoft.Json.Linq.JToken.Parse(text) is not Newtonsoft.Json.Linq.JObject root) return null;
+            var token = root["pagination"]?["total_pages"];
+            return token != null && token.Type == Newtonsoft.Json.Linq.JTokenType.Integer ? (int?)(long)token : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 카메라 프리셋 <b>전부</b> — 쪽마다 <c>limit=100</c> 으로 묻고 끝 쪽까지 모아 한 응답으로 돌려준다(8.0.15 대조 G21).
+    /// </summary>
+    /// <remarks>
+    /// <para>서버 기본 <c>limit</c> 은 <b>10</b>(명세 §5.7.1)이라 종전처럼 한 번만 물으면 11번째 프리셋부터 조용히 사라졌다.</para>
+    /// <para>끝 판정: 봉투 <c>pagination.total_pages</c> → 없으면 <c>data.total</c>(모은 건수가 닿을 때까지) → 둘 다 없으면 빈 쪽까지.
+    /// 쪽이 비거나 상한(<see cref="PRESET_PAGE_GUARD"/>)에 닿으면 멈춘다. 중간 쪽이 실패하면 그 실패를 그대로 돌려준다.</para>
+    /// </remarks>
     public async Task<ApiResponse<PresetListDataDto>> GetPresetsAsync(int cameraId, bool includeRois = false, CancellationToken token = default)
     {
         try
         {
-            var parameters = new Dictionary<string, string>();
-            if (includeRois) parameters.Add("include_rois", "true");
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets", parameters);
-            return await response.ToApiResponseAsync<PresetListDataDto>();
+            ApiResponse<PresetListDataDto>? first = null;
+            var items = new List<CameraPresetDto>();
+            for (var page = 1; page <= PRESET_PAGE_GUARD; page++)
+            {
+                var parameters = new Dictionary<string, string>();
+                if (includeRois) parameters.Add("include_rois", "true");
+                parameters["page"] = page.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                parameters["limit"] = LIMIT_MAX.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+                var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets", parameters);
+                var totalPages = await ReadTotalPagesAsync(response);
+                var result = await response.ToApiResponseAsync<PresetListDataDto>();
+                if (!result.Success) return result;
+
+                first ??= result;
+                var got = result.Data?.Items ?? new List<CameraPresetDto>();
+                items.AddRange(got);
+
+                if (got.Count == 0) break;
+                if (totalPages.HasValue) { if (page >= totalPages.Value) break; }
+                else if (result.Data != null && result.Data.Total > 0 && items.Count >= result.Data.Total) break;
+                if (page == PRESET_PAGE_GUARD)
+                    _log?.Warning($"[{nameof(GetPresetsAsync)}] camera={cameraId} 쪽 상한({PRESET_PAGE_GUARD})에 닿아 멈췄습니다 — {items.Count}건까지만 모았습니다.");
+            }
+
+            first!.Data ??= new PresetListDataDto();
+            first.Data.Items = items;
+            if (first.Data.Total < items.Count) first.Data.Total = items.Count;
+            return first;
         }
         catch (Exception ex)
         {
@@ -1285,7 +1355,19 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/rois/{roiId}/points", dto);
-            return await response.ToApiResponseAsync<PointListDataDto>();
+            // 응답 data 는 {roi_id, points, total} — 목록 모양(items)이 아니다(명세 §5.9.3, 8.0.15 대조 G26).
+            var result = await response.ToApiResponseAsync<PointReplaceResultDto>();
+            return new ApiResponse<PointListDataDto>
+            {
+                Success = result.Success,
+                Message = result.Message,
+                Data = result.Data,
+                Error = result.Error,
+                Meta = result.Meta,
+                Warnings = result.Warnings,
+                StatusCode = result.StatusCode,
+                RawData = result.RawData,
+            };
         }
         catch (Exception ex)
         {
@@ -1546,6 +1628,56 @@ public class DeviceApiService : IDeviceApiService
             return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete enclosure {id}", ex.Message);
         }
     }
+
+    /// <summary><inheritdoc cref="IDeviceApiService.GetEnclosuresAsync(int, CancellationToken)" path="/summary"/></summary>
+    public async Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(int deviceId, CancellationToken token = default)
+    {
+        // 옛 서버는 device_id 를 모르는 쿼리로 무시하고 전체 함체를 돌려준다 — 묻지 않는다.
+        if (!IsEnclosureContentsContract)
+            return AxisEndpointUnavailableList<EnclosureDeviceDto>(
+                "GET /api/devices/enclosures?device_id=",
+                "서버 8.0.6 이상에서만 '이 장비를 담은 함체' 를 물을 수 있습니다.");
+
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                ["device_id"] = deviceId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            };
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/enclosures", parameters);
+            return await response.ToApiListResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEnclosuresAsync)}(deviceId)] Error: {ex.Message}");
+            return ApiListResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to get enclosures containing device {deviceId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - FileGroup API (§5.10) -
+    /// <summary><inheritdoc cref="IDeviceApiService.GetFileGroupsAsync" path="/summary"/></summary>
+    public async Task<ApiListResponse<FileGroupDto>> GetFileGroupsAsync(
+        int? serverId = null, int page = 1, int limit = 100, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                ["page"] = Math.Max(1, page).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["limit"] = ClampLimit(limit, nameof(GetFileGroupsAsync)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            };
+            if (serverId.HasValue) parameters["server_id"] = serverId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/file-groups", parameters);
+            return await response.ToApiListResponseAsync<FileGroupDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetFileGroupsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<FileGroupDto>.CreateError("INTERNAL_ERROR", "Failed to get file groups", ex.Message);
+        }
+    }
     #endregion
 
     #region - Gate Device API (통문, 서버 v6.3) -
@@ -1566,7 +1698,11 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var parameters = new Dictionary<string, string>();
-            if (!string.IsNullOrEmpty(gateStatus)) parameters.Add("gate_status", gateStatus);
+            // 7.0+ 는 gate_status 질의가 없다(문 위치는 부품 관측) — 실으면 422 이거나 무시돼 "걸렀는데 전건" 이 된다. 싣지 않고 남긴다.
+            if (!string.IsNullOrEmpty(gateStatus) && IsAxisContract)
+                _log?.Warning($"[{nameof(GetGatesAsync)}] contract={Contract} 에는 gate_status 필터가 없다 — 전송 생략(전체 통문을 돌려받는다). " +
+                    $"value=\"{gateStatus}\" 대체: GetDevicesByComponentAsync(componentType: \"DOOR_ACTUATOR\", state: …, deviceType: \"gates\")");
+            else if (!string.IsNullOrEmpty(gateStatus)) parameters.Add("gate_status", gateStatus);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());     // 서버 ge=1 — 0 은 VALIDATION_ERROR(2026-09-08 실측)
             parameters.Add("limit", ClampLimit(limit, nameof(GetGatesAsync)).ToString());
@@ -2184,6 +2320,21 @@ public class DeviceApiService : IDeviceApiService
         {
             _log?.Error($"[{nameof(GetEnclosureMetricLatestAsync)}] Error: {ex.Message}");
             return ApiResponse<EnclosureMetricDto>.CreateError("INTERNAL_ERROR", "Failed to get latest enclosure metric", ex.Message);
+        }
+    }
+
+    /// <summary><inheritdoc cref="IDeviceApiService.GetAllEnclosureLatestMetricsAsync" path="/summary"/></summary>
+    public async Task<ApiListResponse<EnclosureLatestMetricsDto>> GetAllEnclosureLatestMetricsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/enclosure-metrics");
+            return await response.ToApiListResponseAsync<EnclosureLatestMetricsDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetAllEnclosureLatestMetricsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EnclosureLatestMetricsDto>.CreateError("INTERNAL_ERROR", "Failed to get latest metrics of all enclosures", ex.Message);
         }
     }
 
