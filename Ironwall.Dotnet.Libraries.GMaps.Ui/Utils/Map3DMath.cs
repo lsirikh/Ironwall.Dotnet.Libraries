@@ -63,6 +63,12 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>env.state 일 때 3D 의 해 · 차 · 사람 상태(env3d-contract C, <see cref="Map3DEnvironment"/>).</summary>
     public Map3DEnvState? EnvState { get; init; }
+
+    /// <summary>draw.point · draw.done · draw.end 일 때 3D 에서 그린 것(edit3d-contract 2단계, <see cref="Map3DEdit"/>).</summary>
+    public Map3DDrawEvent? Draw { get; init; }
+
+    /// <summary>edit.commit 일 때 3D 손잡이로 고친 도형(edit3d-contract 3단계).</summary>
+    public Map3DEditCommit? EditCommit { get; init; }
 }
 
 /// <summary>
@@ -398,6 +404,7 @@ public static class Map3DMath
                 return type == "userbuilding.pick" ? new Map3DMessage(type, null, null, null) { UserUid = uid }
                                                    : new Map3DMessage(type, null, null, null) { DecorationUid = uid };
             }
+            if (type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end") return Map3DEdit.Parse(type, o);   // 3D 안에서 편집(2026-10-21)
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;

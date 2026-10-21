@@ -107,6 +107,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DUserBuilding.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DLook.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DDecoration.cs" />
+    <!-- 3D 안에서 편집(draw.* · edit.* 메시지 · 판 단추 계산) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DEdit.cs" />
     <!-- 3D 화면 위 GIS 창 자리(overlay.watch · overlay.screen · 팝업 오프셋) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\Map3DScreen.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Map3D\Map3DClient.cs" />
