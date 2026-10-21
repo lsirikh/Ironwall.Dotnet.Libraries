@@ -30,6 +30,17 @@ public class Map3DExitInputScenarioTests
 
     // ─────────────── 장치 ───────────────
 
+    /// <summary>
+    /// <see cref="Map3DEntryScenarioTests.Run"/> 과 같되 숨은 데스크톱에서 — 휠 단정(줌 반 단계)은 Shift 가 안 눌렸다는 전제다
+    /// (제품은 Shift+휠 = 지도 회전 — 시험 스레드에 Shift 를 얹으면 휠 단정이 "17.5 ≠ 17" 로 깨진다). 2026-10-21 저녁 사용자가 입력하던 무렵 Nothing · BuildingPanel 2건이 0.2초 사이에 실패했다.
+    /// </summary>
+    private static void Run(string mode, Action<Rig> body) => Scenario.StaOnHiddenDesktop(() =>
+    {
+        var rig = new Rig(mode);
+        body(rig);
+        rig.Done();
+    });
+
     private static List<string> CaptureInfo(Rig rig)
     {
         var lines = new List<string>();
@@ -145,7 +156,7 @@ public class Map3DExitInputScenarioTests
     [InlineData(Map3DModel.EntryManual)]
     [InlineData(Map3DModel.EntryAuto)]
     public void should_accept_wheel_drag_click_when_exited_after_rotating_and_zooming_in_3d(string mode)
-        => Map3DEntryScenarioTests.Run(mode, rig =>
+        => Run(mode, rig =>
         {
             Enter(rig);
             // 앱 로그 17:40:14~23 — 3D 에서 돌리고(66°) 줌이 바뀌며 2D 가 따라간다
@@ -168,7 +179,7 @@ public class Map3DExitInputScenarioTests
     [InlineData(During.BuildingPanel)]
     [InlineData(During.BuildingPanelThenCancel)]
     public void should_restore_2d_input_when_exited_with_panel_or_window_opened_in_3d(During during)
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             Scenario.SetField(rig.Vm, "_map3DBuildingPost", (Action<string>)(_ => { }));
             Enter(rig);
@@ -193,7 +204,7 @@ public class Map3DExitInputScenarioTests
     /// </summary>
     [Fact]
     public void should_restore_2d_input_and_close_panel_when_3d_send_throws_while_exiting()
-        => Scenario.Sta(() =>
+        => Scenario.StaOnHiddenDesktop(() =>
         {
             var rig = new Rig(Map3DModel.EntryManual);
             Scenario.SetField(rig.Vm, "_map3DBuildingPost", (Action<string>)(_ => { }));
@@ -225,7 +236,7 @@ public class Map3DExitInputScenarioTests
     [InlineData(Exit.HostFallback)]
     [InlineData(Exit.EventFlyTo)]
     public void should_restore_2d_input_whichever_way_3d_is_left(Exit exit)
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             Enter(rig);
             Camera3D(rig, 40, 17.2);
@@ -254,7 +265,7 @@ public class Map3DExitInputScenarioTests
 
     [Fact]
     public void should_keep_2d_blocked_by_esc_and_restore_only_by_exit_button_when_3d_shown_in_wpf()
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             Enter(rig);
             Assert.False(rig.PressEsc(), "WPF 안 3D 는 ESC 로 나가지 않는다(「나가기」 단추로만)");
@@ -270,7 +281,7 @@ public class Map3DExitInputScenarioTests
 
     [Fact]
     public void should_restore_2d_input_when_other_code_changed_it_or_3d_revealed_twice_during_3d()
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             Enter(rig);
             rig.W.Map.IsHitTestVisible = true;    // 3D 중 다른 코드가 바꿈
@@ -283,7 +294,7 @@ public class Map3DExitInputScenarioTests
 
     [Fact]
     public void should_restore_2d_input_every_time_when_entered_and_exited_many_times()
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             for (int i = 0; i < 5; i++)
             {
@@ -307,7 +318,7 @@ public class Map3DExitInputScenarioTests
     [InlineData(Stuck.RubberBand)]
     [InlineData(Stuck.LinePress)]
     public void should_clear_stuck_gesture_and_accept_input_when_exited_after_release_was_missed_in_3d(Stuck stuck)
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             var warnings = new List<string>();
             rig.W.Log.Setup(l => l.Warning(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
@@ -331,7 +342,7 @@ public class Map3DExitInputScenarioTests
 
     [Fact]
     public void should_log_2d_input_state_now_and_when_idle_after_exit()
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             var infos = CaptureInfo(rig);
             Enter(rig);
@@ -349,7 +360,7 @@ public class Map3DExitInputScenarioTests
 
     [Fact]
     public void should_name_blocking_state_in_log_when_2d_input_is_still_blocked_after_exit()
-        => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
+        => Run(Map3DModel.EntryManual, rig =>
         {
             var infos = CaptureInfo(rig);
             Enter(rig);
