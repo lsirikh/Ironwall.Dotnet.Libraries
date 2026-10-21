@@ -100,7 +100,7 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
                                          // 이 영역을 다시 만드는 중이면 「만들기 취소」(진행 판 단추와 같은 동작)
                                          _isMap3DBaking && _map3DBakeJob != null && scene.Id == _map3DBakeSourceId ? area => _ = CancelMap3DBakeAsync() : null,
                                          // 직접 그린 건물(MapViewModel.UserBuilding) — 「건물 그리기」 · 「직접 그린 건물 n개 — 모두 지우기…」
-                                         StartUserBuildingDraw, area => _ = RequestClearUserBuildingsAsync(area));
+                                         area => StartUserBuildingDraw(area), area => _ = RequestClearUserBuildingsAsync(area));
             int index = Map3DAreas.ToList().FindIndex(a => a.Id == scene.Id);
             if (index >= 0) Map3DAreas[index] = item; else Map3DAreas.Add(item);
 

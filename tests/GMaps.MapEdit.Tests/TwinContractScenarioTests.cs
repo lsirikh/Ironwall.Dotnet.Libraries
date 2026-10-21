@@ -31,7 +31,7 @@ namespace GMaps.MapEdit.Tests;
 /// C 「꾸미기」 판 — 도구별 놓기(한 그루 · 담장 · 소품) · 본문 키 · decorations.reload · 고르기 · 방향 키 · 적용 · 지우기 · 되돌리기/다시 하기 ·
 /// 옛 엔진(404) · 3D 에서 고름(decoration.pick), 판 템플릿 실제 그리기(아이콘 · 토큰 · AutomationId).
 /// </summary>
-public class TwinContractScenarioTests
+public partial class TwinContractScenarioTests
 {
     private const string Job = "j-twin";
     private const string Uid = "0123456789ab";
@@ -48,6 +48,8 @@ public class TwinContractScenarioTests
         public bool NeedsRebake { get; set; }
         /// <summary>look 응답에 facade_live=true(엔진이 외벽 무늬를 바로 반영).</summary>
         public bool FacadeLive { get; set; }
+        /// <summary>user-buildings · decorations PUT 을 400 {"detail": 이 글}로 거절(값 범위 · 개수 상한 등 서버 문구).</summary>
+        public string? RejectPut { get; set; }
         public List<JObject> UserBuildings { get; } = new();
         public Dictionary<int, JObject> Looks { get; } = new();
         public List<JObject> Decorations { get; } = new();
@@ -63,6 +65,8 @@ public class TwinContractScenarioTests
                 return Json(HttpStatusCode.OK, new JObject { ["scenes"] = new JArray(new JObject { ["id"] = Job, ["name"] = "시험 영역", ["bbox"] = new JArray(Bbox.Cast<object>().ToArray()) }) }.ToString());
             var seg = path.Split('/');   // "", "api", "jobs", {job}, …
             if (seg.Length < 5 || seg[3] != Job) return Json(HttpStatusCode.NotFound, "{\"detail\":\"작업이 없습니다\"}");
+            if (RejectPut != null && m == HttpMethod.Put && seg[4] is "user-buildings" or "decorations")
+                return Json(HttpStatusCode.BadRequest, new JObject { ["detail"] = RejectPut }.ToString());
             switch (seg[4])
             {
                 case "user-buildings":
@@ -357,13 +361,13 @@ public class TwinContractScenarioTests
     // ─────────────── B. 3D 에서 직접 그린 건물 고름 → 2D 고치기 판 ───────────────
 
     [Fact]
-    public void should_open_2d_edit_panel_for_user_building_picked_in_3d_and_save_look() => RunAsync(async rig =>
+    public void should_open_edit_panel_over_3d_for_user_building_picked_in_3d_and_save_look() => RunAsync(async rig =>
     {
         rig.AddUserBuilding();
         rig.Enter3D();
         rig.From3D(new JObject { ["type"] = "userbuilding.pick", ["uid"] = Uid });
         Assert.True(rig.Vm.IsUserBuildingDrawing);
-        Assert.NotEqual("3D", rig.Vm.Map3DStatusText);                                   // 고치기는 2D 에서
+        Assert.Equal("3D", rig.Vm.Map3DStatusText);                                      // 3D 에 머문 채 3D 위 판(edit3d-contract 1단계)
         await Rig.Until(() => rig.Vm.UserBuildingEditingUid == Uid, "그 건물 고치기");
         Assert.Equal("건물 고치기 · 경비동", rig.Vm.UserBuildingTitle);
         Assert.Equal(Uid, rig.Sent("userbuilding.select").First().Value<string>("uid"));
@@ -511,7 +515,7 @@ public class TwinContractScenarioTests
     });
 
     [Fact]
-    public void should_select_decoration_picked_in_3d_in_2d_panel() => RunAsync(async rig =>
+    public void should_select_decoration_picked_in_3d_in_panel_over_3d() => RunAsync(async rig =>
     {
         rig.Server.Decorations.Add(new JObject
         {
@@ -522,7 +526,7 @@ public class TwinContractScenarioTests
         rig.Enter3D();
         rig.From3D(new JObject { ["type"] = "decoration.pick", ["uid"] = Uid });
         Assert.True(rig.Vm.IsDecorating);
-        Assert.NotEqual("3D", rig.Vm.Map3DStatusText);
+        Assert.Equal("3D", rig.Vm.Map3DStatusText);                                      // 3D 에 머문다(edit3d-contract 1단계)
         await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid, "그 항목 고름");
         Assert.True(rig.Vm.IsDecorationGroundValues);
         Assert.Equal("water", rig.Vm.DecorationSurface);

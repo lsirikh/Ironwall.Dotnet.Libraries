@@ -377,6 +377,8 @@
 									TextWrapping="Wrap"
 									Visibility="{Binding HasDecorationError, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+								<ContentControl Template="{StaticResource Edit3DSectionTemplate}" />
+
 								<Grid Margin="0,10,0,0">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*" />

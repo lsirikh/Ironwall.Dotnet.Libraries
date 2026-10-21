@@ -912,6 +912,7 @@ public partial class MapViewModel
         if (MainMap != null) { Map3DHost.Park(); RestoreMap2DInput(); }
         System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;   // 지도가 없어도 푼다(정적 이벤트 — 남으면 VM 이 매 프레임 불린다)
         CloseBuildingHeightPanel(clearUndo: true);   // 「건물 높이」 판 — 미리보기 원래대로 · 판 안 되돌리기 비움
+        EndEdit3DSessions(cause);   // 3D 위에서 연 「건물 만들기」 · 「꾸미기」 판 닫기
         if (MainMap == null) return;
         _map3DAreaViewJob = null; _map3DReturn = null;   // 다음 진입은 다시 줌 게이트 또는 새 「영역 보기」
         _map3DRevealedBehindLogin = false;
@@ -1102,6 +1103,12 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 꾸미기 항목 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
+        if (msg.Type is "draw.point" or "draw.done" or "draw.end" or "edit.commit")
+        {
+            try { OnMap3DEditMessage(msg); }   // 3D 안에서 놓기 · 그리기 · 손잡이(MapViewModel.Edit3D)
+            catch (Exception ex) { _log?.Error($"[Map3D] 3D 편집 메시지 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
         if (msg.Pick is { } pick)
         {
             try { OnMap3DPick(pick); }
@@ -1171,9 +1178,10 @@ public partial class MapViewModel
 
     // ── 입력 모드 충돌(1단계) ──
 
-    /// <summary>편집 모드 · 독점 입력 모드 중인가 — 이때는 3D 에 들어가지 않는다.</summary>
+    /// <summary>편집 모드 · 독점 입력 모드 중인가 — 이때는 3D 에 들어가지 않는다(3D 위 판으로 연 「건물 만들기」 · 「꾸미기」는 3D 에 머문다 — MapViewModel.Edit3D).</summary>
     private bool IsMap3DBlockedByInputMode()
-        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled, ExclusiveInputModeGate.IsActive(MainMap) || IsUserBuildingDrawing || IsDecorating);
+        => MainMap != null && Map3DMath.IsBlockedByInputMode(IsEditModeEnabled,
+               ExclusiveInputModeGate.IsActive(MainMap) || (IsUserBuildingDrawing && !_ubIn3D) || (IsDecorating && !_decoIn3D));
 
     /// <summary>
     /// 입력 모드가 켜지거나 꺼진 직후 호출 — 모드 중이면 3D 를 접고(표시 중이면 3D 마지막 카메라를 2D 에 적용),

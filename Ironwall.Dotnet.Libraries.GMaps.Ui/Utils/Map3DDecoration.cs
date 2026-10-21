@@ -191,7 +191,7 @@ public static class Map3DDecoration
         return new Map3DDecorationItem(o.Value<string>("uid")!, kind, type!, pts, o["props"] as JObject ?? new JObject(), name);
     }
 
-    private static bool AddPoint(JToken? t, List<UbPoint> pts)
+    internal static bool AddPoint(JToken? t, List<UbPoint> pts)
     {
         if (t is not JArray p || p.Count < 2 || p[0].Type is not (JTokenType.Float or JTokenType.Integer) || p[1].Type is not (JTokenType.Float or JTokenType.Integer))
             return false;
