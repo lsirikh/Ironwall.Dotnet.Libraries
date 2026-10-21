@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -36,6 +36,7 @@ public class ServerAxisRetryAndListViewTests
     private static ServerWriteIntent Intent() => new() { TypeServer = "PROXY", CategoryId = 1, Name = "A", IpAddress = "10.0.0.1", Port = 8100 };
 
     #region - G01 409 재시도 -
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData(EnumServerContract.V8_0)]
     [InlineData(EnumServerContract.V6_3)]
@@ -52,6 +53,7 @@ public class ServerAxisRetryAndListViewTests
         Assert.DoesNotContain("같은 이름", result.Message);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public async Task should_say_retry_when_patch_hits_a_retryable_conflict()
     {
@@ -66,6 +68,7 @@ public class ServerAxisRetryAndListViewTests
         Assert.DoesNotContain("같은 이름", result.Message);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public async Task should_keep_the_duplicate_name_text_when_the_conflict_is_not_retryable()
     {
@@ -84,6 +87,7 @@ public class ServerAxisRetryAndListViewTests
     #endregion
 
     #region - G28 목록 표현 프로필 -
+    [Trait("Scenario", "GOP815-G28")]
     [Theory]
     [InlineData(EnumServerContract.V7_0)]
     [InlineData(EnumServerContract.V8_0)]
@@ -99,6 +103,7 @@ public class ServerAxisRetryAndListViewTests
         Assert.Equal("server_config", http.Query["include"]);
     }
 
+    [Trait("Scenario", "GOP815-G28")]
     [Fact]
     public async Task should_not_send_view_or_include_to_a_6_3_server()
     {

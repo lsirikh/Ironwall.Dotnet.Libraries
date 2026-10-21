@@ -20,7 +20,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
    Purpose      : 「꾸미기」(2026-10-21 사용자 요청 — 층만 올리는 게 아니라 디지털 트윈처럼 꾸미는 도구) — 3D 영역 안 2D 지도 위에
                   나무(한 그루 · 줄 · 영역) · 바닥(영역) · 소품(클릭) · 담장(선)을 놓고 값을 바꾼다. map-3d 는 굽지 않고 뷰어가 바로 그린다(twin-contract C).
-   Note         : ★ 들어가기 = 툴바(Map.Decoration.Start — 화면 가운데 3D 영역) · 3D 의 decoration.pick(그 항목을 판에서 고름). 지도 편집 권한이 있어야 한다.
+   Note         : ★ 들어가기 = 툴바(Map.Decoration.Start — 화면 가운데 3D 영역) · 3D 의 decoration.pick(그 항목을 판에서 고름). 지도 편집 모드에서만(꺼짐 = 보기 전용, 2026-10-21) · 지도 편집 권한이 있어야 한다.
                     꾸미는 동안은 독점 입력 모드라 3D 에 들어가지 않는다(IsMap3DBlockedByInputMode) — 「건물 그리기」와 같은 관용구.
                     단, 3D 중에 시작하면 3D 위 판으로 3D 에 머문다(놓기 · 그리기 · 손잡이 = draw.* · edit.*, MapViewModel.Edit3D).
                   ★ 놓기 = 도구를 고르고 지도 클릭(점 도구는 한 번에 저장, 선 · 영역은 Enter · 두 번 누르기 · [마치기]). 옮기기는 [다시 놓기](지도 위 새 끌기 없음 —
@@ -181,7 +181,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         }
         if (item == null) { SetAimStatus("3D 영역 안에서 시작하세요 — 화면 가운데를 3D 영역 안에 두고 다시 누르세요", autoHide: true); return; }
         StartDecoration(item, in3D: ShouldEditIn3D && item.Id == _map3DJob);
-    });
+    }, _ => IsEditModeEnabled || IsDecorating);   // 편집 모드에서만 시작(꾸미는 중이면 끝내기는 늘)
 
     private RelayCommand? _exitDecorationCommand;
     public RelayCommand ExitDecorationCommand => _exitDecorationCommand ??= new RelayCommand(_ => ExitDecoration("close"));
@@ -252,6 +252,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
     private void StartDecoration(Map3DAreaItem item, bool in3D = false)
     {
         if (MainMap == null) return;
+        if (!RequireMapEditMode(notify: true)) return;   // 꺼짐 = 보기 전용
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         if (item.IsBaking) { SetAimStatus("이 영역은 다시 만드는 중입니다 — 다 만든 뒤 꾸미세요", autoHide: true); return; }
         if (IsDecorating) ExitDecoration("switch");
@@ -298,6 +299,13 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
     private void OnMap3DDecorationPicked(string uid)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob is not { } job || Map3DAreas.FirstOrDefault(a => a.Id == job) is not { } area) return;
+        if (!RequireMapEditMode(notify: false))
+        {
+            // 보기 전용 — 판 · 강조 없음(엔진이 그렸을 수 있는 강조만 지운다)
+            _log?.Info($"[Decoration] 3D 에서 고름 — 편집 모드 아님(무시) uid={uid}");
+            PostUserBuilding3D(job, Map3DDecoration.SelectMessageJson(null));
+            return;
+        }
         _log?.Info($"[Decoration] 3D 에서 고름 uid={uid} job={job}");
         CloseBuildingHeightPanel(clearUndo: false);
         bool in3D = ShouldEditIn3D;

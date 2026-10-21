@@ -169,6 +169,15 @@ public class Map3DScreenTests
     public void should_stay_in_3d_when_window_opens_over_composition_host(string hostMode, bool expected)
         => Assert.Equal(expected, Map3DGuide.ShouldLeave3DForWindow(hostMode));
 
+    // ── 편집 모드에서 3D 유지(2026-10-21) ──
+
+    [Theory]
+    [InlineData("composition", false)]   // WPF 안 3D — 편집 스트립 · 속성 창이 3D 위에 보인다
+    [InlineData("none", false)]          // 아직 안 만듦 — 기본 WPF 안 3D 로 열린다(네이티브 창으로 바뀌면 HostFallback 이 접는다)
+    [InlineData("hwnd", true)]           // 네이티브 창 3D 는 편집 판을 덮는다 — 2D 로
+    public void should_leave_3d_for_edit_mode_only_on_native_window_host(string hostMode, bool expected)
+        => Assert.Equal(expected, Map3DGuide.EditModeLeaves3D(hostMode));
+
     // ── Esc 로 3D 나가기 ──
 
     [Theory]

@@ -88,8 +88,10 @@ public class BuildingHeightEdgeScenarioTests
             W = WiredMapRig.Create(canEdit);
             W.Log.Setup(l => l.Info(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
              .Callback<string, string, string, int>((m, _, _, _) => Infos.Add(m));
-            Scenario.SetField(Vm, "_isEditModeEnabled", false);
-            W.Map.SetEditMode(false);
+            // 2026-10-21 사용자 결정 — 건물 고르기 · 그리기 · 외관 · 꾸미기는 지도 편집 모드에서만. 고치기 시험이라 편집 모드로 시작한다
+            // (권한 없는 계정 시험도 켜 둔다 — 편집 모드 중 권한을 잃은 경우의 CanEditMap 막힘을 그대로 본다). 보기 전용 시험은 끈다.
+            Scenario.SetField(Vm, "_isEditModeEnabled", true);
+            W.Map.SetEditMode(true);
             W.Map.SetEffectiveZoom(17d);
             Center = W.Map.Position;
             var settings = new Map3DModel { EntryMode = Map3DModel.EntryManual, EnterZoom = 17, ExitZoom = 16.5, GuideMinSeconds = 0, IsEnabled = true };

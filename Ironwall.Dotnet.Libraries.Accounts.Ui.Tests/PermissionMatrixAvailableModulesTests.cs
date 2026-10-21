@@ -61,6 +61,7 @@ public class PermissionMatrixAvailableModulesTests
         vm.OnClickGroupDetail();
     }
 
+    [Trait("Scenario", "GOP815-G05")]
     [Fact]
     public async Task should_send_every_available_module_including_a_17th_one_the_client_does_not_know()
     {
@@ -79,6 +80,7 @@ public class PermissionMatrixAvailableModulesTests
         Assert.True(sent.ContainsKey("legacy_only"));         // 원본에만 있는 키도 떨어뜨리지 않는다
     }
 
+    [Trait("Scenario", "GOP815-G05")]
     [Fact]
     public async Task should_keep_the_old_union_when_the_snapshot_has_no_available_modules_like_6_3()
     {
@@ -93,6 +95,7 @@ public class PermissionMatrixAvailableModulesTests
         Assert.True(sent.ContainsKey("devices"));
     }
 
+    [Trait("Scenario", "GOP815-G05")]
     [Fact]
     public async Task should_fill_the_missing_module_with_false_and_retry_once_on_422_missing_field()
     {
@@ -112,6 +115,7 @@ public class PermissionMatrixAvailableModulesTests
         Assert.False(patrol.View || patrol.Edit || patrol.Delete || patrol.Control);
     }
 
+    [Trait("Scenario", "GOP815-G05")]
     [Fact]
     public async Task should_not_retry_more_than_once_when_the_server_keeps_saying_missing_field()
     {

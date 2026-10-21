@@ -360,6 +360,7 @@ public class SsoExchangeTests
     /// 그 401 로 다시 refresh 경로에 들어가 <b>이미 쥔 전역 락을 또 기다려</b> 멈췄다(재진입 데드락 → 시간 초과 → Terminal).
     /// 교환은 401 을 그대로 돌려받아 즉시 Transient 여야 하고, 교환 요청에는 옛 Bearer 가 실리면 안 된다.
     /// </summary>
+    [Trait("Scenario", "GOP815-G04")]
     [Fact]
     public async Task should_return_transient_at_once_when_exchange_inside_reauth_gets_token_replayed()
     {

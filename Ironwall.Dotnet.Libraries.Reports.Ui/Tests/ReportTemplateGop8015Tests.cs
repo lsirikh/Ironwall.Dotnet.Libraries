@@ -64,6 +64,7 @@ public class ReportTemplateGop8015Tests : IDisposable
     }
 
     #region - G09 구성 0개 -
+    [Trait("Scenario", "GOP815-G09")]
     [Fact]
     public async Task should_keep_register_off_and_say_why_when_no_component_is_on_in_a_new_template()
     {
@@ -83,6 +84,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.NotEqual(NoComponentText, console.DetailFooterText);
     }
 
+    [Trait("Scenario", "GOP815-G09")]
     [Fact]
     public async Task should_keep_apply_off_and_send_nothing_when_every_component_is_turned_off_while_editing()
     {
@@ -98,6 +100,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.Null(api.LastUpdate);                                   // 422 왕복을 만들지 않는다
     }
 
+    [Trait("Scenario", "GOP815-G09")]
     [Fact]
     public async Task should_still_allow_a_rename_of_a_template_whose_components_are_untouched()
     {
@@ -114,6 +117,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.Null(api.LastUpdate!.Components);
     }
 
+    [Trait("Scenario", "GOP815-G09")]
     [Fact]
     public async Task should_explain_a_components_422_with_the_same_words()
     {
@@ -140,6 +144,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         return console;
     }
 
+    [Trait("Scenario", "GOP815-G10")]
     [Fact]
     public async Task should_say_the_template_has_no_component_when_custom_generation_is_refused_on_template_id()
     {
@@ -152,6 +157,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.Equal("이 템플릿에 켜진 구성 요소가 없습니다. 템플릿에서 1개 이상 켜고 다시 시도하세요.", console.CreateViewModel.StatusText);
     }
 
+    [Trait("Scenario", "GOP815-G10")]
     [Fact]
     public async Task should_keep_the_general_refusal_for_other_generation_422s()
     {
@@ -166,6 +172,7 @@ public class ReportTemplateGop8015Tests : IDisposable
     #endregion
 
     #region - G11 고아 구성 -
+    [Trait("Scenario", "GOP815-G11")]
     [Fact]
     public void should_drop_withdrawn_components_from_what_is_sent_when_the_catalog_was_received()
     {
@@ -181,6 +188,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.Contains(board.Items, i => i.Id == "legacy_widget");   // 화면에는 보인다(빠진다는 걸 알 수 있게)
     }
 
+    [Trait("Scenario", "GOP815-G11")]
     [Fact]
     public void should_keep_saved_components_as_they_are_when_the_catalog_was_not_received()
     {
@@ -194,6 +202,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.Equal(new[] { "a", "legacy_widget" }, board.ToConfig().Select(c => c.Id).ToArray());
     }
 
+    [Trait("Scenario", "GOP815-G11")]
     [Fact]
     public async Task should_tell_how_many_withdrawn_components_will_be_dropped_and_drop_them_on_save()
     {
@@ -211,6 +220,7 @@ public class ReportTemplateGop8015Tests : IDisposable
         Assert.DoesNotContain(api.LastUpdate!.Components!, c => c.Id == "legacy_widget");
     }
 
+    [Trait("Scenario", "GOP815-G11")]
     [Fact]
     public async Task should_not_announce_dropping_when_the_catalog_failed()
     {
@@ -244,6 +254,7 @@ public class ActionReportTemplateRetryableConflictUiTests : IDisposable
         return (console, api);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData(true, ApiStatusHelper.RetryableConflictMessage)]
     [InlineData(false, "이미 등록된 문구입니다.")]

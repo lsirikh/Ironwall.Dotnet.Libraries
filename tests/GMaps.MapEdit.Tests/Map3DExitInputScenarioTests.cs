@@ -142,6 +142,7 @@ public class Map3DExitInputScenarioTests
     /// <summary>「건물 높이」 판을 여는 3D building 메시지(판 입력칸 초기값은 생성자 대신 채운다).</summary>
     private static void PickBuilding(Rig rig, int id = 7)
     {
+        Map3DEntryScenarioTests.UseEditMode(rig);   // 2026-10-21 — 건물 고르기 · 그리기는 지도 편집 모드에서만
         Scenario.SetField(rig.Vm, "_bhFloorHeightText", "3.0");
         Scenario.SetField(rig.Vm, "_bhFloorsText", "");
         Scenario.SetField(rig.Vm, "_bhHeightText", "");
@@ -226,11 +227,11 @@ public class Map3DExitInputScenarioTests
 
     // ─────────────── 3. 나가는 길 전부 ───────────────
 
-    public enum Exit { Button, EditMode, LoadFailed, SettingsOff, HostFallback, EventFlyTo }
+    public enum Exit { Button, EditModeOnNativeWindow, LoadFailed, SettingsOff, HostFallback, EventFlyTo }
 
     [Theory]
     [InlineData(Exit.Button)]
-    [InlineData(Exit.EditMode)]
+    [InlineData(Exit.EditModeOnNativeWindow)]
     [InlineData(Exit.LoadFailed)]
     [InlineData(Exit.SettingsOff)]
     [InlineData(Exit.HostFallback)]
@@ -243,7 +244,8 @@ public class Map3DExitInputScenarioTests
             switch (exit)
             {
                 case Exit.Button: rig.PressExit(); break;
-                case Exit.EditMode:   // 편집 · 묶음 회전 판은 편집 모드 안 — 켜면 3D 를 접는다(SyncMap3DWithInputModes)
+                case Exit.EditModeOnNativeWindow:   // 2026-10-21 — 편집 모드는 네이티브 창 3D 에서만 3D 를 접는다(WPF 안 3D 는 머문다, SyncMap3DWithInputModes)
+                    Map3DEntryScenarioTests.UseNativeWindowHost(rig, true);
                     Scenario.SetField(rig.Vm, "_isEditModeEnabled", true);
                     rig.W.Map.SetEditMode(true);
                     Scenario.Call(rig.Vm, "SyncMap3DWithInputModes");
@@ -254,8 +256,9 @@ public class Map3DExitInputScenarioTests
                 case Exit.EventFlyTo: Scenario.Call(rig.Vm, "Leave3D", null, "event-flyto"); break;
             }
             AssertMap2DInputAlive(rig, exit.ToString());
-            if (exit == Exit.EditMode)
+            if (exit == Exit.EditModeOnNativeWindow)
             {
+                Map3DEntryScenarioTests.UseNativeWindowHost(rig, false);
                 Scenario.SetField(rig.Vm, "_isEditModeEnabled", false);   // 편집 모드 끄기 — 다시 운영 모드 입력
                 rig.W.Map.SetEditMode(false);
                 Scenario.Call(rig.Vm, "SyncMap3DWithInputModes");

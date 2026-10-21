@@ -17,6 +17,7 @@ public class ApiRetryableAndRequestIdTests
     private static ApiError Parse(string detailsJson)
         => JsonConvert.DeserializeObject<ApiError>("{\"code\":\"CONFLICT\",\"message\":\"m\",\"details\":" + detailsJson + "}")!;
 
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData("{\"retryable\":true}", true)]
     [InlineData("{\"retryable\":false}", false)]
@@ -28,6 +29,7 @@ public class ApiRetryableAndRequestIdTests
         Assert.Equal(expected, Parse(details).IsRetryable);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public void should_treat_only_409_with_retryable_as_retryable_conflict()
     {
@@ -54,6 +56,7 @@ public class ApiRetryableAndRequestIdTests
         return r;
     }
 
+    [Trait("Scenario", "GOP815-G02")]
     [Fact]
     public async Task should_log_meta_request_id_on_failure_envelope()
     {
@@ -70,6 +73,7 @@ public class ApiRetryableAndRequestIdTests
         Assert.Contains(_lines, l => l.Contains("req=" + id) && l.Contains("409") && l.Contains("/api/devices/7"));
     }
 
+    [Trait("Scenario", "GOP815-G02")]
     [Fact]
     public async Task should_fall_back_to_x_request_id_header_when_body_is_not_an_envelope()
     {

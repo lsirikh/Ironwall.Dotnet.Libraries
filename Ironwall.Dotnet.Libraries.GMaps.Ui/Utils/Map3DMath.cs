@@ -223,7 +223,10 @@ public static class Map3DMath
         return Math.Clamp(zoom, Map3DModel.MinZoom, Map3DModel.MaxZoom);
     }
 
-    /// <summary>독점 입력 모드(편집 · 선 그리기 · 측정 · 심볼 배치 · 조준 · 홈/앵커 배치) 중에는 3D 에 들어가지 않는다 — 막으면 true.</summary>
+    /// <summary>
+    /// 독점 입력 모드(선 그리기 · 측정 · 심볼 배치 · 조준 · 홈/앵커 배치) 중에는 3D 에 들어가지 않는다 — 막으면 true.
+    /// <paramref name="isEditMode"/> = 3D 를 접어야 하는 편집 모드(네이티브 창 3D 일 때만 — Map3DGuide.EditModeLeaves3D 를 걸러 넘긴다).
+    /// </summary>
     public static bool IsBlockedByInputMode(bool isEditMode, bool isExclusiveInputMode) => isEditMode || isExclusiveInputMode;
 
     // ── 방위 ──

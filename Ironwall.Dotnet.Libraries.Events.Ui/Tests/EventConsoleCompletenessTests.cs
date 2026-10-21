@@ -283,6 +283,7 @@ public class EventRowLabelTests : IDisposable
         Assert.DoesNotContain("sqlalchemy", history.FailureReason);
     }
 
+    [Trait("Scenario", "GOP815-G42")]
     [Fact]
     public void should_fill_connection_event_actions_from_the_common_list_filtered_by_origin()
     {

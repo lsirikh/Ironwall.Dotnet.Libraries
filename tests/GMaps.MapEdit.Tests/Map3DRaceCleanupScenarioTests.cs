@@ -170,6 +170,8 @@ public class Map3DRaceCleanupScenarioTests
 
         public void PickBuilding(int id, double height)
         {
+            Scenario.SetField(Vm, "_isEditModeEnabled", true);   // 2026-10-21 — 건물 고르기 · 그리기는 지도 편집 모드에서만
+            W.Map.SetEditMode(true);
             var msg = Map3DMath.ParseMessage(new JObject { ["type"] = "building", ["id"] = id, ["origin"] = "photo", ["height"] = height, ["height_source"] = "overlay",
                                                            ["height_from"] = "shadow", ["levels"] = null, ["area_m2"] = 320.4, ["lon"] = 127.0, ["lat"] = 37.5,
                                                            ["manual"] = false }.ToString());

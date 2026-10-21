@@ -355,11 +355,12 @@ public class Map3DEntryExitMoreScenarioTests
     /// 편집을 끄고 다른 자리 · 줌 18 에서 「3D 로 보기」로 들어갔다 나가면 거절된 누름 전 자리(줌 17)로 돌아갔다.
     /// </summary>
     [Fact]
-    public void should_return_to_button_press_spot_when_area_view_was_refused_before_in_edit_mode()
+    public void should_return_to_button_press_spot_when_area_view_was_refused_before_in_edit_mode_on_native_window()
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
         {
             var areaB = rig.AreaAround(AreaB, dLon: 0.02);
             rig.Areas(rig.AreaAround(AreaA, dLon: 0.05), areaB);
+            Map3DEntryScenarioTests.UseNativeWindowHost(rig, true);   // 2026-10-21 — 편집 모드가 3D 를 막는 것은 네이티브 창 3D 뿐
             Scenario.SetField(rig.Vm, "_isEditModeEnabled", true);
             rig.W.Map.SetEditMode(true);
 
@@ -367,6 +368,7 @@ public class Map3DEntryExitMoreScenarioTests
             Assert.Equal("Off", rig.State);
             Assert.Contains("들어가지 않습니다", rig.Status);
 
+            Map3DEntryScenarioTests.UseNativeWindowHost(rig, false);
             Scenario.SetField(rig.Vm, "_isEditModeEnabled", false);
             rig.W.Map.SetEditMode(false);
             var spot = CenterOf(areaB);
@@ -386,12 +388,13 @@ public class Map3DEntryExitMoreScenarioTests
 
     /// <summary>D-1 자동(줌) 변형 — 거절된 「영역 보기」가 옮겨 둔 자리에서 편집을 끄면 게이트가 들어간다. 나가면 그 진입 직전 자리(영역 가운데 · 줌 17.5).</summary>
     [Fact]
-    public void should_return_to_gate_entry_spot_when_area_view_was_refused_then_edit_mode_ended_in_auto()
+    public void should_return_to_gate_entry_spot_when_area_view_was_refused_then_edit_mode_ended_on_native_window_in_auto()
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryAuto, rig =>
         {
             var areaA = rig.AreaAround(AreaA, dLon: 0.05);
             rig.Areas(areaA);
             rig.HostReady(AreaA);
+            Map3DEntryScenarioTests.UseNativeWindowHost(rig, true);   // 2026-10-21 — 편집 모드가 3D 를 막는 것은 네이티브 창 3D 뿐
             Scenario.SetField(rig.Vm, "_isEditModeEnabled", true);
             rig.W.Map.SetEditMode(true);
             rig.ViewArea(AreaA);   // 거절 — 지도는 영역 가운데 · 줌 17.5 로 옮겨졌다
@@ -399,6 +402,7 @@ public class Map3DEntryExitMoreScenarioTests
             var moved = rig.W.Map.Position;
             double movedZoom = rig.W.Map.EffectiveZoom;
 
+            Map3DEntryScenarioTests.UseNativeWindowHost(rig, false);
             Scenario.SetField(rig.Vm, "_isEditModeEnabled", false);
             rig.W.Map.SetEditMode(false);
             rig.Gate();
@@ -689,11 +693,11 @@ public class Map3DEntryExitMoreScenarioTests
             Assert.Equal("none", rig.Vm.Map3DHost.HostMode);
         });
 
-    public enum NoPreload { Baking, EditMode, Disabled, OtherSceneLoading, BelowPreloadZoom, OutsideArea, Measuring }
+    public enum NoPreload { Baking, EditModeOnNativeWindow, Disabled, OtherSceneLoading, BelowPreloadZoom, OutsideArea, Measuring }
 
     [Theory]
     [InlineData(NoPreload.Baking)]
-    [InlineData(NoPreload.EditMode)]
+    [InlineData(NoPreload.EditModeOnNativeWindow)]
     [InlineData(NoPreload.Disabled)]
     [InlineData(NoPreload.OtherSceneLoading)]
     [InlineData(NoPreload.BelowPreloadZoom)]
@@ -708,7 +712,8 @@ public class Map3DEntryExitMoreScenarioTests
             switch (why)
             {
                 case NoPreload.Baking: Scenario.SetField(rig.Vm, "_isMap3DBaking", true); break;
-                case NoPreload.EditMode: Scenario.SetField(rig.Vm, "_isEditModeEnabled", true); rig.W.Map.SetEditMode(true); break;
+                // 2026-10-21 — 편집 모드가 3D 를 막는 것은 네이티브 창 3D 뿐(WPF 안 3D 는 편집 중에도 미리 연다)
+                case NoPreload.EditModeOnNativeWindow: SetHost(rig, "_el", new Border()); Scenario.SetField(rig.Vm, "_isEditModeEnabled", true); rig.W.Map.SetEditMode(true); break;
                 case NoPreload.Disabled: rig.UseSettings(Map3DModel.EntryAuto, enabled: false); break;
                 case NoPreload.OtherSceneLoading: rig.HostLoading(AreaB); break;
                 case NoPreload.BelowPreloadZoom: rig.SetZoom(14); break;
@@ -720,29 +725,29 @@ public class Map3DEntryExitMoreScenarioTests
             Assert.Equal("Off", rig.State);
             rig.W.Map.IsAnchorDrawMode = false;
             Scenario.SetField(rig.Vm, "_isMap3DBaking", false);
+            SetHost(rig, "_el", null);
         });
 
     // ─────────────── A-74 · A-76 · A-77 입력 모드 ───────────────
 
     [Fact]
-    public void should_refuse_group_rotation_in_3d_and_leave_3d_when_edit_mode_turned_on()
+    public void should_refuse_group_rotation_in_3d_and_stay_in_3d_when_edit_mode_turned_on()
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryManual, rig =>
         {
             var infos = Capture(rig);
             X.Enter(rig);
             Assert.False(rig.Vm.StartGroupRotationCommand.CanExecute(null), "3D 중(운영 모드)에는 묶음 회전 불가");
-            rig.Vm.IsEditModeEnabled = true;   // 편집 도구줄 — 켜면 3D 를 먼저 접는다
-            Assert.False(rig.Shown);
-            Assert.True(rig.W.Map.IsHitTestVisible);
-            Assert.Contains(infos, l => l.StartsWith("[Map3D] 2D 복귀(input-mode) zoom=", StringComparison.Ordinal));
-            rig.PressEnter();
-            Assert.Equal("Off", rig.State);   // 편집 중 — 「3D 로 보기」 거절
-            Assert.Contains("들어가지 않습니다", rig.Status);
+            // 2026-10-21 사용자 요청 — 편집 모드 켜기만으로는 3D 를 떠나지 않는다(WPF 안 3D 는 편집 스트립 · 속성 창이 위에 보인다)
+            rig.Vm.IsEditModeEnabled = true;
+            Assert.True(rig.Shown, "편집 모드를 켜도 3D 그대로");
+            Assert.False(rig.W.Map.IsHitTestVisible, "아직 3D — 2D 입력은 막혀 있다");
+            Assert.DoesNotContain(infos, l => l.StartsWith("[Map3D] 2D 복귀(input-mode)", StringComparison.Ordinal));
             rig.Vm.IsEditModeEnabled = false;
             Scenario.Pump();
             rig.Gate(); rig.Tick();
-            Assert.False(rig.Shown, "수동 — 편집을 끝내도 저절로 다시 들어가지 않는다");
-            X.AssertMap2DInputAlive(rig, "편집 모드 끈 뒤");
+            Assert.True(rig.Shown, "편집 모드를 꺼도 3D 그대로");
+            rig.PressExit();
+            X.AssertMap2DInputAlive(rig, "편집 모드를 켰다 끈 뒤 「나가기」");
         });
 
     public enum InputMode { Measure, TargetAim, SymbolPlacement, AnchorDraw }
@@ -794,7 +799,7 @@ public class Map3DEntryExitMoreScenarioTests
     [InlineData(InputMode.TargetAim)]
     [InlineData(InputMode.SymbolPlacement)]
     [InlineData(InputMode.AnchorDraw)]
-    [InlineData(null)]   // 편집 모드
+    [InlineData(null)]   // 편집 모드(네이티브 창 3D)
     public void should_not_reenter_at_same_place_in_auto_until_gate_is_satisfied_again_when_input_mode_ends(InputMode? mode)
         => Map3DEntryScenarioTests.Run(Map3DModel.EntryAuto, rig =>
         {
@@ -808,7 +813,8 @@ public class Map3DEntryExitMoreScenarioTests
                     case InputMode.TargetAim: rig.W.Map.IsTargetAimMode = true; Scenario.Call(rig.Vm, "SyncMap3DWithInputModes"); break;
                     case InputMode.SymbolPlacement: Scenario.Call(rig.Vm, "EnterSymbolPlacementMode", EnumMarkerCategory.BASIC_SHAPES, new object(), "시험 심볼"); break;
                     case InputMode.AnchorDraw: Scenario.Call(rig.Vm, "EnterAnchorDrawMode"); break;
-                    case null: rig.Vm.IsEditModeEnabled = true; break;
+                    // 2026-10-21 — 편집 모드가 3D 를 접는 것은 네이티브 창 3D 뿐(그 갈래를 본다 — 접은 뒤 호스트는 기본으로 되돌린다)
+                    case null: SetHost(rig, "_el", new Border()); rig.Vm.IsEditModeEnabled = true; SetHost(rig, "_el", null); break;
                 }
                 Assert.False(rig.Shown, $"{mode} 시작 — 3D 를 먼저 접는다");
 
@@ -849,9 +855,11 @@ public class Map3DEntryExitMoreScenarioTests
             Assert.True(rig.Shown);
             try
             {
-                for (int i = 0; i < 3; i++)   // 편집 모드 연타
+                for (int i = 0; i < 3; i++)   // 편집 모드 연타(네이티브 창 3D — 2026-10-21 부터 편집 모드가 3D 를 접는 것은 그 갈래뿐)
                 {
+                    SetHost(rig, "_el", new Border());
                     rig.Vm.IsEditModeEnabled = true;
+                    SetHost(rig, "_el", null);
                     Assert.False(rig.Shown);
                     rig.Vm.IsEditModeEnabled = false;
                     Scenario.Pump();

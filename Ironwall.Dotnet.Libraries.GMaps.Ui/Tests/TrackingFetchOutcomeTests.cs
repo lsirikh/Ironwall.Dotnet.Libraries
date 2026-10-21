@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
@@ -36,6 +36,7 @@ public class TrackingFetchOutcomeTests
     private static Task<TrackPointsResult> Fetch(TrackingApiService svc)
         => svc.GetTrackPointsWithStatusAsync(DateTime.UtcNow.AddHours(-1), DateTime.UtcNow);
 
+    [Trait("Scenario", "GOP815-G12")]
     [Fact]
     public async Task should_report_forbidden_when_first_page_is_403()
     {
@@ -48,6 +49,7 @@ public class TrackingFetchOutcomeTests
         Assert.False(r.IsPartial);
     }
 
+    [Trait("Scenario", "GOP815-G12")]
     [Fact]
     public async Task should_keep_first_page_and_report_partial_when_second_page_is_500()
     {
@@ -59,6 +61,7 @@ public class TrackingFetchOutcomeTests
         Assert.True(r.IsPartial);
     }
 
+    [Trait("Scenario", "GOP815-G12")]
     [Fact]
     public async Task should_report_failure_when_cursor_is_rejected_with_400()
     {
@@ -70,6 +73,7 @@ public class TrackingFetchOutcomeTests
         Assert.True(r.IsPartial);
     }
 
+    [Trait("Scenario", "GOP815-G12")]
     [Fact]
     public async Task should_report_success_when_cursor_runs_to_the_end()
     {
@@ -79,6 +83,7 @@ public class TrackingFetchOutcomeTests
         Assert.Equal(2, r.Points.Count);
     }
 
+    [Trait("Scenario", "GOP815-G13")]
     [Theory]
     [InlineData(HttpStatusCode.OK, EnumTrackingHealth.Ok)]
     [InlineData(HttpStatusCode.ServiceUnavailable, EnumTrackingHealth.Unavailable)]
@@ -107,6 +112,7 @@ public class TrackingFetchOutcomeTests
         return new TrackPointApiReader(api.Object);
     }
 
+    [Trait("Scenario", "GOP815-G12")]
     [Theory]
     [InlineData(EnumTrackFetchOutcome.Forbidden, "추적 이력을 볼 권한이 없습니다(지도 보기 권한 필요)")]
     [InlineData(EnumTrackFetchOutcome.Failed, "일부만 불러왔습니다")]
@@ -122,6 +128,7 @@ public class TrackingFetchOutcomeTests
         Assert.Equal(expected, reader.LastFetchNotice);
     }
 
+    [Trait("Scenario", "GOP815-G13")]
     [Theory]
     [InlineData(EnumTrackingHealth.Unavailable, "추적 이력 저장소를 쓸 수 없습니다")]
     [InlineData(EnumTrackingHealth.Ok, null)]

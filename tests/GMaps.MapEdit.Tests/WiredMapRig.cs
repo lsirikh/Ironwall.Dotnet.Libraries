@@ -60,6 +60,11 @@ internal sealed class WiredMapRig
         Scenario.SetField(Vm, "_permissionService", Permission.Object);
         Scenario.SetField(Vm, "_permissionResolved", true);
         Scenario.SetField(Vm, "_nudgePersistGate", new SemaphoreSlim(1, 1));
+        // 3D 게이트 필드(제품은 필드 초기값 new()) — 2026-10-21 부터 편집 모드가 3D 를 막지 않아, 입력 모드가 끝날 때(SyncMap3DWithInputModes)
+        // 편집 모드인 채로도 게이트가 돈다. 생성자 없이 만든 VM 이라 비어 있으면 게이트가 null 로 던진다 — 3D 는 꺼 둔다(3D 시험 장치가 다시 켠다)
+        Scenario.SetField(Vm, "_map3DSettings", new Ironwall.Dotnet.Libraries.GMaps.Models.Map3DModel { IsEnabled = false });
+        Scenario.SetField(Vm, "_map3DScenes", new List<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D.Map3DScene>());
+        Scenario.SetField(Vm, "_map3DAreaMarkers", new Dictionary<string, Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps.Map3DAreaMarker>());
 
         var ea = new Mock<IEventAggregator>();
         ea.Setup(e => e.PublishAsync(It.IsAny<object>(), It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()))
