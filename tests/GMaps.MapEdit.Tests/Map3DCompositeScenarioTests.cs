@@ -326,9 +326,13 @@ public class Map3DCompositeScenarioTests
         {
             rig.R.Areas(rig.R.AreaAround(A));
             rig.Enter(A);
-            rig.Vm.DrawUserBuildingCommand.Execute(null);                // 툴바 「건물 그리기」 — 그리기는 2D
+            rig.Vm.DrawUserBuildingCommand.Execute(null);                // 툴바 「건물 그리기」 — 3D 중이면 3D 위 판(edit3d-contract 2단계)
             try
             {
+                Assert.True(rig.Vm.IsUserBuildingDrawing);
+                Assert.True(rig.R.Shown);
+                Assert.True(rig.Vm.IsEdit3DMode);
+                rig.Vm.EditIn2DCommand.Execute(null);                    // [2D 에서 윤곽 고치기] — 여기서부터 2D 그리기
                 Assert.True(rig.Vm.IsUserBuildingDrawing);
                 Assert.False(rig.R.Shown);
                 Assert.True(rig.R.W.Map.IsHitTestVisible, "그리려면 2D 가 누름을 받아야 한다");
