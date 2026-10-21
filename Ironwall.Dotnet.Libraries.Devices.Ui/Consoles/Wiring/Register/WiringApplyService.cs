@@ -215,10 +215,15 @@ public sealed class WiringApplyService
             {
                 if (call.Add)
                 {
-                    var response = await _gateway.AssignToGroupAsync(call.GroupId, call.DeviceIds, token).ConfigureAwait(false);
-                    results.Add(new WiringGroupResult(call.GroupId, true, call.DeviceIds.Count, response.Success,
-                        response.Success ? "그룹에 넣었습니다" : Text(response, "그룹에 넣지 못했습니다"),
-                        response.Success ? call.DeviceIds : null));
+                    // 넣기도 서버가 한 번에 100대까지만 받는다(명세 §5.6 그룹 할당 device_ids 1~100개 · G31) — 빼기와 같은 규칙으로
+                    //   나눠 보내고, 된 묶음만 성공으로 센다.
+                    foreach (var chunk in AssignDelta.ChunkAssigns(call.DeviceIds))
+                    {
+                        var response = await _gateway.AssignToGroupAsync(call.GroupId, chunk, token).ConfigureAwait(false);
+                        results.Add(new WiringGroupResult(call.GroupId, true, chunk.Count, response.Success,
+                            response.Success ? "그룹에 넣었습니다" : Text(response, "그룹에 넣지 못했습니다"),
+                            response.Success ? chunk : null));
+                    }
                 }
                 else
                 {

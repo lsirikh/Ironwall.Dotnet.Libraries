@@ -50,8 +50,8 @@ public class ComponentDisplayTests
         => Assert.Equal(korean, ComponentDisplay.StateName(code));
 
     [Fact]
-    public void should_cover_exactly_the_10_server_states_when_dictionary_is_enumerated()
-        => Assert.Equal(10, ComponentDisplay.KnownStates.Count());
+    public void should_cover_exactly_the_19_server_states_when_dictionary_is_enumerated()
+        => Assert.Equal(19, ComponentDisplay.KnownStates.Count());   // 10종 + v8.0.8 확장 9종(GOP API 8.0.15 대조 G18)
 
     [Theory]
     [InlineData("SENSOR_TIMEOUT", "센서 응답 없음")]

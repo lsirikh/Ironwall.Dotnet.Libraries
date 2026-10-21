@@ -18,6 +18,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -78,7 +79,7 @@ public class ComponentTableHostViewTests : IDisposable
                 WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false,
             };
             window.Resources.MergedDictionaries.Add(Theme("Tokens.Light.xaml"));
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             try
             {

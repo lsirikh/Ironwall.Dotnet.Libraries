@@ -12,8 +12,16 @@ public interface IBroadcastControlService
     /// <summary>음원 재생 (BROADCAST_PLAY, REQ) — RSP 결과 반환</summary>
     Task<BrokerRequestResult> PublishPlayAsync(int speakerId, int fileGroupId, int repeat);
 
+    /// <summary>음원 재생 + 음량(0~100, 0 허용 · 8.0.15). 기본 구현은 음량 없이 보낸다(매니저 기본 100).</summary>
+    Task<BrokerRequestResult> PublishPlayAsync(int speakerId, int fileGroupId, int repeat, int volume)
+        => PublishPlayAsync(speakerId, fileGroupId, repeat);
+
     /// <summary>TTS 방송 발행 (비스펙 cmd, PUB 유지)</summary>
     Task PublishTtsAsync(int speakerId, string message);
+
+    /// <summary>TTS + 음량(0~100, 0 허용 · 8.0.15). 기본 구현은 음량 없이 보낸다.</summary>
+    Task PublishTtsAsync(int speakerId, string message, int volume)
+        => PublishTtsAsync(speakerId, message);
 
     /// <summary>방송 정지 (BROADCAST_STOP, REQ) — RSP 결과 반환</summary>
     Task<BrokerRequestResult> PublishStopAsync(int speakerId);

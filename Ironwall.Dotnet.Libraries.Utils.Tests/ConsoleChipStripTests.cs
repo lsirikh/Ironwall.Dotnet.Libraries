@@ -10,6 +10,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -339,7 +340,7 @@ public class ConsoleChipStripTests
             Content = frame, Width = 1200, Height = 400, Left = -20000, Top = -20000,
             ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, WindowStyle = WindowStyle.None,
         };
-        window.Show();
+        QuietWindow.Show(window);
         window.UpdateLayout();
         return new Hosted { Window = window, Frame = frame, Strip = strip };
     }

@@ -656,11 +656,22 @@ public class EventApiService : IEventApiService
     /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Action Event DTO 목록을 포함한 API 응답</returns>
-    public async Task<ApiListResponse<ActionEventDto>> GetActionEventsAsync(
+    public Task<ApiListResponse<ActionEventDto>> GetActionEventsAsync(
         string? startDate = null,
         string? endDate = null,
         int page = 1,
         int limit = 20,
+        CancellationToken token = default)
+        => GetActionEventsAsync(startDate, endDate, page, limit, null, null, token);
+
+    /// <inheritdoc/>
+    public async Task<ApiListResponse<ActionEventDto>> GetActionEventsAsync(
+        string? startDate,
+        string? endDate,
+        int page,
+        int limit,
+        int? fromEventId,
+        string? user,
         CancellationToken token = default)
     {
         try
@@ -668,6 +679,8 @@ public class EventApiService : IEventApiService
             var parameters = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
             if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
+            if (fromEventId is > 0) parameters.Add("from_event_id", fromEventId.Value.ToString());
+            if (!string.IsNullOrWhiteSpace(user)) parameters.Add("user", user);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
@@ -1052,6 +1065,13 @@ public class EventApiService : IEventApiService
     {
         if (response.StatusCode != 409) return response;
 
+        // 8.0.15 동시 쓰기 경합(details.retryable=true)은 중복이 아니다 — 재시도 문구만 바꾸고 원문 details 는 그대로 둔다(G01).
+        if (ApiStatusHelper.IsRetryableConflict(response.StatusCode, response.Error))
+        {
+            response.Error!.Message = ApiStatusHelper.RetryableConflictMessage;
+            return response;
+        }
+
         var origin = response.Error?.Message;
         response.Error ??= new ApiError();
         response.Error.Code = "CONFLICT";
@@ -1131,6 +1151,32 @@ public class EventApiService : IEventApiService
         if (dto == null) return new JObject();
         var body = JObject.FromObject(dto);
         if (dto.FileGroupId <= 0) body.Remove("file_group_id");
+        return body;
+    }
+
+    /// <summary>
+    /// 매핑 카메라 쓰기(POST · PATCH · PUT) 본문 — <c>target_preset_id</c> · <c>home_preset_id</c> 가 0 이하면 키째 뺀다(G51).
+    /// <para>값형 <c>int</c> 라 "없음"을 0 으로 들고 다닌다. 0 은 실제 프리셋 id 가 아니고, 빼면 POST = 없음 · PATCH/PUT = 현재 값 유지다(명세 §7.3).</para>
+    /// </summary>
+    private static JObject BuildMappingCameraWriteBody(EventMappingCameraDto? dto)
+    {
+        if (dto == null) return new JObject();
+        var body = JObject.FromObject(dto);
+        if (dto.TargetPresetId <= 0) body.Remove("target_preset_id");
+        if (dto.HomePresetId <= 0) body.Remove("home_preset_id");
+        return body;
+    }
+
+    /// <summary>
+    /// 매핑 경광등 쓰기 본문 — <c>event_mapping_id</c> 는 경로가 정본이다(G51, 8.0.15 감사 D04).
+    /// PATCH 는 이 키를 받지 않아 늘 빼고(422 UNKNOWN_FIELD), POST · PUT 은 경로 값으로 맞춘다(다르면 422 IMMUTABLE_FIELD).
+    /// 호출자 DTO 는 바꾸지 않는다.
+    /// </summary>
+    private static JObject BuildMappingLampWriteBody(EventMappingLampDto? dto, int? pathMappingId)
+    {
+        var body = dto == null ? new JObject() : JObject.FromObject(dto);
+        body.Remove("event_mapping_id");
+        if (pathMappingId is int id) body["event_mapping_id"] = id;
         return body;
     }
     #endregion
@@ -1266,7 +1312,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras", BuildMappingCameraWriteBody(dto));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingCameraDto>(), "카메라");
         }
         catch (Exception ex)
@@ -1280,7 +1326,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", BuildMappingCameraWriteBody(dto));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingCameraDto>(), "카메라");
         }
         catch (Exception ex)
@@ -1294,7 +1340,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", BuildMappingCameraWriteBody(dto));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingCameraDto>(), "카메라");
         }
         catch (Exception ex)
@@ -1439,7 +1485,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps", BuildMappingLampWriteBody(dto, mappingId));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingLampDto>(), "경광등");
         }
         catch (Exception ex)
@@ -1453,7 +1499,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", BuildMappingLampWriteBody(dto, null));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingLampDto>(), "경광등");
         }
         catch (Exception ex)
@@ -1467,7 +1513,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", BuildMappingLampWriteBody(dto, mappingId));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingLampDto>(), "경광등");
         }
         catch (Exception ex)

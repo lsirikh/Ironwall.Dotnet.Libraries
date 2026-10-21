@@ -839,6 +839,8 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
         var dto = UnitRequestBuilder.Edit(Form.Original, Form.EditValues);
         if (dto is null) { Detail.Settle("바뀐 내용이 없습니다."); RaiseDetail(); return; }
+        // (G33) 인접 부대가 있으면 제대만 바꿀 수 없다(서버 422) — 보내기 전에 막는다.
+        if (UnitRequestBuilder.EchelonAdjacencyBlock(Form.Original, Form.AdjacentIds, dto) is { } blocked) { Form.ErrorText = blocked; return; }
 
         IsBusy = true;
         try

@@ -5,6 +5,8 @@ using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
@@ -360,12 +362,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             if (_formGroupId > 0)
             {
                 var res = await _api.UpdateUserGroupAsync(_formGroupId, new UserGroupUpdateDto { Name = FormName.Trim(), Description = FormDescription });
-                if (!res.Success) { await Info(Explain("그룹 수정", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName, "그룹 정보를 저장하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.")); return; }
+                if (!res.Success) { await Info(Explain("그룹 수정", res.StatusCode, res.Error, res.Error?.Message ?? res.Message, DuplicateGroupName, "그룹 정보를 저장하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.")); return; }
             }
             else
             {
                 var res = await _api.CreateUserGroupAsync(new UserGroupCreateDto { Name = FormName.Trim(), Description = FormDescription });
-                if (!res.Success) { await Info(Explain("그룹 생성", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName, "새 권한 그룹을 만들지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.")); return; }
+                if (!res.Success) { await Info(Explain("그룹 생성", res.StatusCode, res.Error, res.Error?.Message ?? res.Message, DuplicateGroupName, "새 권한 그룹을 만들지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.")); return; }
             }
             IsGroupFormOpen = false;
             await Info(_formGroupId > 0 ? "그룹 정보를 수정했습니다." : "새 권한 그룹을 생성했습니다.");   // 성공 피드백(grant 생성 패턴 정합·진단)
@@ -416,9 +418,13 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     /// 결과는 ① 그 서버가 아는 모듈을 <b>빠짐없이</b> 담고(전체 교체 계약 충족) ② <b>모르는 키를 담지 않는다</b>.
     /// 원본에만 있고 사전에 없는 키도 값 그대로 실려 나가 사라지지 않는다.</para>
     /// </summary>
-    private Dictionary<string, ModulePermissionDto> BuildMergedModules()
+    private Dictionary<string, ModulePermissionDto> BuildMergedModules(IEnumerable<string>? availableModules = null)
     {
         var merged = new Dictionary<string, ModulePermissionDto>(StringComparer.Ordinal);
+        // ⓪ 서버가 알려 준 모듈 전체(available_modules, v8.0.1+) — 원본에 없는 키는 4동작 모두 끈 채로 싣는다(G05).
+        //    없으면(6.3.2) 이 단계를 건너뛰어 종전과 같다.
+        foreach (var key in availableModules ?? Enumerable.Empty<string>())
+            if (!string.IsNullOrWhiteSpace(key)) merged[key] = new ModulePermissionDto();
         foreach (var kv in _originModules)          // ① 서버가 아는 것 전부 보존
             merged[kv.Key] = kv.Value;
         foreach (var m in Modules)                  // ② 화면에서 편집한 것으로 덮어쓰기
@@ -456,10 +462,20 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             var dto = new PermissionsDto
             {
                 DeviceGroups = _detailDeviceGroups,
-                // 원본 ∪ 화면 편집분 — 우리가 모르는 모듈을 떨어뜨리면 422(전체 교체 계약).
-                Modules = BuildMergedModules(),
+                // (서버가 아는 모듈 전체 ∪) 원본 ∪ 화면 편집분 — 우리가 모르는 모듈을 떨어뜨리면 422(전체 교체 계약).
+                Modules = BuildMergedModules(await AvailableModulesAsync(ct).ConfigureAwait(true)),
             };
             var res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto, ct).ConfigureAwait(true);
+
+            // 그래도 빠진 모듈이 있다고 하면(422 MISSING_FIELD) 그 키를 4동작 모두 끈 채로 채워 한 번만 다시 보낸다(G05).
+            var missing = MissingModuleKeys(res);
+            if (missing.Count > 0)
+            {
+                _log?.Warning($"[PermGroup] 권한 저장 422 MISSING_FIELD — 빠진 모듈 {string.Join(",", missing)} 을 끈 채로 채워 1회 재시도");
+                foreach (var key in missing) dto.Modules.TryAdd(key, new ModulePermissionDto());
+                res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto, ct).ConfigureAwait(true);
+            }
+
             if (!res.Success)
             {
                 _log?.Warning($"[PermGroup] 권한 저장 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
@@ -479,6 +495,40 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             return PermissionSaveOutcome.Fail("서버에 닿지 못했습니다.");
         }
         finally { IsSaving = false; }
+    }
+
+    /// <summary>
+    /// 서버가 아는 모듈 전체(<c>/auth/me/permissions</c> 의 <c>available_modules</c>, v8.0.1+). 칸이 없거나(6.3.2) 못 읽으면 null.
+    /// </summary>
+    private async Task<IReadOnlyList<string>?> AvailableModulesAsync(CancellationToken ct)
+    {
+        try
+        {
+            var res = await _api.GetMyPermissionsAsync(ct).ConfigureAwait(true);
+            return res is { Success: true } ? res.Data?.AvailableModules : null;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[PermGroup] available_modules 를 읽지 못해 종전 방식(원본 ∪ 세대 어휘)으로 저장한다: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 422 <c>details[].code=MISSING_FIELD</c> 가 지목한 모듈 키(<c>modules.&lt;key&gt;</c> 경로의 마지막 마디). 아니면 빈 목록.
+    /// </summary>
+    private static List<string> MissingModuleKeys<T>(ApiResponse<T>? res)
+    {
+        var keys = new List<string>();
+        if (res is null || res.Success || !res.IsValidationError()) return keys;
+        foreach (var fe in res.Error!.FieldErrors)
+        {
+            if (!string.Equals(fe.Code?.Trim(), ApiFieldErrorCodes.MissingField, StringComparison.OrdinalIgnoreCase)) continue;
+            var path = fe.Field?.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? Array.Empty<string>();
+            var at = Array.IndexOf(path, "modules");
+            if (at >= 0 && at + 1 < path.Length && !keys.Contains(path[at + 1])) keys.Add(path[at + 1]);
+        }
+        return keys;
     }
 
     /// <summary>
@@ -703,9 +753,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     /// 409 가 아니면 고정 문장 <paramref name="fallback"/> — 서버 원문은 팝업에 붙이지 않고 로그로만 남긴다
     /// (A-38: 영문 원문 · 코드가 운영자 팝업에 떴다).
     /// </remarks>
-    private string Explain(string what, int statusCode, string? code, string? serverMessage, string conflict, string fallback)
+    private string Explain(string what, int statusCode, ApiError? error, string? serverMessage, string conflict, string fallback)
     {
+        var code = error?.Code;
         _log?.Warning($"[PermGroup] {what} 거부: {statusCode} {code} {serverMessage}");
+        // 8.0.15 동시 쓰기 경합(details.retryable=true)은 이름 중복이 아니다 — 고정 문구보다 먼저 본다(G01).
+        if (ApiStatusHelper.IsRetryableConflict(statusCode, error)) return ApiStatusHelper.RetryableConflictMessage;
         return (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase)) ? conflict : fallback;
     }
 

@@ -22,6 +22,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                   나무(한 그루 · 줄 · 영역) · 바닥(영역) · 소품(클릭) · 담장(선)을 놓고 값을 바꾼다. map-3d 는 굽지 않고 뷰어가 바로 그린다(twin-contract C).
    Note         : ★ 들어가기 = 툴바(Map.Decoration.Start — 화면 가운데 3D 영역) · 3D 의 decoration.pick(그 항목을 판에서 고름). 지도 편집 권한이 있어야 한다.
                     꾸미는 동안은 독점 입력 모드라 3D 에 들어가지 않는다(IsMap3DBlockedByInputMode) — 「건물 그리기」와 같은 관용구.
+                    단, 3D 중에 시작하면 3D 위 판으로 3D 에 머문다(놓기 · 그리기 · 손잡이 = draw.* · edit.*, MapViewModel.Edit3D).
                   ★ 놓기 = 도구를 고르고 지도 클릭(점 도구는 한 번에 저장, 선 · 영역은 Enter · 두 번 누르기 · [마치기]). 옮기기는 [다시 놓기](지도 위 새 끌기 없음 —
                     drag-first-ux Must Never). 소품 방향은 판의 값 칸 · ↺/↻ · 판 안 ↑/↓(Shift = 1°).
                   ★ 저장 = PUT …/decorations/{uid} → 목록 다시 받기 · 3D 에 decorations.reload + GIS 편집 기록(DecorationCommand, 되돌리기 · 다시 하기).
@@ -68,7 +69,8 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
     public string DecorationUnsupportedText => Map3DDecoration.OldEngineText;
     public string DecorationTitle => DecoSelected is { } s ? $"꾸미기 · {s.Text}" : "꾸미기";
     public string DecorationStatusText => _decoReplaceUid != null && _decoTool is { } t && Map3DDecoration.GeometryOf(t) == Map3DDecoration.GeoPoint
-        ? "지도를 눌러 새 자리에 놓으세요" : Map3DDecoration.StatusText(_decoTool, DecoPoints.Count);
+        ? (_decoIn3D ? "3D 에서 땅을 눌러 새 자리에 놓으세요" : "지도를 눌러 새 자리에 놓으세요")
+        : _decoIn3D ? Map3DEdit.DecorationStatusText(_decoTool) : Map3DDecoration.StatusText(_decoTool, DecoPoints.Count);
     public string DecorationCountText => _decoArea is { } a ? $"3D 영역 '{a.Title}' · {Map3DDecoration.CountText(DecorationItems.Count)}" : "";
     public string? DecorationError => _decoError;
     public bool HasDecorationError => _decoError != null;
@@ -171,13 +173,14 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
     {
         if (IsDecorating) { ExitDecoration("toggle"); return; }
         var item = p as Map3DAreaItem;
+        if (item == null && ShouldEditIn3D) item = Map3DAreas.FirstOrDefault(a => a.Id == _map3DJob);   // 3D 중 — 보고 있는 영역에서 3D 위 판으로
         if (item == null && MainMap != null)
         {
             var c = MainMap.Position;
             item = Map3DAreas.FirstOrDefault(a => a.Area.Contains(c.Lng, c.Lat));
         }
         if (item == null) { SetAimStatus("3D 영역 안에서 시작하세요 — 화면 가운데를 3D 영역 안에 두고 다시 누르세요", autoHide: true); return; }
-        StartDecoration(item);
+        StartDecoration(item, in3D: ShouldEditIn3D && item.Id == _map3DJob);
     });
 
     private RelayCommand? _exitDecorationCommand;
@@ -208,6 +211,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         _decoReplaceUid = s.Uid;
         _decoTool = s.Tool;
         DecoPoints.Clear();
+        if (_decoIn3D) StartDraw3D(Map3DEdit.ModeOf(s.Tool), s.Kind, (JObject)DecoProps.DeepClone());   // 3D 에서 새 자리를 찍는다
         _decoAdorner?.InvalidateVisual();
         RefreshDecorationPanel();
     }, _ => DecoSelected != null && !_decoBusy && IsDecorationToolsEnabled);
@@ -244,7 +248,8 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
 
     // ── 들어가기 · 나가기 ──
 
-    private void StartDecoration(Map3DAreaItem item)
+    /// <summary>그 영역에서 꾸미기 시작. in3D = 3D 위 판(2D 지도 표면 없음 · 3D 에 머문다).</summary>
+    private void StartDecoration(Map3DAreaItem item, bool in3D = false)
     {
         if (MainMap == null) return;
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
@@ -254,14 +259,15 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         CancelConflictingModesForMeasure();   // 「건물 그리기」 · 측정 · 조준 · 배치 · 선 그리기 끝내기
         if (MainMap.IsMeasuring) MainMap.StopMeasure();
         _decoArea = item;
+        _decoIn3D = in3D;
         _decoItemList = null;
         _decoUnsupported = false;
         _decoError = null;
         SetDecorationTool(null);
-        AttachDecorationSurface();
-        MainMap.Focus();
-        SyncMap3DWithInputModes();   // 3D 중이면 2D 로(꾸미기는 2D)
-        _log?.Info($"[Decoration] 시작 area={item.Id}");
+        AttachDecorationSurface(adorner: !in3D);
+        if (!in3D) MainMap.Focus();
+        SyncMap3DWithInputModes();   // 2D 꾸미기면 3D 를 접는다(3D 위 판은 3D 에 머문다)
+        _log?.Info($"[Decoration] 시작 area={item.Id} 3D={in3D}");
         _ = LoadDecorationsAsync(item.Id);
     }
 
@@ -270,7 +276,9 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         if (_decoArea is not { } area) return;
         _log?.Info($"[Decoration] 끝 area={area.Id} cause={cause}");
         if (_decoSelectedUid != null) PostUserBuilding3D(area.Id, Map3DDecoration.SelectMessageJson(null));
+        if (_decoIn3D) EndEdit3D();   // 3D 그리기 · 손잡이 내림
         _decoArea = null;
+        _decoIn3D = false;
         _decoItemList = null;
         _decoSelectedUid = _decoReplaceUid = _decoPendingSelect = null;
         _decoTool = null;
@@ -283,16 +291,25 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         SyncMap3DWithInputModes();
     }
 
-    /// <summary>3D 에서 꾸미기 항목을 눌렀다 — 그 3D 영역에서 「꾸미기」를 시작하고(2D 로 바뀐다) 목록을 받으면 그 항목을 판에서 고른다.</summary>
+    /// <summary>
+    /// 3D 에서 꾸미기 항목을 눌렀다 — 그 3D 영역에서 「꾸미기」를 3D 위 판으로 시작하고(3D 에 머문다, edit3d-contract 1단계 — 네이티브 창 3D 만 2D 로)
+    /// 목록을 받으면 그 항목을 판에서 고른다(3D 손잡이 edit.start).
+    /// </summary>
     private void OnMap3DDecorationPicked(string uid)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob is not { } job || Map3DAreas.FirstOrDefault(a => a.Id == job) is not { } area) return;
         _log?.Info($"[Decoration] 3D 에서 고름 uid={uid} job={job}");
         CloseBuildingHeightPanel(clearUndo: false);
-        StartDecoration(area);
+        bool in3D = ShouldEditIn3D;
+        bool same = in3D && _decoIn3D && _decoArea?.Id == job;   // 이미 3D 위 판 — 그 항목만 고른다
+        if (!same) StartDecoration(area, in3D);
         if (_decoArea?.Id != job) return;
         if (DecorationItems.Any(i => i.Uid == uid)) SelectDecoration(uid);   // 목록을 이미 받았다
-        else _decoPendingSelect = uid;
+        else
+        {
+            _decoPendingSelect = uid;
+            if (same) _ = LoadDecorationsAsync(job);
+        }
     }
 
     private void SetDecorationTool(DecoTool? tool)
@@ -310,6 +327,11 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
             _decoName = "";
         }
         else if (_decoSelectedUid == null) _decoProps = null;
+        if (_decoIn3D)   // 3D 위 판 — 도구 = 3D 그리기 모드
+        {
+            if (tool is { } d) StartDraw3D(Map3DEdit.ModeOf(d), Map3DDecoration.KindOf(d), (JObject)DecoProps.DeepClone());
+            else CancelDraw3D();
+        }
         _decoAdorner?.InvalidateVisual();
         RefreshDecorationPanel();
     }
@@ -333,17 +355,20 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         }
         else _decoProps = null;
         if (_decoArea is { } a) PostUserBuilding3D(a.Id, Map3DDecoration.SelectMessageJson(item?.Uid));
+        if (_decoIn3D) { CancelDraw3D(); if (item != null) StartEdit3D(Map3DEdit.TargetDecoration, item.Uid); else StopEdit3D(); }   // 3D 손잡이
         _decoAdorner?.InvalidateVisual();
         RefreshDecorationPanel();
     }
 
-    private void AttachDecorationSurface()
+    /// <summary>지도 표면(adorner = false 면 판 키만 — 3D 위 판).</summary>
+    private void AttachDecorationSurface(bool adorner = true)
     {
         if (MainMap == null) return;
         try
         {
             var layer = AdornerLayer.GetAdornerLayer(MainMap);
-            if (layer != null) { _decoAdorner = new DecorationAdorner(MainMap, this, _log); layer.Add(_decoAdorner); }
+            if (!adorner) { }
+            else if (layer != null) { _decoAdorner = new DecorationAdorner(MainMap, this, _log); layer.Add(_decoAdorner); }
             else _log?.Warning("[Decoration] AdornerLayer 없음 — 지도 표면 없이(키 · 판만)");
             _decoKeyWindow = System.Windows.Window.GetWindow(MainMap);
             if (_decoKeyWindow != null) _decoKeyWindow.PreviewKeyDown += OnDecorationKeyDown;
@@ -429,7 +454,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
 
     // ── 키 ──
 
-    private bool IsDecorationKey(KeyEventArgs e) => IsDecorating && IsMapAreaKey(e, _decoPanel);
+    private bool IsDecorationKey(KeyEventArgs e) => IsDecorating && (_decoIn3D ? IsPanelKey(e, _decoPanel) : IsMapAreaKey(e, _decoPanel));
 
     private void OnDecorationKeyDown(object sender, KeyEventArgs e)
     {
@@ -443,6 +468,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         if (!IsDecorating) return false;
         if (key == Key.Escape)
         {
+            if (_decoIn3D && ForwardEscapeToEdit3D()) return true;   // 3D 손잡이 → 뷰어가 원위치 또는 편집 끝(edit.end)
             if (DecoPoints.Count > 0) { DecoPoints.Clear(); _decoAdorner?.InvalidateVisual(); RefreshDecorationPanel(); }
             else if (_decoTool != null) SetDecorationTool(null);
             else if (_decoSelectedUid != null) SelectDecoration(null);
@@ -610,6 +636,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         foreach (var c in new[] { SelectDecorationToolCommand, FinishDecorationCommand, ApplyDecorationCommand, ReplaceDecorationCommand, DeleteDecorationCommand,
                                   UndoDecorationCommand, RedoDecorationCommand, ClearDecorationsCommand, StepDecorationHeadingCommand })
             c.RaiseCanExecuteChanged();
+        RefreshEdit3D();
     }
 
     /// <summary>판 안 키(IBuildingHeightPanelHost 규약) — ↑/↓ = 소품 방향 ±15°(Shift = ±1°), Ctrl+Z = 되돌리기. 손잡이는 없다.</summary>

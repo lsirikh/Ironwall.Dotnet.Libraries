@@ -1,0 +1,310 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps.Map3DEnvironmentSettingsBlock"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:fb="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	Loaded="OnLoaded">
+	<!--  3D 환경 설정 묶음(env3d-contract A) — DataContext = Map3DEnvironmentViewModel(DI 싱글톤, 3D 위 「환경」 판과 같은 VM).
+	      호스트 설정 창 「3D 지도」 절에 끼운다. 바꾸면 바로 3D 에 반영되고 잠시 뒤 저장된다(저장 단추 없음).  -->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+			<Style x:Key="EnvLabel" TargetType="TextBlock">
+				<Setter Property="VerticalAlignment" Value="Center" />
+				<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			</Style>
+		</ResourceDictionary>
+	</UserControl.Resources>
+	<StackPanel Margin="0,4">
+		<StackPanel Orientation="Horizontal">
+			<TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Text="3D 환경 — 해 · 날씨 · 차 · 사람" />
+			<fb:HelpTip
+				Margin="6,0,0,0"
+				VerticalAlignment="Center"
+				HelpKey="Map.Map3D.Environment.Settings"
+				Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
+		</StackPanel>
+
+		<!--  ── 날씨 ──  -->
+		<Grid Margin="0,10,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="110" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+			<TextBlock Style="{StaticResource EnvLabel}" Text="날씨" />
+			<ComboBox
+				Grid.Column="1"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.WeatherMode"
+				AutomationProperties.Name="날씨 모드"
+				DisplayMemberPath="Value"
+				ItemsSource="{Binding WeatherModes}"
+				SelectedValue="{Binding WeatherMode, Mode=TwoWay}"
+				SelectedValuePath="Key"
+				Style="{StaticResource PropertyComboBox}" />
+		</Grid>
+
+		<!--  자동(기상청) — 주소 · 인증키(가림) · 갱신 간격 · [연결 시험]  -->
+		<StackPanel Visibility="{Binding IsWeatherAuto, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="110" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Style="{StaticResource EnvLabel}" Text="기상청 주소" />
+				<TextBox
+					Grid.Column="1"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.KmaBaseUrl"
+					AutomationProperties.Name="기상청 주소"
+					Text="{Binding KmaBaseUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+			</Grid>
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="110" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Style="{StaticResource EnvLabel}" Text="인증키" />
+				<PasswordBox
+					x:Name="KeyBox"
+					Grid.Column="1"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.KmaServiceKey"
+					AutomationProperties.Name="기상청 인증키"
+					LostFocus="OnKeyLostFocus" />
+			</Grid>
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="110" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Style="{StaticResource EnvLabel}" Text="갱신 간격" />
+				<ComboBox
+					Grid.Column="1"
+					MinWidth="70"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.Refresh"
+					AutomationProperties.Name="갱신 간격(분)"
+					ItemsSource="{Binding RefreshChoices}"
+					SelectedItem="{Binding WeatherRefreshMinutes, Mode=TwoWay}"
+					Style="{StaticResource PropertyComboBox}" />
+				<TextBlock Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Text="분마다" />
+			</Grid>
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<Button
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.TestConnection"
+					Click="OnTestClick"
+					Command="{Binding TestConnectionCommand}"
+					Content="연결 시험"
+					Style="{StaticResource PanelSecondaryButtonStyle}" />
+				<TextBlock
+					Grid.Column="1"
+					Margin="8,0,0,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.TestResult"
+					Foreground="{DynamicResource TextPrimaryBrush}"
+					Text="{Binding ConnectionTestText}"
+					TextWrapping="Wrap" />
+			</Grid>
+			<TextBlock
+				Margin="0,4,0,0"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.WeatherStatus"
+				Foreground="{DynamicResource TextMutedBrush}"
+				Text="{Binding WeatherStatus}"
+				TextWrapping="Wrap" />
+		</StackPanel>
+
+		<!--  수동 — 하늘 · 비/눈 · 세기 · 안개  -->
+		<StackPanel Visibility="{Binding IsWeatherManual, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="110" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Style="{StaticResource EnvLabel}" Text="하늘 · 비/눈" />
+				<ComboBox
+					Grid.Column="1"
+					Margin="0,0,4,0"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.ManualSky"
+					AutomationProperties.Name="하늘"
+					DisplayMemberPath="Value"
+					ItemsSource="{Binding Skies}"
+					SelectedValue="{Binding ManualSky, Mode=TwoWay}"
+					SelectedValuePath="Key"
+					Style="{StaticResource PropertyComboBox}" />
+				<ComboBox
+					Grid.Column="2"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.ManualPrecip"
+					AutomationProperties.Name="비 · 눈"
+					DisplayMemberPath="Value"
+					ItemsSource="{Binding Precips}"
+					SelectedValue="{Binding ManualPrecip, Mode=TwoWay}"
+					SelectedValuePath="Key"
+					Style="{StaticResource PropertyComboBox}" />
+			</Grid>
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="110" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Style="{StaticResource EnvLabel}" Text="비 · 눈 세기" />
+				<Slider
+					Grid.Column="1"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.ManualIntensity"
+					AutomationProperties.Name="비 · 눈 세기"
+					IsSnapToTickEnabled="True"
+					LargeChange="0.25"
+					Maximum="1"
+					Minimum="0"
+					SmallChange="0.1"
+					TickFrequency="0.05"
+					Value="{Binding ManualIntensity, Mode=TwoWay}" />
+			</Grid>
+			<Grid Margin="0,6,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="110" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Style="{StaticResource EnvLabel}" Text="안개" />
+				<Slider
+					Grid.Column="1"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="GMaps.Map3DEnv.ManualFog"
+					AutomationProperties.Name="안개"
+					IsSnapToTickEnabled="True"
+					LargeChange="0.25"
+					Maximum="1"
+					Minimum="0"
+					SmallChange="0.1"
+					TickFrequency="0.05"
+					Value="{Binding ManualFog, Mode=TwoWay}" />
+			</Grid>
+		</StackPanel>
+
+		<!--  ── 시간 ──  -->
+		<Grid Margin="0,10,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="110" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+			<TextBlock Style="{StaticResource EnvLabel}" Text="시간" />
+			<ComboBox
+				Grid.Column="1"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.TimeMode"
+				AutomationProperties.Name="시간 모드"
+				DisplayMemberPath="Value"
+				ItemsSource="{Binding TimeModes}"
+				SelectedValue="{Binding TimeMode, Mode=TwoWay}"
+				SelectedValuePath="Key"
+				Style="{StaticResource PropertyComboBox}" />
+		</Grid>
+		<Grid Margin="0,6,0,0" Visibility="{Binding IsTimePicked, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="110" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="56" />
+			</Grid.ColumnDefinitions>
+			<TextBlock Style="{StaticResource EnvLabel}" Text="시각" />
+			<!--  하루 안 분, 10분 단위  -->
+			<Slider
+				Grid.Column="1"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.ManualTime"
+				AutomationProperties.Name="시각"
+				IsSnapToTickEnabled="True"
+				LargeChange="60"
+				Maximum="1430"
+				Minimum="0"
+				SmallChange="10"
+				TickFrequency="10"
+				Value="{Binding ManualTimeMinutes, Mode=TwoWay}" />
+			<TextBox
+				Grid.Column="2"
+				Margin="8,0,0,0"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.ManualTimeText"
+				AutomationProperties.Name="시각(시:분)"
+				Text="{Binding ManualTime, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+				TextAlignment="Center" />
+		</Grid>
+		<Grid Margin="0,6,0,0" Visibility="{Binding IsTimeCycle, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="110" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<TextBlock Style="{StaticResource EnvLabel}" Text="빨리 감기" />
+			<Slider
+				Grid.Column="1"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.CycleSpeed"
+				AutomationProperties.Name="빨리 감기 속도(1초에 흐르는 분)"
+				IsSnapToTickEnabled="True"
+				LargeChange="10"
+				Maximum="120"
+				Minimum="1"
+				SmallChange="1"
+				TickFrequency="1"
+				Value="{Binding CycleMinutesPerSecond, Mode=TwoWay}" />
+			<TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Text="{Binding CycleMinutesPerSecond, StringFormat=1초에 {0}분}" />
+		</Grid>
+
+		<!--  ── 차 · 사람 ──  -->
+		<Grid Margin="0,10,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="110" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<CheckBox AutomationProperties.AutomationId="GMaps.Map3DEnv.Cars" Content="차" IsChecked="{Binding CarsEnabled, Mode=TwoWay}" />
+			<TextBlock Grid.Column="1" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Text="적음" />
+			<Slider
+				Grid.Column="2"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.CarDensity"
+				AutomationProperties.Name="차 많음/적음"
+				IsEnabled="{Binding CarsEnabled}"
+				IsSnapToTickEnabled="True"
+				Maximum="1"
+				Minimum="0"
+				TickFrequency="0.1"
+				Value="{Binding CarDensity, Mode=TwoWay}" />
+			<TextBlock Grid.Column="3" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Text="많음" />
+		</Grid>
+		<Grid Margin="0,6,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="110" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<CheckBox AutomationProperties.AutomationId="GMaps.Map3DEnv.People" Content="사람" IsChecked="{Binding PeopleEnabled, Mode=TwoWay}" />
+			<TextBlock Grid.Column="1" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Text="적음" />
+			<Slider
+				Grid.Column="2"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Map3DEnv.PeopleDensity"
+				AutomationProperties.Name="사람 많음/적음"
+				IsEnabled="{Binding PeopleEnabled}"
+				IsSnapToTickEnabled="True"
+				Maximum="1"
+				Minimum="0"
+				TickFrequency="0.1"
+				Value="{Binding PeopleDensity, Mode=TwoWay}" />
+			<TextBlock Grid.Column="3" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Text="많음" />
+		</Grid>
+
+		<TextBlock
+			Margin="0,8,0,0"
+			HorizontalAlignment="Right"
+			AutomationProperties.AutomationId="GMaps.Map3DEnv.SaveStatus"
+			Foreground="{DynamicResource TextMutedBrush}"
+			Text="{Binding SaveStatus}" />
+	</StackPanel>
+</UserControl>

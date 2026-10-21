@@ -16,6 +16,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -150,7 +151,7 @@ public class UnitConsoleTreeSelectionReloadTests
             Content = tree, Width = 300, Height = 400, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
             WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowActivated = false,
         };
-        window.Show();
+        QuietWindow.Show(window);
         return new Harness(console, units, delay, tree, window);
     }
 

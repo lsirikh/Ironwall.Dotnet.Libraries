@@ -35,6 +35,9 @@ public sealed class TemplateComponentItem : PropertyChangedBase
     /// <summary>서버 설명문 — 툴팁.</summary>
     public string? Description { get; init; }
 
+    /// <summary>저장돼 있으나 서버 카탈로그에 없는 줄(제공 중단).</summary>
+    public bool IsOrphan { get; init; }
+
     /// <summary>
     /// 저장된 구성 한 줄을 <b>통째로</b> 들고 있는다 — 우리가 아는 필드만 골라 다시 만들면
     /// 서버가 쥔 나머지(예: <c>title</c>)가 다음 저장 때 말없이 사라진다(배열은 통째로 교체된다).
@@ -108,9 +111,20 @@ public sealed class TemplateComponentBoard
     /// <summary>체크 · 순서 중 무엇이든 바뀌었다.</summary>
     public event EventHandler? Changed;
 
-    public int EnabledCount => Items.Count(i => i.IsEnabled);
+    /// <summary>저장 때 <b>실제로 켜진 채 나갈</b> 줄 수 — 저장할 때 빠질 고아 줄은 세지 않는다.</summary>
+    public int EnabledCount => Items.Count(i => i.IsEnabled && !IsDropped(i));
 
     public int Count => Items.Count;
+
+    /// <summary>
+    /// 저장할 때 빠질 고아 줄 수. 카탈로그를 <b>정상으로 받았을 때만</b> 뺀다 —
+    /// 못 받았으면 모든 저장 줄이 고아처럼 보이므로 지금대로 그대로 나른다(서버 v8.0.15 는 카탈로그 밖 id 를 422 로 막는다).
+    /// </summary>
+    public int DroppedOrphanCount => Items.Count(IsDropped);
+
+    private bool _catalogReceived;
+
+    private bool IsDropped(TemplateComponentItem item) => _catalogReceived && item.IsOrphan;
 
     /// <summary>켠 것의 <b>순서까지 포함한</b> 지금 상태. 미적용 판정의 기준이다.</summary>
     public string Signature => string.Join(",", Items.Where(i => i.IsEnabled).Select(i => i.Id));
@@ -166,6 +180,7 @@ public sealed class TemplateComponentBoard
             {
                 Saved = savedById[id],
                 Description = $"원래 항목 코드: {id}",
+                IsOrphan = true,
             };
             orphan.SetEnabledQuiet(savedEntryEnabled(id));
             built.Add(orphan);
@@ -180,6 +195,9 @@ public sealed class TemplateComponentBoard
             .ThenBy(x => x.index)
             .Select(x => x.item)
             .ToList();
+
+        // 카탈로그에 항목이 하나라도 있어야 "정상으로 받았다" 로 친다(빈 카탈로그로 저장 구성을 몽땅 지우지 않는다).
+        _catalogReceived = built.Any(i => !i.IsOrphan);
 
         foreach (var item in Items) item.EnabledChanged -= OnItemEnabledChanged;
         Items.Clear();
@@ -254,11 +272,12 @@ public sealed class TemplateComponentBoard
         var config = new List<ReportComponentConfigDto>();
         var order = 0;
 
-        foreach (var item in Items.Where(i => i.IsEnabled))
+        // 카탈로그를 받았으면 고아 줄(제공 중단)은 싣지 않는다 — 실으면 v8.0.15 서버가 422 로 거절한다.
+        foreach (var item in Items.Where(i => i.IsEnabled && !IsDropped(i)))
             config.Add(Emit(item, order++, enabled: true));
 
         // 서버가 알고 있던 끈 줄은 사라지지 않게 뒤에 붙인다(새로 끈 것도 여기 포함된다).
-        foreach (var item in Items.Where(i => !i.IsEnabled && i.Saved is not null))
+        foreach (var item in Items.Where(i => !i.IsEnabled && i.Saved is not null && !IsDropped(i)))
             config.Add(Emit(item, order++, enabled: false));
 
         return config;

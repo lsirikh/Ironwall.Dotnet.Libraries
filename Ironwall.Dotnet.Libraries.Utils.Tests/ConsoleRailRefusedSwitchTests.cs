@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -292,7 +293,7 @@ public class ConsoleRailRefusedSwitchTests
         };
         // 앱의 UI 스레드처럼 await 가 같은 디스패처로 돌아오게 한다(Task.Yield 뒤 계속이 디스패처 Normal 에 선다).
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
-        window.Show();
+        QuietWindow.Show(window);
         Pump(DispatcherPriority.Loaded);
         owner.Writes.Clear();
         return (rail, window, owner);
@@ -348,7 +349,13 @@ public class ConsoleRailRefusedSwitchTests
     {
         T result = default!;
         Exception? failure = null;
-        var thread = new Thread(() => { try { result = body(); } catch (Exception ex) { failure = ex; } });
+        var thread = new Thread(() =>
+        {
+            // 키보드 초점이 필요한 반 — 키보드 ↓ 시험은 항목의 진짜 키보드 초점 · 입력 관리자 라우팅을 단정한다. 초점 = 창 활성화라 숨은 데스크톱에서.
+            QuietWindow.UseHiddenDesktop();
+            try { result = body(); } catch (Exception ex) { failure = ex; }
+            finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }   // 숨은 데스크톱 스레드는 디스패처를 닫고 끝낸다 — TSF · 창 정리가 살아 있는 개체에서 돈다
+        });
         thread.SetApartmentState(ApartmentState.STA);
         thread.IsBackground = true;
         thread.Start();

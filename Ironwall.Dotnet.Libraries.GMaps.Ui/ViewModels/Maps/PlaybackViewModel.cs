@@ -34,6 +34,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     private readonly ITrackingSetupModel? _setup;
     private readonly ILogService? _log;
     private bool _suppressSeek;
+    private bool _availabilityChecked;
 
     /// <summary>트랙 클릭 시 지도 센터링 요청(MapViewModel이 처리).</summary>
     public event System.Action<double, double>? FocusRequested;
@@ -194,12 +195,24 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
             _engine.GapThresholdSec = _setup.GapThresholdSec;
         }
 
+        // 서버 추적 저장소를 처음 쓰기 전에 1회 점검한다(G13) — 쓸 수 없으면 조회하지 않고 알린다(다음 불러오기에서 다시 본다).
+        if (!_availabilityChecked)
+        {
+            var unavailable = await _reader.CheckAvailabilityAsync().ConfigureAwait(true);
+            if (unavailable is not null) { Status = unavailable; return; }
+            _availabilityChecked = true;
+        }
+
         var points = await _reader.FetchAsync(null, fromUtc, toUtc).ConfigureAwait(true);
         _engine.Load(points);
         BuildEvents(points);
         _overlay.SetEnabledTracks(EnabledSet());
         HasData = points.Count > 0;
-        Status = HasData ? $"{points.Count}점 · {Events.Count}건 로드" : "해당 기간 데이터 없음";
+        // 실패를 '데이터 없음'으로 보이지 않는다(G12) — 권한 없음 · 일부만 은 판독기가 알려 준 문구로.
+        var notice = _reader.LastFetchNotice;
+        Status = notice is not null
+            ? (HasData ? $"{points.Count}점 · {Events.Count}건 로드 — {notice}" : notice)
+            : HasData ? $"{points.Count}점 · {Events.Count}건 로드" : "해당 기간 데이터 없음";
         _log?.Info($"[Playback] 로드 {points.Count}점 / {Events.Count}건 ({FromTime:HH:mm}~{ToTime:HH:mm})");
         UpdateTimeLabel();
     }

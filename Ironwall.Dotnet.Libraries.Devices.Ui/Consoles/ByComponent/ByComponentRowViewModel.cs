@@ -70,7 +70,7 @@ public sealed class ByComponentRowViewModel
         ComponentTypeLabel = string.IsNullOrWhiteSpace(dto.ComponentType)
             ? Dash
             : ComponentDisplay.TypeName(dto.ComponentType, labels ?? new CatalogLabelAdapter(catalog));
-        StateText = StateLabel(dto.State);
+        StateText = ComponentDisplay.StateName(dto.State, catalog as IComponentStateLabels ?? new CatalogLabelAdapter(catalog)) ?? Dash;
         StateTooltip = UnknownStateTooltip(dto.State);
         var (healthText, healthKind) = ToHealth(dto.Health);
         HealthText = healthText;
@@ -212,10 +212,16 @@ public sealed class ByComponentRowViewModel
     }
 
     /// <summary>카탈로그 서비스를 공용 사전의 유형 이름 입구로 잇는다(<see cref="IComponentTypeLabels"/> 를 구현하지 않는 가짜 서비스용).</summary>
-    private sealed class CatalogLabelAdapter : IComponentTypeLabels
+    private sealed class CatalogLabelAdapter : IComponentTypeLabels, IComponentStateLabels
     {
         private readonly ICatalogService _catalog;
         public CatalogLabelAdapter(ICatalogService catalog) => _catalog = catalog;
+        public string? StateLabel(string? state)
+        {
+            if (string.IsNullOrWhiteSpace(state)) return null;
+            var label = _catalog.LabelOf("component_state", state);
+            return string.IsNullOrWhiteSpace(label) || string.Equals(label, state, StringComparison.OrdinalIgnoreCase) ? null : label;
+        }
         public string? TypeLabel(string? type)
         {
             if (string.IsNullOrWhiteSpace(type)) return null;

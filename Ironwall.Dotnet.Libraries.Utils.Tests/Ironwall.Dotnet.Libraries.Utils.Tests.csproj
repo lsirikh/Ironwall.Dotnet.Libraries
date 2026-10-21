@@ -21,4 +21,9 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
   </ItemGroup>
 
+  <!-- 시험 창이 사용자 화면 · 포커스를 건드리지 않게 하는 공용 도우미(tests/Shared/QuietWindow.cs) -->
+  <ItemGroup>
+    <Compile Include="..\tests\Shared\QuietWindow.cs" Link="Linked\QuietWindow.cs" />
+  </ItemGroup>
+
 </Project>

@@ -7,6 +7,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
@@ -105,7 +106,7 @@ public class ConsoleChipGroupAutomationTests
                     Content = host, Width = 400, Height = 120, Left = -20000, Top = -20000,
                     ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
                 };
-                window.Show();
+                QuietWindow.Show(window);
                 var hwnd = new WindowInteropHelper(window).Handle;
                 var dispatcher = Dispatcher.CurrentDispatcher;
 

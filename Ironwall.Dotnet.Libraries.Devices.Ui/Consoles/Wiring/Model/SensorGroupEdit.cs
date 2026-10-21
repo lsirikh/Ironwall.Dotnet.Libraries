@@ -29,7 +29,7 @@ public sealed record GroupCall(int GroupId, bool Add, IReadOnlyList<int> DeviceI
 /// 줄마다 달랐던 그룹이 사라진다. 그래서 이 창은 <b>체크를 바꾼 그룹만</b>, 그것도
 /// <b>실제로 바뀌어야 하는 줄만</b> 보낸다(WS L367 "적용을 전체 덮어쓰기에서 체크 변화분만 더하고 빼기로").</para>
 /// <para>서버 통로는 배치다 — <c>AssignDevicesToGroupAsync</c> · <c>RemoveDevicesFromGroupAsync</c> 가
-/// 장비 id 목록을 한 번에 받는다. 그래서 센서 24대의 그룹 하나를 바꿔도 <b>호출은 한 번</b>이다.</para>
+/// 장비 id 목록을 한 번에 받는다. 그래서 센서 24대의 그룹 하나를 바꿔도 <b>호출은 한 번</b>이다(한 번에 100대까지 — 넘으면 100대마다 한 번, G31).</para>
 /// </remarks>
 public static class SensorGroupEdit
 {

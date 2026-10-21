@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
@@ -88,7 +89,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
                                        IClock? clock = null,
                                        Func<bool>? canEdit = null,
                                        Func<bool>? canDelete = null,
-                                       Func<IUnitScopeService?>? unitScope = null)
+                                       Func<IUnitScopeService?>? unitScope = null,
+                                       Func<EnumServerContract>? contract = null)
     {
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _log = log;
@@ -119,7 +121,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
 
         Drawer = new SuppressionDrawerViewModel(
             _clock, devices, groups, SaveAsync, _canEdit, () => _active,
-            onError: (what, ex) => _log?.Error($"[SuppressionConsole] {what} 실패: {ex}"));
+            onError: (what, ex) => _log?.Error($"[SuppressionConsole] {what} 실패: {ex}"),
+            contract: contract);
         Drawer.Saved += OnDrawerSaved;
     }
 

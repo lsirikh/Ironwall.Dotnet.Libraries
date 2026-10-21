@@ -44,6 +44,10 @@ public sealed class MappingCommitOutcome
     public IReadOnlyList<string> RawFailureDetails => _rawFailures;
     private readonly List<string> _rawFailures = new();
 
+    /// <summary>진단 메모(화면에 내지 않음) — 예: 서버가 준 중복 행 목록이 보낸 중복 수보다 긴 경우.</summary>
+    public IReadOnlyList<string> Diagnostics => _diagnostics;
+    private readonly List<string> _diagnostics = new();
+
     /// <summary>실패한 행 — 화면에 남겨 두고 배지를 붙인다.</summary>
     public IReadOnlyList<MappingBoardRow> FailedRows => _failedRows;
     private readonly List<MappingBoardRow> _failedRows = new();
@@ -88,7 +92,15 @@ public sealed class MappingCommitOutcome
         var notFoundDevices = new HashSet<int>(result.NotFoundConfigIds ?? new List<int>());
 
         Created += createdIds.Count;
-        Skipped += result.SkippedConfigIds?.Count ?? 0;
+
+        // '중복 N건' 은 요청을 설명한다 — 보낸 수 − 생성 − 없는 장비 − 실패(최소 0) (GOP API 8.0.15 대조 G50, 명세 §7.3.9).
+        // skipped_config_ids 는 "정리해야 할 기존 행" 이라 같은 쌍이 여러 줄 쌓였으면 보낸 수보다 길다 — 그 길이로 세면 부풀었다.
+        var skipped = System.Math.Max(0, rows.Count - createdIds.Count
+            - (result.NotFoundConfigIds?.Count ?? 0) - (result.FailedItems?.Count ?? 0));
+        Skipped += skipped;
+        var skippedIds = result.SkippedConfigIds ?? new List<int>();
+        if (skippedIds.Count > skipped)
+            _diagnostics.Add($"중복 {skipped}건인데 서버가 기존 행 {skippedIds.Count}개를 알려줌(같은 쌍이 여러 줄): {string.Join(",", skippedIds)}");
 
         // created_ids 는 "요청 순서 보존" 이지만 실패·건너뜀이 섞이면 행과 1:1 이 아니다.
         // 그래서 id 를 행에 억지로 붙이지 않고, 실패하지 않은 행만 "정착" 으로 표시한 뒤 재조회로 확정한다.

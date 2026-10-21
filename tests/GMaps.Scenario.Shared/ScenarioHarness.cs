@@ -1,9 +1,10 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Threading;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 using Moq;
 using Xunit;
 
@@ -20,11 +21,21 @@ namespace ScenarioShared;
 internal static class Scenario
 {
     /// <summary>본문을 새 STA 스레드에서 실행(예외는 호출 스레드로 전달, 45 s 제한). Application 은 만들지 않는다.</summary>
-    internal static void Sta(System.Action action)
+    internal static void Sta(System.Action action) => Sta(action, hiddenDesktop: false);
+
+    /// <summary>
+    /// <see cref="Sta(System.Action)"/> 를 사용자에게 보이지 않는 데스크톱(<see cref="QuietWindow.UseHiddenDesktop"/>)에서 — 보조키(Shift · Ctrl)를 읽는 시험용.
+    /// 제품 처리기는 <c>Keyboard.Modifiers</c>(= 이 스레드의 Win32 키 상태)를 읽는데, 기본 데스크톱에서는 시험 중 사용자가 누른 Shift · Ctrl 이 그대로 보인다
+    /// (2026-10-21 저녁: 사용자가 입력하던 0.2~0.5초 동안 Shift+휠=회전 · Ctrl+클릭=그룹 토글로 바뀌어 Map3DExitInput 2건 · GroupRotationEdge 3건이 한꺼번에 실패).
+    /// </summary>
+    internal static void StaOnHiddenDesktop(System.Action action) => Sta(action, hiddenDesktop: true);
+
+    private static void Sta(System.Action action, bool hiddenDesktop)
     {
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            if (hiddenDesktop) QuietWindow.UseHiddenDesktop();   // 창(디스패처 숨은 창 포함)을 만들기 전 첫 줄
             var previous = IoC.GetInstance;
             IoC.GetInstance = (type, key) => type == typeof(ILogService) ? Mock.Of<ILogService>() : type == typeof(IEventAggregator) ? new EventAggregator() : throw new InvalidOperationException(type.Name);
             try { action(); }
@@ -37,7 +48,12 @@ internal static class Scenario
     }
 
     /// <summary>비동기 본문을 STA 디스패처 위에서 끝까지 돌린다(await 뒤 이어짐도 같은 STA 스레드).</summary>
-    internal static void StaAsync(Func<Task> body) => Sta(() =>
+    internal static void StaAsync(Func<Task> body) => StaAsync(body, hiddenDesktop: false);
+
+    /// <summary><see cref="StaAsync(Func{Task})"/> 를 숨은 데스크톱에서(<see cref="StaOnHiddenDesktop"/> 와 같은 이유).</summary>
+    internal static void StaAsyncOnHiddenDesktop(Func<Task> body) => StaAsync(body, hiddenDesktop: true);
+
+    private static void StaAsync(Func<Task> body, bool hiddenDesktop) => Sta(() =>
     {
         var frame = new DispatcherFrame();
         Exception? inner = null;
@@ -49,7 +65,7 @@ internal static class Scenario
         });
         Dispatcher.PushFrame(frame);
         if (inner != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(inner).Throw();
-    });
+    }, hiddenDesktop);
 
     /// <summary>대기 중인 디스패처 작업을 지정 우선순위까지 비운다.</summary>
     internal static void Pump(DispatcherPriority priority = DispatcherPriority.ApplicationIdle)

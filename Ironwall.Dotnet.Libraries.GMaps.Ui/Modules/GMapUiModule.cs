@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Db.Modules;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Weather;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
@@ -59,7 +60,12 @@ public class GMapUiModule: Module
         builder.RegisterType<Services.Brokers.BrokerRequestClient>().As<Services.Brokers.IBrokerRequestClient>().SingleInstance();
         builder.RegisterType<BroadcastControlService>().As<IBroadcastControlService>().SingleInstance();
         // BROADCAST_STATUS 수신(FR-24) — 구독 시작·해제는 MapViewModel 활성/비활성이 맡는다(GMapUiModule 에는 IService 기동 블록이 없음).
-        builder.RegisterType<Services.Broadcast.BroadcastStatusNatsSyncService>()
+        // MIC_PAGING(G38) 이 같은 표시 경로를 쓰도록 BROADCAST_STATUS 서비스를 감싸 같은 인터페이스로 낸다 — 지도는 하나만 구독한다.
+        builder.RegisterType<Services.Broadcast.BroadcastStatusNatsSyncService>().AsSelf().SingleInstance();
+        builder.Register(c => new Services.MicPagingNatsSyncService(
+                   c.ResolveOptional<Ironwall.Dotnet.Libraries.Base.Services.ILogService>(),
+                   c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                   c.Resolve<Services.Broadcast.BroadcastStatusNatsSyncService>()))
                .As<Services.Broadcast.IBroadcastStatusNatsSyncService>().SingleInstance();
         // ENCLOSURE_METRICS 수신(이슈 #7-20) — 구독 시작·해제는 MapViewModel 활성/비활성이 맡는다(BROADCAST_STATUS 와 같다).
         builder.RegisterType<Services.Enclosure.EnclosureMetricsNatsSyncService>()
@@ -124,6 +130,12 @@ public class GMapUiModule: Module
         // 이벤트 시 지도 이동(event-map-flyto) — appsettings(AppSettings.MapEventFlyTo) 동기 로드 단일 인스턴스를 지도 · 설정 블록이 함께 쓴다
         builder.RegisterInstance(MapSettingsHelper.LoadMapEventFlyTo(_log)).AsSelf().SingleInstance();
         builder.RegisterType<MapEventFlyToSetupViewModel>().SingleInstance();
+        // 3D 환경(해 · 날씨 · 차 · 사람, env3d-contract) — appsettings(AppSettings.Map3DEnvironment) 동기 로드 단일 인스턴스를
+        //   설정 화면 「3D 환경」 묶음 · 3D 위 「환경」 판이 같은 VM 으로 함께 쓴다. 날씨 자동 모드 = 기상청(IWeatherProvider).
+        builder.RegisterInstance(MapSettingsHelper.LoadMap3DEnvironment(_log)).AsSelf().SingleInstance();
+        builder.Register(ctx => new KmaWeatherProvider(ctx.Resolve<Map3DEnvironmentModel>(), _log)).As<IWeatherProvider>().SingleInstance();
+        builder.Register(ctx => new Map3DEnvironmentViewModel(ctx.Resolve<Map3DEnvironmentModel>(), ctx.Resolve<IWeatherProvider>(), _log))
+               .AsSelf().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<CustomMapOverlayService>().SingleInstance();

@@ -117,7 +117,12 @@ public class ReportCreateViewModel : BasePanelViewModel
             {
                 // 서버 원문은 로그로만 — 화면에는 무엇이 안 됐고 무엇을 하면 되는지(완성도 패스 문구 규칙).
                 _log?.Warning($"[ReportCreate] 생성 요청 거부: {genRes.ErrorText()}");
-                StatusText = GenerateRejectedText;
+                // v8.0.15 — 켜진 구성이 없는 템플릿으로 CUSTOM 생성 → 422 CONSTRAINT(field template_id).
+                // 옛 판은 이 422 를 내지 않으므로 분기가 걸리지 않는다.
+                StatusText = req.ReportType == "CUSTOM" && genRes.IsValidationError()
+                             && ApiStatusHelper.FieldErrors(genRes.Error).Any(f => string.Equals(f.Field?.Trim(), "template_id", StringComparison.Ordinal))
+                    ? EmptyTemplateText
+                    : GenerateRejectedText;
                 IsGenerating = false;
                 return;
             }
@@ -187,6 +192,9 @@ public class ReportCreateViewModel : BasePanelViewModel
 
     /// <summary>서버가 생성 요청을 받지 않았을 때(원문은 로그).</summary>
     public const string GenerateRejectedText = "보고서 생성을 요청하지 못했습니다. 입력을 확인하고 잠시 후 다시 시도하세요.";
+
+    /// <summary>고른 템플릿에 켜진 구성 요소가 없어 서버가 거절했을 때(422 field <c>template_id</c>).</summary>
+    public const string EmptyTemplateText = "이 템플릿에 켜진 구성 요소가 없습니다. 템플릿에서 1개 이상 켜고 다시 시도하세요.";
 
     /// <summary>
     /// [비우기] — 폼을 처음 상태로 돌린다(서버 미호출). 상세 칸 고정 막대의 되돌리기 자리다(WL L1499 T2).

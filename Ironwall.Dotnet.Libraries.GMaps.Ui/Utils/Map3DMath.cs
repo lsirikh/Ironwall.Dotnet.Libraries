@@ -60,6 +60,15 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>decoration.pick 일 때 3D 에서 누른 꾸미기 항목의 uid(twin-contract C).</summary>
     public string? DecorationUid { get; init; }
+
+    /// <summary>env.state 일 때 3D 의 해 · 차 · 사람 상태(env3d-contract C, <see cref="Map3DEnvironment"/>).</summary>
+    public Map3DEnvState? EnvState { get; init; }
+
+    /// <summary>draw.point · draw.done · draw.end 일 때 3D 에서 그린 것(edit3d-contract 2단계, <see cref="Map3DEdit"/>).</summary>
+    public Map3DDrawEvent? Draw { get; init; }
+
+    /// <summary>edit.commit 일 때 3D 손잡이로 고친 도형(edit3d-contract 3단계).</summary>
+    public Map3DEditCommit? EditCommit { get; init; }
 }
 
 /// <summary>
@@ -311,9 +320,10 @@ public static class Map3DMath
 
     /// <summary>3D 화면 주소(embed=1 — 장식 없이 3D 만).</summary>
     /// <param name="lowQuality">원격(RDP) 세션 — 3D 가 저사양(해상도 1배 · 그림자 · AO 끔 · 초당 30장)으로 돈다(<c>&amp;low=1</c>).</param>
-    public static string ViewUrl(string server, string job, Map3DCamera cam, bool animate, bool lowQuality = false)
+    /// <param name="sky">3D 환경(env.set)을 보낸다 — embed 기본은 검은 바탕이라 하늘 · 구름 덮개가 안 보여 <c>&amp;sky=1</c> 을 붙인다.</param>
+    public static string ViewUrl(string server, string job, Map3DCamera cam, bool animate, bool lowQuality = false, bool sky = false)
         => $"{server}/view?job={Uri.EscapeDataString(job)}&embed=1&lon={Num(cam.Lon)}&lat={Num(cam.Lat)}&zoom={Num(cam.Zoom)}"
-           + $"&bearing={Num(cam.Bearing)}&pitch={Num(cam.Pitch)}&animate={(animate ? 1 : 0)}" + (lowQuality ? "&low=1" : "");
+           + $"&bearing={Num(cam.Bearing)}&pitch={Num(cam.Pitch)}&animate={(animate ? 1 : 0)}" + (lowQuality ? "&low=1" : "") + (sky ? "&sky=1" : "");
 
     // ── 메시지 ──
 
@@ -386,6 +396,7 @@ public static class Map3DMath
             if (type == "building")
                 return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b } : null;
             if (type == "building.none") return new Map3DMessage(type, null, null, null);   // 건물 아닌 땅을 눌렀다(2026-10-19)
+            if (type == "env.state") return new Map3DMessage(type, null, null, null) { EnvState = Map3DEnvironment.ParseState(o) };   // 해 뜸/짐 · 차 · 사람 수(2026-10-21)
             if (type is "userbuilding.pick" or "decoration.pick")   // 직접 그린 건물 상자 · 꾸미기 항목을 눌렀다(2026-10-21) — uid 가 틀리면 버린다
             {
                 string? uid = o["uid"]?.Type == JTokenType.String ? o.Value<string>("uid") : null;
@@ -393,6 +404,7 @@ public static class Map3DMath
                 return type == "userbuilding.pick" ? new Map3DMessage(type, null, null, null) { UserUid = uid }
                                                    : new Map3DMessage(type, null, null, null) { DecorationUid = uid };
             }
+            if (type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end") return Map3DEdit.Parse(type, o);   // 3D 안에서 편집(2026-10-21)
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;

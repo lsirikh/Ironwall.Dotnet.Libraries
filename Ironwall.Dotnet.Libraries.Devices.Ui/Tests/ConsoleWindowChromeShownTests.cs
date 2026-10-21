@@ -14,6 +14,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -37,7 +38,7 @@ public class ConsoleWindowChromeShownTests
             var closed = false;
             var cancels = 0;
             window.Closed += (_, _) => closed = true;
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             // 창의 뿌리인 틀은 제목 줄 ✕ 를 제 취소 길(SecondaryInvoked)로 받는다 — 뷰의 [아니오] 와 같은 하나.
             // 여기서는 Caliburn 창 관리자가 없어 뷰모델의 TryCloseAsync 가 창을 닫지 못한다 — 그 몫을 시험이 대신한다.
@@ -79,7 +80,7 @@ public class ConsoleWindowChromeShownTests
         {
             var view = new ConfirmPromptView { DataContext = new ConfirmPromptViewModel("확인", "미리보기") };
             var window = NewWindow(new Border { Margin = new Thickness(12), Child = view }, "미리보기", ResizeMode.NoResize);
-            window.Show();
+            QuietWindow.Show(window);
             Pump();
             var result = ConsoleWindowChrome.GetIsApplied(window);
             window.Close();

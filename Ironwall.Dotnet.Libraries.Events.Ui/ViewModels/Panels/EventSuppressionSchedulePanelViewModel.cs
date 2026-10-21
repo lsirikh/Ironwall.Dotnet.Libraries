@@ -302,6 +302,13 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             { Title = "억제 스케줄 만들기", Explain = why });
             return;
         }
+        // 6.3 서버는 '운영' 범위를 모른다(422) — 보내기 전에 막는다(G44).
+        if (SuppressionRequestBuilder.ScopeGuard(EventScope, SuppressionRequestBuilder.ContractFromIoC()) is { } scopeBlocked)
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "억제 스케줄 만들기", Explain = scopeBlocked });
+            return;
+        }
         try
         {
             // 서버 8.0: unit_id 생략은 기본 부대 귀속 + 서버 로그 경고("다음 차수부터 필수"). 8.0 미만은 키가 없다 — SuppressionUnitStamp.
@@ -731,6 +738,9 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     private string _eventScope = "all";
     /// <summary>억제 범위: connection / detection / malfunction / all.</summary>
     public string EventScope { get => _eventScope; set { _eventScope = value; NotifyOfPropertyChange(nameof(EventScope)); } }
+
+    /// <summary>억제 범위 콤보에 '운영' 을 보이는가 — 서버 7.0 이상만(G44).</summary>
+    public bool IsOperationScopeAvailable => SuppressionRequestBuilder.SupportsOperationScope(SuppressionRequestBuilder.ContractFromIoC());
 
     private DateTime _windowStart;
     public DateTime WindowStart { get => _windowStart; set { _windowStart = value; NotifyOfPropertyChange(nameof(WindowStart)); NotifyWindowChanged(); } }

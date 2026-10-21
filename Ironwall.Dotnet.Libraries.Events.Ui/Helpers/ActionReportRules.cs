@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Api.Services;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 
@@ -40,6 +41,38 @@ public static class ActionReportRules
         if (string.IsNullOrWhiteSpace(content)) return "조치 내용을 입력하세요.";
         if (content.Length > MAX_CONTENT_LENGTH) return $"조치 내용은 {MAX_CONTENT_LENGTH}자까지 보낼 수 있습니다(지금 {content.Length}자).";
         return null;
+    }
+
+    /// <summary>서버 <c>ActionEventCreate.user</c> 최대 길이(<c>min_length=1, max_length=100</c>).</summary>
+    public const int MAX_USER_LENGTH = 100;
+
+    /// <summary>보고자 칸이 서버가 받을 모양인지(1~100자, G43). 받을 수 있으면 <c>null</c>, 아니면 사람이 읽을 이유.</summary>
+    public static string? ValidateUser(string? user)
+    {
+        if (string.IsNullOrWhiteSpace(user)) return "보고자를 알 수 없어 보낼 수 없습니다. 다시 로그인하세요.";
+        if (user.Length > MAX_USER_LENGTH) return $"보고자 이름은 {MAX_USER_LENGTH}자까지 보낼 수 있습니다(지금 {user.Length}자).";
+        return null;
+    }
+
+    /// <summary>
+    /// 조치 생성 본문의 <c>created_at</c> 판본 규칙(G43). 서버 6.3.16 부터 조치 시각은 서버 접수 시각이라 보낸 값은 무시되고
+    /// 7.0+ 는 <c>warnings[] READ_ONLY_IGNORED</c> 를 단다 → <b>7.0 미만에서만</b> 싣고, 그 밖에는 비운다(<c>null</c> 은 키째 안 나간다).
+    /// 6.3.2(운영)는 받은 값을 그대로 저장하므로 지금처럼 싣는다. 같은 DTO 를 돌려준다.
+    /// <para>파생 클래스의 <c>ShouldSerializeCreatedAt</c> 은 쓰지 않는다 — Newtonsoft 는 선언한 타입에서만 찾아 동작하지 않는다.</para>
+    /// </summary>
+    public static Ironwall.Dotnet.Libraries.Messages.Dto.Events.ActionEventCreateDto ApplyCreatedAtPolicy(
+        Ironwall.Dotnet.Libraries.Messages.Dto.Events.ActionEventCreateDto dto, EnumServerContract? contract = null)
+    {
+        if (dto is null) return dto!;
+        var effective = contract ?? ContractFromIoC();
+        if (effective >= EnumServerContract.V7_0) dto.CreatedAt = null;
+        return dto;
+    }
+
+    private static EnumServerContract ContractFromIoC()
+    {
+        try { return Caliburn.Micro.IoC.Get<IServerContractProbe>()?.Contract ?? EnumServerContract.V6_3; }
+        catch { return EnumServerContract.V6_3; }
     }
 
     /// <summary>로그인한 사람이 없을 때(자동 조치보고 · 자동복구)의 보고자.</summary>

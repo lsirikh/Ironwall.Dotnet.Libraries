@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -139,7 +140,7 @@ public sealed class ServerConsoleService : IServerConsoleService
             result.Servers, units, categories, result.IsTruncated,
             result.IsSuccess
                 ? result.IsTruncated ? "목록의 앞부분만 표시했습니다. 부대 필터나 검색으로 범위를 좁히세요." : null
-                : Plain(result.Message, 0, "서버 목록을 불러오지 못했습니다. 잠시 후 [갱신]을 누르세요."));
+                : Plain(result.Message, 0, false, "서버 목록을 불러오지 못했습니다. 잠시 후 [갱신]을 누르세요."));
     }
 
     private async Task<IReadOnlyList<ServerUnitOption>> UnitsAsync(CancellationToken token)
@@ -187,7 +188,7 @@ public sealed class ServerConsoleService : IServerConsoleService
         var result = await _axis.PatchServerAsync(id, intent, token).ConfigureAwait(false);
         return new ServerWriteResult(result.IsSuccess, result.IsSuccess
             ? "설정을 저장했습니다."
-            : Plain(result.Message, result.StatusCode, "설정을 저장하지 못했습니다. 입력값을 확인하고 다시 시도하세요."));
+            : Plain(result.Message, result.StatusCode, result.IsRetryable, "설정을 저장하지 못했습니다. 입력값을 확인하고 다시 시도하세요."));
     }
 
     public async Task<(ServerWriteResult Result, int NewId)> CreateAsync(
@@ -206,7 +207,7 @@ public sealed class ServerConsoleService : IServerConsoleService
         var result = await _axis.CreateServerAsync(intent, token).ConfigureAwait(false);
         return result.IsSuccess
             ? (new ServerWriteResult(true, ServerStatusRules.JustRegisteredNotice), result.Id)
-            : (new ServerWriteResult(false, Plain(result.Message, result.StatusCode, "서버를 등록하지 못했습니다. 입력값을 확인하고 다시 시도하세요.")), 0);
+            : (new ServerWriteResult(false, Plain(result.Message, result.StatusCode, result.IsRetryable, "서버를 등록하지 못했습니다. 입력값을 확인하고 다시 시도하세요.")), 0);
     }
 
     /// <remarks>
@@ -222,7 +223,7 @@ public sealed class ServerConsoleService : IServerConsoleService
         var result = await _axis.AssignDeviceServerAsync(category, deviceId, serverId, unitId: null, token).ConfigureAwait(false);
         return new ServerWriteResult(result.IsSuccess, result.IsSuccess
             ? result.Message
-            : Plain(result.Message, result.StatusCode, "서버가 요청을 받아들이지 않았습니다."));
+            : Plain(result.Message, result.StatusCode, result.IsRetryable, "서버가 요청을 받아들이지 않았습니다."));
     }
 
     public async Task<DeviceServerLookup> GetDeviceServerAsync(EnumDeviceCategory category, int deviceId, CancellationToken token = default)
@@ -261,10 +262,12 @@ public sealed class ServerConsoleService : IServerConsoleService
     /// <summary>
     /// 서버 · 통로의 원문 사유(HTTP 코드 · 서버 메시지)는 <b>화면에 붙이지 않는다</b> — 로그로 보내고 고정 문장을 돌려준다
     /// (U-18 감사 공통 규칙). 같은 이름 충돌(409)만 운영자가 고칠 수 있는 까닭이라 따로 말한다.
+    /// 단 동시 쓰기 경합 409(8.0.15 <c>retryable=true</c>)는 이름 문제가 아니다 — 재시도 문구를 먼저 본다(G01).
     /// </summary>
-    private string Plain(string? raw, int statusCode, string fixedText)
+    private string Plain(string? raw, int statusCode, bool retryable, string fixedText)
     {
         if (!string.IsNullOrWhiteSpace(raw)) _log?.Warning($"[ServerConsole] 서버 응답 원문({statusCode}): {raw}");
+        if (retryable) return ApiStatusHelper.RetryableConflictMessage;
         return statusCode == 409 ? "같은 이름의 서버가 이미 있습니다. 다른 이름을 쓰세요." : fixedText;
     }
 

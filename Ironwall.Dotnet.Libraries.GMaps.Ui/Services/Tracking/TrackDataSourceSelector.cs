@@ -53,6 +53,15 @@ public sealed class TrackDataSourceSelector : ITrackPointReader
         return _local.FetchAsync(cameraId, fromUtc, toUtc, ct);
     }
 
+    /// <summary>서버 API 를 쓸 때만 그 판독기의 알림을 넘긴다(로컬은 늘 null).</summary>
+    public string? LastFetchNotice => UsesApi ? _api!.LastFetchNotice : null;
+
+    /// <summary>서버 API 를 쓸 때만 추적 저장소 상태를 본다(G13).</summary>
+    public Task<string?> CheckAvailabilityAsync(CancellationToken ct = default)
+        => UsesApi ? _api!.CheckAvailabilityAsync(ct) : Task.FromResult<string?>(null);
+
+    private bool UsesApi => _model.DataSource == EnumTrackDataSource.Api && _api is not null;
+
     #region - Attributes -
     private readonly TrackPointStore _local;
     private readonly TrackPointApiReader? _api;

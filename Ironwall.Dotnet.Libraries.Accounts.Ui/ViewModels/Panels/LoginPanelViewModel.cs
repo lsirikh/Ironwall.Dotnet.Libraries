@@ -417,6 +417,8 @@ public class LoginPanelViewModel : BasePanelViewModel
         return o.ErrorCode switch
         {
             "LOCKED" or "423"     => string.IsNullOrEmpty(o.LockReason) ? "잠긴 계정입니다. 관리자에게 문의하세요." : $"잠긴 계정: {o.LockReason}",
+            // 서버가 403 사유(비활성 · 잠금 등)를 알려 주면 그대로 보인다(G07) — 없을 때만 고정 문구.
+            "FORBIDDEN" when !string.IsNullOrWhiteSpace(o.Message) => o.Message!,
             "FORBIDDEN"           => "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.",   // W6: 잠금 사유 명확화
             "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
             "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",

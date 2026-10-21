@@ -16,6 +16,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Xunit;
+using Ironwall.Dotnet.Libraries.Tests.Shared;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
@@ -465,7 +466,7 @@ public sealed class UnitConsoleNonModalTests
                 Title = "셸", Width = 400, Height = 300, WindowStartupLocation = WindowStartupLocation.Manual,
                 Left = -20000, Top = -20000, ShowInTaskbar = false, ShowActivated = false,
             };
-            Shell.Show();
+            QuietWindow.Show(Shell);
             Launcher = new UnitConsoleLauncher(Windows, Units, new DeviceStub(), events: Events, session: Session,
                                                host: new WpfUnitConsoleWindowHost(() => Shell), prefs: () => null,
                                                guardedWindows: Registry);
@@ -664,6 +665,8 @@ public sealed class UnitConsoleNonModalTests
             Exception? failure = null;
             var thread = new Thread(() =>
             {
+                // 숨은 데스크톱에서 — 최소화한 콘솔은 화면 밖 자리를 버리고 주 모니터 왼쪽 아래([0,1004])에 막대로 뜨고, 진짜 확인 창(모달)도 뜬다(2026-10-21 실측). 거기서는 활성화도 실제 앱처럼 둔다.
+                QuietWindow.UseHiddenDesktop();
                 var savedIoC = IoC.GetInstance;
                 IoC.GetInstance = (_, _) => null!;                           // 권한 게이트 = 허용 폴백
                 var savedPlatform = PlatformProvider.Current;

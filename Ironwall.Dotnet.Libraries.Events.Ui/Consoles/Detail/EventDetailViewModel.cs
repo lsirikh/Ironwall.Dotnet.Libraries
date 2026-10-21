@@ -294,8 +294,8 @@ public sealed class EventDetailViewModel : PropertyChangedBase
 
         RaiseAll();
 
-        // 조치 내역은 한 건을 골랐을 때만, 그리고 조치 여부가 켜져 있을 때만 부른다(정본 E-D4).
-        if (_rows.Count == 1 && _rows[0] is ExEventViewModel ex && kind is EventDetailKind.Detection or EventDetailKind.Malfunction)
+        // 조치 내역은 한 건을 골랐을 때만, 그리고 조치 여부가 켜져 있을 때만 부른다(정본 E-D4). 연결 이벤트도 채운다(G42).
+        if (_rows.Count == 1 && _rows[0] is ExEventViewModel ex && kind is EventDetailKind.Detection or EventDetailKind.Malfunction or EventDetailKind.Connection)
             _ = Actions.LoadAsync(kind, ex.Model?.Id ?? 0, ex.IsActionReported);
         else
             Actions.Clear();
