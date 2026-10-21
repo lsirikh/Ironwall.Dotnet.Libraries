@@ -41,3 +41,9 @@
 - chosen: 숨은 데스크톱(AppHost · UnitConsoleNonModalTests). 가짜 창 관리자 코드는 그대로
 - why: Consoles.ViewTests 의 `OffscreenWindowManager` 는 EnsureWindow 에서 자리를 정하지만 그 뒤 설정(CenterOwner)이 덮어써 「서버 창 닫기」가 화면 가운데 떴고, UnitConsoleNonModalTests 는 최소화 창 막대가 [0,1004] 에 떴다 — 최소화 막대는 자리로 못 숨긴다. 숨은 데스크톱이면 둘 다 보이지 않고 코드도 한 줄.
 - effect: 숨은 데스크톱 줄을 빼면 그 창들이 다시 보인다.
+
+## 8. .sln 밖 창 시험 반(Devices.Ui · Events.Ui · tests/*)을 마지막에 다시 돌릴지
+- options: 지금 전부 다시 돌림(전경 감시) · 하네스 검사(.sln)만 돌림
+- chosen: .sln 만 돌림
+- why: 이전 회차가 그 실행 중에 사용자에게 중단됐고, 사용자가 PC 를 쓰는 동안에는 창을 띄우는 WPF 시험을 돌리지 않는다는 방침이 있다. 그 반들은 개발 중에 바꾼 뒤 실행 · 전경 감시로 이미 확인했다.
+- effect: 사용자가 자리를 비울 때 `$TEMP/final.sh` 와 같은 방식(프로젝트별 --filter)으로 다시 돌리면 된다.

@@ -26,8 +26,9 @@
 - [x] 기준선 실행(전경 감시)
 - [x] 교체 · 링크 · 숨은 데스크톱 · TSF/UIA 함정 해결
 - [x] 헤드리스 전환 + 돌연변이 근거(DialogTextKoreanWrap 확정, DragHitTest · ConsoleRailSelectionBar 는 근거 불충분 → 창 유지)
-- [ ] 최종 실행(.sln + tests/GMaps.* + 바꾼 프로젝트, 전경 감시) — $TEMP/final.sh
-- [ ] 보고
+- [x] 최종 `.sln` 실행 — 1건 실패(CameraPopup.Host `DispatcherStarvationTests`: 시험 장치의 SleepUntil 이 Thread.Sleep 의 밀리초 버림으로 19.99초에 깸 — 이번 변경과 무관한 시간 경계 문제) → 목표 시각까지 다시 자게 고침, Host.Tests 197/197 통과
+- [ ] .sln 밖 WPF 반(Devices.Ui · Events.Ui · tests/*) 전경 감시 최종 재실행 — 사용자가 PC 사용 중이라(이전 회차 사용자 중단) 이번엔 돌리지 않음. 필요 시 $TEMP/final.sh 방식으로
+- [x] 보고
 
 ## 남은 일
-최종 실행 결과 확인 · 보고.
+위 미실행 항목(.sln 밖 창 시험 반의 최종 재실행)만.
