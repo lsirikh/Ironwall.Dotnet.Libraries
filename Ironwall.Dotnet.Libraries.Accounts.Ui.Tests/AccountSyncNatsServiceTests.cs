@@ -67,6 +67,7 @@ public class AccountSyncNatsServiceTests
     private static string Envelope(string cmd, int id, string action = "UPDATED")
         => "{\"id\":\"x\",\"m_type\":\"PUB\",\"cmd\":\"" + cmd + "\",\"from\":\"DBApi\",\"body\":{\"action\":\"" + action + "\",\"resource_id\":" + id + "}}";
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_reload_once_for_a_burst_of_changes_when_the_console_is_open()
     {
@@ -82,6 +83,7 @@ public class AccountSyncNatsServiceTests
         Assert.True(reload.Groups);
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_read_an_array_envelope_item_by_item()
     {
@@ -93,6 +95,7 @@ public class AccountSyncNatsServiceTests
         Assert.Equal((false, true), Assert.Single(rig.Target.Reloads));
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_not_reload_when_the_console_is_closed()
     {
@@ -105,6 +108,7 @@ public class AccountSyncNatsServiceTests
         Assert.Empty(rig.Target.Reloads);
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_skip_what_the_operator_may_not_view()
     {
@@ -120,6 +124,7 @@ public class AccountSyncNatsServiceTests
         Assert.Equal((false, true), Assert.Single(rig.Target.Reloads));
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Theory]
     [InlineData("SYNC_DEVICE")]
     [InlineData("sync_user")]            // 대문자 토큰 그대로만(브로커 §2.4)
@@ -134,6 +139,7 @@ public class AccountSyncNatsServiceTests
         Assert.Empty(rig.Target.Reloads);
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_ignore_everything_before_login()
     {
@@ -146,6 +152,7 @@ public class AccountSyncNatsServiceTests
         Assert.Null(rig.Service.LastFlush);
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_reevaluate_my_permissions_when_my_own_account_changed()
     {
@@ -160,6 +167,7 @@ public class AccountSyncNatsServiceTests
         rig.Permission.Verify(p => p.Refresh(snapshot), Times.Once);
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public async Task should_not_touch_my_permissions_for_someone_else_or_on_403()
     {
@@ -201,6 +209,7 @@ public class AccountSyncNatsServiceTests
         public int Timeout { get; set; } = 10;
     }
 
+    [Trait("Scenario", "GOP815-G08")]
     [Fact]
     public void should_register_the_sync_service_as_an_iservice_and_subscribe_when_the_container_is_built()
     {

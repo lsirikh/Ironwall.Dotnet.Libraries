@@ -44,6 +44,7 @@ public class LoginFailMessageTransportTests
         Assert.Equal(expected, LoginPanelViewModel.FailMessage(AuthOutcome.Fail(code)));
     }
 
+    [Trait("Scenario", "GOP815-G07")]
     [Theory]
     [InlineData("비활성화된 계정입니다", "비활성화된 계정입니다")]   // G07 — 서버가 403 사유를 알려 주면 그대로
     [InlineData("   ", "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.")]

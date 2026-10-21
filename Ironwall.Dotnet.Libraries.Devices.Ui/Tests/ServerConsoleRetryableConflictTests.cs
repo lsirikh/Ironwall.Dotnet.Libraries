@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
@@ -75,6 +75,7 @@ public class ServerConsoleRetryableConflictTests
             new DeviceQueryPolicy(probe));
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData(Retryable, true)]
     [InlineData(NotRetryable, false)]
@@ -86,6 +87,7 @@ public class ServerConsoleRetryableConflictTests
         Assert.Equal(retryable ? ApiStatusHelper.RetryableConflictMessage : NameText, result.Message);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Theory]
     [InlineData(Retryable, true)]
     [InlineData(NotRetryable, false)]
@@ -100,6 +102,7 @@ public class ServerConsoleRetryableConflictTests
         Assert.Equal(retryable ? ApiStatusHelper.RetryableConflictMessage : NameText, result.Message);
     }
 
+    [Trait("Scenario", "GOP815-G01")]
     [Fact]
     public async Task should_say_retry_when_a_device_assignment_hits_a_retryable_conflict()
     {
