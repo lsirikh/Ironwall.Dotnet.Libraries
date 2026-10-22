@@ -100,3 +100,23 @@
 - 여러 건물 높이 미리보기는 판의 건물 하나만 3D 에 보인다(저장하면 모두 바로 반영) — 모두 미리보기는 필요하면 후속.
 - 꼭짓점 지우기는 이제 3D 의 Delete 키로만(판 단추 없음).
 - 엔진 쪽: 판 단추마다 Enter 를 보내므로 엔진이 바뀐 것 없는 Enter 에 edit.commit 을 보내면 같은 모양으로 한 번 더 저장된다(해는 없음).
+
+---
+
+# 엔진 완료 알림 반영(턴 3, 엔진 map-3d f45f073 · e83ce39 · 4dec227)
+| 엔진 사실 | GIS 쪽 | 근거 |
+|---|---|---|
+| building.select ids = 정수 · 숫자 문자열 모두, 500 상한 | 그대로(숫자 문자열 · 상자 500 상한) | `Map3DBuilding.SelectMessageJson` · `MaxBoxItems` |
+| Ctrl+클릭은 GIS 가 ids 로 확정해 줘야 함 | 이미 매번 보냄(넣기 · 빼기 · 상자 · 여러 개 → 하나 · 풀기). 하나 → 하나 클릭은 보내지 않음 | DECISIONS 10, `BuildingPickLikeMarkerScenarioTests` |
+| building.none = 빈 땅 + 하늘 | 그대로(판 닫기 = 고름 풀기) | `MapViewModel.Map3D.cs` building.none |
+| 상자 판정 = 걸치면 고름, building.box + overlay.box 동시 | building.box 만 반영, overlay.box 는 버림(정책은 두 고름 따로) | DECISIONS 11 |
+| 심볼 edit.commit 뒤 overlay.patch | 이 worktree 에 3D 심볼 편집 경로 없음 — 후속 | DECISIONS 11 |
+| pick ctrl · shift = 누를 때 키 | 메시지 값 ∨ 호스트 키 그대로 | `OnMap3DBuildingPicked` |
+| 이름표 필드 | GIS 변경 없음(구판 GIS = 지금 동작) | — |
+
+코드 변경 없음(턴 3) — 문서만. 검증은 턴 2 결과 그대로(MapEdit 927/927 · .sln 2,974/2,974).
+
+## 남은 일(턴 3)
+- overlay.box(3D Shift+끌기의 심볼 고름) 해석 · 2D 그룹 고름 반영 — 엔진의 overlay.box 항목 모양을 받아야 한다.
+- 3D 심볼 고치기(edit.commit kind=심볼) 저장 뒤 overlay.patch 송신.
+- (선택) 일반 클릭에도 building.select ids 송신 — DECISIONS 10 의 effect 참고.

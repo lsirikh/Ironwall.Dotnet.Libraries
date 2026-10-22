@@ -54,3 +54,15 @@
 - chosen: (a) + (d). 값이 서로 다른 칸은 「여러 값」(지도 건물: 높이 입력칸에 "여러 값" · 「고른 건물 n개 · 여러 값: …」 줄 / 직접 그린 건물: 「[✓ 적용] = 고른 n개에 바꾼 칸만 · 여러 값: …」 줄), 손대지 않으면 건물마다 그대로. 지도 건물: 높이([적용]) · 외관([외관 적용])을 따로, 되돌리기 1칸씩(판 안 되돌리기). 직접 그린 건물: 높이 · 층수 · 지붕 · 쓰임 · 외벽 무늬 · 색 · 좁게/넓게를 [✓ 적용] 한 번, GIS 편집 기록 1단위(MacroCommand). 직접 그린 건물 고르기는 2D Ctrl+클릭(기존) + 3D Ctrl+클릭(새로).
 - why: 2D 마커 여러 개 속성창 정본(필드 단위 보류 · 그룹 모드 · 바꾼 필드만 · 되돌리기 한 번)과 같게. 두 종류는 저장 창구(heights/looks vs user-buildings) · 판이 달라 한 고름에 섞으면 칸 뜻이 달라진다 — 지금도 판이 서로 배타(2026-10-22 앞 작업 결정). pattern: follow-recommended
 - effect: `MapViewModel.BuildingErase.cs ApplyBuildingHeightGroupAsync · ApplyBuildingLookGroupAsync · BuildingMixedFields`, `MapViewModel.UserBuilding.cs UbGroupFields · LoadUserBuildingGroupFields · ApplyUserBuildingGroupAsync`. 3D 미리보기는 판의 건물 하나만(저장하면 모두 3D 에 바로 반영).
+
+## 10. 엔진 완료 알림(f45f073 · e83ce39 · 4dec227) — "고름이 바뀔 때마다 ids 를 보낸다" 와 일반 클릭(DECISIONS 5)
+- options: (a) 일반 클릭(하나 → 하나)에도 building.select {id, ids:[id]} 를 보낸다 (b) 지금대로 — 엔진 표시와 GIS 고름이 달라질 수 있는 바뀜(Ctrl+클릭 넣기 · 빼기, 상자, 여러 개 → 하나, 모두 풀기 · 지우기)마다 보내고, 하나 → 하나 클릭은 엔진이 스스로 그 하나만 강조하므로 보내지 않는다
+- chosen: (b)
+- why: 엔진 설명의 어긋남은 Ctrl+클릭(엔진이 화면에서 먼저 넣기/빼기)을 GIS 가 돌려주지 않을 때 — 그 경우는 모두 보낸다(BuildingPickLikeMarkerScenarioTests 가 매번 ids 를 단정). 일반 클릭은 엔진 표시(그 하나) = GIS 고름(그 하나)이라 어긋나지 않고, 기존 계약 시험("고르기만으로는 3D 를 바꾸지 않는다" — TwinContract · PickExclusive · BuildingHeight 시험 5곳)을 지킨다. pattern: follow-recommended
+- effect: 일반 클릭에도 보내려면 `OnMap3DBuildingPicked` 의 `if (wasMany)` 를 없애고 위 시험 5곳의 "building.select 없음" 단정을 바꾼다. ids 는 숫자 문자열(엔진은 정수 · 숫자 문자열 모두 받음, 500개 상한 = GIS 고름도 상자 500 상한).
+
+## 11. Shift+끌기 한 번에 building.box · overlay.box 가 함께 올 때(심볼 · 건물 고름이 섞일 때)
+- options: (a) 둘 다 받아 건물 고름 · 심볼(2D 마커) 고름에 각자 반영 (b) 건물 고름만 반영하고 overlay.box 는 받지 않음(지금)
+- chosen: 정책은 (a) — 두 고름은 따로 산다(건물 = 「건물 높이」 판의 고름, 심볼 = 지도 그룹 고름 · 속성창). 건물 판과 심볼 속성창은 동시에 열려도 서로 풀지 않는다. 이 작업에서는 (b) 상태로 둔다: GIS 는 building.box 만 해석하고 overlay.box 는 모르는 메시지로 버린다(기존 동작 그대로 — 깨지지 않음).
+- why: overlay.box 의 항목 모양(심볼 kind · id 키)과 3D 심볼 고치기 흐름(심볼 edit.commit → 저장 → overlay.patch)은 이 작업 목표(건물 고르기 · 판)의 계약에 없고, 이 worktree 에는 3D 심볼 편집 경로가 아직 없다 — 모양을 추측해 만들지 않는다(사용자 규칙: 근거 없는 추측 구현 금지). pattern: autonomy + 근거 우선
+- effect: 후속 작업 — overlay.box 해석(Map3DMath) → OnMarkersRubberBandSelected 와 같은 ApplyGroupSelectionByIds, 심볼 edit.commit 저장 뒤 Map3DOverlay.PatchMessageJson(overlay.patch) 송신. PLAN 「남은 일(턴 3)」 참고.
