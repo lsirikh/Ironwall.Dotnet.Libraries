@@ -170,6 +170,18 @@ public interface IPtzController
     Task<CameraVideoResolution?> GetMainVideoResolutionAsync(string cameraId, CancellationToken ct = default)
         => Task.FromResult<CameraVideoResolution?>(null);
 
+    /// <summary>
+    /// IR 조명 직접 제어 값 — 준비(EnsureReady) 때 읽은 PTZ 노드의 보조 명령 목록(AuxiliaryCommands)에서 ONVIF 표준
+    /// <c>tt:IRLamp|On</c> · <c>|Off</c> · <c>|Auto</c> 를 찾은 것("On" · "Off" · "Auto"). 빈 목록 = 지원 안 함. 기본 구현은 빈 목록.
+    /// </summary>
+    System.Collections.Generic.IReadOnlyList<string> GetIrLampModes(string cameraId) => System.Array.Empty<string>();
+
+    /// <summary>마지막으로 보낸 IR 조명 값(카메라가 상태를 알려주지 않는다). 기본 구현은 null.</summary>
+    string? GetLastIrLamp(string cameraId) => null;
+
+    /// <summary>IR 조명 보조 명령(SendAuxiliaryCommand — 카메라가 알린 글자 그대로). 지원 안 하는 값이면 보내지 않고 false. 기본 구현은 false.</summary>
+    Task<bool> SetIrLampAsync(string cameraId, string mode, CancellationToken ct = default) => Task.FromResult(false);
+
     /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(string cameraId);
 }

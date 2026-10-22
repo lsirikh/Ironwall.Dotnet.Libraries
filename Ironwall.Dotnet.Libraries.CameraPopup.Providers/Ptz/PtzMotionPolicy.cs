@@ -46,4 +46,17 @@ public static class PtzMotionPolicy
 
     /// <summary>MoveStatus 를 안 주는 카메라에서 한 몫(반 화면)이 끝났다고 보는 어림 시간.</summary>
     public static readonly TimeSpan StepEstimate = TimeSpan.FromMilliseconds(900);
+
+    /// <summary>
+    /// 부른 쪽이 기다리기를 그만둔 ONVIF 호출이 이만큼 넘게 돌고 있으면 카메라가 응답하지 않는 것으로 본다 — 그 연결을 끊고
+    /// (다음 명령이 새로 붙는다) 카메라별 줄을 바로 푼다. 끊지 않으면 WCF 송신 제한(8초)까지 줄이 막혀, 카메라가 돌아온 뒤에도
+    /// 첫 명령 · 팝업 다시 열기가 그만큼 늦었다(2026-10-22 가짜 카메라 실측 6.5~7초). 정상 호출은 수 ms ~ 수백 ms.
+    /// </summary>
+    public static readonly TimeSpan StallThreshold = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// 부른 쪽 제한 시간이 없는 배경 호출(위치 다시 읽기 · 이동 유지 재전송 · 나눠 보내는 끌기)의 제한 시간. 넘으면
+    /// <see cref="StallThreshold"/> 규칙으로 연결을 끊는다 — 준비 직후 위치 읽기가 끊긴 카메라에 걸려 줄을 8초 쥐던 것.
+    /// </summary>
+    public static readonly TimeSpan BackgroundCallTimeout = TimeSpan.FromSeconds(2);
 }

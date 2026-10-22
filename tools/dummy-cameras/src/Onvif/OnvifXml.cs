@@ -15,6 +15,7 @@ internal static class OnvifXml
     public const string NsTds = "http://www.onvif.org/ver10/device/wsdl";
     public const string NsTrt = "http://www.onvif.org/ver10/media/wsdl";
     public const string NsTptz = "http://www.onvif.org/ver20/ptz/wsdl";
+    public const string NsTimg = "http://www.onvif.org/ver20/imaging/wsdl";
     public const string NsTt = "http://www.onvif.org/ver10/schema";
     public const string NsTer = "http://www.onvif.org/ver10/error";
 
@@ -34,7 +35,7 @@ internal static class OnvifXml
 
     public static string Envelope(string inner) =>
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-        $"<s:Envelope xmlns:s=\"{NsSoap}\" xmlns:tds=\"{NsTds}\" xmlns:trt=\"{NsTrt}\" xmlns:tptz=\"{NsTptz}\" xmlns:tt=\"{NsTt}\" xmlns:ter=\"{NsTer}\">" +
+        $"<s:Envelope xmlns:s=\"{NsSoap}\" xmlns:tds=\"{NsTds}\" xmlns:trt=\"{NsTrt}\" xmlns:tptz=\"{NsTptz}\" xmlns:timg=\"{NsTimg}\" xmlns:tt=\"{NsTt}\" xmlns:ter=\"{NsTer}\">" +
         "<s:Body>" + inner + "</s:Body></s:Envelope>";
 
     /// <summary>SOAP 1.2 fault. <paramref name="code"/> = "Sender" | "Receiver", subcode e.g. "ter:NotAuthorized".</summary>
@@ -74,7 +75,7 @@ internal static class OnvifXml
     {
         bool all = categories.Count == 0 || categories.Contains("All");
         bool Want(string c) => all || categories.Contains(c);
-        if (!all && categories.All(c => c is not ("Device" or "Media" or "PTZ"))) return null;
+        if (!all && categories.All(c => c is not ("Device" or "Media" or "PTZ" or "Imaging"))) return null;
         if (!all && Want("PTZ") && !cam.IsPtz && !Want("Media") && !Want("Device")) return null;   // ter:NoSuchService
 
         var sb = new System.Text.StringBuilder("<tds:GetCapabilitiesResponse><tds:Capabilities>");
@@ -85,6 +86,9 @@ internal static class OnvifXml
               .Append("<tt:SystemBackup>false</tt:SystemBackup><tt:SystemLogging>false</tt:SystemLogging><tt:FirmwareUpgrade>false</tt:FirmwareUpgrade>")
               .Append("<tt:SupportedVersions><tt:Major>2</tt:Major><tt:Minor>60</tt:Minor></tt:SupportedVersions></tt:System>")
               .Append("</tt:Device>");
+        // tt:Capabilities order is Analytics · Device · Events · Imaging · Media · PTZ - Imaging out of place is dropped silently.
+        if (Want("Imaging"))
+            sb.Append("<tt:Imaging><tt:XAddr>").Append(cam.ImagingServiceUrl).Append("</tt:XAddr></tt:Imaging>");
         if (Want("Media"))
             sb.Append("<tt:Media><tt:XAddr>").Append(cam.MediaServiceUrl).Append("</tt:XAddr>")
               .Append("<tt:StreamingCapabilities><tt:RTPMulticast>false</tt:RTPMulticast><tt:RTP_TCP>true</tt:RTP_TCP><tt:RTP_RTSP_TCP>true</tt:RTP_RTSP_TCP></tt:StreamingCapabilities>")
@@ -104,6 +108,7 @@ internal static class OnvifXml
                Svc(NsTds, cam.DeviceServiceUrl) +
                Svc(NsTrt, cam.MediaServiceUrl) +
                (cam.IsPtz ? Svc(NsTptz, cam.PtzServiceUrl) : string.Empty) +
+               Svc(NsTimg, cam.ImagingServiceUrl) +
                "</tds:GetServicesResponse>";
     }
 
@@ -130,8 +135,11 @@ internal static class OnvifXml
 
     // ── Media ─────────────────────────────────────────────────────────────
 
+    public const string NoPtzProfile = "Profile_0";
+
     public static IEnumerable<(string Token, int W, int H, string Uri)> ProfileList(CameraSpec cam)
     {
+        if (cam.FirstProfileWithoutPtz) yield return (NoPtzProfile, cam.MainWidth, cam.MainHeight, cam.MainRtspUrl);
         yield return (MainProfile, cam.MainWidth, cam.MainHeight, cam.MainRtspUrl);
         if (cam.HasSub) yield return (SubProfile, cam.SubWidth, cam.SubHeight, cam.SubRtspUrl);
     }
@@ -153,7 +161,7 @@ internal static class OnvifXml
           .Append($"<tt:H264><tt:GovLength>{cam.Fps * 2}</tt:GovLength><tt:H264Profile>Main</tt:H264Profile></tt:H264>")
           .Append("<tt:Multicast><tt:Address><tt:Type>IPv4</tt:Type><tt:IPv4Address>0.0.0.0</tt:IPv4Address></tt:Address><tt:Port>0</tt:Port><tt:TTL>1</tt:TTL><tt:AutoStart>false</tt:AutoStart></tt:Multicast>")
           .Append("<tt:SessionTimeout>PT60S</tt:SessionTimeout></tt:VideoEncoderConfiguration>");
-        if (cam.IsPtz) sb.Append(PtzConfiguration("tt:PTZConfiguration"));
+        if (cam.IsPtz && token != NoPtzProfile) sb.Append(PtzConfiguration("tt:PTZConfiguration"));
         sb.Append("</").Append(element).Append('>');
         return sb.ToString();
     }
@@ -204,7 +212,7 @@ internal static class OnvifXml
     private static string Space1D(string el, string uri, double min, double max) =>
         $"<tt:{el}><tt:URI>{uri}</tt:URI>{Range("XRange", min, max)}</tt:{el}>";
 
-    public static string Node(string element, int maxPresets) =>
+    public static string Node(string element, int maxPresets, IEnumerable<string>? auxiliary = null) =>
         $"<{element} token=\"{PtzNodeToken}\" FixedHomePosition=\"false\"><tt:Name>PTZNode</tt:Name><tt:SupportedPTZSpaces>" +
         Space2D("AbsolutePanTiltPositionSpace", SpaceAbsPt, -1, 1) +
         Space1D("AbsoluteZoomPositionSpace", SpaceAbsZ, 0, 1) +
@@ -215,6 +223,7 @@ internal static class OnvifXml
         Space1D("PanTiltSpeedSpace", SpaceSpeedPt, 0, 1) +
         Space1D("ZoomSpeedSpace", SpaceSpeedZ, 0, 1) +
         $"</tt:SupportedPTZSpaces><tt:MaximumNumberOfPresets>{maxPresets}</tt:MaximumNumberOfPresets><tt:HomeSupported>true</tt:HomeSupported>" +
+        string.Concat((auxiliary ?? Array.Empty<string>()).Select(a => $"<tt:AuxiliaryCommands>{Esc(a)}</tt:AuxiliaryCommands>")) +
         $"</{element}>";
 
     public static string Position(PtzVector p) =>
@@ -226,6 +235,22 @@ internal static class OnvifXml
         $"<tt:MoveStatus><tt:PanTilt>{(s.PanTiltMoving ? "MOVING" : "IDLE")}</tt:PanTilt><tt:Zoom>{(s.ZoomMoving ? "MOVING" : "IDLE")}</tt:Zoom></tt:MoveStatus>" +
         $"<tt:UtcTime>{utc:yyyy-MM-ddTHH:mm:ss.fffZ}</tt:UtcTime>" +
         "</tptz:PTZStatus></tptz:GetStatusResponse>";
+
+    // ── Imaging (ver20) ───────────────────────────────────────────────────
+
+    /// <summary>ImagingSettings20 in schema order (Brightness · … · Focus · IrCutFilter · Sharpness).</summary>
+    public static string ImagingSettings(string irCutFilter, bool autoFocus) =>
+        "<timg:GetImagingSettingsResponse><timg:ImagingSettings>" +
+        "<tt:Brightness>50</tt:Brightness><tt:ColorSaturation>50</tt:ColorSaturation><tt:Contrast>50</tt:Contrast>" +
+        $"<tt:Focus><tt:AutoFocusMode>{(autoFocus ? "AUTO" : "MANUAL")}</tt:AutoFocusMode><tt:DefaultSpeed>0.5</tt:DefaultSpeed></tt:Focus>" +
+        $"<tt:IrCutFilter>{Esc(irCutFilter)}</tt:IrCutFilter>" +
+        "<tt:Sharpness>50</tt:Sharpness>" +
+        "</timg:ImagingSettings></timg:GetImagingSettingsResponse>";
+
+    public static string MoveOptions(double speedMin, double speedMax) =>
+        "<timg:GetMoveOptionsResponse><timg:MoveOptions>" +
+        $"<tt:Continuous><tt:Speed><tt:Min>{F(speedMin)}</tt:Min><tt:Max>{F(speedMax)}</tt:Max></tt:Speed></tt:Continuous>" +
+        "</timg:MoveOptions></timg:GetMoveOptionsResponse>";
 
     public static string Presets(IEnumerable<PtzPreset> presets) =>
         "<tptz:GetPresetsResponse>" +

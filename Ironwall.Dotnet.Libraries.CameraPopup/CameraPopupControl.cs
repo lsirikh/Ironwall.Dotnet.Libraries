@@ -162,6 +162,7 @@ public sealed class CameraPopupControl : ICameraPopupControl
         PresetToken = r.PresetToken,
         PresetName = r.PresetName,
         IrCutFilter = r.IrCutFilter,
+        IrLamp = r.IrLamp,
         AutoFocus = r.AutoFocus,
         TimeoutMs = r.TimeoutMs,
     };

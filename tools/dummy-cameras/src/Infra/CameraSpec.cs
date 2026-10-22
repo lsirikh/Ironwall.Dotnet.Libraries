@@ -11,6 +11,13 @@ public sealed class CameraFaults
     private volatile bool _httpDigest;
     private volatile bool _wsSecurityOnly;
     private volatile bool _corruptStream;
+    private volatile int _clockSkewSec;
+
+    /// <summary>
+    /// Camera clock = real UTC + this many seconds (GetSystemDateAndTime and the WS-UsernameToken freshness check both use it).
+    /// Field cameras without NTP drift by hours - the client must sign with the camera's time, not the PC's.
+    /// </summary>
+    public int ClockSkewSec { get => _clockSkewSec; set => _clockSkewSec = value; }
 
     /// <summary>Delay every ONVIF reply by this many ms (FR-26 · K5).</summary>
     public int SlowOnvifMs { get => _slowOnvifMs; set => _slowOnvifMs = Math.Max(0, value); }
@@ -47,6 +54,7 @@ public sealed class CameraFaults
         if (WsSecurityOnly) parts.Add("ws-security-only");
         if (KillStreamAfterSec is int k) parts.Add($"kill-stream-after={k}s");
         if (CorruptStream) parts.Add("corrupt-stream");
+        if (ClockSkewSec != 0) parts.Add($"clock-skew={ClockSkewSec}s");
         return parts.Count == 0 ? "none" : string.Join(' ', parts);
     }
 }
@@ -74,6 +82,18 @@ public sealed class CameraSpec
 
     /// <summary>A second, lower profile exists (transcode mode only - copy mode cannot scale).</summary>
     public bool HasSub { get; set; } = true;
+
+    /// <summary>
+    /// GetProfiles lists a profile WITHOUT a PTZ configuration first (a metadata / third-stream profile, as some field cameras do).
+    /// PTZ operations naming it fail with ter:NoPTZProfile - a client must pick a profile that carries PTZ.
+    /// </summary>
+    public bool FirstProfileWithoutPtz { get; set; }
+
+    /// <summary>
+    /// PTZ node AuxiliaryCommands (GetNode/GetNodes). Default = the ONVIF IR lamp commands (tt:IRLamp|On · Off · Auto) plus a wiper
+    /// so a client must pick the IR ones; empty = a camera without IR lamp control. SendAuxiliaryCommand accepts only these strings.
+    /// </summary>
+    public string[] AuxiliaryCommands { get; set; } = { "tt:Wiper|On", "tt:IRLamp|On", "tt:IRLamp|Off", "tt:IRLamp|Auto" };
     public int SubWidth { get; set; } = 640;
     public int SubHeight { get; set; } = 360;
     public int Fps { get; set; } = 15;
@@ -90,6 +110,7 @@ public sealed class CameraSpec
     public string DeviceServiceUrl => $"http://{Host}:{OnvifPort}/onvif/device_service";
     public string MediaServiceUrl => $"http://{Host}:{OnvifPort}/onvif/media_service";
     public string PtzServiceUrl => $"http://{Host}:{OnvifPort}/onvif/ptz_service";
+    public string ImagingServiceUrl => $"http://{Host}:{OnvifPort}/onvif/imaging_service";
     public string MainRtspUrl => $"rtsp://{Host}:{RtspPort}/{MainPath}";
     public string SubRtspUrl => $"rtsp://{Host}:{RtspPort}/{(HasSub ? SubPath : MainPath)}";
 

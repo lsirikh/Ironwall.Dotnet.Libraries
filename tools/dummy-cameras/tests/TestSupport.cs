@@ -31,6 +31,10 @@ internal static class Wait
         }
         return condition();
     }
+
+    /// <summary>PTZ positions equal within float noise (the simulator interpolates by wall clock).</summary>
+    public static bool Near(DummyCameras.Ptz.PtzVector a, DummyCameras.Ptz.PtzVector b, double eps = 1e-6)
+        => Math.Abs(a.Pan - b.Pan) < eps && Math.Abs(a.Tilt - b.Tilt) < eps && Math.Abs(a.Zoom - b.Zoom) < eps;
 }
 
 internal static class TestDirs
