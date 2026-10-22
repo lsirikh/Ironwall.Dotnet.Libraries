@@ -99,6 +99,7 @@ public partial class MapViewModel
         EndEdit3D();
         if (_ubIn3D)
         {
+            RevertUserBuildingPreview();   // 2D 그리기는 3D 를 접는다 — 저장 안 한 값으로 그린 상자를 남기지 않는다
             _ubIn3D = false;
             DetachUserBuildingSurface();
             AttachUserBuildingSurface();

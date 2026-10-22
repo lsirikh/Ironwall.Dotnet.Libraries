@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -27,6 +29,13 @@ public sealed record Map3DBuildingPick(int Id, string? Origin, double Height, st
     public Map3DLookState Look { get; init; } = Map3DLookState.Auto;
     /// <summary>다시 만든 직접 그린 건물의 uid(user_uid) — 아니면 null.</summary>
     public string? UserUid { get; init; }
+}
+
+/// <summary>장면의 건물 하나(scene.json buildings 줄) — 고름 메시지와 같은 값 + 바닥 윤곽(footprint, [경도, 위도], 닫는 끝점 없음 · 없으면 빈 목록).</summary>
+public sealed record Map3DSceneBuilding(Map3DBuildingPick Building, IReadOnlyList<UbPoint> Footprint)
+{
+    /// <summary>자동으로 만든 건물(지도 · 국가 자료 · 사진) — 직접 그린 건물(origin user · user_uid)은 아니다.</summary>
+    public bool IsAuto => Building.Origin != "user" && Building.UserUid == null;
 }
 
 public static class Map3DBuilding
@@ -73,6 +82,27 @@ public static class Map3DBuilding
         return new Map3DBuildingPick((int)id, Str(o["origin"]), h, Str(o["height_source"]), Str(o["height_from"]) ?? Str(o["height_source"]),
                                      levels, area, lon, lat, isManual)
                { Look = Map3DLook.StateOf(o), UserUid = uid != null && Map3DUserBuilding.IsUid(uid) ? uid : null };
+    }
+
+    /// <summary>
+    /// 장면 건물 줄(GET …/files/scene.json 의 buildings — 뷰어가 장면을 불러올 때 쓰는 그 파일) — 「지우고 이 자리에 새로 그리기」 의 바닥 윤곽(footprint)과
+    /// 「이 영역 자동 건물 모두 지우기」 의 건물 목록. 닫는 끝점(첫 점과 같음)은 뺀다. id · 높이가 틀린 줄은 버린다.
+    /// </summary>
+    public static IReadOnlyList<Map3DSceneBuilding> ParseSceneBuildings(string json)
+    {
+        var list = new List<Map3DSceneBuilding>();
+        if (JObject.Parse(json)["buildings"] is not JArray rows) return list;
+        foreach (var o in rows.OfType<JObject>())
+        {
+            if (Parse(o) is not { } b) continue;
+            var pts = new List<UbPoint>();
+            if (o["footprint"] is JArray fp)
+                foreach (var t in fp)
+                    if (t is JArray p && p.Count == 2 && Finite(p[0]) is double x && Finite(p[1]) is double y && Math.Abs(x) <= 180 && Math.Abs(y) <= 90) pts.Add(new UbPoint(x, y));
+            if (pts.Count >= 2 && pts[0] == pts[^1]) pts.RemoveAt(pts.Count - 1);
+            list.Add(new Map3DSceneBuilding(b, pts));
+        }
+        return list;
     }
 
     // ── GIS → 3D 메시지 ──

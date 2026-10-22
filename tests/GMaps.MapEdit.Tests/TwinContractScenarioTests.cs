@@ -52,6 +52,10 @@ public partial class TwinContractScenarioTests
         public string? RejectPut { get; set; }
         /// <summary>PUT …/buildings/{bid}/look 을 422 {"detail": 이 글}로 거절(범위 밖 값 등 서버 문구).</summary>
         public string? RejectLook { get; set; }
+        /// <summary>user-buildings PUT 의 taper_deg 가 이보다 크면 400 {"detail":"위로 갈수록 너무 좁아져 윗면이 뒤집힙니다"}(엔진의 모양 거절).</summary>
+        public double? RejectTaperAbove { get; set; }
+        /// <summary>장면 파일(GET …/files/scene.json)의 buildings 줄 — null 이면 404.</summary>
+        public JArray? SceneBuildings { get; set; }
         public List<JObject> UserBuildings { get; } = new();
         public Dictionary<int, JObject> Looks { get; } = new();
         public List<JObject> Decorations { get; } = new();
@@ -69,8 +73,13 @@ public partial class TwinContractScenarioTests
             if (seg.Length < 5 || seg[3] != Job) return Json(HttpStatusCode.NotFound, "{\"detail\":\"작업이 없습니다\"}");
             if (RejectPut != null && m == HttpMethod.Put && seg[4] is "user-buildings" or "decorations")
                 return Json(HttpStatusCode.BadRequest, new JObject { ["detail"] = RejectPut }.ToString());
+            if (RejectTaperAbove is double max && m == HttpMethod.Put && seg[4] == "user-buildings" && body?["taper_deg"]?.Value<double>() > max)
+                return Json(HttpStatusCode.BadRequest, "{\"detail\":\"위로 갈수록 너무 좁아져 윗면이 뒤집힙니다\"}");
             switch (seg[4])
             {
+                case "files" when seg.Length == 6 && seg[5] == "scene.json":
+                    return SceneBuildings == null ? Json(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}")
+                                                  : Json(HttpStatusCode.OK, new JObject { ["buildings"] = SceneBuildings }.ToString());
                 case "user-buildings":
                     if (m == HttpMethod.Get) return Json(HttpStatusCode.OK, new JObject { ["items"] = new JArray(UserBuildings) }.ToString());
                     if (m == HttpMethod.Put)
@@ -244,7 +253,7 @@ public partial class TwinContractScenarioTests
         Assert.True(rig.Vm.IsBuildingHeightPanelOpen);
         await Rig.Until(() => rig.Server.Requests.Any(r => r.Path == $"/api/jobs/{Job}/looks"), "숨긴 건물 목록 요청");
         Assert.Equal("숨긴 건물 없음", rig.Vm.BuildingHiddenCountText);
-        Assert.Equal("이 건물 숨기기", rig.Vm.BuildingHideButtonText);
+        Assert.Equal("이 건물 지우기", rig.Vm.BuildingHideButtonText);                  // 2026-10-22 사용자가 찾는 말(실제로는 숨김 · 되살리기 가능)
         Assert.Empty(rig.Posts);                                                         // 고르기만으로는 3D 를 바꾸지 않는다
 
         rig.Vm.HideBuildingCommand.Execute(null);
@@ -552,8 +561,10 @@ public partial class TwinContractScenarioTests
                        "Map.Decoration.Redo", "Map.Decoration.List", "Map.Decoration.Close");
         AssertRendered(rig.Vm.BuildingHeightPanel, "BuildingHeightPanelStyle.xaml", "Map.BuildingHeight.Facade", "Map.BuildingHeight.WallColor",
                        "Map.BuildingHeight.RoofColor", "Map.BuildingHeight.ApplyLook", "Map.BuildingHeight.Hide", "Map.BuildingHeight.HiddenCount",
-                       "Map.BuildingHeight.RestoreAll", "Map.BuildingHeight.HiddenList");
-        AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.UserBuilding.Facade", "Map.UserBuilding.WallColor", "Map.UserBuilding.RoofColor");
+                       "Map.BuildingHeight.RestoreAll", "Map.BuildingHeight.HiddenList", "Map.BuildingHeight.HideAndRedraw", "Map.BuildingHeight.MultiSelect",
+                       "Map.BuildingHeight.HideSelected", "Map.BuildingHeight.HideAllAuto", "Map.BuildingHeight.MultiSelectText");
+        AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.UserBuilding.Facade", "Map.UserBuilding.WallColor", "Map.UserBuilding.RoofColor",
+                       "Map.UserBuilding.Taper", "Map.UserBuilding.TaperDeg", "Map.UserBuilding.TaperReset", "Map.UserBuilding.TaperStatus");
         var view = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Ironwall.Dotnet.Libraries.GMaps.Ui", "Views", "Maps", "MapView.xaml"));
         Assert.Contains("AutomationProperties.AutomationId=\"Map.Decoration.Start\"", view);
         Assert.Contains("{Binding DecorationPanel}", view);

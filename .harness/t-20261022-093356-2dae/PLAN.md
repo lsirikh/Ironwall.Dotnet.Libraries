@@ -68,7 +68,32 @@
   CameraPopup.Host 197 · Reports.Api 3 · Sso 106 · Reports.Ui 377 · Utils 886 · CameraPopup 334), 실패 0.
 - 헤디드(창 띄우는) 시험은 하지 않았다 — 판 템플릿은 헤드리스로 실제 테마를 입혀 콤보 · 단추 바인딩까지 만졌다. 실앱 확인은 남은 일.
 
+## 추가 지시(2026-10-22, 작업 중 받음) — 진행
+- [x] A. 위로 갈수록 좁게(+) · 넓게(−) `taper_deg`(−30~+30, 1°, 기본 0) — 모델(Map3DUserBuildingItem.TaperDeg · UserBuildingState.TaperDeg) ·
+      본문(PutBody(..., taperDeg)) · 해석(ParseItem, 옛 항목 0) · 미리보기(PreviewMessageJson 에 taper_deg) · 판(막대 Map.UserBuilding.Taper · 숫자 칸 TaperDeg · [0] TaperReset · 상태 줄 TaperStatus) ·
+      "?" 말풍선(Map.UserBuilding.Panel 「건물 설정」) · 되돌리기 · 다시 하기(UserBuildingCommand 상태에 포함) · 400 거절 = 문구 + 기울기만 저장된 값으로(3D 상자도).
+- [x] B. 「6층으로 했는데 그대로 3층」 — 3D 위 판에서 층수 · 높이 · 층고 · 지붕 · 외관 · 기울기를 바꾸는 즉시 userbuilding.preview(PreviewUserBuildingDraft), 같은 내용은 다시 안 보냄,
+      [취소] · 다른 건물 · 끝내기 · [2D 에서 윤곽 고치기] = 저장된 모양으로(RevertUserBuildingPreview), 새 윤곽은 미리 만든 uid 로 미리보기 · 저장. 문구 "3D 에 18.0 m(6층)로 바로 보입니다 — [저장] 해야 남습니다".
+- [x] B-2. 겹친 원래 지도 건물 숨기기 — 계약에 그 키가 없다(userbuilding.preview 는 상자만). GIS 는 보내지 않고 엔진 후보 B 로 보고(다른 작업이 맡음).
+      단, 「지우고 이 자리에 새로 그리기」 로 시작하면 그 원래 건물은 실제로 지운다(숨김 저장).
+- [x] C. 지도 건물 「지우기」 — [이 건물 숨기기] → [이 건물 지우기](새 칸 「지우기 · 다시 만들기」), 확인 제목 · 문구 · 상태 글 · "?" 말풍선 「지우기 · 다시 만들기」.
+      경로(판 단추 → 확인 → PUT hidden → building.look → 숨긴 건물 목록 → 되살리기)를 실제 판 템플릿 단추로 끝까지 시험. 동작 결함은 찾지 못함(DECISIONS 9).
+- [x] C-2. [지우고 이 자리에 새로 그리기] — 장면 파일(GET …/files/scene.json, Map3DClient.GetSceneBuildingsAsync)의 바닥 윤곽 → 숨김 → 3D 위 「건물 만들기」 판(그 윤곽 · 그 높이 · 바로 미리보기). 못 받으면 빈 그리기.
+- [x] C-3. 지도 건물 높이 저장 뒤 3D — 이미 바로 반영(building.commit, 뷰어 view.js onBuildingMessage 가 그 높이로 늘임). 기존 시험 BuildingHeightEdgeScenarioTests 가 단정. [지금 다시 만들기] 는 필요 없음.
+- [x] D. [여러 개 고르기](3D 에서 차례로 · Ctrl+클릭) → [고른 n개 지우기](확인) · [이 영역 자동 건물 모두 지우기…](확인, 직접 그린 건물 · 이미 지운 것 제외) · 되돌리기 1칸 · 모두 되살리기.
+      새 파일 `MapViewModel.BuildingErase.cs`, 확인 콜백 `CallHideMap3DBuildingsProcessMessageModel`. 사각형 끌기는 엔진 메시지가 없어 후보(DECISIONS 11).
+- 시험: `tests/GMaps.MapEdit.Tests/BuildingEraseAndTaperScenarioTests.cs`(10개) · `tests/GMaps.Ui.Tests/Map3DTwinContractTests.cs`(2개 추가) · 렌더 시험에 새 AutomationId.
+  고친 기존 시험(사양이 바뀐 것만): 단추 글 "이 건물 숨기기" → "이 건물 지우기" 1건, 내가 이번에 만든 새 시험 3건의 미리보기 개수(바로 미리보기로 늘어남).
+  ★ 함정: 시험 VM 은 생성자 없이 만들어 Caliburn 알림(IsNotifying)이 꺼져 있다 — 막대 ↔ 숫자 칸 따라오기는 그 시험에서 `IsNotifying = true` 로 켜서 본다.
+  ★ 함정: Slider 를 시험에서 움직일 때는 `SetCurrentValue`(손잡이 끌기와 같은 길).
+- 증명: PreviewUserBuildingDraft 첫 줄에 잠시 `return` → TwinContract 43개 중 **7개 실패**(바로 미리보기 · 기울기 · 지우고 새로 그리기 · 저장 uid) → 되돌려 43/43 통과.
+- 추가 지시 반영 뒤 전수(차례로): GMaps.MapEdit 908/908 · GMaps.Ui 1846/1846 · Housing 362 · MapAux 122 · MapLayer 102 · MapNav 70 · PropertyPanel 436 — 실패 0.
+  `dotnet test Ironwall.Dotnet.Libraries.sln` 11개 어셈블리 모두 통과(실패 0).
+
 ## 남은 일 · 엔진 후보(이번에 엔진은 건드리지 않음)
+- 엔진 후보 D: 고름 메시지(building)에 바닥 윤곽(footprint) — 지금은 장면 파일에서 찾는다.
+- 엔진 후보 E: 여러 건물 강조(`building.select {ids:[…]}`) · 3D 사각형 끌기 고르기 메시지.
+- 엔진 후보 F: user-buildings 항목 `taper_deg` 로 상자 미리보기 · 굽기(계약 — 다른 작업이 같은 키로 만든다). 지금 뷰어는 키를 무시하고 수직 상자.
 - 엔진 후보 A: building 메시지에 외관 키(hidden · wall_color · roof_color · facade)를 최상위로 — 지금은 GIS 가 GET looks 로 메움.
 - 엔진 후보 B: 아직 안 구운 직접 그린 상자가 있는 동안 겹친 자동 건물(다시 만들기의 OVERLAP 규칙)을 숨기기 — 큰 자동 건물 안에 든 상자의 색 · 무늬가 보이게(발견 6).
 - 엔진 후보 C: 강조를 한 번에 모두 지우는 메시지(필요 없음 — building.select null + decoration.select null 로 충분, 참고만).

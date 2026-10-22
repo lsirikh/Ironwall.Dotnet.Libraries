@@ -264,15 +264,21 @@ public partial class TwinContractScenarioTests
         Choose(panel, "Map.UserBuilding.WallColor", "#6fa8b8");
         Choose(panel, "Map.UserBuilding.RoofColor", "#b03a2e");
         Assert.Empty(rig.Writes);
+        // 3D 위 판 — 고르는 즉시 3D 상자가 그 값으로(저장 전, 2026-10-22). 고른 수만큼(같은 내용은 다시 보내지 않음)
+        Assert.Equal(5, rig.Sent("userbuilding.preview").Count);
+        var live = rig.Sent("userbuilding.preview").Last();
+        Assert.Equal(("hip", "industrial", "concrete", "#6fa8b8", "#b03a2e"),
+                     (live.Value<string>("roof"), live.Value<string>("use"), live.Value<string>("facade"), live.Value<string>("wall_color"), live.Value<string>("roof_color")));
         Press(panel, "Map.UserBuilding.Apply");
-        await Rig.Until(() => rig.Writes.Count == 1 && rig.Sent("userbuilding.preview").Count == 1, "저장 · 상자 미리보기");
+        await Rig.Until(() => rig.Writes.Count == 1 && rig.Sent("userbuilding.preview").Count == 6, "저장 · 상자 미리보기");
         var put = rig.Writes[0];
         Assert.Equal((HttpMethod.Put, $"/api/jobs/{Job}/user-buildings/{Uid}"), (put.Method, put.Path));
         Assert.Equal(("hip", "industrial", "concrete", "#6fa8b8", "#b03a2e"),
                      (put.Body!.Value<string>("roof"), put.Body.Value<string>("use"), put.Body.Value<string>("facade"), put.Body.Value<string>("wall_color"), put.Body.Value<string>("roof_color")));
-        var box = rig.Sent("userbuilding.preview").Single();
+        var box = rig.Sent("userbuilding.preview").Last();                                  // 저장 응답 그대로의 상자
         // 뷰어 userbuilding.js lookKeys 가 읽는 키 모두 — 외벽 성격(use)이 빠지면 무늬가 자동일 때 성격을 바꿔 저장해도 상자가 그대로였다
-        Assert.Equal(new[] { "type", "uid", "outline", "height", "floors", "wall_color", "roof_color", "facade", "roof", "use" }, box.Properties().Select(p => p.Name));
+        Assert.Equal(new[] { "type", "uid", "outline", "height", "floors", "wall_color", "roof_color", "facade", "roof", "use", "taper_deg" },
+                     box.Properties().Select(p => p.Name));
         Assert.Equal((Uid, 9.0, 3, 4), (box.Value<string>("uid"), box.Value<double>("height"), box.Value<int>("floors"), ((JArray)box["outline"]!).Count));
         Assert.Equal(("hip", "industrial", "concrete", "#6fa8b8", "#b03a2e"),
                      (box.Value<string>("roof"), box.Value<string>("use"), box.Value<string>("facade"), box.Value<string>("wall_color"), box.Value<string>("roof_color")));
@@ -297,9 +303,8 @@ public partial class TwinContractScenarioTests
         Render(panel, "UserBuildingPanelStyle.xaml");
         Choose(panel, "Map.UserBuilding.Use", "residential");                              // 외벽 무늬는 자동 — 뷰어는 성격으로 무늬를 고른다
         Press(panel, "Map.UserBuilding.Apply");
-        await Rig.Until(() => rig.Sent("userbuilding.preview").Count == 1, "상자 미리보기");
-        var box = rig.Sent("userbuilding.preview").Single();
-        Assert.Equal(("auto", "residential"), (box.Value<string>("facade"), box.Value<string>("use")));
+        await Rig.Until(() => rig.Writes.Count == 1 && rig.Sent("userbuilding.preview").Count == 2, "저장");   // 고를 때(바로) · 저장 뒤(저장된 모양)
+        Assert.All(rig.Sent("userbuilding.preview"), box => Assert.Equal(("auto", "residential"), (box.Value<string>("facade"), box.Value<string>("use"))));
     });
 
     [Fact]
@@ -313,10 +318,11 @@ public partial class TwinContractScenarioTests
         Render(panel, "UserBuildingPanelStyle.xaml");
         rig.Server.RejectPut = "facade 는 정해진 값이어야 합니다";
         Choose(panel, "Map.UserBuilding.WallColor", "#4f7a4f");
+        int previews = rig.Sent("userbuilding.preview").Count;                              // 고른 값은 3D 에 바로(저장 전 미리보기)
         Press(panel, "Map.UserBuilding.Apply");
         await Rig.Until(() => rig.Vm.HasUserBuildingError, "거절 문구");
         Assert.Equal("저장하지 못했습니다: facade 는 정해진 값이어야 합니다", rig.Vm.UserBuildingError);
-        Assert.Empty(rig.Sent("userbuilding.preview"));
+        Assert.Equal(previews, rig.Sent("userbuilding.preview").Count);                     // 저장된 것처럼 보내지 않는다
         Assert.Equal(Uid, rig.Vm.UserBuildingEditingUid);                                   // 고치기 그대로 · 고른 값 그대로
         Assert.Equal("#4f7a4f", Shown(panel, "Map.UserBuilding.WallColor"));
         Assert.False(rig.W.Undo.CanUndo);

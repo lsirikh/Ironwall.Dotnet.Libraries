@@ -31,6 +31,8 @@ public sealed record Map3DUserBuildingItem(string Uid, IReadOnlyList<UbPoint> Ou
     public string? WallColor { get; init; }
     public string? RoofColor { get; init; }
     public string Facade { get; init; } = Map3DLook.FacadeAuto;
+    /// <summary>위로 갈수록 좁게(+) · 넓게(−) 기울기(°, −30~+30, 0 = 수직) — user-buildings 항목 taper_deg(옛 항목은 키가 없어 0).</summary>
+    public double TaperDeg { get; init; }
 }
 
 /// <summary>합치기(POST …/user-buildings/merge) 응답 — 합친 건물 · 합쳐진(지워진) uid · 채운 안쪽 빈 곳 수 · 지붕을 평지붕으로 바꿨는가.</summary>
@@ -143,6 +145,34 @@ public static class Map3DUserBuilding
     internal static double Dist(UbPoint a, UbPoint b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
     /// <summary>되돌리기 기록 설명 앞머리 — 그리기 중 Ctrl+Z 가 GIS 편집 기록의 이 기록만 되돌린다.</summary>
     public const string UndoPrefix = "직접 그린 건물";
+
+    /// <summary>위로 갈수록 좁게 · 넓게(taper_deg) 범위 — 1° 단위.</summary>
+    public const int MinTaper = -30, MaxTaper = 30;
+
+    /// <summary>기울기를 1° 단위 · −30~+30 으로(유한하지 않으면 0 = 수직).</summary>
+    public static double ClampTaper(double deg)
+        => double.IsFinite(deg) ? Math.Clamp(Math.Round(deg, MidpointRounding.AwayFromZero), MinTaper, MaxTaper) + 0.0 : 0;
+
+    /// <summary>판 숫자 칸 — 정수 −30~+30(앞의 + 허용). 틀리면 사용자용 이유.</summary>
+    public static bool TryParseTaper(string? text, out double deg, out string? error)
+    {
+        deg = 0;
+        error = null;
+        var t = (text ?? "").Trim().Replace("°", "");
+        if (t.Length == 0) t = "0";
+        if (!double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) || !double.IsFinite(v)
+            || v < MinTaper || v > MaxTaper)
+        {
+            error = $"좁게 · 넓게는 {MinTaper} ~ +{MaxTaper}° 사이로 넣어 주세요.";
+            return false;
+        }
+        deg = ClampTaper(v);
+        return true;
+    }
+
+    /// <summary>판 기울기 줄 — "수직" · "위로 갈수록 좁게 10°" · "위로 갈수록 넓게 5°".</summary>
+    public static string TaperText(double deg)
+        => deg == 0 ? "수직(위아래 같은 넓이)" : deg > 0 ? $"위로 갈수록 좁게 {deg:0}°" : $"위로 갈수록 넓게 {-deg:0}°";
 
     public const string TooFewText = "점이 3개 이상 있어야 건물 윤곽이 됩니다.";
     public const string CrossText = "윤곽 선이 서로 엇갈립니다 — 꼭짓점을 옮겨 주세요.";
@@ -332,6 +362,11 @@ public static class Map3DUserBuilding
 
     /// <summary>PUT 본문 — 외벽 색 · 지붕 색(null = 자동) · 외벽 무늬까지(look 의 Hidden 은 쓰지 않는다). look 이 null 이면 그 키를 빼서 옛 본문 그대로.</summary>
     public static JObject PutBody(IReadOnlyList<UbPoint> outline, double height, int? floors, string? name, string roof, string use, Map3DLookState? look)
+        => PutBody(outline, height, floors, name, roof, use, look, null);
+
+    /// <summary>PUT 본문 — 위로 갈수록 좁게 · 넓게(taper_deg, null = 키를 빼서 옛 본문 그대로 — 엔진이 0)까지.</summary>
+    public static JObject PutBody(IReadOnlyList<UbPoint> outline, double height, int? floors, string? name, string roof, string use, Map3DLookState? look,
+                                  double? taperDeg)
     {
         var body = new JObject
         {
@@ -343,6 +378,7 @@ public static class Map3DUserBuilding
             ["use"] = Uses.Any(u => u.Key == use) ? use : UseAuto,
         };
         if (look != null) body.Merge(Map3DLook.PutBody(null, look), Map3DLook.KeepNulls);   // wall_color · roof_color · facade
+        if (taperDeg is double t) body["taper_deg"] = ClampTaper(t);
         return body;
     }
 
@@ -365,7 +401,8 @@ public static class Map3DUserBuilding
         o["floors"] = it.Floors is int f ? f : JValue.CreateNull();
         o.Merge(Map3DLook.PutBody(null, LookOf(it)), Map3DLook.KeepNulls);
         o["roof"] = it.Roof;
-        o["use"] = it.Use;   // 외벽 무늬가 자동이면 뷰어는 외벽 성격으로 무늬를 고른다(userbuilding.js boxLook) — 빠지면 성격을 바꿔 저장해도 상자가 그대로였다
+        o["use"] = it.Use;
+        o["taper_deg"] = ClampTaper(it.TaperDeg);   // 위로 갈수록 좁게(+) · 넓게(−) — 이 키를 모르는 뷰어는 무시한다(수직 상자)   // 외벽 무늬가 자동이면 뷰어는 외벽 성격으로 무늬를 고른다(userbuilding.js boxLook) — 빠지면 성격을 바꿔 저장해도 상자가 그대로였다
         return o.ToString(Formatting.None);
     }
 
@@ -403,6 +440,7 @@ public static class Map3DUserBuilding
             Roof = Roofs.Any(r => r.Key == roof) ? roof! : RoofFlat,
             Use = Uses.Any(u => u.Key == use) ? use! : UseAuto,
             WallColor = look.WallColor, RoofColor = look.RoofColor, Facade = look.Facade,
+            TaperDeg = Num(o["taper_deg"]) is double taper ? ClampTaper(taper) : 0,
         };
     }
 

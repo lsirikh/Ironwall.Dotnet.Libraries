@@ -65,8 +65,11 @@ public partial class MapViewModel
     /// <summary>고른 건물이 숨겨져 있는가(숨긴 뒤 · 되돌리기 전).</summary>
     public bool IsBuildingHidden => _bhBuilding?.Look.Hidden == true;
     private bool IsBuildingUserDrawn => _bhBuilding?.Origin == "user";
-    /// <summary>직접 그린 건물은 숨기지 않고 지운다.</summary>
-    public string BuildingHideButtonText => IsBuildingUserDrawn ? "이 건물 지우기" : "이 건물 숨기기";
+    /// <summary>
+    /// 사용자가 찾는 말로 [이 건물 지우기](2026-10-22 사용자 "삭제가 안 되는데?") — 지도 건물은 실제로는 숨김(되살리기 가능, "?" 말풍선),
+    /// 직접 그린 건물은 user-buildings DELETE.
+    /// </summary>
+    public string BuildingHideButtonText => "이 건물 지우기";
 
     public IReadOnlyList<Map3DLookItem> BuildingHiddenItems => (_bhLooks ?? Array.Empty<Map3DLookItem>()).Where(l => l.State.Hidden).ToList();
     public string BuildingHiddenCountText => Map3DLook.HiddenCountText(BuildingHiddenItems.Count);
@@ -196,10 +199,10 @@ public partial class MapViewModel
             _pendingBuildingHide = (job, b);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
             {
-                Title = IsBuildingUserDrawn ? "직접 그린 건물 지우기" : "건물 숨기기",
+                Title = IsBuildingUserDrawn ? "직접 그린 건물 지우기" : "건물 지우기",
                 Explain = IsBuildingUserDrawn
                     ? "직접 그린 이 건물을 지우시겠습니까?\n다시 만들면 그 자리는 자동으로 찾은 건물로 돌아갑니다."
-                    : "이 건물을 3D 에서 숨기시겠습니까?\n다시 만들어도 숨긴 채로 남고, 「숨긴 건물」 목록의 [되살리기] 로 되돌릴 수 있습니다.",
+                    : "이 건물을 3D 에서 지우시겠습니까?\n다시 만들어도 지운 채로 남고, 「숨긴 건물」 목록의 [되살리기] 로 되돌릴 수 있습니다.",
                 MessageModel = new CallHideMap3DBuildingProcessMessageModel(),
             });
         }
@@ -225,7 +228,7 @@ public partial class MapViewModel
                 else SetBuildingHeightError(_ubError ?? "지우지 못했습니다.");
                 return;
             }
-            await SaveBuildingLookAsync(p.Job, p.Building.Id, true, null, p.Building.Look, "건물을 숨겼습니다 — 「숨긴 건물」 목록에서 되살릴 수 있습니다");
+            await SaveBuildingLookAsync(p.Job, p.Building.Id, true, null, p.Building.Look, "건물을 지웠습니다 — 「숨긴 건물」 목록에서 되살릴 수 있습니다");
         }
         finally
         {
@@ -264,7 +267,7 @@ public partial class MapViewModel
             int n = await _map3DClient.ResetAllLooksAsync(job, cancellationToken);
             foreach (var it in known)
                 if (it.Id is int id) PostBuilding3D(Map3DLook.LookMessageJson(id, Map3DLookState.Auto));
-            BhUndo.RemoveAll(u => u.Job == job && u.Look != null);   // 지운 값으로 되돌리지 않게
+            BhUndo.RemoveAll(u => u.Job == job && (u.Look != null || u.Group != null));   // 지운 값으로 되돌리지 않게
             if (_bhJob == job && _bhBuilding is { } b) { _bhBuilding = b with { Look = Map3DLookState.Auto }; _bhLookEdit = null; }
             _log?.Info($"[Map3D] 건물 외관 모두 되돌림 job={job} n={n}");
             SetAimStatus($"건물 {n}개를 되살리고 외관을 자동으로 되돌렸습니다", autoHide: true);
