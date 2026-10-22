@@ -360,7 +360,7 @@ public partial class TwinContractScenarioTests
         // 판 크기 단추 = 뷰어 키(+) — 실제 판 템플릿의 단추를 누른다
         AssertRendered(rig.Vm.DecorationPanel, "DecorationPanelStyle.xaml", "Map.Edit3D.ScaleUp", "Map.Edit3D.ScaleDown", "Map.Model.Delete", "Map.Model.Name");
         Press(rig.Vm.DecorationPanel, "Map.Edit3D.ScaleUp");
-        Assert.Equal("+", rig.Sent("edit.key").Last().Value<string>("key"));
+        Assert.Equal(new[] { "+", "Enter" }, rig.Sent("edit.key").TakeLast(2).Select(k => k.Value<string>("key")));   // 누를 때마다 확정(2026-10-22)
 
         // 손잡이로 옮기기 · 돌리기 · 키우기 → PUT, 되돌리기 = 앞 자리로 PUT
         double lon = rig.Center.Lng + 0.0005, lat = rig.Center.Lat + 0.0003;

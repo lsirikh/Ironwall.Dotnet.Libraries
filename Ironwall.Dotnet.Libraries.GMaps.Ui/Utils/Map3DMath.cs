@@ -29,7 +29,7 @@ public readonly record struct Map3DZoomGate(double Enter, double Exit, double Pr
 /// <summary>3D 마우스가 가리키는 땅(지형 · 건물 지붕) — 경도 · 위도 · 고도(m, 모르면 null). 좌표 칩용.</summary>
 public readonly record struct Map3DCursor(double Lon, double Lat, double? Alt);
 
-/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor" | "building" | "building.none". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
+/// <summary>3D → GIS 메시지. Type = "ready" | "rendered" | "camera" | "pick" | "overlay.resync" | "overlay.screen" | "progress" | "perf.stats" | "cursor" | "building" | "building.box" | "building.none". camera 일 때만 <see cref="Camera"/>, pick 일 때만 <see cref="Pick"/> 가 있다.</summary>
 public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3DCamera? Camera)
 {
     public Map3DPick? Pick { get; init; }
@@ -54,6 +54,14 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>building 일 때 3D 에서 누른 건물(「건물 높이」 판, <see cref="Map3DBuilding"/>).</summary>
     public Map3DBuildingPick? Building { get; init; }
+
+    /// <summary>building 일 때 클릭 때 누른 Ctrl · Shift(엔진이 보낸 값 — 옛 엔진은 없어 false, GIS 는 호스트 키 상태와 함께 본다).</summary>
+    public bool Ctrl { get; init; }
+    public bool Shift { get; init; }
+
+    /// <summary>building.box 일 때 Shift+끌기 상자 안의 건물(최대 500)과 add(Ctrl 도 눌림 = 지금 고름에 더함).</summary>
+    public IReadOnlyList<Map3DBuildingPick>? BuildingBox { get; init; }
+    public bool BoxAdd { get; init; }
 
     /// <summary>userbuilding.pick 일 때 3D 에서 누른 직접 그린 건물 상자의 uid(twin-contract B).</summary>
     public string? UserUid { get; init; }
@@ -410,7 +418,12 @@ public static class Map3DMath
                 return clon == null || clat == null ? null : new Map3DMessage(type, null, null, null) { Cursor = new Map3DCursor(clon.Value, clat.Value, Finite(o["alt"])) };
             }
             if (type == "building")
-                return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b } : null;
+            {
+                var (ctrl, shift) = Map3DBuilding.ParseModifiers(o);
+                return Map3DBuilding.Parse(o) is { } b ? new Map3DMessage(type, null, null, null) { Building = b, Ctrl = ctrl, Shift = shift } : null;
+            }
+            if (type == "building.box")   // Shift+끌기 상자(2026-10-22 — 2D 러버밴드와 같게)
+                return Map3DBuilding.ParseBox(o) is { } box ? new Map3DMessage(type, null, null, null) { BuildingBox = box.Items, BoxAdd = box.Add } : null;
             if (type == "building.none") return new Map3DMessage(type, null, null, null);   // 건물 아닌 땅을 눌렀다(2026-10-19)
             if (type == "env.state") return new Map3DMessage(type, null, null, null) { EnvState = Map3DEnvironment.ParseState(o) };   // 해 뜸/짐 · 차 · 사람 수(2026-10-21)
             if (type is "userbuilding.pick" or "decoration.pick" or "model.pick")   // 직접 그린 건물 상자 · 꾸미기 항목 · 넣은 모델을 눌렀다 — uid 가 틀리면 버린다

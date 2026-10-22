@@ -69,7 +69,11 @@
 			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
 		</Style>
 
-		<Style x:Key="Unit.Combo" TargetType="ComboBox">
+		<!--  BasedOn 필수 — 없으면 앱의 ComboBox 기본 스타일(MaterialDesign · 테마 토큰)이 빠지고 흰 기본 WPF 모양이 된다(2026-10-22)  -->
+		<Style
+			x:Key="Unit.Combo"
+			BasedOn="{StaticResource {x:Type ComboBox}}"
+			TargetType="ComboBox">
 			<Setter Property="Height" Value="32" />
 			<Setter Property="VerticalContentAlignment" Value="Center" />
 			<Setter Property="FontSize" Value="12.5" />

@@ -346,6 +346,9 @@ public class Map3DCompositeScenarioTests
                 Assert.True(rig.Vm.IsUserBuildingDrawing);
                 Assert.False(rig.R.Shown);
                 Assert.True(rig.R.W.Map.IsHitTestVisible, "그리려면 2D 가 누름을 받아야 한다");
+                // 2D 에서 점을 찍던 중(닫지 않은 윤곽) — 3D 로 이어 그릴 수 없어 거절한다. 빈 판 · 고치던 건물은 3D 위 판으로 함께 들어간다
+                // (2026-10-22 사용자 "2D 윤곽에서 고치기 후에 3D 로 들어올 때 버그" — BuildingGroupEditScenarioTests)
+                rig.Vm.UserBuildingDraft!.Load(new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.UbPoint(rig.R.W.Map.Position.Lng, rig.R.W.Map.Position.Lat) });
                 rig.R.PressEnter();
                 Assert.Equal("Off", rig.R.State);
                 Assert.Contains("들어가지 않습니다", rig.R.Status);

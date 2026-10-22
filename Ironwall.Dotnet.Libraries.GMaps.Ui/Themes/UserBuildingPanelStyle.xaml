@@ -34,7 +34,8 @@
 
 	<!--  3D 위 편집 칸(2026-10-21, edit3d-contract) — 「건물 만들기」 · 「꾸미기」 판이 3D 위에서 열렸을 때만(IsEdit3DMode).
 	      단추는 edit.key 로 뷰어 키보드와 똑같이 동작한다(엔진 dac1e69): 화면 기준 ↑↓←→(0.5 m · Shift = 5 m) · ↺↻(소품 15° · Shift = 1°) ·
-	      꼭짓점 이전/다음/지우기는 미리보기만, [✓ 확정](Enter)에서 저장 · 편집 기록. [2D 에서 윤곽 고치기].
+	      판 단추로 옮기기 · 돌리기 · 크기는 누를 때마다 바로 저장(편집 기록) — [✓ 확정] 은 없앴다(2026-10-22 사용자 "확정은 뭐고", 판 아래 [✓ 적용] 하나).
+	      3D 손잡이를 마우스로 끈 것은 [✓ 적용](또는 3D 에서 Enter)에서 함께 저장. 꼭짓점 지우기는 3D 의 Delete 키(판에는 [지우기] 하나만). [2D 에서 윤곽 고치기].
 	      DataContext = MapViewModel(판에서 물려받음). 두 판이 같이 쓴다(동시에 열리지 않는다).  -->
 	<ControlTemplate x:Key="Edit3DSectionTemplate" TargetType="ContentControl">
 		<StackPanel AutomationProperties.AutomationId="Map.Edit3D.Section" Visibility="{Binding IsEdit3DMode, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -53,7 +54,7 @@
 						CommandParameter="ArrowUp"
 						Content="↑"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="화면 안쪽(보는 쪽)으로 0.5 m (Shift = 5 m)" />
+						ToolTip="앞으로" />
 					<Button
 						Margin="2"
 						AutomationProperties.AutomationId="Map.Edit3D.MoveDown"
@@ -62,7 +63,7 @@
 						CommandParameter="ArrowDown"
 						Content="↓"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="화면 바깥쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="뒤로" />
 					<Button
 						Margin="2"
 						AutomationProperties.AutomationId="Map.Edit3D.MoveLeft"
@@ -71,7 +72,7 @@
 						CommandParameter="ArrowLeft"
 						Content="←"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="화면 왼쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="왼쪽으로" />
 					<Button
 						Margin="2"
 						AutomationProperties.AutomationId="Map.Edit3D.MoveRight"
@@ -80,7 +81,7 @@
 						CommandParameter="ArrowRight"
 						Content="→"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="화면 오른쪽으로 0.5 m (Shift = 5 m)" />
+						ToolTip="오른쪽으로" />
 				</UniformGrid>
 				<UniformGrid
 					Margin="0,0,0,6"
@@ -94,7 +95,7 @@
 						CommandParameter="["
 						Content="↺"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="왼쪽으로 15° (Shift = 1°)" />
+						ToolTip="왼쪽으로 15° (Shift 1°)" />
 					<Button
 						Margin="2"
 						AutomationProperties.AutomationId="Map.Edit3D.RotateRight"
@@ -103,7 +104,7 @@
 						CommandParameter="]"
 						Content="↻"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="오른쪽으로 15° (Shift = 1°)" />
+						ToolTip="오른쪽으로 15° (Shift 1°)" />
 				</UniformGrid>
 				<!--  넣은 모델 크기(2026-10-22, 엔진 + − 키 = ×1.1 · ÷1.1) — 모델을 골랐을 때만  -->
 				<UniformGrid
@@ -118,7 +119,7 @@
 						CommandParameter="-"
 						Content="작게 −"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="1.1배 작게 (Shift = 1.01배)" />
+						ToolTip="1.1배 작게 (Shift 1.01배)" />
 					<Button
 						Margin="2"
 						AutomationProperties.AutomationId="Map.Edit3D.ScaleUp"
@@ -127,11 +128,11 @@
 						CommandParameter="+"
 						Content="크게 +"
 						Style="{StaticResource BuildingHeightStepButton}"
-						ToolTip="1.1배 크게 (Shift = 1.01배)" />
+						ToolTip="1.1배 크게 (Shift 1.01배)" />
 				</UniformGrid>
 				<UniformGrid
 					Margin="0,0,0,6"
-					Columns="3"
+					Columns="2"
 					Visibility="{Binding IsEdit3DVertexVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<Button
 						Margin="2"
@@ -141,7 +142,7 @@
 						CommandParameter="Shift+Tab"
 						Content="◀ 이전"
 						Style="{StaticResource PanelSecondaryButtonStyle}"
-						ToolTip="이전 꼭짓점 고르기 (3D 에서 Shift+Tab)" />
+						ToolTip="이전 꼭짓점 (Shift+Tab)" />
 					<Button
 						Margin="2"
 						AutomationProperties.AutomationId="Map.Edit3D.VertexNext"
@@ -150,32 +151,15 @@
 						CommandParameter="Tab"
 						Content="다음 ▶"
 						Style="{StaticResource PanelSecondaryButtonStyle}"
-						ToolTip="다음 꼭짓점 고르기 (3D 에서 Tab)" />
-					<Button
-						Margin="2"
-						AutomationProperties.AutomationId="Map.Edit3D.VertexDelete"
-						AutomationProperties.Name="고른 꼭짓점 지우기"
-						Command="{Binding Edit3DKeyCommand}"
-						CommandParameter="Delete"
-						Content="지우기"
-						Style="{StaticResource PanelSecondaryButtonStyle}"
-						ToolTip="고른 꼭짓점 지우기 (3D 에서 Delete — 확정해야 저장)" />
+						ToolTip="다음 꼭짓점 (Tab)" />
 				</UniformGrid>
-				<Button
-					Margin="0,0,0,6"
-					AutomationProperties.AutomationId="Map.Edit3D.Confirm"
-					Command="{Binding Edit3DKeyCommand}"
-					CommandParameter="Enter"
-					Content="✓ 확정"
-					Style="{StaticResource PanelPrimaryButtonStyle}"
-					ToolTip="옮기기 · 돌리기 · 꼭짓점 고친 것을 저장 (3D 에서 Enter · 되돌리기 가능)" />
 			</StackPanel>
 			<Button
 				AutomationProperties.AutomationId="Map.Edit3D.To2D"
 				Command="{Binding EditIn2DCommand}"
 				Content="2D 에서 윤곽 고치기"
 				Style="{StaticResource PanelSecondaryButtonStyle}"
-				ToolTip="2D 지도로 바꿔 윤곽을 고칩니다(3D 를 나갑니다)" />
+				ToolTip="2D 지도로 바꿔 고치기" />
 		</StackPanel>
 	</ControlTemplate>
 
@@ -333,6 +317,15 @@
 											Foreground="{DynamicResource TextPrimaryBrush}"
 											Text="{Binding UserBuildingSelectionText}"
 											TextWrapping="Wrap" />
+										<!--  여러 개 함께 고치기(2026-10-22) — 바꾼 칸만 고른 것 모두에, 값이 다른 칸은 「여러 값」  -->
+										<TextBlock
+											Margin="0,4,0,0"
+											AutomationProperties.AutomationId="Map.UserBuilding.GroupText"
+											FontSize="11"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="{Binding UserBuildingGroupText}"
+											TextWrapping="Wrap"
+											Visibility="{Binding IsUserBuildingGroup, Converter={StaticResource BooleanToVisibilityConverter}}" />
 										<Grid Margin="0,6,0,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="*" />
@@ -514,7 +507,13 @@
 										<ColumnDefinition Width="8" />
 										<ColumnDefinition Width="64" />
 									</Grid.ColumnDefinitions>
-									<StackPanel Grid.Column="0">
+									<!--  지붕 이름이 길어(「박공(세모 지붕)」) 한 줄 전체, 쓰임 · 원 꼭짓점은 그 아래(2026-10-22 — 세 칸이면 글자가 잘렸다)  -->
+									<Grid.RowDefinitions>
+										<RowDefinition Height="Auto" />
+										<RowDefinition Height="6" />
+										<RowDefinition Height="Auto" />
+									</Grid.RowDefinitions>
+									<StackPanel Grid.Row="0" Grid.ColumnSpan="5">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="지붕 모양" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.UserBuilding.Roof"
@@ -524,7 +523,7 @@
 											SelectedValue="{Binding UserBuildingRoof, Mode=TwoWay}"
 											SelectedValuePath="Key" />
 									</StackPanel>
-									<StackPanel Grid.Column="2">
+									<StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 성격" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.UserBuilding.Use"
@@ -534,7 +533,7 @@
 											SelectedValue="{Binding UserBuildingUse, Mode=TwoWay}"
 											SelectedValuePath="Key" />
 									</StackPanel>
-									<StackPanel Grid.Column="4">
+									<StackPanel Grid.Row="2" Grid.Column="4">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="원 꼭짓점" />
 										<TextBox
 											AutomationProperties.AutomationId="Map.UserBuilding.CircleSides"
@@ -549,10 +548,14 @@
 										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="8" />
 										<ColumnDefinition Width="*" />
-										<ColumnDefinition Width="8" />
-										<ColumnDefinition Width="*" />
 									</Grid.ColumnDefinitions>
-									<StackPanel Grid.Column="0">
+									<!--  외벽 무늬는 한 줄 전체, 색 둘은 두 칸(「건물 높이」 판과 같게 — 세 칸이면 잘렸다)  -->
+									<Grid.RowDefinitions>
+										<RowDefinition Height="Auto" />
+										<RowDefinition Height="6" />
+										<RowDefinition Height="Auto" />
+									</Grid.RowDefinitions>
+									<StackPanel Grid.Row="0" Grid.ColumnSpan="3">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 무늬" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.UserBuilding.Facade"
@@ -567,7 +570,7 @@
 											</ComboBox.GroupStyle>
 										</ComboBox>
 									</StackPanel>
-									<StackPanel Grid.Column="2">
+									<StackPanel Grid.Row="2" Grid.Column="0">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 색" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.UserBuilding.WallColor"
@@ -577,7 +580,7 @@
 											SelectedValue="{Binding UserBuildingWallColor, Mode=TwoWay}"
 											SelectedValuePath="Key" />
 									</StackPanel>
-									<StackPanel Grid.Column="4">
+									<StackPanel Grid.Row="2" Grid.Column="2">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="지붕 색" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.UserBuilding.RoofColor"
@@ -642,7 +645,7 @@
 										Command="{Binding ApplyUserBuildingCommand}"
 										Content="✓ 적용"
 										Style="{StaticResource PanelPrimaryButtonStyle}"
-										ToolTip="저장 — 3D 에 상자로 바로 보이고, 다시 만들면 사진으로 꾸며집니다" />
+										ToolTip="저장 (3D 에서 고친 모양 · 판 값 함께)" />
 									<Button
 										Grid.Row="0"
 										Grid.Column="2"
@@ -652,17 +655,18 @@
 										Style="{StaticResource PanelSecondaryButtonStyle}"
 										ToolTip="그리던 윤곽 버리기 (Esc)" />
 									<Button
-										Grid.Row="2"
+										Grid.Row="4"
 										Grid.Column="0"
+										Grid.ColumnSpan="3"
 										AutomationProperties.AutomationId="Map.UserBuilding.Delete"
 										Command="{Binding DeleteUserBuildingCommand}"
-										Content="지우기"
+										Content="이 건물 지우기"
 										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="저장된 이 건물을 지웁니다(되돌리기 가능)"
+										ToolTip="저장된 이 건물 지우기 (되돌리기 가능)"
 										Visibility="{Binding IsUserBuildingEditingSaved, Converter={StaticResource BooleanToVisibilityConverter}}" />
 									<Button
 										Grid.Row="2"
-										Grid.Column="2"
+										Grid.Column="0"
 										AutomationProperties.AutomationId="Map.UserBuilding.Undo"
 										Command="{Binding UndoUserBuildingCommand}"
 										Style="{StaticResource PanelSecondaryButtonStyle}"
@@ -677,7 +681,7 @@
 										</StackPanel>
 									</Button>
 									<Button
-										Grid.Row="4"
+										Grid.Row="2"
 										Grid.Column="2"
 										AutomationProperties.AutomationId="Map.UserBuilding.Redo"
 										Command="{Binding RedoUserBuildingCommand}"
