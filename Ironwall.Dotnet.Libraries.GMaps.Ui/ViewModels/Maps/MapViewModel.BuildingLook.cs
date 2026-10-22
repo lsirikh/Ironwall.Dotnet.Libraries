@@ -41,25 +41,28 @@ public partial class MapViewModel
     public string BuildingFacade
     {
         get => BhLook.Facade;
-        set => SetBuildingLookEdit(BhLook with { Facade = Map3DLook.NormalizeFacade(value) }, value);
+        set => SetBuildingLookEdit(BhLook with { Facade = Map3DLook.NormalizeFacade(value) }, value, "facade");
     }
 
     /// <summary>외벽 색("#rrggbb", "" = 자동).</summary>
     public string BuildingWallColor
     {
         get => BhLook.WallColor ?? "";
-        set => SetBuildingLookEdit(BhLook with { WallColor = Map3DLook.NormalizeColor(value) }, value);
+        set => SetBuildingLookEdit(BhLook with { WallColor = Map3DLook.NormalizeColor(value) }, value, "wall");
     }
 
     /// <summary>지붕 색("#rrggbb", "" = 자동).</summary>
     public string BuildingRoofColor
     {
         get => BhLook.RoofColor ?? "";
-        set => SetBuildingLookEdit(BhLook with { RoofColor = Map3DLook.NormalizeColor(value) }, value);
+        set => SetBuildingLookEdit(BhLook with { RoofColor = Map3DLook.NormalizeColor(value) }, value, "roof");
     }
 
-    /// <summary>판의 외관이 저장된 값과 다른가([외관 적용]).</summary>
-    public bool IsBuildingLookChanged => _bhBuilding is { } b && _bhLookEdit is { } e && e with { Hidden = b.Look.Hidden } != b.Look;
+    /// <summary>판의 외관이 저장된 값과 다른가([외관 적용]). 여러 개 골랐으면 손댄 칸이 고른 것 중 하나라도 다를 때(칸 단위 — 2D 여러 개 속성창과 같다).</summary>
+    public bool IsBuildingLookChanged => _bhBuilding is { } b && _bhLookEdit is { } e
+        && (IsBuildingMultiSelect
+            ? LookFields.Any(f => BhLookTouched.Contains(f.Field) && BhSelection.Any(s => f.Get(WithSavedLook(s).Look) != f.Get(e)))
+            : e with { Hidden = b.Look.Hidden } != b.Look);
     /// <summary>외관 칸 · 숨기기를 쓸 수 있는 엔진인가.</summary>
     public bool IsBuildingLookAvailable => IsBuildingHeightPanelOpen && !_bhLooksUnsupported;
     public bool IsBuildingLookUnsupported => IsBuildingHeightPanelOpen && _bhLooksUnsupported;
@@ -151,11 +154,13 @@ public partial class MapViewModel
         finally { _map3DFacadeLoading = false; }
     }
 
-    private void SetBuildingLookEdit(Map3DLookState look, string? raw)
+    private void SetBuildingLookEdit(Map3DLookState look, string? raw, string field)
     {
         if (raw == null) return;   // 콤보가 목록에 없는 값(엔진이 넣은 색)을 비우며 되쓴 null — 저장된 값을 지우지 않는다("" = 자동)
         if (!IsBuildingHeightEditable) { RefreshBuildingHeightPanel(); return; }
+        if (look == BhLook) return;   // 콤보가 항목을 다시 그리며 같은 값을 되쓴 것 — 손댄 칸으로 치지 않는다
         _bhLookEdit = look;
+        BhLookTouched.Add(field);
         RefreshBuildingHeightPanel();
     }
 
@@ -186,6 +191,7 @@ public partial class MapViewModel
     {
         if (_bhBuilding is not { } b || _bhJob is not { } job || _bhBusy || !IsBuildingLookChanged) return;
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
+        if (IsBuildingMultiSelect) { await ApplyBuildingLookGroupAsync(job); return; }
         await SaveBuildingLookAsync(job, b.Id, null, BhLook, b.Look, "건물 외관을 저장했습니다");
     }
 
@@ -212,7 +218,12 @@ public partial class MapViewModel
             if (_bhLookNotice != null) done = _bhLookNotice;
             if (_bhBuilding?.Id == id && _bhJob == job)
             {
-                if (saved.State.Hidden && !_bhBuilding.Look.Hidden) PostBuilding3D(Map3DBuilding.SelectMessageJson(null));   // 사라진 건물의 강조 윤곽도 지운다
+                if (saved.State.Hidden && !_bhBuilding.Look.Hidden)
+                {
+                    // 사라진 건물의 강조 윤곽도 지운다 — 함께 고른 다른 건물의 강조 · 고름은 그대로
+                    BhSelection.RemoveAll(s => s.Id == id);
+                    PostBuilding3D(Map3DBuilding.SelectMessageJson(null, BhSelection.Count > 0 ? BhSelection.Select(s => s.Id) : null));
+                }
                 _bhBuilding = _bhBuilding with { Look = saved.State };
                 _bhLookEdit = null;
             }

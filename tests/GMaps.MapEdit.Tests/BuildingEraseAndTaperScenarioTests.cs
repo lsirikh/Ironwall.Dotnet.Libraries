@@ -14,7 +14,7 @@ namespace GMaps.MapEdit.Tests;
 /// ① "위로 올라가면서 점점 좁게 혹은 점점 넓게"(taper_deg) — 막대 · 숫자 칸 · [0] → 3D 상자 바로 · 저장 본문 · 되돌리기 · 다시 하기 · 400 거절 복구 · 다시 불러오기.
 /// ② "6층으로 했는데 그대로 3층" — 3D 위 판에서 층수 · 높이를 바꾸는 즉시 userbuilding.preview(height · floors), [취소] = 저장된 모양으로.
 /// ③ "기존 건물을 지우고 다시 만들 수 있으면 · 삭제가 안 되는데?" — [이 건물 지우기] · [지우고 이 자리에 새로 그리기](장면 파일의 바닥 윤곽).
-/// ④ "안양발전소 엉망" — [여러 개 고르기](차례로 누름 · Ctrl+클릭) → [고른 n개 지우기] · [이 영역 자동 건물 모두 지우기…] · 되돌리기 1칸.
+/// ④ "안양발전소 엉망" — 여러 개 고르기(2D 마커처럼 Ctrl+클릭 · Shift+끌기, BuildingPickLikeMarkerScenarioTests) → [고른 n개 지우기] · [이 영역 자동 건물 모두 지우기…] · 되돌리기 1칸.
 /// </summary>
 public partial class TwinContractScenarioTests
 {
@@ -244,7 +244,7 @@ public partial class TwinContractScenarioTests
     // ─────────────── ④ 여러 개 · 영역 모두 지우기 ───────────────
 
     [Fact]
-    public void should_pick_several_by_click_and_ctrl_click_erase_them_at_once_and_undo_in_one_step() => Scenario.StaAsyncOnHiddenDesktop(async () =>
+    public void should_pick_several_by_ctrl_click_like_2d_markers_erase_them_at_once_and_undo_in_one_step() => Scenario.StaAsyncOnHiddenDesktop(async () =>
     {
         var rig = new Rig();
         rig.Enter3D();
@@ -252,44 +252,51 @@ public partial class TwinContractScenarioTests
         await Rig.Until(() => rig.Vm.IsBuildingLookAvailable && rig.Server.Requests.Any(r => r.Path.EndsWith("/looks")), "외관 목록");
         var panel = rig.Vm.BuildingHeightPanel;
         Render(panel, "BuildingHeightPanelStyle.xaml");
-        Press(panel, "Map.BuildingHeight.MultiSelect");
-        Assert.True(rig.Vm.IsBuildingMultiSelect);
-        Assert.Equal(("여러 개 고르기 끝", "고른 1개 지우기"), (rig.Vm.BuildingMultiButtonText, rig.Vm.BuildingMultiDeleteText));
-        rig.PickBuilding(9);
-        rig.PickBuilding(10);
-        rig.PickBuilding(9);                                                                // 다시 누르면 뺀다
-        Assert.Equal(2, rig.Vm.BuildingMultiCount);
-        Assert.Equal("고른 건물 2개 — 3D 에서 누르면 넣고, 다시 누르면 뺍니다", rig.Vm.BuildingMultiSelectText);
+        rig.Vm.IsNotifying = true;                                                          // 단추 보임이 고름을 따라오는지(실앱과 같게)
+        Assert.Null(FindOrNull<Button>(panel, "Map.BuildingHeight.MultiSelect"));          // [여러 개 고르기] 모드 단추는 없다(2026-10-22)
+        var hideSelected = Find<Button>(panel, "Map.BuildingHeight.HideSelected");
+        Assert.Equal(System.Windows.Visibility.Collapsed, hideSelected.Visibility);       // 하나만 골랐다
+        Assert.False(rig.Vm.HideSelectedBuildingsCommand.CanExecute(null));
+
+        // Ctrl+클릭 = 넣기 · 빼기(2D 마커와 같다)
+        rig.PickBuilding(9, extra: new JObject { ["ctrl"] = true });
+        rig.PickBuilding(10, extra: new JObject { ["ctrl"] = true });
+        rig.PickBuilding(9, extra: new JObject { ["ctrl"] = true });                        // 다시 누르면 뺀다
+        Assert.Equal(new[] { 8, 10 }, rig.Vm.BuildingSelectionIds);
+        Assert.Equal(("고른 건물 2개", "고른 2개 지우기"), (rig.Vm.BuildingMultiSelectText, rig.Vm.BuildingMultiDeleteText));
+        Assert.Equal(System.Windows.Visibility.Visible, hideSelected.Visibility);
+        Assert.Equal(System.Windows.Visibility.Visible, Find<TextBlock>(panel, "Map.BuildingHeight.MultiSelectText").Visibility);
         Assert.Empty(rig.Writes);
 
-        // Ctrl+클릭 = 여러 개 고르기 중이 아니어도 넣는다
-        Press(panel, "Map.BuildingHeight.MultiSelect");                                    // 끔
-        Assert.False(rig.Vm.IsBuildingMultiSelect);
+        // 옛 엔진(키 필드 없음) — 호스트 Ctrl 로도 넣는다
         Scenario.SetField(rig.Vm, "_map3DModifiers", (Func<ModifierKeys>)(() => ModifierKeys.Control));
-        rig.PickBuilding(11);                                                               // 지금 판의 건물(9) + 11
+        rig.PickBuilding(11);
         Scenario.SetField(rig.Vm, "_map3DModifiers", (Func<ModifierKeys>)(() => ModifierKeys.None));
-        Assert.True(rig.Vm.IsBuildingMultiSelect);
-        Assert.Equal(2, rig.Vm.BuildingMultiCount);
+        Assert.Equal(new[] { 8, 10, 11 }, rig.Vm.BuildingSelectionIds);
+        Assert.Equal(11, rig.Vm.BuildingHeightBuilding!.Id);                                 // 판은 마지막에 넣은 건물
 
         Press(panel, "Map.BuildingHeight.HideSelected");
         await Rig.Until(() => rig.W.Published.OfType<OpenConfirmPopupMessageModel>().Any(), "확인 창");
-        Assert.Contains("고른 건물 2개", rig.W.Published.OfType<OpenConfirmPopupMessageModel>().Last().Explain);
+        Assert.Contains("고른 건물 3개", rig.W.Published.OfType<OpenConfirmPopupMessageModel>().Last().Explain);
         Assert.Empty(rig.Writes);                                                           // 확인 전에는 지우지 않는다
         await rig.Vm.HandleAsync(new Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps.CallHideMap3DBuildingsProcessMessageModel(), CancellationToken.None);
-        Assert.Equal(new[] { "/buildings/9/look", "/buildings/11/look" }, rig.Writes.Select(w => w.Path[$"/api/jobs/{Job}".Length..]));
+        Assert.Equal(new[] { "/buildings/8/look", "/buildings/10/look", "/buildings/11/look" }, rig.Writes.Select(w => w.Path[$"/api/jobs/{Job}".Length..]));
         Assert.All(rig.Writes, w => Assert.Equal("{\"hidden\":true}", w.Body!.ToString(Newtonsoft.Json.Formatting.None)));
-        Assert.Equal(new[] { 9, 11 }, rig.Sent("building.look").Select(m => m.Value<int>("id")));
+        Assert.Equal(new[] { 8, 10, 11 }, rig.Sent("building.look").Select(m => m.Value<int>("id")));
         Assert.All(rig.Sent("building.look"), m => Assert.True(m.Value<bool>("hidden")));
+        Assert.Equal(JTokenType.Null, rig.Sent("building.select").Last()["id"]!.Type);      // 사라진 건물 강조 지움
         Assert.False(rig.Vm.IsBuildingMultiSelect);
-        Assert.Equal("숨긴 건물 2개", rig.Vm.BuildingHiddenCountText);
+        Assert.Empty(rig.Vm.BuildingSelectionIds);                                          // 지운 건물은 고름에서도 빠진다
+        Assert.Equal(System.Windows.Visibility.Collapsed, hideSelected.Visibility);
+        Assert.Equal("숨긴 건물 3개", rig.Vm.BuildingHiddenCountText);
         Assert.Equal(1, rig.Vm.BuildingHeightUndoCount);
 
-        // 되돌리기 한 번 = 둘 다 되살림
+        // 되돌리기 한 번 = 모두 되살림
         rig.Vm.UndoBuildingHeightCommand.Execute(null);
-        await Rig.Until(() => rig.Writes.Count == 4 && !rig.Vm.HasBuildingHidden, "되돌리기");
-        Assert.All(rig.Writes.Skip(2), w => Assert.False(w.Body!.Value<bool>("hidden")));
-        Assert.Equal(new[] { 9, 11 }, rig.Sent("building.look").Skip(2).Select(m => m.Value<int>("id")));
-        Assert.All(rig.Sent("building.look").Skip(2), m => Assert.False(m.Value<bool>("hidden")));
+        await Rig.Until(() => rig.Writes.Count == 6 && !rig.Vm.HasBuildingHidden, "되돌리기");
+        Assert.All(rig.Writes.Skip(3), w => Assert.False(w.Body!.Value<bool>("hidden")));
+        Assert.Equal(new[] { 8, 10, 11 }, rig.Sent("building.look").Skip(3).Select(m => m.Value<int>("id")));
+        Assert.All(rig.Sent("building.look").Skip(3), m => Assert.False(m.Value<bool>("hidden")));
         rig.Done();
     });
 

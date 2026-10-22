@@ -13,50 +13,143 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Purpose      : 「건물 높이」 판의 지우기 · 다시 만들기(2026-10-22 사용자 — "기존에 만들어진 건물을 지우고 내가 다시 만들 수 있으면 좋겠어 · 삭제가 안 되는데?",
                   "안양발전소 이거 너가 미리 만들어 놓은 건 진짜 엉망이거든").
                   [지우고 이 자리에 새로 그리기] = 그 건물을 지우고(숨김) 그 바닥 윤곽으로 직접 그린 건물 판을 3D 위에 연다,
-                  [여러 개 고르기] = 3D 에서 차례로 눌러(또는 Ctrl+클릭) 넣고 빼기 → [고른 n개 지우기](확인),
+                  여러 개 고르기 = 2D 마커와 같은 규칙(2026-10-22 사용자 — "건물을 고르는 게 힘들다 · 2D 에서 Marker 선택할 때와 같은 방식으로"):
+                  클릭 = 하나만 · Ctrl+클릭 = 넣기 · 빼기 · Shift+끌기 = 상자 안 모두(building.box, Ctrl+Shift = 더함) · 빈 곳 클릭 · Esc = 풀기
+                  → 2개 이상이면 [고른 n개 지우기](확인). 옛 [여러 개 고르기] 모드 단추는 없앴다.
                   [이 영역 자동 건물 모두 지우기…](확인) = 그 장면의 자동 건물(지도 · 국가 자료 · 사진)을 모두 지운다(직접 그린 건물 · 꾸미기는 그대로).
    Note         : ★ 지도 건물 「지우기」 = 실제로는 숨김(PUT …/buildings/{bid}/look hidden=true → building.look, twin-contract A) — 다시 만들어도 숨긴 채,
                     「숨긴 건물 n개」 목록의 [되살리기] · [모두 되살리기] 로 되돌린다. 여러 개 지우기는 판 안 되돌리기 1칸(BuildingHeightUndoStep.Group).
                   ★ 고름 메시지(building)에는 바닥 윤곽이 없어 장면 파일(GET …/files/scene.json 의 buildings.footprint — 뷰어가 장면을 불러올 때 받는 그 파일)에서 찾는다.
-                  ★ 3D 는 한 번에 한 건물만 강조한다(building.select) — 여러 개 고른 것은 판의 개수로 보인다(엔진 후보: 여러 건물 강조 메시지).
+                  ★ 고른 건물 모두 강조 = building.select {id(판의 건물), ids} — ids 를 모르는 옛 엔진은 판의 건물만 강조한다.
    Created On   : 2026-10-22 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
 {
-    private List<Map3DBuildingPick>? _bhMultiList;
-    /// <summary>여러 개 고르기로 고른 지도 건물(고른 순서) — 지연 초기화(생성자 없이 만든 시험 VM 에서도).</summary>
-    private List<Map3DBuildingPick> BhMulti => _bhMultiList ??= new();
-    private bool _bhMultiOn;
+    private List<Map3DBuildingPick>? _bhSelectionList;
+    /// <summary>3D 에서 고른 지도 건물(고른 순서, 판의 건물 포함 · 직접 그린 건물 · 숨긴 건물 빼고) — 지연 초기화(생성자 없이 만든 시험 VM 에서도).</summary>
+    private List<Map3DBuildingPick> BhSelection => _bhSelectionList ??= new();
     private IReadOnlyList<(int Id, Map3DLookState Look)>? _pendingBuildingsHide;
     private string? _pendingBuildingsHideJob;
 
-    /// <summary>여러 개 고르기 중인가(판 「고른 건물 n개」 줄 · [고른 n개 지우기] 보임).</summary>
-    public bool IsBuildingMultiSelect => IsBuildingHeightPanelOpen && _bhMultiOn;
-    public int BuildingMultiCount => BhMulti.Count;
-    public string BuildingMultiSelectText => $"고른 건물 {BhMulti.Count}개 — 3D 에서 누르면 넣고, 다시 누르면 뺍니다";
-    public string BuildingMultiButtonText => _bhMultiOn ? "여러 개 고르기 끝" : "여러 개 고르기";
-    public string BuildingMultiDeleteText => $"고른 {BhMulti.Count}개 지우기";
+    /// <summary>여러 개 골랐나(2개 이상 — 판 「고른 건물 n개」 줄 · [고른 n개 지우기] 보임).</summary>
+    public bool IsBuildingMultiSelect => IsBuildingHeightPanelOpen && BhSelection.Count > 1;
+    public int BuildingMultiCount => BhSelection.Count;
+    /// <summary>고른 건물 id(고른 순서 — 시험 · 계측용).</summary>
+    public IReadOnlyList<int> BuildingSelectionIds => BhSelection.Select(b => b.Id).ToList();
+    public string BuildingMultiSelectText
+        => BuildingMixedFields() is { Count: > 0 } mixed ? $"고른 건물 {BhSelection.Count}개 · {Map3DBuilding.MixedText}: {string.Join(" · ", mixed)}" : $"고른 건물 {BhSelection.Count}개";
+
+    /// <summary>고른 건물 높이가 서로 다르고 높이 칸을 손대지 않았나(입력칸에 "여러 값").</summary>
+    private bool IsBuildingHeightMixed => IsBuildingMultiSelect && !_bhHeightTouched && BhSelection.Any(s => Math.Abs(s.Height - BhSelection[0].Height) > 1e-9);
+
+    /// <summary>값이 서로 다르고 아직 손대지 않은 칸 이름(높이 · 외벽 무늬 · 외벽 색 · 지붕 색) — 2D 여러 개 속성창의 「여러 값」.</summary>
+    private List<string> BuildingMixedFields()
+    {
+        var mixed = new List<string>();
+        if (!IsBuildingMultiSelect) return mixed;
+        if (IsBuildingHeightMixed) mixed.Add("높이");
+        var looks = BhSelection.Select(s => WithSavedLook(s).Look).ToList();
+        foreach (var (field, name, get) in LookFields)
+            if (!BhLookTouched.Contains(field) && looks.Any(l => get(l) != get(looks[0]))) mixed.Add(name);
+        return mixed;
+    }
+
+    private static readonly (string Field, string Name, Func<Map3DLookState, string?> Get)[] LookFields =
+    {
+        ("facade", "외벽 무늬", l => l.Facade), ("wall", "외벽 색", l => l.WallColor), ("roof", "지붕 색", l => l.RoofColor),
+    };
+
+    private HashSet<string>? _bhLookTouchedSet;
+    /// <summary>판에서 손댄 외관 칸(facade · wall · roof) — 여러 개 함께 적용은 이 칸만(지연 초기화).</summary>
+    private HashSet<string> BhLookTouched => _bhLookTouchedSet ??= new();
+
+    /// <summary>
+    /// 고른 여러 건물 높이를 함께(2D 여러 개 속성창처럼 — 높이 칸을 손댔을 때만) → 건물마다 PUT …/height · 3D building.commit → 판 안 되돌리기 1칸.
+    /// 중간에 실패하면 그때까지 바꾼 것만 되돌리기 칸에(판에 이유 한 줄 — SaveBuildingHeightAsync).
+    /// </summary>
+    private async Task ApplyBuildingHeightGroupAsync(string job, double target, int floors)
+    {
+        var done = new List<(int Id, double? Before, int? BeforeFloors)>();
+        int session = _bhSession;
+        foreach (var s in BhSelection.ToList())
+        {
+            if (Math.Abs(s.Height - target) <= 1e-9) continue;
+            bool keep = s.Manual || s.Origin == "user";
+            if (!await SaveBuildingHeightAsync(job, s.Id, target, floors, null, () => Map3DBuilding.SavedText(target, floors))) break;
+            done.Add((s.Id, keep ? s.Height : null, keep ? s.Levels : null));
+        }
+        if (done.Count > 0 && session == _bhSession) BhUndo.Add(new BuildingHeightUndoStep(job, done[0].Id, null, null) { Heights = done });
+        _bhHeightTouched = false;
+        _log?.Info($"[Map3D] 건물 높이 함께 적용 {done.Count}/{BhSelection.Count} → {target} m job={job}");
+        if (done.Count > 0) SetAimStatus($"건물 {done.Count}개를 {Map3DBuilding.FormatMeters(target)} m({floors}층)로 저장했습니다", autoHide: true);
+        RefreshBuildingHeightPanel();
+    }
+
+    /// <summary>판 안 되돌리기(높이를 함께 바꾼 한 칸) — 건물마다 앞 높이(null = 자동)로. 모두 되돌렸으면 true.</summary>
+    private async Task<bool> RestoreBuildingHeightsAsync(string job, IReadOnlyList<(int Id, double? Before, int? BeforeFloors)> heights)
+    {
+        foreach (var (id, before, floors) in heights)
+            if (!await SaveBuildingHeightAsync(job, id, before, floors, null, () => "되돌렸습니다")) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 고른 여러 건물 외관을 함께 — 손댄 칸(외벽 무늬 · 외벽 색 · 지붕 색)만 건물마다 자기 외관에 덮어 저장, 손대지 않은 칸은 건물마다 그대로.
+    /// 되돌리기 1칸(앞 외관으로 모두 다시 저장 — RestoreBuildingsAsync).
+    /// </summary>
+    private async Task ApplyBuildingLookGroupAsync(string job)
+    {
+        if (_map3DClient == null || _bhLookEdit is not { } edit) return;
+        _bhError = null;
+        int session = _bhSession;
+        var done = new List<(int Id, Map3DLookState Look)>();
+        SetBuildingHeightBusy(true);
+        try
+        {
+            foreach (var s in BhSelection.ToList())
+            {
+                var before = WithSavedLook(s).Look;
+                var after = before with
+                {
+                    Facade = BhLookTouched.Contains("facade") ? edit.Facade : before.Facade,
+                    WallColor = BhLookTouched.Contains("wall") ? edit.WallColor : before.WallColor,
+                    RoofColor = BhLookTouched.Contains("roof") ? edit.RoofColor : before.RoofColor,
+                };
+                if (after == before) continue;
+                var saved = await _map3DClient.PutBuildingLookAsync(job, s.Id, Map3DLook.PutBody(null, after));
+                done.Add((s.Id, before));
+                if (!saved.NeedsRebake) PostUserBuilding3D(job, Map3DLook.LookMessageJson(s.Id, saved.State));
+                if (_bhBuilding?.Id == s.Id && _bhJob == job) _bhBuilding = _bhBuilding with { Look = saved.State };
+            }
+            SetAimStatus($"건물 {done.Count}개 외관을 저장했습니다", autoHide: true);
+        }
+        catch (Map3DServerUnavailableException ex)
+        {
+            _log?.Warning($"[Map3D] 외관 함께 적용 — 서버 닿지 않음: {ex.Message}");
+            SetBuildingHeightError(Map3DUnavailableText);
+            NoteMap3DEngineDown("building-look-many");
+        }
+        catch (Exception ex) { SetBuildingHeightError($"{done.Count}개를 저장한 뒤 멈췄습니다: {ex.Message}"); }
+        finally
+        {
+            if (done.Count > 0 && session == _bhSession) BhUndo.Add(new BuildingHeightUndoStep(job, done[0].Id, null, null) { Group = done });
+            _bhLookEdit = null;
+            BhLookTouched.Clear();
+            SetBuildingHeightBusy(false);
+        }
+        _log?.Info($"[Map3D] 건물 외관 함께 적용 {done.Count}/{BhSelection.Count} job={job}");
+        if (done.Count > 0) await LoadBuildingLooksAsync(job);
+    }
+    public string BuildingMultiDeleteText => $"고른 {BhSelection.Count}개 지우기";
 
     private bool CanEraseMapBuildings => IsBuildingHeightEditable && IsBuildingLookAvailable;
 
-    private RelayCommand? _toggleBuildingMultiSelectCommand;
-    /// <summary>[여러 개 고르기] · [여러 개 고르기 끝] — 켜면 지금 고른 건물부터 넣는다.</summary>
-    public RelayCommand ToggleBuildingMultiSelectCommand => _toggleBuildingMultiSelectCommand ??= new RelayCommand(_ =>
-    {
-        if (!CanEraseMapBuildings) return;
-        _bhMultiOn = !_bhMultiOn;
-        BhMulti.Clear();
-        if (_bhMultiOn && _bhBuilding is { } b && !IsBuildingUserDrawn && !b.Look.Hidden) BhMulti.Add(b);
-        _log?.Info($"[Map3D] 여러 개 고르기 {(_bhMultiOn ? "켬" : "끔")}");
-        RefreshBuildingHeightPanel();
-    }, _ => CanEraseMapBuildings);
-
     private RelayCommand? _hideSelectedBuildingsCommand;
-    /// <summary>[고른 n개 지우기] — 확인 한 번.</summary>
+    /// <summary>[고른 n개 지우기] — 확인 한 번. 외관은 받아 둔 목록 값으로(되돌리기가 지우기 전 모양으로 돌아가게).</summary>
     public RelayCommand HideSelectedBuildingsCommand => _hideSelectedBuildingsCommand ??= new RelayCommand(
-        _ => _ = RequestHideBuildingsAsync(BhMulti.Select(b => (b.Id, b.Look)).ToList(), "고른 건물 지우기",
-                                           $"고른 건물 {BhMulti.Count}개를 3D 에서 지우시겠습니까?\n다시 만들어도 지운 채로 남고, 「숨긴 건물」 목록에서 되살릴 수 있습니다."),
-        _ => CanEraseMapBuildings && _bhMultiOn && BhMulti.Count > 0);
+        _ => _ = RequestHideBuildingsAsync(BhSelection.Select(b => (b.Id, WithSavedLook(b).Look)).ToList(), "고른 건물 지우기",
+                                           $"고른 건물 {BhSelection.Count}개를 3D 에서 지우시겠습니까?\n다시 만들어도 지운 채로 남고, 「숨긴 건물」 목록에서 되살릴 수 있습니다."),
+        _ => CanEraseMapBuildings && IsBuildingMultiSelect);
 
     private RelayCommand? _hideAllAutoBuildingsCommand;
     /// <summary>[이 영역 자동 건물 모두 지우기…] — 장면 파일의 자동 건물 목록 → 확인 한 번.</summary>
@@ -68,25 +161,65 @@ public partial class MapViewModel
     public RelayCommand HideAndRedrawBuildingCommand => _hideAndRedrawBuildingCommand ??= new RelayCommand(
         _ => _ = HideAndRedrawBuildingAsync(), _ => CanEraseMapBuildings && !IsBuildingUserDrawn && !IsBuildingHidden);
 
+    /// <summary>고름에 넣을 수 있는 지도 건물인가 — 직접 그린 건물(그 판에서 고친다) · 숨긴 건물은 뺀다.</summary>
+    private static bool IsSelectableMapBuilding(Map3DBuildingPick b) => b.Origin != "user" && b.UserUid == null && !b.Look.Hidden;
+
+    /// <summary>고른 건물을 3D 에 모두 강조(판의 건물 = id) — 고름이 바뀔 때마다.</summary>
+    private void PostBuildingSelection()
+        => PostBuilding3D(Map3DBuilding.SelectMessageJson(_bhBuilding?.Id, BhSelection.Select(b => b.Id)));
+
     /// <summary>
-    /// 3D 고름 — 여러 개 고르기 중(또는 Ctrl+클릭)이면 그 지도 건물을 넣거나 뺀다. Ctrl+클릭으로 처음 넣으면 여러 개 고르기를 켜고 지금 판의 건물부터 넣는다.
-    /// 넣거나 뺐으면 true.
+    /// Ctrl+클릭(2D :1204 와 같다) — 그 지도 건물을 고름에 넣거나 뺀다. 넣으면 판이 그 건물로, 판의 건물을 빼면 남은 것 중 마지막으로,
+    /// 모두 빼면 판을 닫는다(고름 풀림 — DECISIONS 3). 판이 닫혀 있거나 넣을 수 없는 건물이면 false(일반 클릭으로).
     /// </summary>
-    private bool ToggleBuildingMultiSelect(Map3DBuildingPick pick, bool ctrl)
+    private bool ToggleBuildingSelection(Map3DBuildingPick pick)
     {
-        if ((!_bhMultiOn && !ctrl) || !IsBuildingHeightPanelOpen || _bhJob != _map3DJob || !CanEraseMapBuildings || pick.Origin == "user") return false;
-        if (!_bhMultiOn)
+        if (!IsBuildingHeightPanelOpen || _bhJob != _map3DJob) return false;
+        var b = WithSavedLook(pick);
+        if (!IsSelectableMapBuilding(b)) return false;
+        int at = BhSelection.FindIndex(s => s.Id == b.Id);
+        if (at >= 0)
         {
-            _bhMultiOn = true;
-            BhMulti.Clear();
-            if (_bhBuilding is { } cur && cur.Origin != "user" && !cur.Look.Hidden && cur.Id != pick.Id) BhMulti.Add(cur);
+            BhSelection.RemoveAt(at);
+            _log?.Info($"[Map3D] 건물 고름에서 뺌 id={b.Id} → {BhSelection.Count}개");
+            if (BhSelection.Count == 0) { CloseBuildingHeightPanel(clearUndo: false); return true; }   // 강조 지움(building.select null)
+            if (_bhBuilding?.Id == b.Id) OpenBuildingHeightPanel(BhSelection[^1]);
         }
-        int at = BhMulti.FindIndex(b => b.Id == pick.Id);
-        if (at >= 0) BhMulti.RemoveAt(at);
-        else BhMulti.Add(WithSavedLook(pick));
-        _log?.Info($"[Map3D] 여러 개 고르기 {(at >= 0 ? "뺌" : "넣음")} id={pick.Id} → {BhMulti.Count}개");
+        else
+        {
+            BhSelection.Add(b);
+            _log?.Info($"[Map3D] 건물 고름에 넣음 id={b.Id} → {BhSelection.Count}개");
+            OpenBuildingHeightPanel(b);
+        }
+        PostBuildingSelection();
         RefreshBuildingHeightPanel();
         return true;
+    }
+
+    /// <summary>
+    /// Shift+끌기 상자(building.box — 2D :1165 러버밴드와 같다): add = false 면 상자 안 건물로 새로 고르고(빈 상자 = 고름 풀기),
+    /// add = true(Ctrl+Shift) 면 지금 고름에 더한다(DECISIONS 1). 판은 지금 건물이 고름에 남아 있으면 그대로, 아니면 고른 것 중 첫 건물로.
+    /// 직접 그린 건물 · 숨긴 건물은 빼고, 편집 모드가 아니면 무시한다(보기 전용).
+    /// </summary>
+    private void OnMap3DBuildingBox(IReadOnlyList<Map3DBuildingPick> items, bool add)
+    {
+        if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
+        if (!CanPickMap3DBuildings(null)) return;
+        if (!add || !IsBuildingHeightPanelOpen || _bhJob != _map3DJob) BhSelection.Clear();
+        var known = BhSelection.Select(s => s.Id).ToHashSet();
+        foreach (var b in items.Select(i => _bhJob == _map3DJob ? WithSavedLook(i) : i))
+            if (IsSelectableMapBuilding(b) && known.Add(b.Id)) BhSelection.Add(b);
+        _log?.Info($"[Map3D] 건물 상자 고르기 받음={items.Count} add={add} → {BhSelection.Count}개 job={_map3DJob}");
+        if (BhSelection.Count == 0)
+        {
+            if (IsBuildingHeightPanelOpen) CloseBuildingHeightPanel(clearUndo: false);   // 강조도 지운다
+            else PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+            return;
+        }
+        if (_bhJob != _map3DJob || BhSelection.All(s => s.Id != _bhBuilding?.Id))
+            OpenBuildingHeightPanel(BhSelection[0]);
+        PostBuildingSelection();
+        RefreshBuildingHeightPanel();
     }
 
     private async Task RequestHideAllAutoBuildingsAsync()
@@ -133,12 +266,7 @@ public partial class MapViewModel
         try
         {
             if (targets == null || job == null || _bhJob != job) return;   // 그 사이 다른 영역으로
-            if (await HideBuildingsAsync(job, targets) && _bhJob == job)
-            {
-                _bhMultiOn = false;
-                BhMulti.Clear();
-                RefreshBuildingHeightPanel();
-            }
+            await HideBuildingsAsync(job, targets);   // 지운 건물은 고름에서도 뺀다(HideBuildingsAsync)
         }
         finally
         {
@@ -190,6 +318,7 @@ public partial class MapViewModel
         finally
         {
             if (done.Count > 0 && session == _bhSession) BhUndo.Add(new BuildingHeightUndoStep(job, done[0].Id, null, null) { Group = done });
+            if (_bhJob == job) BhSelection.RemoveAll(s => done.Any(d => d.Id == s.Id));   // 사라진 건물은 고름에서도(중간 실패면 남은 것만 고른 채)
             SetBuildingHeightBusy(false);
         }
         _log?.Info($"[Map3D] 건물 여러 개 지움 {done.Count}/{targets.Count} job={job}");

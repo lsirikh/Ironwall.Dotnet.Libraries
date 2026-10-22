@@ -96,6 +96,13 @@ public partial class TwinContractScenarioTests
                     }
                     UserBuildings.RemoveAll(i => i.Value<string>("uid") == seg[5]);
                     return Json(HttpStatusCode.OK, "{\"deleted\":1}");
+                case "buildings" when seg.Length == 7 && seg[6] == "height":   // 여러 개 함께 적용 시험(2026-10-22) — 저장 = 직접 입력, 지움 = 자동 12 m
+                    return Json(HttpStatusCode.OK, new JObject
+                    {
+                        ["building"] = m == HttpMethod.Delete
+                            ? new JObject { ["id"] = int.Parse(seg[5]), ["origin"] = "photo", ["height"] = 12.0, ["height_from"] = "shadow", ["manual"] = false }
+                            : new JObject { ["id"] = int.Parse(seg[5]), ["origin"] = "photo", ["height"] = body!["height"], ["height_from"] = "manual", ["manual"] = true, ["levels"] = body["floors"] },
+                    }.ToString());
                 case "buildings" when seg.Length == 7 && seg[6] == "look":
                     if (OldEngine) return Json(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}");
                     if (RejectLook != null) return Json(HttpStatusCode.UnprocessableEntity, new JObject { ["detail"] = RejectLook }.ToString());
@@ -565,7 +572,7 @@ public partial class TwinContractScenarioTests
                        "Map.Decoration.Redo", "Map.Decoration.List", "Map.Decoration.Close");
         AssertRendered(rig.Vm.BuildingHeightPanel, "BuildingHeightPanelStyle.xaml", "Map.BuildingHeight.Facade", "Map.BuildingHeight.WallColor",
                        "Map.BuildingHeight.RoofColor", "Map.BuildingHeight.ApplyLook", "Map.BuildingHeight.Hide", "Map.BuildingHeight.HiddenCount",
-                       "Map.BuildingHeight.RestoreAll", "Map.BuildingHeight.HiddenList", "Map.BuildingHeight.HideAndRedraw", "Map.BuildingHeight.MultiSelect",
+                       "Map.BuildingHeight.RestoreAll", "Map.BuildingHeight.HiddenList", "Map.BuildingHeight.HideAndRedraw",
                        "Map.BuildingHeight.HideSelected", "Map.BuildingHeight.HideAllAuto", "Map.BuildingHeight.MultiSelectText");
         AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.UserBuilding.Facade", "Map.UserBuilding.WallColor", "Map.UserBuilding.RoofColor",
                        "Map.UserBuilding.Taper", "Map.UserBuilding.TaperDeg", "Map.UserBuilding.TaperReset", "Map.UserBuilding.TaperStatus");
