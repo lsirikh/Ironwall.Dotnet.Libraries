@@ -270,6 +270,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         SyncMap3DWithInputModes();   // 2D 꾸미기면 3D 를 접는다(3D 위 판은 3D 에 머문다)
         _log?.Info($"[Decoration] 시작 area={item.Id} 3D={in3D}");
         _ = LoadDecorationsAsync(item.Id);
+        StartModelSession(item.Id);   // 넣은 모델 목록(MapViewModel.Model3D)
     }
 
     private void ExitDecoration(string cause)
@@ -277,6 +278,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         if (_decoArea is not { } area) return;
         _log?.Info($"[Decoration] 끝 area={area.Id} cause={cause}");
         if (_decoSelectedUid != null) PostUserBuilding3D(area.Id, Map3DDecoration.SelectMessageJson(null));
+        EndModelSession(area.Id);
         if (_decoIn3D) EndEdit3D();   // 3D 그리기 · 손잡이 내림
         _decoArea = null;
         _decoIn3D = false;
@@ -329,6 +331,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         _decoError = null;
         if (tool is { } t)
         {
+            ClearModelSelection();   // 도구를 고르면 넣은 모델 고름도 푼다(3D 손잡이 · 그리기는 하나)
             if (_decoSelectedUid != null && _decoArea is { } a) PostUserBuilding3D(a.Id, Map3DDecoration.SelectMessageJson(null));
             _decoSelectedUid = null;
             _decoProps = DecoLastProps.TryGetValue(t, out var last) ? (JObject)last.DeepClone() : Map3DDecoration.DefaultProps(t);
@@ -356,6 +359,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         _decoError = null;
         if (item != null)
         {
+            ClearModelSelection();   // 꾸미기 항목과 넣은 모델은 함께 고르지 않는다
             var props = Map3DDecoration.DefaultProps(item.Tool);
             props.Merge(item.Props, Map3DLook.KeepNulls);
             _decoProps = props;
@@ -480,6 +484,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
             if (DecoPoints.Count > 0) { DecoPoints.Clear(); _decoAdorner?.InvalidateVisual(); RefreshDecorationPanel(); }
             else if (_decoTool != null) SetDecorationTool(null);
             else if (_decoSelectedUid != null) SelectDecoration(null);
+            else if (_modelSelectedUid != null) SelectModel(null);
             else ExitDecoration("escape");
             return true;
         }
@@ -499,6 +504,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
             case Key.Back: RemoveLastDecorationPoint(); return true;
             case Key.Delete:
                 if (DeleteDecorationCommand.CanExecute(null)) _ = DeleteDecorationAsync();
+                else if (DeleteModelCommand.CanExecute(null)) _ = DeleteModelAsync();
                 return true;
             default: return false;
         }
@@ -644,6 +650,7 @@ public partial class MapViewModel : IDecorationHost, IHandle<CallClearDecoration
         foreach (var c in new[] { SelectDecorationToolCommand, FinishDecorationCommand, ApplyDecorationCommand, ReplaceDecorationCommand, DeleteDecorationCommand,
                                   UndoDecorationCommand, RedoDecorationCommand, ClearDecorationsCommand, StepDecorationHeadingCommand })
             c.RaiseCanExecuteChanged();
+        RefreshModelPanel();
         RefreshEdit3D();
     }
 

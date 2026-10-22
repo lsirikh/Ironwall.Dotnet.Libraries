@@ -331,6 +331,13 @@
 						</Style>
 					</MenuItem.ItemContainerStyle>
 				</MenuItem>
+				<!--  3D 영역 가져오기(2026-10-22, .iw3d 한 파일 — 다른 PC 에서 「이 영역 내보내기…」로 만든 것). 지도 편집 권한이 있을 때만 보인다  -->
+				<MenuItem
+					AutomationProperties.AutomationId="GMaps.Map3D.Import"
+					Command="{Binding ImportMap3DAreaCommand}"
+					Header="3D 영역 가져오기…"
+					Icon="{md:PackIcon Kind=FileImportOutline}"
+					Visibility="{Binding CanMapEdit, Converter={StaticResource BooleanToVisibilityConverter}}" />
 				<Separator />
 				<MenuItem
 					Command="{Binding ExitApplicationCommand}"

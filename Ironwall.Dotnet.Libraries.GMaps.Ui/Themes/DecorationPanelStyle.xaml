@@ -481,6 +481,94 @@
 										</Style>
 									</ListBox.ItemContainerStyle>
 								</ListBox>
+
+								<!--  넣은 모델(2026-10-22 — Blender · Fusion 360 등에서 만든 GLB · OBJ · FBX). 자리 · 방향 · 크기는 3D 손잡이로, 이름 · 지우기는 여기서  -->
+								<Border
+									Height="1"
+									Margin="0,12,0,8"
+									Background="{DynamicResource DividerBrush}" />
+								<Grid Margin="0,0,0,6">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+									<TextBlock
+										VerticalAlignment="Center"
+										AutomationProperties.AutomationId="Map.Model.Count"
+										Style="{StaticResource BuildingHeightSectionLabel}"
+										Text="{Binding ModelCountText}" />
+									<Button
+										Grid.Column="1"
+										AutomationProperties.AutomationId="Map.Model.Add"
+										AutomationProperties.Name="모델 넣기"
+										Command="{Binding AddModelCommand}"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="GLB · OBJ · FBX 파일을 골라 이 영역에 넣기 (50 MB 까지)">
+										<StackPanel Orientation="Horizontal">
+											<md:PackIcon
+												Width="14"
+												Height="14"
+												VerticalAlignment="Center"
+												Kind="CubeOutline" />
+											<TextBlock Margin="5,0,0,0" Text="모델 넣기…" />
+										</StackPanel>
+									</Button>
+								</Grid>
+								<TextBlock
+									Margin="0,0,0,6"
+									AutomationProperties.AutomationId="Map.Model.Status"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{Binding ModelStatusText}"
+									TextWrapping="Wrap"
+									Visibility="{Binding HasModelStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+								<ListBox
+									MaxHeight="120"
+									AutomationProperties.AutomationId="Map.Model.List"
+									AutomationProperties.Name="넣은 모델 목록"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource BorderBrush}"
+									DisplayMemberPath="Text"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									ItemsSource="{Binding ModelItems}"
+									SelectedValue="{Binding ModelSelectedUid, Mode=TwoWay}"
+									SelectedValuePath="Uid">
+									<ListBox.ItemContainerStyle>
+										<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding Text}" />
+										</Style>
+									</ListBox.ItemContainerStyle>
+								</ListBox>
+								<Grid Margin="0,6,0,0" Visibility="{Binding HasModelSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+									<TextBox
+										HorizontalContentAlignment="Left"
+										AutomationProperties.AutomationId="Map.Model.Name"
+										AutomationProperties.Name="모델 이름"
+										MaxLength="60"
+										Style="{StaticResource BuildingHeightInputBox}"
+										Text="{Binding ModelName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									<Button
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.Model.Rename"
+										Command="{Binding RenameModelCommand}"
+										Content="이름 저장"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="고른 모델 이름 저장" />
+									<Button
+										Grid.Column="4"
+										AutomationProperties.AutomationId="Map.Model.Delete"
+										Command="{Binding DeleteModelCommand}"
+										Content="지우기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="고른 모델 지우기 (되돌리기 가능)" />
+								</Grid>
 							</StackPanel>
 						</Grid>
 					</fb:FrameBorder>

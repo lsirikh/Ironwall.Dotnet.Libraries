@@ -18,13 +18,17 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 /// <summary>3D 그리기 결과 — draw.point(점 1개 · 고도) · draw.done(방식 · 점 목록, 다각형은 닫지 않은 점) · draw.end(이유).</summary>
 public sealed record Map3DDrawEvent(string? Mode, IReadOnlyList<UbPoint> Points, double? Alt, string? Reason);
 
-/// <summary>3D 손잡이로 고친 결과(edit.commit) — 대상(종류 · uid) · 새 도형(Point · LineString · Polygon, 다각형은 닫는 끝점 없이) · 소품 방향.</summary>
-public sealed record Map3DEditCommit(string Kind, string Uid, string Geometry, IReadOnlyList<UbPoint> Points, double? HeadingDeg);
+/// <summary>3D 손잡이로 고친 결과(edit.commit) — 대상(종류 · uid) · 새 도형(Point · LineString · Polygon, 다각형은 닫는 끝점 없이) · 소품 · 모델 방향.</summary>
+public sealed record Map3DEditCommit(string Kind, string Uid, string Geometry, IReadOnlyList<UbPoint> Points, double? HeadingDeg)
+{
+    /// <summary>넣은 모델 크기(배, 엔진 8cacc6e — 크기 고리 · + − 키). 다른 대상 · 옛 엔진은 null.</summary>
+    public double? Scale { get; init; }
+}
 
 public static class Map3DEdit
 {
     /// <summary>edit.* 대상 종류.</summary>
-    public const string TargetDecoration = "decoration", TargetUserBuilding = "userbuilding";
+    public const string TargetDecoration = "decoration", TargetUserBuilding = "userbuilding", TargetModel = "model";
     /// <summary>그리기 방식.</summary>
     public const string ModePoint = "point", ModeLine = "line", ModePolygon = "polygon", ModeRect = "rect", ModeCircle = "circle";
     // ── GIS → 3D ──
@@ -78,7 +82,7 @@ public static class Map3DEdit
                 return new Map3DMessage(type, Str(o["reason"]), null, null);
             case "edit.commit":
             {
-                if (o["target"] is not JObject t || Str(t["kind"]) is not ({ } kind and (TargetDecoration or TargetUserBuilding))
+                if (o["target"] is not JObject t || Str(t["kind"]) is not ({ } kind and (TargetDecoration or TargetUserBuilding or TargetModel))
                     || Str(t["uid"]) is not { } uid || !Map3DUserBuilding.IsUid(uid) || o["geometry"] is not JObject g) return null;
                 string? geo = Str(g["type"]);
                 var pts = new List<UbPoint>();
@@ -95,7 +99,10 @@ public static class Map3DEdit
                 if (geo == Map3DDecoration.GeoPolygon && pts[0] == pts[^1]) pts.RemoveAt(pts.Count - 1);
                 double? heading = o["heading_deg"]?.Type is JTokenType.Float or JTokenType.Integer && double.IsFinite(o.Value<double>("heading_deg"))
                     ? Map3DDecoration.StepHeading(o.Value<double>("heading_deg"), 0) : null;
-                return new Map3DMessage(type, null, null, null) { EditCommit = new Map3DEditCommit(kind, uid, geo!, pts, heading) };
+                if (kind == TargetModel && geo != Map3DDecoration.GeoPoint) return null;   // 넣은 모델은 한 점(자리)만
+                double? scale = o["scale"]?.Type is JTokenType.Float or JTokenType.Integer && o.Value<double>("scale") is var sc && double.IsFinite(sc) && sc > 0
+                    ? Math.Clamp(sc, 0.01, 100) : null;
+                return new Map3DMessage(type, null, null, null) { EditCommit = new Map3DEditCommit(kind, uid, geo!, pts, heading) { Scale = scale } };
             }
         }
         return null;
@@ -121,8 +128,9 @@ public static class Map3DEdit
 
     // ── 판 단추 → 뷰어 키(edit.key, 엔진 dac1e69 덧붙임) ──
 
-    /// <summary>뷰어가 받는 키 — 방향키 = 화면 기준(↑ = 카메라가 보는 쪽), [ ] = 돌리기, Tab = 다음 꼭짓점(Shift = 앞), Delete · Enter(확정) · Escape.</summary>
-    public static readonly IReadOnlyList<string> Keys = new[] { "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "[", "]", "Tab", "Delete", "Enter", "Escape" };
+    /// <summary>뷰어가 받는 키 — 방향키 = 화면 기준(↑ = 카메라가 보는 쪽), [ ] = 돌리기, Tab = 다음 꼭짓점(Shift = 앞), Delete · Enter(확정) · Escape,
+    /// + − = 넣은 모델 크기 ×1.1 · ÷1.1(Shift = 1.01, 엔진 8cacc6e).</summary>
+    public static readonly IReadOnlyList<string> Keys = new[] { "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "[", "]", "Tab", "Delete", "Enter", "Escape", "+", "-" };
 
     /// <summary>
     /// 판 단추 매개변수 → {"type":"edit.key","key","shift"}. "Shift+Tab" 처럼 앞에 "Shift+" 를 붙이면 shift 를 켠다(꼭짓점 이전).
