@@ -62,6 +62,9 @@ DECISIONS.md 참고.
   CameraPopup.Host.Tests `EventWindowRenderTests` 1(PNG "looks empty"). 그 두 프로젝트는 변경 0(`git diff --stat HEAD -- …` 빈 결과)이고 단독으로 다시 돌려도 같다.
   `quser` = 세션 `Disc`(원격 끊김) — 끊긴 세션에서는 WPF 비트맵 렌더가 검게 나온다(메모리 uia_needs_connected_session 과 같은 부류). 세션이 붙으면 다시 돌려 볼 것.
 - 도움말 수정 뒤 `dotnet test tests\GMaps.MapEdit.Tests\…` 다시 → 통과 938 / 실패 0.
+- 턴 2(하네스 검사 실패 3건 = 같은 렌더 시험): `FrameBorderTests` 를 읽어 보니 실제 창을 띄우고(`Show(root)`) 화면 픽셀을 읽는 시험이다 —
+  세션이 끊기면(`Disc`) 화면이 그려지지 않아 검정 픽셀이 된다. 지금 `quser` = `rdp-tcp#0 Active`(다시 붙음). 이 작업은 창을 띄우는 시험을 직접 돌리지 않는 규칙이라
+  다시 돌리지 않고, 세션이 붙은 상태의 하네스 검사에 맡긴다. 제품 코드 변경은 없다(이 시험들은 Utils · CameraPopup.Host 만 쓰고 두 프로젝트는 변경 0).
 - 창을 띄우는 시험 · 헤디드 시험은 하지 않았다(사용자 PC 사용 중). 실제 앱(설치본)에서 눌러 보지 않았다.
 
 ## 남은 일
