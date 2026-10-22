@@ -436,6 +436,52 @@
 										ToolTip="위아래로 끌어 높이 바꾸기 (Esc = 끌기 전으로)" />
 								</Grid>
 
+								<!--  위로 갈수록 좁게 · 넓게(2026-10-22, taper_deg) — 막대 끌기가 먼저, 숫자 칸 · [0] 은 폴백. 설명은 판 "?" 말풍선  -->
+								<TextBlock
+									Margin="0,8,0,0"
+									Style="{StaticResource BuildingHeightSectionLabel}"
+									Text="위로 갈수록 좁게(+) · 넓게(−)" />
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="6" />
+										<ColumnDefinition Width="48" />
+										<ColumnDefinition Width="6" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+									<Slider
+										Grid.Column="0"
+										VerticalAlignment="Center"
+										AutomationProperties.AutomationId="Map.UserBuilding.Taper"
+										AutomationProperties.Name="위로 갈수록 좁게 · 넓게 막대"
+										IsSnapToTickEnabled="True"
+										LargeChange="5"
+										Maximum="30"
+										Minimum="-30"
+										SmallChange="1"
+										TickFrequency="1"
+										Value="{Binding UserBuildingTaperDeg, Mode=TwoWay}" />
+									<TextBox
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.UserBuilding.TaperDeg"
+										AutomationProperties.Name="기울기(도)"
+										Style="{StaticResource BuildingHeightInputBox}"
+										Text="{Binding UserBuildingTaperText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+									<Button
+										Grid.Column="4"
+										AutomationProperties.AutomationId="Map.UserBuilding.TaperReset"
+										Command="{Binding ResetUserBuildingTaperCommand}"
+										Content="0"
+										Style="{StaticResource BuildingHeightStepButton}"
+										ToolTip="수직으로" />
+								</Grid>
+								<TextBlock
+									Margin="2,2,2,0"
+									AutomationProperties.AutomationId="Map.UserBuilding.TaperStatus"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{Binding UserBuildingTaperStatus}" />
+
 								<Grid Margin="0,8,0,0">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*" />

@@ -13,6 +13,8 @@ public sealed record UserBuildingState(IReadOnlyList<UbPoint> Outline, double He
     public string Use { get; init; } = Map3DUserBuilding.UseAuto;
     /// <summary>외관 — 외벽 색 · 지붕 색 · 외벽 무늬(Hidden 은 쓰지 않음).</summary>
     public Map3DLookState Look { get; init; } = Map3DLookState.Auto;
+    /// <summary>위로 갈수록 좁게(+) · 넓게(−) 기울기(°, 0 = 수직).</summary>
+    public double TaperDeg { get; init; }
 }
 
 /****************************************************************************

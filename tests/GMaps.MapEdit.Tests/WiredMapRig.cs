@@ -63,6 +63,8 @@ internal sealed class WiredMapRig
         // 3D 게이트 필드(제품은 필드 초기값 new()) — 2026-10-21 부터 편집 모드가 3D 를 막지 않아, 입력 모드가 끝날 때(SyncMap3DWithInputModes)
         // 편집 모드인 채로도 게이트가 돈다. 생성자 없이 만든 VM 이라 비어 있으면 게이트가 null 로 던진다 — 3D 는 꺼 둔다(3D 시험 장치가 다시 켠다)
         Scenario.SetField(Vm, "_map3DSettings", new Ironwall.Dotnet.Libraries.GMaps.Models.Map3DModel { IsEnabled = false });
+        // 3D 건물 고름의 Ctrl(여러 개 고르기) — 시험 중 사용자가 누른 Ctrl 이 끼어들지 않게 늘 "안 누름"(Ctrl 경로는 시험이 직접 바꾼다)
+        Scenario.SetField(Vm, "_map3DModifiers", (Func<System.Windows.Input.ModifierKeys>)(() => System.Windows.Input.ModifierKeys.None));
         Scenario.SetField(Vm, "_map3DScenes", new List<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D.Map3DScene>());
         Scenario.SetField(Vm, "_map3DAreaMarkers", new Dictionary<string, Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps.Map3DAreaMarker>());
 

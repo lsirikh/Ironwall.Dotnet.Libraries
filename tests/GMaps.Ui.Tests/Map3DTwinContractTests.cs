@@ -152,9 +152,10 @@ public class Map3DTwinContractTests
         var redo = Map3DUserBuilding.MergeBody(new[] { "a1b2c3d4e5f6" }, look: new Map3DLookState(false, "#ffffff", "#000000", "glass"));
         Assert.Equal(("#ffffff", "#000000", "glass"), (redo.Value<string>("wall_color"), redo.Value<string>("roof_color"), redo.Value<string>("facade")));
 
-        var item = new Map3DUserBuildingItem("a1b2c3d4e5f6", Square, 18, 6, null, null) { Roof = "gable", WallColor = "#6fa8b8", Facade = "glass" };
+        var item = new Map3DUserBuildingItem("a1b2c3d4e5f6", Square, 18, 6, null, null) { Roof = "gable", WallColor = "#6fa8b8", Facade = "glass", Use = "industrial" };
         var prev = JObject.Parse(Map3DUserBuilding.PreviewMessageJson(item));
         Assert.Equal("userbuilding.preview", prev.Value<string>("type"));
+        Assert.Equal("industrial", prev.Value<string>("use"));                 // 뷰어 boxLook 은 무늬가 자동이면 외벽 성격으로 고른다
         Assert.Equal((6, "#6fa8b8", "glass", "gable"), (prev.Value<int>("floors"), prev.Value<string>("wall_color"), prev.Value<string>("facade"), prev.Value<string>("roof")));
         Assert.Equal(JTokenType.Null, prev["roof_color"]!.Type);
         Assert.Equal("{\"type\":\"userbuilding.select\",\"uid\":null}", Map3DUserBuilding.SelectMessageJson(null));
@@ -297,5 +298,50 @@ public class Map3DTwinContractTests
         var list = Map3DLook.ColorsWith("#7D3C98", null, "#7d3c98");
         Assert.Equal(Map3DLook.Colors.Count + 1, list.Count);
         Assert.Equal(new KeyValuePair<string, string>("#7d3c98", "지정 색 #7d3c98"), list[^1]);
+    }
+
+    [Fact]
+    public void should_parse_clamp_and_send_taper_deg_and_read_old_items_as_vertical()
+    {
+        // 판 숫자 칸 — 정수 −30~+30, 앞의 + · ° 허용, 빈 칸 = 0
+        Assert.True(Map3DUserBuilding.TryParseTaper("+12", out var a, out _));
+        Assert.Equal(12.0, a);
+        Assert.True(Map3DUserBuilding.TryParseTaper("-7°", out var b, out _));
+        Assert.Equal(-7.0, b);
+        Assert.True(Map3DUserBuilding.TryParseTaper(" ", out var c, out _));
+        Assert.Equal(0.0, c);
+        Assert.False(Map3DUserBuilding.TryParseTaper("31", out _, out var err));
+        Assert.Equal("좁게 · 넓게는 -30 ~ +30° 사이로 넣어 주세요.", err);
+        Assert.False(Map3DUserBuilding.TryParseTaper("abc", out _, out _));
+        Assert.Equal((4.0, 30.0, -30.0, 0.0), (Map3DUserBuilding.ClampTaper(3.6), Map3DUserBuilding.ClampTaper(99), Map3DUserBuilding.ClampTaper(-99), Map3DUserBuilding.ClampTaper(double.NaN)));
+        Assert.Equal(("수직(위아래 같은 넓이)", "위로 갈수록 좁게 5°", "위로 갈수록 넓게 8°"),
+                     (Map3DUserBuilding.TaperText(0), Map3DUserBuilding.TaperText(5), Map3DUserBuilding.TaperText(-8)));
+
+        // 저장 본문 — 키 taper_deg(옛 호출은 키 없음 = 엔진이 0)
+        Assert.Equal(-12.0, Map3DUserBuilding.PutBody(Square, 9, 3, null, "flat", "auto", Map3DLookState.Auto, -12)["taper_deg"]!.Value<double>());
+        Assert.Null(Map3DUserBuilding.PutBody(Square, 9, 3, null, "flat", "auto", Map3DLookState.Auto)["taper_deg"]);
+
+        // 서버 항목 — 옛 항목(키 없음) = 0, 범위 밖은 붙임
+        var old = Map3DUserBuilding.ParseItem(JObject.Parse("{\"uid\":\"a1b2c3d4e5f6\",\"outline\":[[127,37.5],[127.0002,37.5],[127.0002,37.5002]],\"height\":9}"))!;
+        Assert.Equal(0.0, old.TaperDeg);
+        var tapered = Map3DUserBuilding.ParseItem(JObject.Parse("{\"uid\":\"a1b2c3d4e5f6\",\"outline\":[[127,37.5],[127.0002,37.5],[127.0002,37.5002]],\"height\":9,\"taper_deg\":45}"))!;
+        Assert.Equal(30.0, tapered.TaperDeg);
+        Assert.Equal(30.0, JObject.Parse(Map3DUserBuilding.PreviewMessageJson(tapered))["taper_deg"]!.Value<double>());   // 3D 상자 미리보기에도
+    }
+
+    [Fact]
+    public void should_parse_scene_buildings_with_footprint_and_tell_auto_from_drawn()
+    {
+        var rows = Map3DBuilding.ParseSceneBuildings(
+            "{\"buildings\":[" +
+            "{\"id\":1,\"origin\":\"map\",\"height\":6,\"center\":[126.97,37.39],\"footprint\":[[126.9693,37.3928],[126.9698,37.3929],[126.9699,37.3927],[126.9693,37.3928]]}," +
+            "{\"id\":2,\"origin\":\"user\",\"user_uid\":\"a1b2c3d4e5f6\",\"height\":9}," +
+            "{\"id\":0,\"height\":3},{\"id\":3,\"height\":-1}]}");
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Building.Id));                        // id · 높이가 틀린 줄은 버린다
+        Assert.Equal(3, rows[0].Footprint.Count);                                            // 닫는 끝점은 뺀다
+        Assert.True(rows[0].IsAuto);
+        Assert.False(rows[1].IsAuto);
+        Assert.Empty(rows[1].Footprint);
+        Assert.Empty(Map3DBuilding.ParseSceneBuildings("{}"));
     }
 }
