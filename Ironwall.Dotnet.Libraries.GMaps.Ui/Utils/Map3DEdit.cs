@@ -10,6 +10,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
    Purpose      : 3D 안에서 편집(edit3d-contract, 2026-10-21) 순수 함수 — WPF · GMap 무의존(헤드리스 시험: tests/GMaps.Ui.Tests/Map3DEditTests).
                   ① GIS → 3D 메시지(draw.start · draw.cancel · edit.start · edit.stop · edit.revert · edit.key)
                   ② 3D → GIS 메시지 해석(draw.point · draw.done · draw.end · edit.commit · edit.end) ③ 도구 → 그리기 방식.
+                  ④ 지도 심볼(2026-10-22): overlay.select · edit.start/edit.revert(target kind "overlay") · edit.commit(overlay) · overlay.box.
    Note         : 메시지 type · 키 이름은 계약 그대로(edit.key · edit.end = 엔진 dac1e69 덧붙임). 좌표는 [경도, 위도] 소수 7자리.
                   판 단추(옮기기 · 돌리기 · 꼭짓점 · 확정)는 edit.key 로 뷰어 키보드와 똑같이 — 미리보기는 뷰어, 저장은 Enter 뒤 edit.commit.
    Created On   : 2026-10-21 · Sensorway Co., Ltd.
@@ -25,10 +26,19 @@ public sealed record Map3DEditCommit(string Kind, string Uid, string Geometry, I
     public double? Scale { get; init; }
 }
 
+/// <summary>
+/// 3D 손잡이로 고친 지도 심볼(edit.commit target {kind:"overlay", overlayKind, id}) — 점 심볼 = Lon · Lat(+ HeadingDeg),
+/// 선 · 구역(pidsGroup · line · polygon) = Points 전체([경도, 위도], 닫는 끝점 없이).
+/// </summary>
+public sealed record Map3DOverlayEdit(string OverlayKind, int Id, double? Lon, double? Lat, double? HeadingDeg, IReadOnlyList<UbPoint>? Points);
+
+/// <summary>3D {Shift}+끌기 상자 안 지도 심볼(overlay.box) — Add = 지금 고름에 더하기(2D 러버밴드 규칙), false = 상자 안 것으로 바꾸기.</summary>
+public sealed record Map3DOverlayBox(IReadOnlyList<(string Kind, int Id)> Items, bool Add);
+
 public static class Map3DEdit
 {
-    /// <summary>edit.* 대상 종류.</summary>
-    public const string TargetDecoration = "decoration", TargetUserBuilding = "userbuilding", TargetModel = "model";
+    /// <summary>edit.* 대상 종류(overlay = 지도 심볼 — overlayKind · id 로 가리킨다).</summary>
+    public const string TargetDecoration = "decoration", TargetUserBuilding = "userbuilding", TargetModel = "model", TargetOverlay = "overlay";
     /// <summary>그리기 방식.</summary>
     public const string ModePoint = "point", ModeLine = "line", ModePolygon = "polygon", ModeRect = "rect", ModeCircle = "circle";
     // ── GIS → 3D ──
@@ -52,6 +62,25 @@ public static class Map3DEdit
 
     /// <summary>저장 실패 — 손잡이 · 모양을 원위치로.</summary>
     public static string EditRevertJson(string kind, string uid) => new JObject { ["type"] = "edit.revert", ["target"] = Target(kind, uid) }.ToString(Formatting.None);
+
+    // ── 지도 심볼(overlay) — 3D 에서 고르기 · 고치기(2026-10-22) ──
+
+    /// <summary>고른 심볼 표시 — {"type":"overlay.select","items":[{kind,id}…]}. 빈 목록 = 풀기.</summary>
+    public static string OverlaySelectJson(IEnumerable<(string Kind, int Id)> items)
+        => new JObject { ["type"] = "overlay.select", ["items"] = new JArray(items.Select(i => new JObject { ["kind"] = i.Kind, ["id"] = i.Id })) }.ToString(Formatting.None);
+
+    private static JObject OverlayTarget(string overlayKind, int id) => new() { ["kind"] = TargetOverlay, ["overlayKind"] = overlayKind, ["id"] = id };
+
+    /// <summary>심볼 하나에 손잡이 — 점 = 옮기기 원판(+ rotatable 이면 돌리기 원호), 선 · 구역 = 꼭짓점 공 + 통째 옮기기 원판.</summary>
+    public static string OverlayEditStartJson(string overlayKind, int id, bool rotatable)
+    {
+        var t = OverlayTarget(overlayKind, id);
+        t["rotatable"] = rotatable;
+        return new JObject { ["type"] = "edit.start", ["target"] = t }.ToString(Formatting.None);
+    }
+
+    /// <summary>심볼 저장을 받지 않았다(편집 모드 꺼짐 · 잠김 · 권한 없음 · 모양 틀림) — 3D 모양을 원위치로.</summary>
+    public static string OverlayEditRevertJson(string overlayKind, int id) => new JObject { ["type"] = "edit.revert", ["target"] = OverlayTarget(overlayKind, id) }.ToString(Formatting.None);
 
     // ── 3D → GIS ──
 
@@ -80,6 +109,16 @@ public static class Map3DEdit
                 return new Map3DMessage(type, null, null, null) { Draw = new Map3DDrawEvent(null, Array.Empty<UbPoint>(), null, Str(o["reason"])) };
             case "edit.end":   // 바뀐 것 없이 3D 에서 Esc 로 편집이 끝났다(엔진 덧붙임) — 판의 편집 표시를 끈다
                 return new Map3DMessage(type, Str(o["reason"]), null, null);
+            case "overlay.box":
+            {
+                if (o["items"] is not JArray arr) return null;
+                var items = new List<(string, int)>();
+                foreach (var t in arr)
+                    if (OverlayRef(t) is { } r) items.Add(r);
+                return new Map3DMessage(type, null, null, null) { OverlayBox = new Map3DOverlayBox(items, o["add"]?.Type != JTokenType.Boolean || o.Value<bool>("add")) };
+            }
+            case "edit.commit" when o["target"] is JObject ot && Str(ot["kind"]) == TargetOverlay:
+                return ParseOverlayCommit(o, ot);
             case "edit.commit":
             {
                 if (o["target"] is not JObject t || Str(t["kind"]) is not ({ } kind and (TargetDecoration or TargetUserBuilding or TargetModel))
@@ -109,6 +148,34 @@ public static class Map3DEdit
     }
 
     private static string? Str(JToken? t) => t?.Type == JTokenType.String ? t.Value<string>() : null;
+
+    private static double? Num(JToken? t) => t?.Type is JTokenType.Float or JTokenType.Integer && double.IsFinite(t.Value<double>()) ? t.Value<double>() : null;
+
+    /// <summary>{kind, id} — kind 가 빈 문자열이거나 id 가 정수가 아니면 null.</summary>
+    private static (string Kind, int Id)? OverlayRef(JToken? t)
+        => t is JObject r && Str(r["kind"]) is { Length: > 0 } k && r["id"]?.Type == JTokenType.Integer ? (k, r.Value<int>("id")) : null;
+
+    /// <summary>
+    /// 심볼 edit.commit — 선 · 구역 종류는 points(점 2개 이상, 닫는 끝점은 뗀다), 점 심볼은 lon · lat(+ heading_deg)이 있어야 한다.
+    /// 없거나 틀리면 null(구판 엔진 · 깨진 메시지는 무시).
+    /// </summary>
+    private static Map3DMessage? ParseOverlayCommit(JObject o, JObject t)
+    {
+        if (Str(t["overlayKind"]) is not { Length: > 0 } kind || t["id"]?.Type != JTokenType.Integer) return null;
+        int id = t.Value<int>("id");
+        List<UbPoint>? pts = null;
+        double? lon = Num(o["lon"]), lat = Num(o["lat"]);
+        if (Map3DOverlay.IsLineKind(kind))
+        {
+            pts = new List<UbPoint>();
+            if (o["points"] is not JArray arr || !arr.All(p => Map3DDecoration.AddPoint(p, pts))) return null;
+            if (pts.Count > 2 && pts[0] == pts[^1]) pts.RemoveAt(pts.Count - 1);
+            if (pts.Count < 2) return null;
+        }
+        else if (lon is not (>= -180 and <= 180) || lat is not (>= -90 and <= 90)) return null;
+        double? heading = Num(o["heading_deg"]) is double h ? Map3DDecoration.StepHeading(h, 0) : null;
+        return new Map3DMessage("edit.commit", null, null, null) { OverlayEdit = new Map3DOverlayEdit(kind, id, lon, lat, heading, pts) };
+    }
 
     // ── 도구 → 그리기 방식 ──
 

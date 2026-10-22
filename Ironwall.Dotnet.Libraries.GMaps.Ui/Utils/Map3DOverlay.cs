@@ -37,13 +37,28 @@ public sealed record Map3DOverlayPoint(
     public Map3DOverlayLabelStyle? Label { get; init; }
     /// <summary>카메라 시야 부채꼴(카메라 장비만).</summary>
     public Map3DOverlayFov? Fov { get; init; }
+    /// <summary>모양 표시(ShowShape) — 꺼지면 3D 는 받침 · 기둥 · 바닥 점을 빼고 이름표만(2026-10-22).</summary>
+    public bool ShowShape { get; init; } = true;
+    /// <summary>도형 투명도(0~1, 도형 심볼만) — 아이콘 PNG 는 바깥 투명도 없이 굽고 3D 가 이 값을 건다. 없으면 null.</summary>
+    public double? Opacity { get; init; }
 }
 
 /// <summary>점 아이콘 — Key = overlay.icon 키, WPx × HPx = 2D 화면 크기(DIP).</summary>
 public sealed record Map3DOverlayIcon(string Key, double WPx, double HPx);
 
-/// <summary>라벨 스타일 — Color "#RRGGBB", Bg "#AARRGGBB"(투명이면 null).</summary>
-public sealed record Map3DOverlayLabelStyle(string? Text, double Size, string Color, string? Bg, bool Bold);
+/// <summary>라벨 스타일 — Color "#RRGGBB", Bg "#AARRGGBB"(투명이면 "transparent", 형식이 틀리면 null = 3D 기본 칩).</summary>
+public sealed record Map3DOverlayLabelStyle(string? Text, double Size, string Color, string? Bg, bool Bold)
+{
+    /// <summary>글꼴 이름(비면 null = 3D 기본) · 기울임 · 최대 폭(DIP, 넘치면 말줄임 — 2D LabelAdorner.EffectiveMaxWidth 값).</summary>
+    public string? Font { get; init; }
+    public bool Italic { get; init; }
+    public double? MaxWidth { get; init; }
+    /// <summary>점 심볼 — 2D 이름표를 옮긴 만큼(DIP, 2D 와 같은 기준: 모양 아래 기본 자리 + 이 값).</summary>
+    public (double X, double Y)? Offset { get; init; }
+    /// <summary>선 · 구역 — 2D 이름표 자리 비율(U · V, 점 상자 반폭 · 반높이 기준)과 그 자리의 지리 좌표.</summary>
+    public (double U, double V)? Anchor { get; init; }
+    public (double Lon, double Lat)? At { get; init; }
+}
 
 /// <summary>카메라 시야 부채꼴 — BearingDeg 는 북 0° 시계 방향(지도 방위와 무관한 월드각).</summary>
 public sealed record Map3DOverlayFov(bool Show, double RangeM, double AngleDeg, double BearingDeg, string Color, double Opacity);
@@ -60,6 +75,9 @@ public sealed record Map3DOverlayLine(
     public Map3DOverlayLineStyle? Style { get; init; }
     /// <summary>구역 선 위 탐지 센서 구간 — 선 길이 비율 [From, To](0~1). 모르면 null. 구역 선(pidsGroup)만 state.activeSection 으로 보낸다.</summary>
     public (double From, double To)? ActiveSection { get; init; }
+    /// <summary>이름표(2026-10-22 — 점과 같은 label). null 이면 보내지 않는다(옛 호출). ShowLabel = 2D ShowTitle.</summary>
+    public Map3DOverlayLabelStyle? Label { get; init; }
+    public bool ShowLabel { get; init; }
 }
 
 /// <summary>일반 선 · 다각형 스타일 — Fill "#RRGGBB"(채움 없음이면 null), Pattern "Solid" | "Dash" | "Dot".</summary>
@@ -68,7 +86,12 @@ public sealed record Map3DOverlayLineStyle(string? Fill, double FillOpacity, str
 /// <summary>3D 로 보내는 오버레이 이미지(보안 가림 포함). 경계는 경도(Left · Right) · 위도(Top · Bottom), ImageKey = overlay.imageData 키.</summary>
 public sealed record Map3DOverlayImage(
     int Id, string Title, double Left, double Top, double Right, double Bottom, double Rotation, double Opacity,
-    int ZOrder, bool Visible, double MinZoom, bool Mask, string ImageKey);
+    int ZOrder, bool Visible, double MinZoom, bool Mask, string ImageKey)
+{
+    /// <summary>이름표(2026-10-22, 오버레이 이미지 마커). null 이면 보내지 않는다(지도 CustomImages 는 이름표가 없다).</summary>
+    public Map3DOverlayLabelStyle? Label { get; init; }
+    public bool ShowLabel { get; init; }
+}
 
 public static class Map3DOverlay
 {
@@ -175,12 +198,13 @@ public static class Map3DOverlay
                 ["operation"] = Str(p.State.Operation),
                 ["door"] = Str(p.State.Door),
             },
-            ["label"] = p.Label is { } l
-                ? new JObject { ["show"] = p.ShowLabel, ["text"] = Str(l.Text), ["size"] = l.Size, ["color"] = l.Color, ["bg"] = Str(l.Bg), ["bold"] = l.Bold }
-                : new JObject { ["show"] = p.ShowLabel },
+            ["label"] = LabelJson(p.ShowLabel, p.Label),
             ["visible"] = p.Visible,
             ["minZoom"] = p.MinZoom,
+            // Diff 는 사라진 키를 보내지 못한다 — 켜짐(true)도 늘 싣는다(옛 뷰어는 모르는 키를 무시)
+            ["showShape"] = p.ShowShape,
         };
+        if (p.Opacity is double op) o["opacity"] = op;
         if (p.Icon is { } i) o["icon"] = new JObject { ["key"] = i.Key, ["wPx"] = i.WPx, ["hPx"] = i.HPx };
         if (p.Fov is { } f)
             o["fov"] = new JObject
@@ -219,10 +243,46 @@ public static class Map3DOverlay
             o["arrow"] = s.Arrow;
             o["opacity"] = s.Opacity;
         }
+        if (l.Label != null) o["label"] = LabelJson(l.ShowLabel, l.Label);   // 없으면 옛 뷰어가 이름을 늘 보였다(ShowTitle 무시)
         return o;
     }
 
-    public static JObject ToJson(Map3DOverlayImage i) => new()
+    /// <summary>
+    /// label 객체 — show · text · size · color · bg · bold · font · italic · maxWidth(스타일이 있을 때),
+    /// 점은 offset{x,y}, 선 · 구역은 anchor{u,v} 와 그 자리 lon · lat(있을 때).
+    /// </summary>
+    private static JObject LabelJson(bool show, Map3DOverlayLabelStyle? l)
+    {
+        var o = new JObject { ["show"] = show };
+        if (l == null) return o;
+        o["text"] = Str(l.Text); o["size"] = l.Size; o["color"] = l.Color; o["bg"] = Str(l.Bg); o["bold"] = l.Bold;
+        o["font"] = Str(l.Font); o["italic"] = l.Italic;
+        o["maxWidth"] = l.MaxWidth is double w ? w : JValue.CreateNull();
+        if (l.Offset is { } off) o["offset"] = new JObject { ["x"] = off.X, ["y"] = off.Y };
+        if (l.Anchor is { } a) o["anchor"] = new JObject { ["u"] = a.U, ["v"] = a.V };
+        if (l.At is { } at) { o["lon"] = at.Lon; o["lat"] = at.Lat; }
+        return o;
+    }
+
+    /// <summary>
+    /// 선 · 구역 이름표의 지리 자리 — 2D LabelAdorner 와 같은 규칙: 기준점(마커 Position) + (U · 반폭, 아래로 반높이 + V · 반높이),
+    /// 반폭 · 반높이 = 점 상자의 절반(경도 · 위도). 2D 의 아이콘 간격 8 px(줌마다 거리가 바뀜)은 넣지 않는다. 점이 없으면 null.
+    /// </summary>
+    public static (double Lon, double Lat)? LineLabelAt(IReadOnlyList<(double Lat, double Lon)> points, double posLat, double posLon, double u, double v)
+    {
+        if (points.Count == 0) return null;
+        double hw = (points.Max(p => p.Lon) - points.Min(p => p.Lon)) / 2d, hh = (points.Max(p => p.Lat) - points.Min(p => p.Lat)) / 2d;
+        return (Finite(posLon + Finite(u) * hw), Finite(posLat - (1d + Finite(v)) * hh));   // 화면 아래 = 남쪽
+    }
+
+    public static JObject ToJson(Map3DOverlayImage i)
+    {
+        var o = ImageJson(i);
+        if (i.Label != null) o["label"] = LabelJson(i.ShowLabel, i.Label);
+        return o;
+    }
+
+    private static JObject ImageJson(Map3DOverlayImage i) => new()
     {
         ["kind"] = KindImage,
         ["id"] = i.Id,
@@ -244,7 +304,8 @@ public static class Map3DOverlay
     public static string IconSignature(JObject item, string style, double wPx, double hPx)
     {
         var copy = (JObject)item.DeepClone();
-        foreach (var name in new[] { "lat", "lon", "altM", "bearing", "visible", "minZoom", "icon", "fov", "label", "title" }) copy.Remove(name);
+        // opacity = 3D 가 아이콘에 거는 값(아이콘은 바깥 투명도 없이 굽는다) — 바뀌어도 다시 그리지 않는다
+        foreach (var name in new[] { "lat", "lon", "altM", "bearing", "visible", "minZoom", "icon", "fov", "label", "title", "opacity" }) copy.Remove(name);
         return $"{copy.ToString(Formatting.None)}|{style}|{wPx:0.##}x{hPx:0.##}";
     }
 
@@ -287,11 +348,15 @@ public static class Map3DOverlay
             : (Math.Max(1, (int)Math.Round(width * s)), max);
     }
 
-    /// <summary>"#RRGGBB" → 알파 0xCD 칩 배경 "#CDRRGGBB". "#AARRGGBB" 의 알파가 0(투명) · 형식이 다르면 null.</summary>
+    /// <summary>3D 에 "배경 없음"을 알리는 값 — null 은 3D 가 기본 칩(어두운 배경)으로 바꿔 그렸다(2026-10-22).</summary>
+    public const string TransparentBg = "transparent";
+
+    /// <summary>"#RRGGBB" → 알파 0xCD 칩 배경 "#CDRRGGBB". "#AARRGGBB" 의 알파가 0(투명)이면 "transparent", 형식이 다르면 null.</summary>
     public static string? ChipBackground(string? hex)
     {
         if (hex is { Length: 7 } && hex[0] == '#') return $"#{LabelChipAlpha}{hex.Substring(1)}";
-        if (hex is { Length: 9 } && hex[0] == '#' && !hex.StartsWith("#00", StringComparison.Ordinal)) return $"#{LabelChipAlpha}{hex.Substring(3)}";
+        if (hex is { Length: 9 } && hex[0] == '#')
+            return hex.StartsWith("#00", StringComparison.Ordinal) ? TransparentBg : $"#{LabelChipAlpha}{hex.Substring(3)}";
         return null;
     }
 
