@@ -102,6 +102,13 @@ public partial class MapViewModel
         RefreshBuildingHeightPanel();
     }
 
+    /// <summary>
+    /// 저장된 외관(GET …/looks 의 그 건물 줄)을 고른 건물에 — 뷰어의 building 메시지에는 외관 키가 없다(buildingedit.js buildingMessage).
+    /// 이게 없으면 외관을 저장한 건물을 다시 고를 때 판이 「자동」으로 보이고, 지붕 색만 바꿔 [외관 적용]하면 저장한 외벽 무늬 · 색까지 자동으로 지워졌다(2026-10-22).
+    /// </summary>
+    private Map3DBuildingPick WithSavedLook(Map3DBuildingPick b)
+        => _bhLooks?.FirstOrDefault(l => l.Id == b.Id) is { } saved ? b with { Look = saved.State } : b;
+
     /// <summary>지금 장면의 덮어쓰기 목록 — 옛 엔진(404)이면 외관 칸을 끈다. 닿지 않음 · 그 밖의 실패는 기록만(목록을 비운 채로).</summary>
     private async Task LoadBuildingLooksAsync(string job)
     {
@@ -112,6 +119,7 @@ public partial class MapViewModel
             if (_bhJob != job) return;
             _bhLooksUnsupported = list == null;
             _bhLooks = list;
+            if (_bhBuilding is { } b && _bhLookEdit == null) _bhBuilding = WithSavedLook(b);
             RefreshBuildingHeightPanel();
         }
         catch (Exception ex) { _log?.Warning($"[Map3D] 건물 외관 목록 실패 job={job}: {ex.Message}"); }

@@ -152,9 +152,10 @@ public class Map3DTwinContractTests
         var redo = Map3DUserBuilding.MergeBody(new[] { "a1b2c3d4e5f6" }, look: new Map3DLookState(false, "#ffffff", "#000000", "glass"));
         Assert.Equal(("#ffffff", "#000000", "glass"), (redo.Value<string>("wall_color"), redo.Value<string>("roof_color"), redo.Value<string>("facade")));
 
-        var item = new Map3DUserBuildingItem("a1b2c3d4e5f6", Square, 18, 6, null, null) { Roof = "gable", WallColor = "#6fa8b8", Facade = "glass" };
+        var item = new Map3DUserBuildingItem("a1b2c3d4e5f6", Square, 18, 6, null, null) { Roof = "gable", WallColor = "#6fa8b8", Facade = "glass", Use = "industrial" };
         var prev = JObject.Parse(Map3DUserBuilding.PreviewMessageJson(item));
         Assert.Equal("userbuilding.preview", prev.Value<string>("type"));
+        Assert.Equal("industrial", prev.Value<string>("use"));                 // 뷰어 boxLook 은 무늬가 자동이면 외벽 성격으로 고른다
         Assert.Equal((6, "#6fa8b8", "glass", "gable"), (prev.Value<int>("floors"), prev.Value<string>("wall_color"), prev.Value<string>("facade"), prev.Value<string>("roof")));
         Assert.Equal(JTokenType.Null, prev["roof_color"]!.Type);
         Assert.Equal("{\"type\":\"userbuilding.select\",\"uid\":null}", Map3DUserBuilding.SelectMessageJson(null));

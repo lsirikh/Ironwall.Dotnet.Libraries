@@ -358,13 +358,14 @@ public static class Map3DUserBuilding
         return o.ToString(Formatting.None);
     }
 
-    /// <summary>저장된 건물 그대로 3D 상자 미리보기 — 층수 · 외벽 색 · 지붕 색 · 외벽 무늬 · 지붕 모양까지(뷰어가 층 띠 · 창 칸 · 지붕 색을 입힌다).</summary>
+    /// <summary>저장된 건물 그대로 3D 상자 미리보기 — 층수 · 외벽 색 · 지붕 색 · 외벽 무늬 · 지붕 모양 · 외벽 성격까지(뷰어가 층 띠 · 창 칸 · 지붕 색을 입힌다).</summary>
     public static string PreviewMessageJson(Map3DUserBuildingItem it)
     {
         var o = JObject.Parse(PreviewMessageJson(it.Uid, it.Outline, it.Height));
         o["floors"] = it.Floors is int f ? f : JValue.CreateNull();
         o.Merge(Map3DLook.PutBody(null, LookOf(it)), Map3DLook.KeepNulls);
         o["roof"] = it.Roof;
+        o["use"] = it.Use;   // 외벽 무늬가 자동이면 뷰어는 외벽 성격으로 무늬를 고른다(userbuilding.js boxLook) — 빠지면 성격을 바꿔 저장해도 상자가 그대로였다
         return o.ToString(Formatting.None);
     }
 

@@ -183,6 +183,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 윤곽 지우기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
             return;
         }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
+        if (OnMap3DBuildingPickedOverEdit3D(pick)) return;
         if (Map3DHost.HostMode == "hwnd")
         {
             // 네이티브 창 3D 는 WPF 판을 덮는다 — 안 보이는 판이 첫 Esc 를 가로채 3D 를 못 나가게 되므로 열지 않고 알린다(3D 가 그린 윤곽은 지운다)
@@ -198,7 +199,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
             if (IsBuildingHeightChanged) PostBuilding3D(Map3DBuilding.PreviewMessageJson(old.Id, null));
         }
         _bhDragStart = null;
-        _bhBuilding = pick;
+        _bhBuilding = _bhJob == _map3DJob ? WithSavedLook(pick) : pick;   // 받아 둔 목록이 이 장면 것이면 저장된 외관을 바로(목록을 다시 받으면 또 맞춘다)
         _bhJob = _map3DJob;
         _bhPreview = pick.Height;
         _bhLookEdit = null;
@@ -208,6 +209,38 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _log?.Info($"[Map3D] 건물 고름 id={pick.Id} 높이={pick.Height} 출처={pick.HeightFrom ?? "-"} job={_map3DJob}");
         RefreshBuildingHeightPanel();
         _ = LoadBuildingLooksAsync(_map3DJob);   // 「숨긴 건물」 목록 · 옛 엔진 판정
+    }
+
+    /// <summary>
+    /// 3D 고르기는 서로 배타(2026-10-22 사용자 — 직접 그린 굴뚝을 누르자 같은 자리의 엔진이 만든 굴뚝도 골라져 두 판 · 두 강조가 함께 떴다).
+    /// 3D 위 「건물 그리기」 판이 열려 있을 때 구운 건물 고름이 오면:
+    /// ① 3D 그리기 중(draw.start)이면 그 클릭은 점 찍기 몫 — 무시하고 엔진이 그린 윤곽만 지운다.
+    /// ② 고른 자리가 아직 안 구운 직접 그린 건물 안이면 직접 그린 건물이 우선(다시 만들면 겹친 자동 건물은 빠진다) — 구운 건물 윤곽은 지우고
+    ///    그 직접 그린 건물 고름 · 강조를 그대로 둔다(다른 것이면 그것을 연다).
+    /// ③ 아니면 직접 그린 건물 · 꾸미기 판(손잡이 · 강조 포함)을 닫고 「건물 높이」 판으로 간다(false).
+    /// 처리를 끝냈으면 true.
+    /// </summary>
+    private bool OnMap3DBuildingPickedOverEdit3D(Map3DBuildingPick pick)
+    {
+        bool ub3D = _ubIn3D && IsUserBuildingDrawing && _ubArea?.Id == _map3DJob;
+        if (ub3D && _draw3DMode != null || _decoIn3D && IsDecorating && _draw3DMode != null)
+        {
+            _log?.Info($"[Map3D] 건물 고름 — 3D 그리기 중(무시) id={pick.Id}");
+            PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+            return true;
+        }
+        if (ub3D && pick.Lon is double lon && pick.Lat is double lat
+            && UserBuildingItems.LastOrDefault(i => i.BakedId == null && Map3DUserBuilding.Contains(i.Outline, new UbPoint(lon, lat))) is { } drawn)
+        {
+            _log?.Info($"[Map3D] 건물 고름 id={pick.Id} — 같은 자리의 직접 그린 건물 우선 uid={drawn.Uid}");
+            PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+            if (_ubEditing?.Uid == drawn.Uid) PostUserBuilding3D(_ubArea!.Id, Map3DUserBuilding.SelectMessageJson(drawn.Uid));   // 엔진이 구운 건물로 옮긴 강조를 되돌린다
+            else OnMap3DUserBuildingPicked(drawn.Uid);
+            return true;
+        }
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("building-pick");   // 고름 · 손잡이 · 판을 내린다(userbuilding.select null · edit.stop)
+        if (IsDecorating) ExitDecoration("building-pick");                   // decoration.select null · edit.stop
+        return false;
     }
 
     /// <summary>판 닫기 — 미리보기 원래대로 · 강조 지움. clearUndo = 3D 를 나갈 때(판 안 되돌리기 비움).</summary>

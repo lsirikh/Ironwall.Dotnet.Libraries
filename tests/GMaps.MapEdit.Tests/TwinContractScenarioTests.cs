@@ -50,6 +50,8 @@ public partial class TwinContractScenarioTests
         public bool FacadeLive { get; set; }
         /// <summary>user-buildings · decorations PUT 을 400 {"detail": 이 글}로 거절(값 범위 · 개수 상한 등 서버 문구).</summary>
         public string? RejectPut { get; set; }
+        /// <summary>PUT …/buildings/{bid}/look 을 422 {"detail": 이 글}로 거절(범위 밖 값 등 서버 문구).</summary>
+        public string? RejectLook { get; set; }
         public List<JObject> UserBuildings { get; } = new();
         public Dictionary<int, JObject> Looks { get; } = new();
         public List<JObject> Decorations { get; } = new();
@@ -83,6 +85,7 @@ public partial class TwinContractScenarioTests
                     return Json(HttpStatusCode.OK, "{\"deleted\":1}");
                 case "buildings" when seg.Length == 7 && seg[6] == "look":
                     if (OldEngine) return Json(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}");
+                    if (RejectLook != null) return Json(HttpStatusCode.UnprocessableEntity, new JObject { ["detail"] = RejectLook }.ToString());
                     int id = int.Parse(seg[5]);
                     var look = Looks.TryGetValue(id, out var l) ? l : new JObject { ["hidden"] = false, ["wall_color"] = null, ["roof_color"] = null, ["facade"] = "auto" };
                     look.Merge(body, new Newtonsoft.Json.Linq.JsonMergeSettings { MergeNullValueHandling = MergeNullValueHandling.Merge });
@@ -562,9 +565,7 @@ public partial class TwinContractScenarioTests
         var xaml = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Ironwall.Dotnet.Libraries.GMaps.Ui", "Themes", styleFile));
         Assert.DoesNotContain("x:Name", xaml);
         Assert.DoesNotContain("#", xaml.Split("<Style TargetType=\"{x:Type ctrl:")[1].Replace("✓", ""));   // 색은 토큰만
-        panel.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/{styleFile}", UriKind.Relative) });
-        panel.Style = (Style)panel.Resources[panel.GetType()];
-        Scenario.Layout(panel, 320, 1400);   // 템플릿을 실제로 만든다(틀린 아이콘 이름 · 없는 리소스면 여기서 예외)
+        Render(panel, styleFile);
         var found = new HashSet<string>();
         void Walk(DependencyObject d)
         {
@@ -573,5 +574,13 @@ public partial class TwinContractScenarioTests
         }
         Walk(panel);
         foreach (var id in ids) Assert.Contains(id, found);
+    }
+
+    /// <summary>판에 실제 테마 템플릿을 입혀 그린다(틀린 아이콘 이름 · 없는 리소스면 여기서 예외) — 바인딩이 살아 있는 콤보 · 단추를 시험이 직접 만진다.</summary>
+    private static void Render(System.Windows.Controls.Control panel, string styleFile)
+    {
+        panel.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/{styleFile}", UriKind.Relative) });
+        panel.Style = (Style)panel.Resources[panel.GetType()];
+        Scenario.Layout(panel, 320, 1400);
     }
 }
