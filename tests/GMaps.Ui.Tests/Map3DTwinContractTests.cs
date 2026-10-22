@@ -54,7 +54,9 @@ public class Map3DTwinContractTests
         Assert.Equal("#00ff00", Map3DLook.NormalizeColor("00FF00"));
         Assert.Null(Map3DLook.NormalizeColor("#12345"));
         Assert.Null(Map3DLook.NormalizeColor("#gg0000"));
-        Assert.Equal(new[] { "auto", "residential", "commercial", "industrial", "glass", "brick", "concrete" }, Map3DLook.Facades.Select(f => f.Key));
+        // 옛 7개는 그대로 남고(facade-package-contract A) 새 15개가 더해진다 — 차례 · 전체는 Map3DFacadePackageModelTests 가 본다
+        Assert.Subset(Map3DLook.Facades.Select(f => f.Key).ToHashSet(), new[] { "auto", "residential", "commercial", "industrial", "glass", "brick", "concrete" }.ToHashSet());
+        Assert.Equal(22, Map3DLook.Facades.Count);
     }
 
     [Fact]

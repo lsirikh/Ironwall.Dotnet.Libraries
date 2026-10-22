@@ -60,8 +60,12 @@ public partial class TwinContractScenarioTests
         public Dictionary<int, JObject> Looks { get; } = new();
         public List<JObject> Decorations { get; } = new();
 
+        /// <summary>외벽 무늬 목록 · .iw3d 패키지 · 넣은 모델(facade-package-contract) — 먼저 묻고 답하면 그 응답(본문이 JSON 이 아닐 수 있다: multipart · zip).</summary>
+        public Func<HttpRequestMessage, Task<HttpResponseMessage?>>? Extra { get; set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            if (Extra != null && await Extra(request) is { } extra) return extra;
             string? text = request.Content == null ? null : await request.Content.ReadAsStringAsync(ct);
             var path = request.RequestUri!.AbsolutePath;
             var body = text == null ? null : JObject.Parse(text);

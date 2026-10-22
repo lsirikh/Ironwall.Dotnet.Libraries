@@ -105,6 +105,30 @@
 						Style="{StaticResource BuildingHeightStepButton}"
 						ToolTip="오른쪽으로 15° (Shift = 1°)" />
 				</UniformGrid>
+				<!--  넣은 모델 크기(2026-10-22, 엔진 + − 키 = ×1.1 · ÷1.1) — 모델을 골랐을 때만  -->
+				<UniformGrid
+					Margin="0,0,0,6"
+					Columns="2"
+					Visibility="{Binding IsEdit3DScaleVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.ScaleDown"
+						AutomationProperties.Name="작게"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="-"
+						Content="작게 −"
+						Style="{StaticResource BuildingHeightStepButton}"
+						ToolTip="1.1배 작게 (Shift = 1.01배)" />
+					<Button
+						Margin="2"
+						AutomationProperties.AutomationId="Map.Edit3D.ScaleUp"
+						AutomationProperties.Name="크게"
+						Command="{Binding Edit3DKeyCommand}"
+						CommandParameter="+"
+						Content="크게 +"
+						Style="{StaticResource BuildingHeightStepButton}"
+						ToolTip="1.1배 크게 (Shift = 1.01배)" />
+				</UniformGrid>
 				<UniformGrid
 					Margin="0,0,0,6"
 					Columns="3"
@@ -534,9 +558,14 @@
 											AutomationProperties.AutomationId="Map.UserBuilding.Facade"
 											AutomationProperties.Name="외벽 무늬"
 											DisplayMemberPath="Value"
+											IsSynchronizedWithCurrentItem="False"
 											ItemsSource="{Binding UserBuildingFacades}"
 											SelectedValue="{Binding UserBuildingFacade, Mode=TwoWay}"
-											SelectedValuePath="Key" />
+											SelectedValuePath="Key">
+											<ComboBox.GroupStyle>
+												<StaticResource ResourceKey="FacadeGroupStyle" />
+											</ComboBox.GroupStyle>
+										</ComboBox>
 									</StackPanel>
 									<StackPanel Grid.Column="2">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 색" />

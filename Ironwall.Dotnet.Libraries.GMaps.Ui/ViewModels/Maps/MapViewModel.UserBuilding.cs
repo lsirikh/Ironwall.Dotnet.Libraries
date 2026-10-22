@@ -151,14 +151,14 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     // ── 외관(외벽 색 · 지붕 색 · 외벽 무늬, twin-contract B) ──
 
     private string? _ubWallColor, _ubRoofColor, _ubFacade;
-    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingFacades => Map3DLook.Facades;
+    public System.ComponentModel.ICollectionView UserBuildingFacades => _ubFacadeView ??= NewFacadeView();   // 분류 머리글로 묶음(MapViewModel.BuildingLook)
     public IReadOnlyList<KeyValuePair<string, string>> UserBuildingColors => Map3DLook.ColorsWith(_ubWallColor, _ubRoofColor);
 
-    /// <summary>외벽 무늬(auto · residential · commercial · industrial · glass · brick · concrete).</summary>
+    /// <summary>외벽 무늬(Map3DLook.FacadeCatalog · 엔진 목록의 키 — null 은 콤보가 항목을 갈며 비운 것이라 무시).</summary>
     public string UserBuildingFacade
     {
         get => _ubFacade ?? Map3DLook.FacadeAuto;
-        set { _ubFacade = Map3DLook.NormalizeFacade(value); NotifyOfPropertyChange(); PreviewUserBuildingDraft(); }
+        set { if (value == null) return; _ubFacade = Map3DLook.NormalizeFacade(value); NotifyOfPropertyChange(); PreviewUserBuildingDraft(); }
     }
 
     /// <summary>외벽 색("#rrggbb", "" = 자동 — null 은 콤보가 목록에 없는 값을 비우며 되쓴 것이라 무시).</summary>

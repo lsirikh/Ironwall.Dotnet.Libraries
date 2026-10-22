@@ -21,6 +21,30 @@
 		<Setter Property="Margin" Value="0,0,0,4" />
 	</Style>
 
+	<!--  외벽 무늬 콤보의 분류 머리글(공장 · 발전소 · 군사 · 일반, 2026-10-22) — 자동은 머리글 없이 맨 위(이름 "")  -->
+	<GroupStyle x:Key="FacadeGroupStyle">
+		<GroupStyle.HeaderTemplate>
+			<DataTemplate>
+				<TextBlock
+					Margin="8,6,0,2"
+					FontSize="11"
+					FontWeight="SemiBold"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="{Binding Name}">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding Name}" Value="">
+									<Setter Property="Visibility" Value="Collapsed" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+			</DataTemplate>
+		</GroupStyle.HeaderTemplate>
+	</GroupStyle>
+
 	<!--  숫자 입력칸 — GroupRotationInputBox 와 같은 값  -->
 	<Style x:Key="BuildingHeightInputBox" TargetType="TextBox">
 		<Setter Property="Margin" Value="2" />
@@ -310,9 +334,14 @@
 											AutomationProperties.Name="외벽 무늬"
 											DisplayMemberPath="Value"
 											IsEnabled="{Binding IsBuildingHeightEditable}"
+											IsSynchronizedWithCurrentItem="False"
 											ItemsSource="{Binding BuildingFacades}"
 											SelectedValue="{Binding BuildingFacade, Mode=TwoWay}"
-											SelectedValuePath="Key" />
+											SelectedValuePath="Key">
+											<ComboBox.GroupStyle>
+												<StaticResource ResourceKey="FacadeGroupStyle" />
+											</ComboBox.GroupStyle>
+										</ComboBox>
 									</StackPanel>
 									<StackPanel Grid.Column="2">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 색" />

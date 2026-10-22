@@ -37,8 +37,10 @@ public partial class MapViewModel
     /// <summary>3D 손잡이가 떠 있는가(판의 옮기기 · 확정 단추 보임).</summary>
     public bool IsEdit3DTargetActive => Edit3DTarget != null;
     public bool IsEdit3DVertexVisible => Edit3DTarget is { } t && t.Geometry != Map3DDecoration.GeoPoint;
-    /// <summary>돌리기 단추 — 소품만(엔진은 소품에만 heading_deg 를 붙인다).</summary>
-    public bool IsEdit3DRotateVisible => _decoIn3D && IsEdit3DTargetActive && DecoSelected?.Kind == Map3DDecoration.KindProp;
+    /// <summary>돌리기 단추 — 소품 · 넣은 모델만(엔진은 이 둘에만 heading_deg 를 붙인다).</summary>
+    public bool IsEdit3DRotateVisible => _decoIn3D && IsEdit3DTargetActive && (DecoSelected?.Kind == Map3DDecoration.KindProp || ModelSelected != null);
+    /// <summary>크기 단추(+ −) — 넣은 모델만.</summary>
+    public bool IsEdit3DScaleVisible => _decoIn3D && IsEdit3DTargetActive && ModelSelected != null;
     /// <summary>지금 켠 3D 그리기 방식(시험 · 계측).</summary>
     public string? Edit3DDrawMode => _draw3DMode;
 
@@ -47,12 +49,13 @@ public partial class MapViewModel
         => _edit3DTarget is null ? null
          : _ubIn3D && IsUserBuildingDrawing && _ubEditing is { } e ? (Map3DEdit.TargetUserBuilding, e.Uid, Map3DDecoration.GeoPolygon)
          : _decoIn3D && IsDecorating && DecoSelected is { } s ? (Map3DEdit.TargetDecoration, s.Uid, s.Geometry)
+         : _decoIn3D && IsDecorating && ModelSelected is { } m ? (Map3DEdit.TargetModel, m.Uid, Map3DDecoration.GeoPoint)
          : null;
 
     /// <summary>3D 에서 고른 것을 3D 에 머문 채 고치는가 — 3D 표시 중이고 WPF 판이 3D 위에 보이는 방식(네이티브 창 3D 아님).</summary>
     private bool ShouldEditIn3D => _map3DState == Map3DState.Shown && !Map3DGuide.EditModeLeaves3D(Map3DHost.HostMode);
 
-    private bool Edit3DBusy => _ubBusy || _decoBusy;
+    private bool Edit3DBusy => _ubBusy || _decoBusy || _modelBusy;
 
     /// <summary>편집 모드가 꺼진 채 고치기 입구(건물 그리기 · 꾸미기 · 영역 배지 메뉴)를 눌렀을 때 안내.</summary>
     public const string EditModeRequiredText = "편집 모드에서 쓸 수 있습니다 — 툴바의 「편집」을 켜세요";
@@ -191,7 +194,7 @@ public partial class MapViewModel
             _log?.Info($"[Edit3D] 3D 에서 편집 끝 reason={msg.Reason ?? "-"}");
             if (_edit3DTarget == null) return;
             _edit3DTarget = null;
-            if (_decoIn3D && IsDecorating) SelectDecoration(null);
+            if (_decoIn3D && IsDecorating) { if (_modelSelectedUid != null) SelectModel(null); else SelectDecoration(null); }
             else if (_ubIn3D && IsUserBuildingDrawing) ResetUserBuildingDraft(null);
             return;
         }
@@ -236,7 +239,12 @@ public partial class MapViewModel
     {
         string? job = Edit3DJob;
         bool ok;
-        try { ok = c.Kind == Map3DEdit.TargetUserBuilding ? await CommitUserBuildingShapeAsync(c) : await CommitDecorationShapeAsync(c); }
+        try
+        {
+            ok = c.Kind == Map3DEdit.TargetUserBuilding ? await CommitUserBuildingShapeAsync(c)
+               : c.Kind == Map3DEdit.TargetModel ? await CommitModelPlaceAsync(c)   // 넣은 모델(MapViewModel.Model3D)
+               : await CommitDecorationShapeAsync(c);
+        }
         catch (Exception ex) { _log?.Error($"[Edit3D] 모양 저장 실패(격리): {ex.Message}"); ok = false; }
         if (ok || job == null) return;
         PostUserBuilding3D(job, Map3DEdit.EditRevertJson(c.Kind, c.Uid));
@@ -303,7 +311,7 @@ public partial class MapViewModel
 
     private void RefreshEdit3D()
     {
-        foreach (var name in new[] { nameof(IsEdit3DMode), nameof(IsEdit3DTargetActive), nameof(IsEdit3DVertexVisible), nameof(IsEdit3DRotateVisible) })
+        foreach (var name in new[] { nameof(IsEdit3DMode), nameof(IsEdit3DTargetActive), nameof(IsEdit3DVertexVisible), nameof(IsEdit3DRotateVisible), nameof(IsEdit3DScaleVisible) })
             NotifyOfPropertyChange(name);
         foreach (var c in new[] { Edit3DKeyCommand, EditIn2DCommand })
             c.RaiseCanExecuteChanged();
