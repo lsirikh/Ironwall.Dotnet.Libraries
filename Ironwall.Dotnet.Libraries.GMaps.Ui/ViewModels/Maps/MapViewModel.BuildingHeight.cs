@@ -196,7 +196,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private void OnMap3DBuildingPicked(Map3DBuildingPick pick, bool ctrl = false, bool shift = false)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
-        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid, ctrl); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
+        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid, ctrl || shift); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
         if (!CanPickMap3DBuildings(pick)) return;
         var mods = Map3DModifiers();
         if ((ctrl || shift || (mods & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)

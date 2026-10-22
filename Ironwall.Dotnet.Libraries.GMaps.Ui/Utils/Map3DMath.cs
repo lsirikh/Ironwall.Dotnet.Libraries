@@ -420,7 +420,9 @@ public static class Map3DMath
             {
                 string? uid = o["uid"]?.Type == JTokenType.String ? o.Value<string>("uid") : null;
                 if (!Map3DUserBuilding.IsUid(uid)) return null;
-                return type == "userbuilding.pick" ? new Map3DMessage(type, null, null, null) { UserUid = uid }
+                // 상자 클릭의 ctrl · shift(2026-10-22 GIS 요청 계약 — building 메시지와 같은 키, 옛 엔진은 없다 = 거짓 · 호스트 키로 본다)
+                var (ctrl, shift) = Map3DBuilding.ParseModifiers(o);
+                return type == "userbuilding.pick" ? new Map3DMessage(type, null, null, null) { UserUid = uid, Ctrl = ctrl, Shift = shift }
                      : type == "model.pick" ? new Map3DMessage(type, null, null, null) { ModelUid = uid }
                                             : new Map3DMessage(type, null, null, null) { DecorationUid = uid };
             }

@@ -82,9 +82,11 @@ public static class Map3DBuilding
         int? levels = o["levels"]?.Type == JTokenType.Integer && o.Value<long>("levels") is long lv && lv > 0 && lv <= 10_000 ? (int)lv : null;
         double? area = Finite(o["area_m2"]) is double a && a > 0 ? a : null;
         string? uid = Str(o["user_uid"]);
+        // 서버 건물 줄(높이 저장 응답 · scene.json)은 외관을 look:{hidden, wall_color, roof_color, facade} 안에 둔다(map-3d looks._set_row_look) —
+        // 바깥 키만 읽으면 높이 [적용] 뒤 판의 외관이 「자동」으로 바뀌어, 다음 [외관 적용]이 저장한 무늬 · 색을 지웠다(2026-10-22 "높이를 수정하면 다른 속성이 변경").
         return new Map3DBuildingPick((int)id, Str(o["origin"]), h, Str(o["height_source"]), Str(o["height_from"]) ?? Str(o["height_source"]),
                                      levels, area, lon, lat, isManual)
-               { Look = Map3DLook.StateOf(o), UserUid = uid != null && Map3DUserBuilding.IsUid(uid) ? uid : null };
+               { Look = Map3DLook.StateOf(o["look"] as JObject ?? o), UserUid = uid != null && Map3DUserBuilding.IsUid(uid) ? uid : null };
     }
 
     /// <summary>
