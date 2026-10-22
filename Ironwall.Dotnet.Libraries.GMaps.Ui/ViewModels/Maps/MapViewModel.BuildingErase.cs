@@ -36,7 +36,110 @@ public partial class MapViewModel
     public int BuildingMultiCount => BhSelection.Count;
     /// <summary>고른 건물 id(고른 순서 — 시험 · 계측용).</summary>
     public IReadOnlyList<int> BuildingSelectionIds => BhSelection.Select(b => b.Id).ToList();
-    public string BuildingMultiSelectText => $"고른 건물 {BhSelection.Count}개";
+    public string BuildingMultiSelectText
+        => BuildingMixedFields() is { Count: > 0 } mixed ? $"고른 건물 {BhSelection.Count}개 · {Map3DBuilding.MixedText}: {string.Join(" · ", mixed)}" : $"고른 건물 {BhSelection.Count}개";
+
+    /// <summary>고른 건물 높이가 서로 다르고 높이 칸을 손대지 않았나(입력칸에 "여러 값").</summary>
+    private bool IsBuildingHeightMixed => IsBuildingMultiSelect && !_bhHeightTouched && BhSelection.Any(s => Math.Abs(s.Height - BhSelection[0].Height) > 1e-9);
+
+    /// <summary>값이 서로 다르고 아직 손대지 않은 칸 이름(높이 · 외벽 무늬 · 외벽 색 · 지붕 색) — 2D 여러 개 속성창의 「여러 값」.</summary>
+    private List<string> BuildingMixedFields()
+    {
+        var mixed = new List<string>();
+        if (!IsBuildingMultiSelect) return mixed;
+        if (IsBuildingHeightMixed) mixed.Add("높이");
+        var looks = BhSelection.Select(s => WithSavedLook(s).Look).ToList();
+        foreach (var (field, name, get) in LookFields)
+            if (!BhLookTouched.Contains(field) && looks.Any(l => get(l) != get(looks[0]))) mixed.Add(name);
+        return mixed;
+    }
+
+    private static readonly (string Field, string Name, Func<Map3DLookState, string?> Get)[] LookFields =
+    {
+        ("facade", "외벽 무늬", l => l.Facade), ("wall", "외벽 색", l => l.WallColor), ("roof", "지붕 색", l => l.RoofColor),
+    };
+
+    private HashSet<string>? _bhLookTouchedSet;
+    /// <summary>판에서 손댄 외관 칸(facade · wall · roof) — 여러 개 함께 적용은 이 칸만(지연 초기화).</summary>
+    private HashSet<string> BhLookTouched => _bhLookTouchedSet ??= new();
+
+    /// <summary>
+    /// 고른 여러 건물 높이를 함께(2D 여러 개 속성창처럼 — 높이 칸을 손댔을 때만) → 건물마다 PUT …/height · 3D building.commit → 판 안 되돌리기 1칸.
+    /// 중간에 실패하면 그때까지 바꾼 것만 되돌리기 칸에(판에 이유 한 줄 — SaveBuildingHeightAsync).
+    /// </summary>
+    private async Task ApplyBuildingHeightGroupAsync(string job, double target, int floors)
+    {
+        var done = new List<(int Id, double? Before, int? BeforeFloors)>();
+        int session = _bhSession;
+        foreach (var s in BhSelection.ToList())
+        {
+            if (Math.Abs(s.Height - target) <= 1e-9) continue;
+            bool keep = s.Manual || s.Origin == "user";
+            if (!await SaveBuildingHeightAsync(job, s.Id, target, floors, null, () => Map3DBuilding.SavedText(target, floors))) break;
+            done.Add((s.Id, keep ? s.Height : null, keep ? s.Levels : null));
+        }
+        if (done.Count > 0 && session == _bhSession) BhUndo.Add(new BuildingHeightUndoStep(job, done[0].Id, null, null) { Heights = done });
+        _bhHeightTouched = false;
+        _log?.Info($"[Map3D] 건물 높이 함께 적용 {done.Count}/{BhSelection.Count} → {target} m job={job}");
+        if (done.Count > 0) SetAimStatus($"건물 {done.Count}개를 {Map3DBuilding.FormatMeters(target)} m({floors}층)로 저장했습니다", autoHide: true);
+        RefreshBuildingHeightPanel();
+    }
+
+    /// <summary>판 안 되돌리기(높이를 함께 바꾼 한 칸) — 건물마다 앞 높이(null = 자동)로. 모두 되돌렸으면 true.</summary>
+    private async Task<bool> RestoreBuildingHeightsAsync(string job, IReadOnlyList<(int Id, double? Before, int? BeforeFloors)> heights)
+    {
+        foreach (var (id, before, floors) in heights)
+            if (!await SaveBuildingHeightAsync(job, id, before, floors, null, () => "되돌렸습니다")) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 고른 여러 건물 외관을 함께 — 손댄 칸(외벽 무늬 · 외벽 색 · 지붕 색)만 건물마다 자기 외관에 덮어 저장, 손대지 않은 칸은 건물마다 그대로.
+    /// 되돌리기 1칸(앞 외관으로 모두 다시 저장 — RestoreBuildingsAsync).
+    /// </summary>
+    private async Task ApplyBuildingLookGroupAsync(string job)
+    {
+        if (_map3DClient == null || _bhLookEdit is not { } edit) return;
+        _bhError = null;
+        int session = _bhSession;
+        var done = new List<(int Id, Map3DLookState Look)>();
+        SetBuildingHeightBusy(true);
+        try
+        {
+            foreach (var s in BhSelection.ToList())
+            {
+                var before = WithSavedLook(s).Look;
+                var after = before with
+                {
+                    Facade = BhLookTouched.Contains("facade") ? edit.Facade : before.Facade,
+                    WallColor = BhLookTouched.Contains("wall") ? edit.WallColor : before.WallColor,
+                    RoofColor = BhLookTouched.Contains("roof") ? edit.RoofColor : before.RoofColor,
+                };
+                if (after == before) continue;
+                var saved = await _map3DClient.PutBuildingLookAsync(job, s.Id, Map3DLook.PutBody(null, after));
+                done.Add((s.Id, before));
+                if (!saved.NeedsRebake) PostUserBuilding3D(job, Map3DLook.LookMessageJson(s.Id, saved.State));
+                if (_bhBuilding?.Id == s.Id && _bhJob == job) _bhBuilding = _bhBuilding with { Look = saved.State };
+            }
+            SetAimStatus($"건물 {done.Count}개 외관을 저장했습니다", autoHide: true);
+        }
+        catch (Map3DServerUnavailableException ex)
+        {
+            _log?.Warning($"[Map3D] 외관 함께 적용 — 서버 닿지 않음: {ex.Message}");
+            SetBuildingHeightError(Map3DUnavailableText);
+            NoteMap3DEngineDown("building-look-many");
+        }
+        catch (Exception ex) { SetBuildingHeightError($"{done.Count}개를 저장한 뒤 멈췄습니다: {ex.Message}"); }
+        finally
+        {
+            if (done.Count > 0 && session == _bhSession) BhUndo.Add(new BuildingHeightUndoStep(job, done[0].Id, null, null) { Group = done });
+            _bhLookEdit = null;
+            BhLookTouched.Clear();
+            SetBuildingHeightBusy(false);
+        }
+        _log?.Info($"[Map3D] 건물 외관 함께 적용 {done.Count}/{BhSelection.Count} job={job}");
+        if (done.Count > 0) await LoadBuildingLooksAsync(job);
+    }
     public string BuildingMultiDeleteText => $"고른 {BhSelection.Count}개 지우기";
 
     private bool CanEraseMapBuildings => IsBuildingHeightEditable && IsBuildingLookAvailable;

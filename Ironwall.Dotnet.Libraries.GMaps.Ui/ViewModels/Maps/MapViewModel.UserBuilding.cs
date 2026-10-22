@@ -272,7 +272,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     /// 3D 에서 직접 그린 건물을 눌렀다(userbuilding.pick · user_uid 있는 building) — 그 3D 영역에서 「건물 그리기」를 3D 위 판으로 시작하고
     /// (3D 에 머문다, edit3d-contract 1단계 — 네이티브 창 3D 만 예전처럼 2D 로) 목록을 받으면 그 건물 고치기 판을 연다. 3D 의 그 상자에 고름 표시(userbuilding.select).
     /// </summary>
-    private void OnMap3DUserBuildingPicked(string uid)
+    private void OnMap3DUserBuildingPicked(string uid, bool ctrl = false)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob is not { } job || Map3DAreas.FirstOrDefault(a => a.Id == job) is not { } area) return;
         if (!RequireMapEditMode(notify: false))
@@ -288,6 +288,21 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         PostUserBuilding3D(job, Map3DUserBuilding.SelectMessageJson(uid));
         bool in3D = ShouldEditIn3D;
         bool same = in3D && _ubIn3D && _ubArea?.Id == job;   // 이미 3D 위 판 — 그 건물만 연다
+        // Ctrl+클릭(엔진 키 · 옛 엔진은 호스트 키) = 고름에 넣기 · 빼기 — 2D 판의 Ctrl+클릭과 같다(고치던 건물부터 고름에 넣는다, 여러 개 함께 고치기)
+        if (same && (ctrl || (Map3DModifiers() & System.Windows.Input.ModifierKeys.Control) != 0) && UserBuildingItems.Any(i => i.Uid == uid))
+        {
+            var seed = _ubEditing?.Uid;
+            var keep = UbSelected.ToList();
+            if (_ubEditing != null) ResetUserBuildingDraft(null);
+            UbSelected.Clear();
+            UbSelected.AddRange(keep);
+            if (seed != null && !UbSelected.Contains(seed)) UbSelected.Add(seed);
+            if (uid != seed && !UbSelected.Remove(uid)) UbSelected.Add(uid);
+            _log?.Info($"[UserBuilding] 3D 에서 고름 {UbSelected.Count}개");
+            LoadUserBuildingGroupFields();
+            RefreshUserBuildingPanel();
+            return;
+        }
         if (!same) StartUserBuildingDraw(area, in3D);
         _ubPendingEditUid = uid;
         if (_ubArea?.Id != job) { _ubPendingEditUid = null; return; }   // 시작하지 못함(만드는 중 등)
@@ -397,7 +412,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     private RelayCommand? _applyUserBuildingCommand;
     /// <summary>「저장」 — 닫힌 윤곽 · 바른 높이일 때.</summary>
     public RelayCommand ApplyUserBuildingCommand => _applyUserBuildingCommand ??= new RelayCommand(
-        _ => _ = ApplyUserBuildingAsync(), _ => IsUserBuildingDrawing && !_ubBusy && !_ubInputError && _ubDraft is { IsClosed: true });
+        _ => _ = ApplyUserBuildingAsync(), _ => IsUserBuildingDrawing && !_ubBusy && !_ubInputError && (_ubDraft is { IsClosed: true } || IsUserBuildingGroup));
 
     private RelayCommand? _cancelUserBuildingCommand;
     /// <summary>「취소」 — 그리던(고치던) 윤곽을 버리고 빈 윤곽으로(그리기는 그대로).</summary>
@@ -427,6 +442,73 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     public bool HasUserBuildingSelection => UbSelected.Count > 0;
     /// <summary>판 「도형 N개 선택」 줄.</summary>
     public string UserBuildingSelectionText => Map3DUserBuilding.SelectionText(UbSelected.Count);
+    // ── 여러 개 함께 고치기(2026-10-22 사용자 "건물들 멀티플하게 선택해서 속성을 변경하면 같이 적용되게 우리 마커처럼") ──
+    // 2D 마커 여러 개 속성창과 같다: 고르면 판 칸에 공통 값(다르면 첫 건물 값 + 「여러 값」), 손댄 칸만 고른 건물 모두에 [✓ 적용], 되돌리기 한 번에 모두.
+
+    /// <summary>판 칸 값(높이 · 지붕 · 쓰임 · 외관 · 기울기) — 손댄 칸 판정용.</summary>
+    private sealed record UbGroupFields(double Height, string Roof, string Use, string? WallColor, string? RoofColor, string Facade, double TaperDeg);
+    private UbGroupFields? _ubGroupBase;
+    private IReadOnlyList<string> _ubGroupMixed = Array.Empty<string>();
+
+    /// <summary>저장된 건물을 2개 이상 골랐다(고치는 건물 없음) — 판 값을 고른 것 모두에 함께 적용.</summary>
+    public bool IsUserBuildingGroup => _ubEditing == null && UbSelected.Count >= 2;
+    /// <summary>판 「고른 n개에 함께 적용 · 여러 값: …」 줄.</summary>
+    public string UserBuildingGroupText => !IsUserBuildingGroup ? ""
+        : _ubGroupMixed.Count > 0 ? $"[✓ 적용] = 고른 {UbSelected.Count}개에 바꾼 칸만 · {Map3DBuilding.MixedText}: {string.Join(" · ", _ubGroupMixed)}"
+        : $"[✓ 적용] = 고른 {UbSelected.Count}개에 바꾼 칸만";
+
+    private UbGroupFields CurrentUbGroupFields() => new(_ubHeight, UserBuildingRoof, UserBuildingUse, _ubWallColor, _ubRoofColor, UserBuildingFacade, _ubTaper);
+
+    /// <summary>고름이 바뀌면 판 칸을 고른 건물 값으로 — 모두 같으면 그 값, 다르면 첫 건물 값에 「여러 값」 표시(그 칸은 손대지 않으면 적용하지 않는다).</summary>
+    private void LoadUserBuildingGroupFields()
+    {
+        var items = UbSelected.Select(uid => UserBuildingItems.FirstOrDefault(i => i.Uid == uid)).OfType<Map3DUserBuildingItem>().ToList();
+        if (_ubEditing != null || items.Count < 2) { _ubGroupBase = null; _ubGroupMixed = Array.Empty<string>(); return; }
+        var f = items[0];
+        var mixed = new List<string>();
+        void Check<T>(string name, Func<Map3DUserBuildingItem, T> get) { if (items.Any(i => !Equals(get(i), get(f)))) mixed.Add(name); }
+        Check("높이", i => i.Height); Check("지붕", i => i.Roof); Check("쓰임", i => i.Use); Check("외벽 무늬", i => i.Facade);
+        Check("외벽 색", i => i.WallColor); Check("지붕 색", i => i.RoofColor); Check("좁게 · 넓게", i => i.TaperDeg);
+        _ubHeight = f.Height; _ubRoof = f.Roof; _ubUse = f.Use; _ubFacade = f.Facade; _ubWallColor = f.WallColor; _ubRoofColor = f.RoofColor; _ubTaper = f.TaperDeg;
+        _ubGroupMixed = mixed;
+        _ubGroupBase = CurrentUbGroupFields();
+    }
+
+    /// <summary>[✓ 적용](여러 개) — 손댄 칸만 건물마다 자기 값에 덮어 저장(윤곽 · 이름은 그대로) → 편집 기록 1단위(MacroCommand).</summary>
+    private async Task ApplyUserBuildingGroupAsync(Map3DAreaItem area)
+    {
+        if (_ubGroupBase is not { } b) return;
+        var c = CurrentUbGroupFields();
+        bool height = c.Height != b.Height, roof = c.Roof != b.Roof, use = c.Use != b.Use, facade = c.Facade != b.Facade,
+             wall = c.WallColor != b.WallColor, roofColor = c.RoofColor != b.RoofColor, taper = c.TaperDeg != b.TaperDeg;
+        if (!(height || roof || use || facade || wall || roofColor || taper)) { SetAimStatus("바꾼 칸이 없습니다", autoHide: true); return; }
+        int floors = Map3DBuilding.FloorsFromHeight(c.Height, UbFloorHeight);
+        var commands = new List<Services.Undo.IUndoableCommand>();
+        foreach (var uid in UbSelected.ToList())
+        {
+            if (UserBuildingItems.FirstOrDefault(i => i.Uid == uid) is not { } item) continue;
+            var before = StateOf(item);
+            var after = before with
+            {
+                Height = height ? c.Height : before.Height, Floors = height ? floors : before.Floors,
+                Roof = roof ? c.Roof : before.Roof, Use = use ? c.Use : before.Use, TaperDeg = taper ? c.TaperDeg : before.TaperDeg,
+                Look = before.Look with { Facade = facade ? c.Facade : before.Look.Facade, WallColor = wall ? c.WallColor : before.Look.WallColor,
+                                          RoofColor = roofColor ? c.RoofColor : before.Look.RoofColor },
+            };
+            if (after == before) continue;
+            if (!await SaveUserBuildingAsync(area.Id, uid, after)) break;   // 이유는 판 오류 줄 — 그때까지 바꾼 것만 기록
+            commands.Add(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} 고치기", area.Id, uid, before, after, ApplyUserBuildingStateAsync, ResolveUserBuildingJob));
+        }
+        if (commands.Count > 0)
+        {
+            _undoService?.Push(new Services.Undo.Commands.MacroCommand($"{Map3DUserBuilding.UndoPrefix} {commands.Count}개 함께 고치기", commands, _log));
+            SetAimStatus($"건물 {commands.Count}개를 함께 고쳤습니다", autoHide: true);
+        }
+        _log?.Info($"[UserBuilding] 함께 고치기 {commands.Count}/{UbSelected.Count}");
+        LoadUserBuildingGroupFields();
+        RefreshUserBuildingPanel();
+    }
+
     /// <summary>[합치기] 보임 — 2개 이상 골랐을 때만.</summary>
     public bool IsUserBuildingMergeVisible => UbSelected.Count >= 2;
 
@@ -445,6 +527,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (UbSelected.Count == 0) return false;
         UbSelected.Clear();
+        LoadUserBuildingGroupFields();
         _ubAdorner?.InvalidateVisual();
         RefreshUserBuildingPanel();
         return true;
@@ -469,6 +552,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (seed != null && !UbSelected.Contains(seed)) UbSelected.Add(seed);
         if (hit != null && hit.Uid != seed && !UbSelected.Remove(hit.Uid)) UbSelected.Add(hit.Uid);
         _log?.Info($"[UserBuilding] 고름 {UbSelected.Count}개");
+        LoadUserBuildingGroupFields();
         _ubAdorner?.InvalidateVisual();
         RefreshUserBuildingPanel();
         return true;
@@ -775,6 +859,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(IsUserBuildingToolPolygon), nameof(UserBuildingCircleSidesText), nameof(UserBuildingRoof), nameof(UserBuildingUse),
                      nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus), nameof(IsUserBuildingToolTriangle),
                      nameof(UserBuildingSelectedUids), nameof(HasUserBuildingSelection), nameof(UserBuildingSelectionText), nameof(IsUserBuildingMergeVisible),
+                     nameof(IsUserBuildingGroup), nameof(UserBuildingGroupText),
                      nameof(UserBuildingColors), nameof(UserBuildingFacade), nameof(UserBuildingWallColor), nameof(UserBuildingRoofColor),
                      nameof(UserBuildingTaperDeg), nameof(UserBuildingTaperText), nameof(UserBuildingTaperStatus),
                  })
@@ -822,6 +907,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (_ubArea is not { } area || _ubDraft is not { } d || _ubBusy || _ubInputError) return;
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
+        if (IsUserBuildingGroup) { await ApplyUserBuildingGroupAsync(area); return; }
+        CommitPendingEdit3D();   // 3D 손잡이로 고친 것도 [✓ 적용] 한 번에(옛 [✓ 확정] 을 합침)
         if (d.Validate() is { } why) { SetUserBuildingError(why); return; }
         string uid = UserBuildingDraftUid;
         var before = _ubEditing is { } e ? StateOf(e) : null;

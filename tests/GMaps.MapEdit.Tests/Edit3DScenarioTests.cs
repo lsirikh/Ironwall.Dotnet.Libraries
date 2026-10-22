@@ -239,7 +239,7 @@ public partial class TwinContractScenarioTests
         Assert.False(rig.Vm.IsEdit3DVertexVisible);                                         // 점 항목 — 꼭짓점 단추 없음
         Assert.True(rig.Vm.IsEdit3DRotateVisible);                                          // 소품 — ↺↻ = 뷰어 '[' · ']'
         rig.Vm.Edit3DKeyCommand.Execute("]");
-        Assert.Equal("]", rig.Sent("edit.key").Single().Value<string>("key"));
+        Assert.Equal(new[] { "]", "Enter" }, rig.Sent("edit.key").Select(k => k.Value<string>("key")));   // 판 단추 = 누를 때마다 확정(2026-10-22 — [✓ 확정] 없앰)
         Assert.Empty(rig.Writes);
 
         rig.From3D(Commit("decoration", Uid, "Point", Geo(rig, 3, 4), heading: 375));
@@ -279,13 +279,14 @@ public partial class TwinContractScenarioTests
         Assert.True(rig.Vm.IsEdit3DTargetActive && rig.Vm.IsEdit3DVertexVisible);
         Assert.False(rig.Vm.IsEdit3DRotateVisible);                                         // 돌리기는 소품만
 
-        // 판 단추 = 뷰어 키(edit.key) — 미리보기만, 서버 호출 없음
+        // 판 단추 = 뷰어 키(edit.key) — 옮기기 · 돌리기는 누를 때마다 Enter(확정)를 함께(2026-10-22 — [✓ 확정] 없앰, 2D 화살표 옮기기처럼),
+        // 꼭짓점 고르기(Tab) · 지우기(3D Delete 키) 는 확정하지 않는다. 저장은 뷰어의 edit.commit 에서만
         foreach (var p in new[] { "ArrowUp", "ArrowLeft", "Tab", "Shift+Tab", "Tab", "Delete", "Enter" }) rig.Vm.Edit3DKeyCommand.Execute(p);
         var keys = rig.Sent("edit.key");
-        Assert.Equal(new[] { "ArrowUp", "ArrowLeft", "Tab", "Tab", "Tab", "Delete", "Enter" }, keys.Select(k => k.Value<string>("key")));
-        Assert.Equal(new[] { false, false, false, true, false, false, false }, keys.Select(k => k.Value<bool>("shift")));
+        Assert.Equal(new[] { "ArrowUp", "Enter", "ArrowLeft", "Enter", "Tab", "Tab", "Tab", "Delete", "Enter" }, keys.Select(k => k.Value<string>("key")));
+        Assert.Equal(new[] { false, false, false, false, false, true, false, false, false }, keys.Select(k => k.Value<bool>("shift")));
         rig.Vm.Edit3DKeyCommand.Execute("Space");                                           // 모르는 키는 보내지 않는다
-        Assert.Equal(7, rig.Sent("edit.key").Count);
+        Assert.Equal(9, rig.Sent("edit.key").Count);
         Assert.Empty(rig.Writes);
 
         // ✓ 확정(Enter) 뒤 뷰어가 보낸 edit.commit(가운데 꼭짓점 지움 · 화면 기준 옮김) = PUT · 편집 기록 1단위
@@ -374,7 +375,7 @@ public partial class TwinContractScenarioTests
         await Rig.Until(() => rig.Vm.DecorationSelectedUid == Uid, "고름");
         AssertRendered(rig.Vm.DecorationPanel, "DecorationPanelStyle.xaml", "Map.Edit3D.Section", "Map.Edit3D.MoveUp", "Map.Edit3D.MoveDown",
                        "Map.Edit3D.MoveLeft", "Map.Edit3D.MoveRight", "Map.Edit3D.RotateLeft", "Map.Edit3D.RotateRight", "Map.Edit3D.VertexPrev",
-                       "Map.Edit3D.VertexNext", "Map.Edit3D.VertexDelete", "Map.Edit3D.Confirm", "Map.Edit3D.To2D");
+                       "Map.Edit3D.VertexNext", "Map.Edit3D.To2D");
         AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.Edit3D.Section", "Map.Edit3D.To2D", "Map.UserBuilding.Redo");
         var help = Ironwall.Dotnet.Libraries.GMaps.Ui.Help.MapsHelp.Entries.Single(e => e.Key == "Map.Decoration.Panel");
         Assert.NotNull(help);

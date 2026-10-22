@@ -29,8 +29,10 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private sealed record BuildingHeightUndoStep(string Job, int Id, double? Before, int? BeforeFloors)
     {
         public Map3DLookState? Look { get; init; }
-        /// <summary>여러 건물을 한꺼번에 지운 한 칸(고른 n개 · 영역 모두) — 되돌리기 = 그 건물들을 지우기 전 모양으로 모두 되살림.</summary>
+        /// <summary>여러 건물을 한꺼번에 지운 · 외관을 바꾼 한 칸(고른 n개 · 영역 모두) — 되돌리기 = 그 건물들을 앞 모양으로 모두 다시 저장.</summary>
         public IReadOnlyList<(int Id, Map3DLookState Look)>? Group { get; init; }
+        /// <summary>고른 여러 건물의 높이를 함께 바꾼 한 칸 — 되돌리기 = 건물마다 앞 높이(null = 자동)로.</summary>
+        public IReadOnlyList<(int Id, double? Before, int? BeforeFloors)>? Heights { get; init; }
     }
 
     private Map3DBuildingPick? _bhBuilding;   // 고른 건물(저장된 값 = 취소하면 돌아갈 값)
@@ -81,14 +83,23 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     public string BuildingHeightReadOnlyText => Map3DBuilding.ReadOnlyReason;
     /// <summary>입력 · 손잡이를 쓸 수 있는가 — 권한이 있고 저장 중이 아닐 때.</summary>
     public bool IsBuildingHeightEditable => IsBuildingHeightPanelOpen && CanEditMap() && !_bhBusy;
-    /// <summary>미리보기가 저장된 높이와 다른가.</summary>
-    public bool IsBuildingHeightChanged => _bhBuilding is { } b && Math.Abs(_bhPreview - b.Height) > 1e-9;
+    /// <summary>
+    /// 미리보기가 저장된 높이와 다른가. 여러 개 골랐으면 2D 마커 여러 개 속성창처럼 칸 단위 — 높이 칸을 손댔고 고른 것 중 하나라도 다를 때만
+    /// (손대지 않은 "여러 값" 은 적용하지 않는다).
+    /// </summary>
+    public bool IsBuildingHeightChanged => _bhBuilding is { } b
+        && (IsBuildingMultiSelect ? _bhHeightTouched && BhSelection.Any(s => Math.Abs(_bhPreview - s.Height) > 1e-9) : Math.Abs(_bhPreview - b.Height) > 1e-9);
+    /// <summary>높이 칸을 손댔나(판을 연 뒤 · 여러 개 함께 적용 뒤 처음으로).</summary>
+    private bool _bhHeightTouched;
     /// <summary>판 안 되돌리기 칸 수(이 3D 동안).</summary>
     public int BuildingHeightUndoCount => BhUndo.Count;
 
     /// <summary>적용할 내용 한 줄 — "적용하면 12.0 m → 30.0 m(10층)" · 바꾸지 않았으면 그렇게.</summary>
     public string BuildingHeightSummary => _bhBuilding is not { } b ? ""
         : _bhBusy ? "저장하는 중… 끝날 때까지 닫을 수 없습니다"
+        : IsBuildingMultiSelect
+            ? IsBuildingHeightChanged ? $"적용하면 고른 {BhSelection.Count}개 모두 {Map3DBuilding.FormatMeters(_bhPreview)} m({Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight)}층)"
+                                      : "아직 바꾸지 않았습니다"
         : IsBuildingHeightChanged
             ? $"적용하면 {Map3DBuilding.FormatMeters(b.Height)} m → {Map3DBuilding.FormatMeters(_bhPreview)} m({Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight)}층)"
             : b.Manual ? "직접 입력한 높이입니다 — 바꾸려면 층수나 높이를 넣으세요" : "아직 바꾸지 않았습니다";
@@ -185,7 +196,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private void OnMap3DBuildingPicked(Map3DBuildingPick pick, bool ctrl = false, bool shift = false)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
-        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
+        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid, ctrl); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
         if (!CanPickMap3DBuildings(pick)) return;
         var mods = Map3DModifiers();
         if ((ctrl || shift || (mods & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)
@@ -241,6 +252,8 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhLookNotice = null;
         _bhError = null;
         _bhInputError = false;
+        _bhHeightTouched = false;
+        BhLookTouched.Clear();
         _log?.Info($"[Map3D] 건물 고름 id={pick.Id} 높이={pick.Height} 출처={pick.HeightFrom ?? "-"} job={_map3DJob}");
         RefreshBuildingHeightPanel();
         _ = LoadBuildingLooksAsync(_map3DJob);   // 「숨긴 건물」 목록 · 옛 엔진 판정
@@ -306,6 +319,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         double h = Map3DBuilding.ClampHeight(height);
         _bhError = null;
         _bhInputError = false;
+        _bhHeightTouched = true;
         if (Math.Abs(h - _bhPreview) > 1e-9)
         {
             _bhPreview = h;
@@ -334,6 +348,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     {
         _bhHeightText = _bhBuilding == null ? "" : Map3DBuilding.FormatMeters(_bhPreview);
         _bhFloorsText = _bhBuilding == null ? "" : Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (IsBuildingHeightMixed) _bhHeightText = _bhFloorsText = Map3DBuilding.MixedText;   // 고른 건물 높이가 서로 다르고 손대지 않았다(2D 여러 개 속성창과 같다)
         _bhFloorHeightText = Map3DBuilding.FormatMeters(BhFloorHeight);
         foreach (var name in new[]
                  {
@@ -376,6 +391,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         double target = _bhPreview;
         int floors = Map3DBuilding.FloorsFromHeight(target, BhFloorHeight);
+        if (IsBuildingMultiSelect) { await ApplyBuildingHeightGroupAsync(job, target, floors); return; }
         // 직접 그린 건물(origin user)은 자동 높이가 없다 — 되돌리기는 "자동으로"가 아니라 앞 높이로 다시 저장
         bool keep = b.Manual || b.Origin == "user";
         await SaveBuildingHeightAsync(job, b.Id, target, floors, new BuildingHeightUndoStep(job, b.Id, keep ? b.Height : null, keep ? b.Levels : null),
@@ -399,7 +415,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         var step = BhUndo[index];
         BhUndo.RemoveAt(index);
         int session = _bhSession;
-        bool ok = step.Group is { } group
+        bool ok = step.Heights is { } heights
+            ? await RestoreBuildingHeightsAsync(step.Job, heights)
+            : step.Group is { } group
             ? await RestoreBuildingsAsync(step.Job, group)
             : step.Look is { } look
             ? await SaveBuildingLookAsync(step.Job, step.Id, look.Hidden, look, null, "되돌렸습니다")
@@ -458,6 +476,8 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
             _bhBuilding = saved.Pick;
             _bhPreview = saved.Pick.Height;
         }
+        int at = _bhJob == job ? BhSelection.FindIndex(s => s.Id == saved.Pick.Id) : -1;
+        if (at >= 0) BhSelection[at] = BhSelection[at] with { Height = saved.Pick.Height, Levels = saved.Pick.Levels, Manual = saved.Pick.Manual, HeightFrom = saved.Pick.HeightFrom };
         RefreshBuildingHeightPanel();
     }
 

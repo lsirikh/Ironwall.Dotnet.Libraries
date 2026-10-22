@@ -71,3 +71,32 @@
 ## 남은 일 · 주의
 - 엔진(map-3d) 쪽: `ctrl/shift` · `building.box` 를 보내고 `building.select.ids` 로 여러 건물을 강조해야 3D 에서 보인다(다른 세션). 엔진이 옛 판이면: Ctrl+클릭은 호스트 키로 동작, Shift+끌기는 엔진이 상자를 보내지 않아 안 됨, 강조는 판의 건물 하나.
 - UserBuildingPanelStyle.xaml 의 같은 세 칸 외관 콤보도 이름이 길면 잘릴 수 있다 — 이번 목표(「건물 높이」 판) 밖이라 손대지 않았다.
+
+---
+
+# 추가 요청(2026-10-22, 3D 직접 그린 건물 고치기 판 캡처) — 턴 2
+원문: "여기보면 버튼이 너무 많은데 확정은 뭐고 2D 윤곽에서 고치기 후에 3D로 들어올때 버그 좀 있는거 같고 / 건물들 멀티플하게 선택해서 속성을 변경하면 같이 적용되게 우리 마커처럼"
+
+## 진행
+- [x] 1 단추 정리(`Themes/UserBuildingPanelStyle.xaml` · `MapViewModel.Edit3D.cs`) — [✓ 확정] · 꼭짓점 [지우기] 제거, 판 옮기기 · 돌리기 · 크기 = 누를 때마다 키+Enter(바로 저장), [✓ 적용] 이 Enter 먼저(3D 손잡이 끈 것 확정), [이 건물 지우기] 한 줄 전체, 되돌리기 · 다시 하기 한 줄, 툴팁 짧게, 지붕 · 외관 콤보 칸 넓힘(「박공(세모 지붕)」 이 84px 칸에서 잘렸다). DECISIONS 6 · 7.
+- [x] 2 결함(로그 · 재현으로 확정 — DECISIONS 8) — `CarryUserBuildingPanelTo3D`(진입 때 판을 3D 위 판으로) · `ResumeUserBuildingIn3D`(Reveal3D 에서 고름 · 손잡이 · 미리보기) · `CancelUserBuildingCarry3D`(CancelMap3DPending 에서 2D 판으로).
+  로그(C:\PidsMonitoringSystem\Logs\log-2026-10-22.txt, FileShare.ReadWrite): 15:51:51 2D 에서 고치기로 → 15:54:24 「편집 · 그리기 중에는 3D 로 들어가지 않습니다」 → 15:54:28 판 닫기 → 15:54:32 진입 → 15:54:39 같은 건물 다시 고름. 15:54:45 edit.commit 저장 + 15:54:46 적용 저장(확정 · 적용 이중 저장).
+- [x] 3 여러 건물 속성 함께(DECISIONS 9) — 지도 건물: `ApplyBuildingHeightGroupAsync` · `ApplyBuildingLookGroupAsync` · 「여러 값」(`BuildingMixedFields`, `Map3DBuilding.MixedText`) · 판 안 되돌리기 1칸(`BuildingHeightUndoStep.Heights` · `Group`). 직접 그린 건물: `IsUserBuildingGroup` · `LoadUserBuildingGroupFields` · `ApplyUserBuildingGroupAsync`(MacroCommand) · 3D Ctrl+클릭으로 고름(`OnMap3DUserBuildingPicked(uid, ctrl)`).
+- [x] "?" 말풍선(`MapsHelp.cs`) — 고치기 판 3D 칸 문구([✓ 확정] 언급 제거 · 3D 로 함께 돌아옴) · 건물 높이 판 「여러 개 고르기」 절에 함께 적용.
+- [x] 시험 `tests/GMaps.MapEdit.Tests/BuildingGroupEditScenarioTests.cs` 6건 + 가짜 엔진 PUT/DELETE …/height. 바뀐 흐름에 맞춰 옛 시험 4곳 수정(Edit3DScenarioTests 키 순서 2 · 렌더 id 목록, FacadePackageModelScenarioTests 키 순서, Map3DCompositeScenarioTests 거절 조건).
+
+## 검증(턴 2)
+- `dotnet test tests/GMaps.MapEdit.Tests/GMaps.MapEdit.Tests.csproj` → 통과 927 · 실패 0.
+- 고치기 전(턴 1 커밋 상태 HEAD 5090dff9 의 제품 코드 11개 파일, 사본 $TEMP/before-proof — 새 속성은 dynamic 으로 읽어 컴파일)에서 새 시험 6건 → 결과는 아래 「결과 채움(턴 2)」.
+- `dotnet test Ironwall.Dotnet.Libraries.sln` → 아래.
+
+## 결과 채움(턴 2)
+- MapEdit 전체: 통과 927 · 실패 0(새 6건 포함).
+- 고치기 전 사본(제품 코드 = 턴 1 커밋 5090dff9): 새 6건 중 5건 실패 — 3D 복귀 "2D" 그대로 · 「박공(세모 지붕)」 84px 잘림 · [✓ 확정] 단추 있음 · 「여러 값」 없음 · IsUserBuildingGroup 없음. 1건(찍던 점이면 거절)은 원래 동작을 지키는 시험이라 그 전에도 통과.
+- `dotnet test Ironwall.Dotnet.Libraries.sln` → 11개 어셈블리 모두 통과(2,974건, 실패 0).
+- 창을 띄우는 시험 없음. 띄운 프로세스 없음. 임시 사본은 $TEMP(하네스가 지움).
+
+## 남은 일 · 주의(턴 2)
+- 여러 건물 높이 미리보기는 판의 건물 하나만 3D 에 보인다(저장하면 모두 바로 반영) — 모두 미리보기는 필요하면 후속.
+- 꼭짓점 지우기는 이제 3D 의 Delete 키로만(판 단추 없음).
+- 엔진 쪽: 판 단추마다 Enter 를 보내므로 엔진이 바뀐 것 없는 Enter 에 edit.commit 을 보내면 같은 모양으로 한 번 더 저장된다(해는 없음).

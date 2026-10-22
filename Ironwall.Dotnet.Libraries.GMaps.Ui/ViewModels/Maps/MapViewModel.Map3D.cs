@@ -475,7 +475,7 @@ public partial class MapViewModel
         // 만드는 중 · 이벤트 지도 이동 중에는 게이트가 곧바로 취소한다 — 안내가 깜빡이지 않게 처음부터 들어가지 않는다
         if (_isMap3DBaking) { SetAimStatus("3D 를 만드는 중입니다 — 다 만든 뒤 다시 누르세요", autoHide: true); return; }
         if (_flyAnimation != null) return;
-        if (IsMap3DBlockedByInputMode())
+        if (IsMap3DBlockedByInputMode() && !CarryUserBuildingPanelTo3D(scene.Id))   // 그 영역 「건물 만들기」 판은 3D 위 판으로 함께 들어간다(MapViewModel.Edit3D)
         {
             SetAimStatus("편집 · 그리기 중에는 3D 로 들어가지 않습니다 — 모드를 끝낸 뒤 다시 누르세요", autoHide: true);
             return;
@@ -780,6 +780,7 @@ public partial class MapViewModel
         _map3DAreaViewJob = null; _map3DReturn = null;   // 「영역 보기」 진입도 함께 취소
         Map3DHost.Park();
         _map3DOverlay?.Pause();
+        CancelUserBuildingCarry3D();   // 3D 로 되돌리던 「건물 만들기」 판은 2D 판 그대로
     }
 
     /// <summary>장면 페이지를 1×1 대기 상태로 연다(지금 2D 와 같은 자리 · 축척, 위에서 내려다봄). 새 페이지라 오버레이 기록은 버린다.</summary>
@@ -899,6 +900,7 @@ public partial class MapViewModel
         HoldMap2DInput();                                                               // 3D 가 보이는 동안 2D 입력 막음(나올 때 RestoreMap2DInput)
         EnsureAimEscWindowHook();
         BeginMap3DWindows();                                                            // 카메라 상자 · 조립 카드가 3D 마커 자리를 따라간다(MapViewModel.Map3DWindows)
+        ResumeUserBuildingIn3D();                                                       // 2D 판을 3D 위 판으로 되돌려 들어왔으면 고름 · 손잡이 다시
         _map3DWpfFrames.Reset(); _map3DSync2D.Reset();                                  // 계측 — 3D 의 perf.stats 가 올 때 WPF 프레임 간격과 함께 한 줄([Map3D][perf])
         System.Windows.Media.CompositionTarget.Rendering -= OnMap3DWpfFrame;
         System.Windows.Media.CompositionTarget.Rendering += OnMap3DWpfFrame;

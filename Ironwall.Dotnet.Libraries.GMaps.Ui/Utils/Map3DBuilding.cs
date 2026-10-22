@@ -54,6 +54,9 @@ public static class Map3DBuilding
     /// <summary>손잡이 끌기 데드존(px) — 이만큼 안 움직였으면 끌기가 아니다(클릭 · 손떨림).</summary>
     public const double DragDeadZonePx = 4.0;
 
+    /// <summary>여러 개 골랐는데 값이 서로 다른 칸(2D 여러 개 속성창과 같은 말).</summary>
+    public const string MixedText = "여러 값";
+
     /// <summary>판 머리 띠 제목.</summary>
     public const string Title = "건물 높이";
     /// <summary>지도 편집 권한이 없을 때 판에 보이는 이유 한 줄.</summary>
