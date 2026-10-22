@@ -102,10 +102,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             if (updated is null) return;
             _model.Severity = updated.Severity;
             _model.DetailText = updated.DetailText;
+            _model.ComponentChange = updated.ComponentChange;
             _model.Status = updated.Status;
             NotifyOfPropertyChange(nameof(SeverityText));
             NotifyOfPropertyChange(nameof(IsWarning));
             NotifyOfPropertyChange(nameof(DetailText));
+            NotifyOfPropertyChange(nameof(ComponentText));
+            NotifyOfPropertyChange(nameof(HasComponentText));
+            NotifyOfPropertyChange(nameof(ComponentLineText));
+            NotifyOfPropertyChange(nameof(ComponentToolTip));
         }
         #endregion
         #region - Properties -
@@ -126,6 +131,42 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
 
         /// <summary>상세 한 줄. 없으면 "—".</summary>
         public string DetailText => string.IsNullOrWhiteSpace(_model.DetailText) ? "—" : _model.DetailText!;
+
+        /// <summary>
+        /// 어느 부품이 어떻게 바뀌었나 — 「도어 센서 닫힘 → 열림」. 카드는 상세 원문 대신 이 한 줄만 보인다(OPC-016 — 개발자용 키=값은 빼고 쉬운 말만).
+        /// 부품 전이가 아니면 빈 글자.
+        /// </summary>
+        public string ComponentText => _model.ComponentChange?.Text ?? string.Empty;
+
+        /// <summary>부품 줄을 보일지.</summary>
+        public bool HasComponentText => _model.ComponentChange is not null;
+
+        /// <summary>
+        /// 같은 장비에서 30초 안에 이어진 부품 전이 흐름 — 「문 구동부 열림 → 도어 센서 열림」(<see cref="OperationComponentFlow"/>).
+        /// 앞선 전이가 없으면 null. 카드를 합치지 않고 나중 카드에 보이기만 한다.
+        /// </summary>
+        public string? FlowText
+        {
+            get => _flowText;
+            set
+            {
+                _flowText = value;
+                NotifyOfPropertyChange(nameof(FlowText));
+                NotifyOfPropertyChange(nameof(HasFlowText));
+                NotifyOfPropertyChange(nameof(ComponentLineText));
+                NotifyOfPropertyChange(nameof(ComponentToolTip));
+            }
+        }
+
+        /// <summary>흐름이 있는가 — 부품 줄 앞 시계 아이콘.</summary>
+        public bool HasFlowText => !string.IsNullOrEmpty(_flowText);
+        private string? _flowText;
+
+        /// <summary>카드 부품 줄 — 흐름이 있으면 흐름(이 전이가 맨 끝), 없으면 <see cref="ComponentText"/>. 카드 높이에 한 줄만 들어간다.</summary>
+        public string ComponentLineText => HasFlowText ? _flowText! : ComponentText;
+
+        /// <summary>부품 줄 말풍선 — 이 전이 전체(이전 → 지금)와, 흐름이 있으면 흐름까지.</summary>
+        public string ComponentToolTip => HasFlowText ? $"{ComponentText}\n30초 안 흐름: {_flowText}" : ComponentText;
 
         /// <summary>[닫기] 단추 자동화 식별자 — <c>{AutomationKey}.Close</c>.</summary>
         public string CloseAutomationKey => AutomationKey + ".Close";

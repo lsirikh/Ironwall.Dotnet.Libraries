@@ -31,4 +31,7 @@ public class OperationEventModel : ExEventModel
 
     /// <summary>상세(JSONB)를 한 줄로 편 것 — 사유마다 키가 달라 강타입으로 두지 않는다. 없으면 null.</summary>
     public string? DetailText { get; set; }
+
+    /// <summary>어느 부품이 어떻게 바뀌었나(<c>detail.component</c> 전이 — 「도어 센서 닫힘 → 열림」). 부품 전이가 아니면 null.</summary>
+    public Helpers.OperationComponentChange? ComponentChange { get; set; }
 }

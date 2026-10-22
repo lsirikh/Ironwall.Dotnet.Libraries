@@ -253,6 +253,40 @@ public class EventConsoleFourKindsTests : IDisposable
         Assert.True(console.DetailView.ShowReportAction);
     }
 
+    [Fact]
+    public async Task should_show_which_component_changed_in_the_operation_list_row_and_the_detail()
+    {
+        // 2026-10-22 요청 — "통문 접점 감지, 액추에이터 열림 뭐 이렇게": 목록 행 · 상세 칸에 부품 이름(장비 캐시의 부품 선언)을 붙인다.
+        _devices.Add(OperationComponentModelTests.Gate(810,
+            OperationComponentTextTests.Part("actuator", "DOOR_ACTUATOR"), OperationComponentTextTests.Part("door", "DOOR_SENSOR", "통문 접점")));
+        var api = BuildApi(Page(
+            new OperationEventDto
+            {
+                Id = 811, Reason = "GATE_OPEN", Severity = "WARNING", ActionReported = "false", CreatedAt = "2026-10-03T10:03:00+09:00",
+                Device = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.BaseDeviceDto { Id = 810, CategoryDevice = "gate" },
+                Detail = JObject.Parse("""{ "component": "door", "state": "OPEN", "previous": "CLOSED", "device_status": "ACTIVATED" }"""),
+            },
+            new OperationEventDto
+            {
+                Id = 812, Reason = "GATE_OPEN", Severity = "WARNING", ActionReported = "false", CreatedAt = "2026-10-03T10:02:58+09:00",
+                Device = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.BaseDeviceDto { Id = 810, CategoryDevice = "gate" },
+                Detail = JObject.Parse("""{ "component": "actuator", "state": "OPEN", "previous": "RUNNING", "device_status": "ACTIVATED" }"""),
+            }));
+        var console = Build(api.Object);
+        await Activate(console);
+        await console.SelectRailAsync(EventDashboardViewModel.OperationRailKey);
+        var rows = (await RowsOf(console, 2)).Cast<OperationEventViewModel>().ToDictionary(r => r.Model!.Id);
+
+        Assert.Equal("통문 접점 닫힘 → 열림", rows[811].DetailText);
+        Assert.Equal("문 구동부 구동 중 → 열림", rows[812].DetailText);
+
+        console.SetSelection(new object[] { rows[812] });
+        Assert.Equal("문 구동부 구동 중 → 열림", FieldText(console, "상세"));
+
+        console.SearchText = "구동부";   // 부품 이름으로도 찾힌다
+        Assert.Equal(new[] { 812 }, console.Rows!.Cast<OperationEventViewModel>().Select(r => r.Model!.Id));
+    }
+
     [Theory]
     [InlineData(EventListFilter.ChipDoor, new[] { 704 })]
     [InlineData(EventListFilter.ChipEnvironment, new[] { 705, 706 })]
@@ -378,8 +412,9 @@ public class EventConsoleFourKindsTests : IDisposable
     }
 
     [Theory]
-    [InlineData("""{ "state": "OPEN", "previous": "CLOSED", "component": "door", "device_status": "ACTIVATED" }""", "닫힘 → 열림")]
-    [InlineData("""{ "state": "OPEN", "previous": null, "component": "actuator", "device_status": "DEACTIVATED" }""", "열림 · 장비 점검 중")]
+    // 2026-10-22 — 어느 부품인지도 보인다(장비 캐시 없이는 key 그대로, 이름은 OperationComponentTextTests).
+    [InlineData("""{ "state": "OPEN", "previous": "CLOSED", "component": "door", "device_status": "ACTIVATED" }""", "door 닫힘 → 열림")]
+    [InlineData("""{ "state": "OPEN", "previous": null, "component": "actuator", "device_status": "DEACTIVATED" }""", "actuator 열림 · 장비 점검 중")]
     [InlineData("""{ "previous": "OPEN", "gate_status": "CLOSED", "device_status": "ACTIVATED" }""", "열림 → 닫힘")]
     [InlineData("""{ "field": "temperature", "value": 65, "threshold": 60, "direction": "HIGH", "metric_id": 12 }""", "온도 65℃ — 기준 60℃ 초과")]
     [InlineData("""{ "field": "voltage", "value": 10.5, "threshold": 11, "direction": "LOW", "metric_id": 3, "suppressed_schedule_id": 7 }""", "전압 10.5V — 기준 11V 미만 · 억제 시간 중 발생")]

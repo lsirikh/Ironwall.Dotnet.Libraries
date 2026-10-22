@@ -2,6 +2,17 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - 운영 이벤트에 "어느 부품이 어떻게" 표시 (2026-10-22)
+
+### Added
+- **운영 이벤트 카드 · 콘솔 목록 행 · 상세 칸 · 조치보고 창에 바뀐 부품** — (사용자 "통문 열림이 감지되면 어떤 부품이 동작한지도 같이 … 통문 접점 감지, 액추에이터 열림 뭐 이렇게") 서버가 문 위치 부품 전이에 싣는 `detail.component`(부품 key) · `previous` · `state` 를 「도어 센서 닫힘 → 열림」 · 「문 구동부 구동 중 → 열림」 처럼 보인다. 지금까지는 key 를 일부러 빼고 「닫힘 → 열림」 만 보였고, 카드는 상세를 아예 싣지 않았다.
+  - 부품 이름: 장비 캐시의 그 장비 부품 선언(`hardware_spec.components[]`)에서 key 로 찾아 **등록 이름 → 유형 한글(서버 카탈로그 → 내장 사전) → key** — 지도 · 장비 콘솔과 같은 정본 `ComponentDisplay.ComponentName`. 상태 글자도 같은 정본(RUNNING = "구동 중"; 옛 운영 글자 "움직이는 중" 을 맞췄다).
+  - 이벤트가 장비 캐시 갱신(SYNC_DEVICE)보다 먼저 와도 상태는 detail 값으로 바로 보이고 이름만 key 다.
+  - 카드는 상세 원문을 여전히 싣지 않고(OPC-016) 사유 아래 **부품 한 줄**만 더한다.
+- **같은 장비 30초 안의 부품 전이 흐름** — 서버는 부품마다 따로 이벤트를 낸다(구동부 RUNNING→OPEN · 도어 센서 CLOSED→OPEN 이 두 건, RUNNING 으로 바뀔 때는 이벤트 없음). 카드는 합치지 않고(종류 + 번호 중복 · 조치보고 · 500장 상한 그대로), 나중 카드의 부품 줄이 「⟲ 문 구동부 열림 → 도어 센서 열림」 흐름(최근 3칸)이 된다. 제 전이 전체는 말풍선에. `Helpers/OperationComponentFlow`.
+- 실측(로컬 시험 서버 DB 읽기 전용, 2026-10-22): 카탈로그 DOOR_SENSOR="도어 센서" · DOOR_ACTUATOR="문 구동부" · RUNNING="동작 중"(서버 라벨 — 화면은 정본 "구동 중"), 운영 이벤트 detail 키 `component` 실제 값 `door` · `actuator`. 서버 `record_component_transition` 은 OPEN · CLOSED 로 바뀔 때만 이벤트를 만든다.
+- 시험: Events.Ui `OperationComponentTextTests` 등 4클래스 31건(detail 조합 · 캐시 없음 · 카탈로그 이름 · 흐름 · NATS → 카드 실제 경로 · 카드 XAML) + `EventConsoleFourKindsTests` 목록 행 · 상세 칸 1건. 고치기 전 코드로 같은 단정 3건 실패 → 고친 뒤 통과.
+
 ## [Unreleased] - 카메라 팝업 ONVIF 전수 확인 · 연결 회복 결함 4건 (2026-10-22)
 
 ### Fixed
