@@ -890,6 +890,7 @@ public partial class MapViewModel
         _map3DRevealedBehindLogin = Map3DGuide.IsBehindLogin(ResolveTokenStorage()?.IsAuthenticated);   // 로그인 뒤 한 번 안내(R5)
         _map3DLastCamera = null;
         Map3DOverlay.Resume(MainMap);                                                    // ready 때 보낸 스냅샷에 이어 바뀐 것만(기록이 없으면 전체 스냅샷)
+        ResyncMap3DSelection(newPage: false);                                           // 이미 고른 심볼 → 3D 고름 표시 · 손잡이(MapViewModel.Overlay3D)
         Map3DHost.PostCamera(Current2DCamera(0d), animate: false);                    // 지금 2D 와 같은 자리 · 축척(로딩 중 움직였을 수 있다)
         Map3DHost.Reveal();
         Map3DHost.PostCamera(Current2DCamera(Map3DMath.DefaultPitchDeg), animate: true); // 0.6 s 동안 눕힌다
@@ -1025,6 +1026,7 @@ public partial class MapViewModel
             if (MainMap == null) return;
             // 새 페이지 — 곧바로 오버레이 전체 스냅샷(3D 가 적용하고 한 프레임 그린 뒤 rendered 를 보낸다)
             Map3DOverlay.Start(MainMap);
+            ResyncMap3DSelection(newPage: true);   // 새 페이지는 고름 표시 · 손잡이를 모른다 — 3D 표시 중이면 다시
             _map3DSnapshotAt = DateTime.UtcNow;
             if (_map3DState == Map3DState.Pending && (msg.Job == null || msg.Job == _map3DJob))
             {
@@ -1120,6 +1122,12 @@ public partial class MapViewModel
         {
             try { if (msg.ModelUid is { } uid) OnMap3DModelPicked(uid); }   // 「꾸미기」 판의 넣은 모델(MapViewModel.Model3D)
             catch (Exception ex) { _log?.Error($"[Map3D] 넣은 모델 고르기 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
+        if (msg.OverlayBox is { } box)
+        {
+            try { OnMap3DOverlayBox(box); }   // 3D {Shift}+끌기 심볼 상자(MapViewModel.Overlay3D)
+            catch (Exception ex) { _log?.Error($"[Map3D] 심볼 상자 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
         if (msg.Type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end")
@@ -1306,24 +1314,26 @@ public partial class MapViewModel
             if (image != null && pick.Action == "click") OnMapImageClicked(image);
             return;
         }
-        var marker = pick.Kind is { } kind && pick.Id is int id
-            ? MainMap.Markers.FirstOrDefault(m => Map3DOverlayBridge.KindOf(m) == kind && ((IEditableMarker)m).Id == id)
-            : null;
-        _log?.Info($"[Map3D] pick {pick.Action} kind={pick.Kind ?? "-"} id={pick.Id?.ToString() ?? "-"} → {(marker != null ? "마커" : "빈 곳")}");
+        var editable = pick.Kind is { } kind && pick.Id is int id ? FindMap3DMarker(kind, id) : null;
+        var marker = editable as GMap.NET.WindowsPresentation.GMapMarker;
+        _log?.Info($"[Map3D] pick {pick.Action} kind={pick.Kind ?? "-"} id={pick.Id?.ToString() ?? "-"}{(pick.Ctrl ? " ctrl" : "")} → {(marker != null ? "마커" : "빈 곳")}");
 
-        if (marker is not IEditableMarker editable)
+        if (editable == null || marker == null)
         {
             if (pick.Action != "click") return;
-            // 빈 곳 클릭 — "지도에서 보기" 강조 해제 · 조립 카드 닫기만
+            // 빈 곳 클릭 — "지도에서 보기" 강조 해제 · 조립 카드 닫기, 편집 모드면 2D 빈 곳 클릭처럼 고름도 푼다(OnMapClicked)
             if (_locateHighlight.ActiveRequestId != null) ClearLocateHighlight();
             _componentCard?.OnEmptyPressed(at ?? default);
             _componentCard?.OnReleased(at ?? default);
+            if (IsEditModeEnabled && !pick.Ctrl) ClearAllSelections();
             return;
         }
 
         switch (pick.Action)
         {
             case "click":
+                // {Ctrl}+클릭 = 2D 와 같이 묶음 고름에 넣기/빼기(GMapCustomControl → MarkerToggleRequested 와 같은 처리기)
+                if (pick.Ctrl && !pick.Shift && IsEditModeEnabled) { OnMapMarkerToggleRequested(editable); break; }
                 MainMap.TriggerMarkerClicked(marker);
                 // 지도 위 누름 · 뗌이 없으므로 같은 자리로 바로 끝낸다(OnMapMarkerClicked 와 같은 조건)
                 if (_componentCard != null && !IsEditModeEnabled && !editable.IsLocked)

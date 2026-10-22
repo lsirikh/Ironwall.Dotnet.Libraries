@@ -8840,6 +8840,7 @@ public partial class MapViewModel : BasePanelViewModel,
             NotifyOfPropertyChange(nameof(HasSelectedItem));
             NotifyOfPropertyChange(nameof(IsEditModeEnabled));
             SyncLayerSelectionFromMap(reveal: true);   // 단일 선택 → 레이어 패널 잎 선택(편집 모드, MapViewModel.LayerSelection)
+            QueueMap3DSelectionSync();                 // 3D 표시 중이면 고름 표시 · 손잡이도(MapViewModel.Overlay3D — 2D 어도너는 3D 밑에 가린다)
         }
     }
     /// <summary>

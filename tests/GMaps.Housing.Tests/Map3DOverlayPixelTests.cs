@@ -52,6 +52,17 @@ public class Map3DOverlayPixelTests
     });
 
     [Fact]
+    public void should_bake_root_opacity_by_default_but_not_when_opacity_goes_separately() => HousingTests.Sta(() =>
+    {
+        var shape = new Rectangle { Width = 20, Height = 20, Fill = Brushes.Red, Opacity = 0.5 };
+        HousingTests.Layout(shape, 20, 20);
+
+        Assert.Equal(128, Pixel(Decode(Map3DOverlayBridge.RenderIconPng(shape)!), 10, 10)[3]);   // 실측: VisualBrush 는 루트 투명도를 굽는다
+        Assert.Equal(255, Pixel(Decode(Map3DOverlayBridge.RenderIconPng(shape, withoutRootOpacity: true)!), 10, 10)[3]);   // 도형 = 3D 가 opacity 로
+        Assert.Equal(0.5, shape.Opacity);   // 그린 뒤 원래대로
+    });
+
+    [Fact]
     public void should_keep_only_marker_box_when_drawing_overflows() => HousingTests.Sta(() =>
     {
         var box = new System.Windows.Controls.Canvas { Width = 20, Height = 20, Background = Brushes.Blue };
@@ -141,7 +152,7 @@ public class Map3DOverlayPixelTests
         Assert.Equal("도형", g["label"]!.Value<string>("text"));
         Assert.Equal(13, g["label"]!.Value<double>("size"));
         Assert.Equal("#FFFFFF", g["label"]!.Value<string>("color"));
-        Assert.Equal(Newtonsoft.Json.Linq.JTokenType.Null, g["label"]!["bg"]!.Type);   // 투명 배경 → null
+        Assert.Equal("transparent", g["label"]!.Value<string>("bg"));   // 투명 배경 → "transparent"(2026-10-22 — null 은 3D 가 기본 칩으로 바꿔 그렸다)
         Assert.True(g["label"]!.Value<bool>("bold"));
         Assert.Null(g["fov"]);
 
