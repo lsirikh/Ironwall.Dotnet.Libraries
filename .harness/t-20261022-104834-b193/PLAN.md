@@ -41,8 +41,20 @@
     모델(틀린 파일 · 넣기 자리 · 이름 · 되돌리기/다시 하기 · 되살린 uid 따라가기 · 3D 고름 · 손잡이 저장 · 영역 밖 원위치 · 판 크기 단추 · 지우기 원본 받기 · 되살리기 · edit.end · 배타 · 옛 엔진).
 - 기존 시험 한 줄 변경: `Map3DTwinContractTests` 외벽 7개 고정 → 옛 7개 포함 + 22개(DECISIONS 1).
 
-## 전수 결과
-(아래에 채움)
+## 전수 결과(고친 뒤, 이 세션 — `dotnet test tests/<프로젝트>/<프로젝트>.csproj` 차례로, 모두 실패 0)
+| 프로젝트 | 통과 |
+|---|---|
+| GMaps.Ui.Tests | 1859 |
+| GMaps.MapEdit.Tests | 916 |
+| GMaps.MapNav.Tests | 70 |
+| GMaps.MapLayer.Tests | 102 |
+| GMaps.MapAux.Tests | 122 |
+| GMaps.PropertyPanel.Tests | 436 |
+| GMaps.Housing.Tests | 362 |
+| (솔루션 안에서 GMaps.Ui 를 참조하는 유일한 프로젝트) Ironwall.Dotnet.Libraries.CameraPopup.Tests | 334 |
+
+GMaps 프로젝트들은 `Ironwall.Dotnet.Libraries.sln` 밖이라 저장소 검사(`dotnet test` sln)는 이 변경을 CameraPopup.Tests 로만 본다.
+소리가 나는 Sounds · 다른 PC DB 에 쓰는 Db 시험이 들어 있어 sln 전체 시험은 돌리지 않았다(AGENTS.md 사용자 작업 방식).
 
 ## 남은 것 · 이어 갈 사람에게
 - 엔진 패키지 API(`GET /api/jobs/{id}/package` · `POST /api/jobs/import`)가 엔진에 들어오면 실제 엔진으로 내보내기 → 다른 데이터 폴더 엔진에 가져오기를 한 번 확인할 것.
