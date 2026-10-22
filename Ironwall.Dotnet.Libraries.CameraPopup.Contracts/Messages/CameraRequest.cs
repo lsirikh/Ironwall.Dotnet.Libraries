@@ -25,6 +25,9 @@ public sealed class CameraRequest : IIpcMessage
     /// <summary>SetIrCutFilter 값("ON" 주간 · "OFF" 야간 · "AUTO").</summary>
     public string? IrCutFilter { get; init; }
 
+    /// <summary>SetIrLamp 값(<see cref="Protocol.IrLampMode"/> — "On" · "Off" · "Auto").</summary>
+    public string? IrLamp { get; init; }
+
     /// <summary>SetAutoFocus 값.</summary>
     public bool AutoFocus { get; init; }
 

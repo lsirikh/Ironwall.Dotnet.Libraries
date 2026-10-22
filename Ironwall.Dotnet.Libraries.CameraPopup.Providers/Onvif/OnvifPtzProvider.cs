@@ -104,6 +104,13 @@ public sealed class OnvifPtzProvider : ICameraPtzProvider
         return true;
     }
 
+    public IReadOnlyList<string> GetIrLampModes(string cameraId) => _controller.GetIrLampModes(cameraId);
+
+    public string? GetLastIrLamp(string cameraId) => _controller.GetLastIrLamp(cameraId);
+
+    public Task<bool> SetIrLampAsync(string cameraId, string mode, CancellationToken ct)
+        => Bounded(_controller.SetIrLampAsync(cameraId, mode, ct), ct, false);
+
     public Task<CameraVideoResolution?> GetVideoResolutionAsync(string cameraId, CancellationToken ct)
         => Bounded(_controller.GetMainVideoResolutionAsync(cameraId, ct), ct, null);
 

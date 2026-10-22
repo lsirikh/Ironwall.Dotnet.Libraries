@@ -728,6 +728,43 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public ICommand SetIrCutFilterCommand => _setIrCutFilterCommand ??= new RelayCommand(p => { var m = p?.ToString(); if (!string.IsNullOrEmpty(m)) Raise(IrCutFilterRequested, m, nameof(IrCutFilterRequested)); });
     public ICommand SetAutoFocusCommand => _setAutoFocusCommand ??= new RelayCommand(p => { if (bool.TryParse(p?.ToString(), out var b)) Raise(AutoFocusRequested, b, nameof(AutoFocusRequested)); });
 
+    // ── 옵션 탭: IR 조명(적외선 LED) 직접 제어 — 카메라가 ONVIF 보조 명령(tt:IRLamp)을 알릴 때만 ──
+    private IReadOnlyList<string> _irLampModes = System.Array.Empty<string>();
+
+    /// <summary>IR 조명 칸을 보인다(카메라가 켜기 · 끄기 · 자동 중 하나라도 알렸다). 아니면 칸을 감춘다 — 설명은 "?" 말풍선.</summary>
+    public bool IsIrLampSupported => _irLampModes.Count > 0;
+    public bool IsIrLampOnAvailable => Has(IrLampMode.On);
+    public bool IsIrLampOffAvailable => Has(IrLampMode.Off);
+    public bool IsIrLampAutoAvailable => Has(IrLampMode.Auto);
+    private bool Has(string mode) => System.Linq.Enumerable.Contains(_irLampModes, mode, System.StringComparer.OrdinalIgnoreCase);
+
+    private string? _irLampMode;
+    /// <summary>마지막으로 보낸 IR 조명 값("On" · "Off" · "Auto") — 카메라가 지금 상태를 알려주지 않아 보낸 값으로 표시한다. 모르면 null.</summary>
+    public string? IrLampSent { get => _irLampMode; set { if (_irLampMode == value) return; _irLampMode = value; NotifyOfPropertyChange(nameof(IrLampSent)); NotifyOfPropertyChange(nameof(IrLampCaption)); } }
+
+    /// <summary>칸 제목 — 보낸 값이 있으면 그것이 "마지막으로 보낸 값"임을 밝힌다(카메라 상태가 아니다).</summary>
+    public string IrLampCaption => _irLampMode is null ? "IR 조명" : "IR 조명 (마지막으로 보낸 값)";
+
+    private string? _irLampStatusText;
+    /// <summary>IR 조명 실패 알림 한 줄(성공 · 대기 중이면 null).</summary>
+    public string? IrLampStatusText { get => _irLampStatusText; set { if (_irLampStatusText == value) return; _irLampStatusText = value; NotifyOfPropertyChange(nameof(IrLampStatusText)); } }
+
+    /// <summary>MapViewModel 이 호스트 응답(준비 · 영상 옵션)을 주입(UI 스레드). modes 가 null 이면 지원 안 함.</summary>
+    internal void SetIrLampState(IReadOnlyList<string>? modes, string? last)
+    {
+        _irLampModes = modes ?? (IReadOnlyList<string>)System.Array.Empty<string>();
+        NotifyOfPropertyChange(nameof(IsIrLampSupported));
+        NotifyOfPropertyChange(nameof(IsIrLampOnAvailable));
+        NotifyOfPropertyChange(nameof(IsIrLampOffAvailable));
+        NotifyOfPropertyChange(nameof(IsIrLampAutoAvailable));
+        if (last is not null) IrLampSent = last;
+    }
+
+    public event EventHandler<string>? IrLampRequested;
+
+    private ICommand? _setIrLampCommand;
+    public ICommand SetIrLampCommand => _setIrLampCommand ??= new RelayCommand(p => { var m = p?.ToString(); if (!string.IsNullOrEmpty(m) && Has(m)) Raise(IrLampRequested, m, nameof(IrLampRequested)); });
+
     public ICommand CloseCommand =>
         _closeCommand ??= new RelayCommand(() => Raise(CloseRequested, nameof(CloseRequested)));
 
