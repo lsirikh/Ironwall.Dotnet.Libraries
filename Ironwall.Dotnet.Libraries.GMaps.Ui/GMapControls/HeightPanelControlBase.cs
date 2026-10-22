@@ -1,9 +1,11 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 
@@ -27,6 +29,41 @@ public abstract class HeightPanelControlBase : Control
         AddHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnHandleDragDelta));
         AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnHandleDragCompleted));
     }
+
+    /// <summary>판 끝과 지도 아래 가장자리 사이 여백(px).</summary>
+    public const double FitBottomMargin = 8;
+    /// <summary>판이 줄어드는 가장 작은 높이(px) — 판을 지도 아래쪽으로 끌어 놓아도 머리 띠와 몇 줄은 보인다.</summary>
+    public const double FitMinHeight = 200;
+    private Canvas? _fitCanvas;
+
+    /// <summary>
+    /// 판 높이를 지도(Canvas) 안 판 자리 아래 남은 높이로 줄인다 — 넘치는 본문은 템플릿의 ScrollViewer 가 스크롤한다.
+    /// Canvas 는 자식을 끝없는 높이로 재므로 그대로 두면 판이 화면 밖까지 길어졌다(2026-10-22 사용자 실측 — 1920×1040 에서 「건물 고치기」 판의
+    /// [적용] · [취소] · [되돌리기] 가 화면 밖).
+    /// </summary>
+    protected override Size MeasureOverride(Size constraint)
+    {
+        if (FitHeight() is double h && h < constraint.Height) constraint = new Size(constraint.Width, h);
+        return base.MeasureOverride(constraint);
+    }
+
+    /// <summary>지도 Canvas 안에서 판이 쓸 수 있는 높이 — Canvas 안이 아니거나 지도 크기를 아직 모르면 null(줄이지 않는다).</summary>
+    internal double? FitHeight()
+    {
+        if (VisualTreeHelper.GetParent(this) is not ContentPresenter cp || VisualTreeHelper.GetParent(cp) is not Canvas canvas) return null;
+        if (!ReferenceEquals(canvas, _fitCanvas))
+        {
+            if (_fitCanvas != null) _fitCanvas.SizeChanged -= OnFitCanvasSizeChanged;
+            _fitCanvas = canvas;
+            canvas.SizeChanged += OnFitCanvasSizeChanged;   // 창 크기가 바뀌면 다시 잰다(Canvas 는 같은 끝없는 높이로 다시 재지 않는다)
+        }
+        if (canvas.ActualHeight <= 0) return null;
+        double top = Canvas.GetTop(cp);
+        if (double.IsNaN(top)) top = 0;
+        return Math.Max(FitMinHeight, canvas.ActualHeight - top - FitBottomMargin);
+    }
+
+    private void OnFitCanvasSizeChanged(object sender, SizeChangedEventArgs e) => InvalidateMeasure();
 
     /// <summary>높이 손잡이(Thumb)의 AutomationId.</summary>
     protected abstract string HandleAutomationId { get; }

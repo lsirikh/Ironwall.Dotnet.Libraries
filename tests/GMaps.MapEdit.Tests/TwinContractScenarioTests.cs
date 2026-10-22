@@ -97,12 +97,14 @@ public partial class TwinContractScenarioTests
                     UserBuildings.RemoveAll(i => i.Value<string>("uid") == seg[5]);
                     return Json(HttpStatusCode.OK, "{\"deleted\":1}");
                 case "buildings" when seg.Length == 7 && seg[6] == "height":   // 여러 개 함께 적용 시험(2026-10-22) — 저장 = 직접 입력, 지움 = 자동 12 m
-                    return Json(HttpStatusCode.OK, new JObject
-                    {
-                        ["building"] = m == HttpMethod.Delete
-                            ? new JObject { ["id"] = int.Parse(seg[5]), ["origin"] = "photo", ["height"] = 12.0, ["height_from"] = "shadow", ["manual"] = false }
-                            : new JObject { ["id"] = int.Parse(seg[5]), ["origin"] = "photo", ["height"] = body!["height"], ["height_from"] = "manual", ["manual"] = true, ["levels"] = body["floors"] },
-                    }.ToString());
+                {
+                    var row = m == HttpMethod.Delete
+                        ? new JObject { ["id"] = int.Parse(seg[5]), ["origin"] = "photo", ["height"] = 12.0, ["height_from"] = "shadow", ["manual"] = false }
+                        : new JObject { ["id"] = int.Parse(seg[5]), ["origin"] = "photo", ["height"] = body!["height"], ["height_from"] = "manual", ["manual"] = true, ["levels"] = body["floors"] };
+                    // 엔진 응답 = scene.json 건물 줄 그대로 — 저장된 외관은 look:{…} 안(heights._set_height · looks._set_row_look)
+                    if (Looks.TryGetValue(int.Parse(seg[5]), out var saved)) row["look"] = saved.DeepClone();
+                    return Json(HttpStatusCode.OK, new JObject { ["building"] = row }.ToString());
+                }
                 case "buildings" when seg.Length == 7 && seg[6] == "look":
                     if (OldEngine) return Json(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}");
                     if (RejectLook != null) return Json(HttpStatusCode.UnprocessableEntity, new JObject { ["detail"] = RejectLook }.ToString());

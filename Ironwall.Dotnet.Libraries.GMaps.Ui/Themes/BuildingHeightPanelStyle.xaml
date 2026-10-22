@@ -162,7 +162,7 @@
 						<Grid>
 							<Grid.RowDefinitions>
 								<RowDefinition Height="38" />
-								<RowDefinition Height="Auto" />
+								<RowDefinition Height="*" />
 							</Grid.RowDefinitions>
 
 							<!--  머리 띠(끌기)  -->
@@ -206,8 +206,14 @@
 								</Grid>
 							</Border>
 
-							<!--  바디 (DataContext = MapViewModel)  -->
-							<StackPanel Grid.Row="1" Margin="14,12,14,14">
+							<!--  바디 (DataContext = MapViewModel) — 판이 지도 아래로 넘치면 스크롤(높이는 HeightPanelControlBase 가 판 자리 아래 남은 높이로 줄인다, 2026-10-22)  -->
+							<ScrollViewer
+								Grid.Row="1"
+								Padding="0,0,2,0"
+								AutomationProperties.AutomationId="Map.BuildingHeight.Scroll"
+								HorizontalScrollBarVisibility="Disabled"
+								VerticalScrollBarVisibility="Auto">
+							<StackPanel Margin="14,12,14,14">
 								<TextBlock
 									AutomationProperties.AutomationId="Map.BuildingHeight.Current"
 									FontSize="13"
@@ -597,6 +603,7 @@
 									</ItemsControl.ItemTemplate>
 								</ItemsControl>
 							</StackPanel>
+							</ScrollViewer>
 						</Grid>
 					</fb:FrameBorder>
 				</ControlTemplate>

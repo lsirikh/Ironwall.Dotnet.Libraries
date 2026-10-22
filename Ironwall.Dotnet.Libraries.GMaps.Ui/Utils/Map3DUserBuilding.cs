@@ -341,6 +341,28 @@ public static class Map3DUserBuilding
         return inside;
     }
 
+    /// <summary>붙여넣기 — 복사한 건물(묶음)과 붙인 건물 사이 틈(m).</summary>
+    public const double PasteGapM = 3.0;
+
+    /// <summary>
+    /// 붙여넣을 윤곽(2026-10-22 "건물 카피 페이스트") — 복사한 건물 묶음을 (묶음 폭 + 틈)만큼 step 번 옆으로 옮긴 자리(겹치지 않게, 같은 복사본을 다시 붙이면 한 칸 더).
+    /// 동 → 서 → 북 → 남 차례로 모든 꼭짓점이 3D 영역 안(inside)인 첫 쪽. 어느 쪽도 안 되면 null.
+    /// </summary>
+    public static IReadOnlyList<IReadOnlyList<UbPoint>>? PasteOutlines(IReadOnlyList<IReadOnlyList<UbPoint>> outlines, int step, Func<UbPoint, bool>? inside = null,
+                                                                       double gapM = PasteGapM)
+    {
+        var all = outlines.SelectMany(o => o).ToList();
+        if (all.Count == 0 || step < 1) return null;
+        double kx = 111320.0 * Math.Cos(all.Average(p => p.Y) * Math.PI / 180.0), ky = 110540.0;
+        double w = all.Max(p => p.X) - all.Min(p => p.X) + gapM / kx, h = all.Max(p => p.Y) - all.Min(p => p.Y) + gapM / ky;
+        foreach (var (dx, dy) in new[] { (w, 0.0), (-w, 0.0), (0.0, h), (0.0, -h) })
+        {
+            var moved = outlines.Select(o => (IReadOnlyList<UbPoint>)o.Select(p => Round(new UbPoint(p.X + dx * step, p.Y + dy * step))).ToList()).ToList();
+            if (inside == null || moved.All(o => o.All(inside))) return moved;
+        }
+        return null;
+    }
+
     // ── 서버 · 3D 메시지 ──
 
     /// <summary>새 건물 식별자 — 소문자 16진수 12자(map-3d UID_RE).</summary>
@@ -406,9 +428,16 @@ public static class Map3DUserBuilding
         return o.ToString(Formatting.None);
     }
 
-    /// <summary>3D 상자 고름 표시(null = 지움) — {"type":"userbuilding.select","uid"}.</summary>
-    public static string SelectMessageJson(string? uid)
-        => new JObject { ["type"] = "userbuilding.select", ["uid"] = uid is null ? JValue.CreateNull() : uid }.ToString(Formatting.None);
+    /// <summary>
+    /// 3D 상자 고름 표시(null = 지움) — {"type":"userbuilding.select","uid"}. uids = 여러 개 고름(2026-10-22, 「건물 높이」 판 building.select ids 와 같은 꼴 —
+    /// 고른 건물 모두 강조). uids 를 모르는 옛 엔진은 uid(마지막에 넣은 건물)만 강조한다.
+    /// </summary>
+    public static string SelectMessageJson(string? uid, IReadOnlyCollection<string>? uids = null)
+    {
+        var o = new JObject { ["type"] = "userbuilding.select", ["uid"] = uid is null ? JValue.CreateNull() : uid };
+        if (uids is { Count: > 0 }) o["uids"] = new JArray(uids.Cast<object>().ToArray());
+        return o.ToString(Formatting.None);
+    }
 
     /// <summary>map-3d UID_RE — 소문자 16진수 12자.</summary>
     public static bool IsUid(string? uid) => uid is { Length: 12 } && uid.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
@@ -508,6 +537,16 @@ public static class Map3DUserBuilding
     /// <summary>저장 뒤 상태 글.</summary>
     public static string SavedText(double height, int floors)
         => $"건물을 저장했습니다 — {Map3DBuilding.FormatMeters(height)} m({floors}층). 3D 를 다시 만들면 사진으로 꾸며집니다";
+
+    // ── 복사 · 붙여넣기 글(2026-10-22) ──
+
+    public static string CopiedText(int count) => $"건물 {count}개를 복사했습니다 — Ctrl+V 로 옆에 붙여넣습니다";
+    public static string PastedText(int count) => $"건물 {count}개를 옆에 붙여넣었습니다";
+    public const string NoPasteRoomText = "옆에 놓을 자리가 이 3D 영역 안에 없습니다 — 영역 안쪽 건물을 복사하거나 붙인 뒤 옮겨 주세요.";
+    public const string StyleCopiedText = "속성(높이 · 지붕 · 외관 · 기울기)을 복사했습니다 — Ctrl+Shift+V 로 다른 건물에 붙입니다";
+    public static string StylePastedText(int count) => $"건물 {count}개에 속성을 붙였습니다";
+    public const string StyleToPanelText = "속성을 판에 넣었습니다 — [적용] 해야 저장됩니다";
+    public const string StyleSameText = "이미 같은 속성입니다";
 }
 
 

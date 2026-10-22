@@ -1097,7 +1097,10 @@ public partial class MapViewModel
         if (msg.Type == "building.none")
         {
             // 3D 빈 땅(건물 · 마커 아님) 클릭 — 3D 는 윤곽을 지웠다. 판도 닫는다(미리보기 중이면 원래 높이로 = 취소, 2026-10-19 사용자 결정) = 고름 풀기(2D 빈 곳 클릭과 같다)
-            if (_map3DState != Map3DState.Shown || !IsBuildingHeightPanelOpen) return;
+            if (_map3DState != Map3DState.Shown) return;
+            // 3D 위 「건물 만들기」 판에서 여러 개 고른 중 = 고름만 풀기(2D 의 고른 상태 빈 곳 클릭과 같다, 2026-10-22)
+            if (_ubIn3D && IsUserBuildingDrawing && ClearUserBuildingSelection()) { _log?.Info("[Map3D] 빈 땅 클릭 → 직접 그린 건물 고름 풀기"); return; }
+            if (!IsBuildingHeightPanelOpen) return;
             _log?.Info("[Map3D] 빈 땅 클릭 → 「건물 높이」 판 닫기");
             try { CloseBuildingHeightPanel(clearUndo: false); }
             catch (Exception ex) { _log?.Error($"[Map3D] 빈 땅 클릭 처리 실패(격리): {ex.Message}"); }
@@ -1105,7 +1108,7 @@ public partial class MapViewModel
         }
         if (msg.Type == "userbuilding.pick")
         {
-            try { if (msg.UserUid is { } uid) OnMap3DUserBuildingPicked(uid); }   // 직접 그린 건물 고치기 판(MapViewModel.UserBuilding)
+            try { if (msg.UserUid is { } uid) OnMap3DUserBuildingPicked(uid, msg.Ctrl || msg.Shift); }   // 직접 그린 건물 고치기 판(MapViewModel.UserBuilding)
             catch (Exception ex) { _log?.Error($"[Map3D] 직접 그린 건물 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
