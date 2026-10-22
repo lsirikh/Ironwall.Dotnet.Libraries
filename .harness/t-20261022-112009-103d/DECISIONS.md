@@ -24,6 +24,18 @@
 - why: AGENTS.md — OnvifSolution 은 서브모듈이라 이 저장소에서 고치지 않는다. 두 가지 모두 지금 동작에는 결함을 만들지 않는다(팝업은 실패를 한 가지로 보여 준다 · 호출부가 늘 같은 비밀번호를 넘긴다).
 - effect: 서브모듈 저장소에서 따로 고칠 수 있다.
 
+## 6. IR 조명 지원 판정 — 어떤 글자를 받을까
+- options: ONVIF 표준 `tt:IRLamp|On/Off/Auto` 만 · 대소문자 · `tt:` 없는 변형까지 · `IRLight` · `IR|On` 같은 업체 이름까지 · 고정 카메라는 DeviceIO RelayOutputs 로
+- chosen: 표준 + 대소문자 · 접두 없는 변형(`irlamp|on`). 다른 이름 · RelayOutputs 는 받지 않는다. 노드 보조 명령 목록과 판정 결과를 호스트 로그에 남긴다.
+- why: 추가 지시 "근거 있는 것만 · 추측 구현 금지". `tt:` 는 ONVIF 스키마 접두라 빠진 표기가 같은 뜻이고, 그 밖의 이름은 근거가 없다. pattern: follow-recommended
+- effect: 다른 이름을 쓰는 카메라는 IR 조명 칸이 안 보인다(로그에 그 카메라의 목록이 남아 근거가 생기면 `PtzController.IrLampAux` 정규식에 더한다). 보낼 때는 카메라가 알린 글자 그대로 보낸다.
+
+## 7. IR 조명 상태 표시 · 칸 위치
+- options: 상태를 모르니 강조 없이 · 마지막으로 보낸 값을 강조(호스트가 카메라별로 기억) / 칸을 영상 옵션 안에 · 따로
+- chosen: 마지막으로 보낸 값 강조(제목에 "(마지막으로 보낸 값)"), 호스트가 기억해 다른 팝업을 다시 열어도 보인다. 칸은 영상 옵션(이미징)과 따로 — 이미징이 없는 카메라도 IR 조명만 될 수 있다. 미지원 설명은 옵션 탭 머리의 "?"(`Map.CameraPopup.Options`).
+- why: 추가 지시 그대로("지금 상태를 알 수 없으면 마지막으로 보낸 값", "지원하지 않으면 칸을 감추고 '?' 말풍선"). 호스트 기억은 호스트 수명 동안만(재시작하면 모름). pattern: follow-recommended
+- effect: 지도 카메라 팝업(GMaps.Ui `CameraStreamPopupStyle.xaml` · `CameraStreamPopupViewModel` · `MapViewModel`)을 고쳤다 — 3D 작업(t-20261022-104834-b193)과 다른 파일이지만 `MapsHelp.cs` 는 겹칠 수 있어 항목을 목록 가운데(추적 설정 앞)에 넣었다. 이벤트 창 타일(호스트)에는 IR 조명 단추를 넣지 않았다(지시 범위 = 팝업 옵션 탭).
+
 ## 5. 가짜 카메라 팜에 이미징을 어떻게 넣을까
 - options: 옵션으로 켤 때만 · 모든 가짜 카메라(고정 포함)가 이미징 서비스를 광고
 - chosen: 모두 광고(GetCapabilities · GetServices 에 Imaging XAddr), 초점 속도 범위는 ±0.5(클라이언트가 GetMoveOptions 를 지키는지 드러나게)

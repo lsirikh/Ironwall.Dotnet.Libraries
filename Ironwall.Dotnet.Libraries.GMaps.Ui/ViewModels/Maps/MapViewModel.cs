@@ -2351,6 +2351,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 vm.PtzUnavailableReason = CameraStreamPopupViewModel.PtzReason(r.Success, r.PtzCapable, permitted);   // 막혔으면 왜 막혔는지(배지)
                 vm.IsPtzCapable = r.Success && r.PtzCapable && permitted;
                 vm.IsImagingCapable = r.Success && r.ImagingCapable;
+                vm.SetIrLampState(r.Success ? r.IrLampModes : null, r.IrLamp);   // IR 조명 직접 제어(카메라가 보조 명령을 알릴 때만)
                 vm.ApplyCameraDefaultSpeeds(r.DefaultPanTiltSpeed, r.DefaultZoomSpeed);   // 사용자가 속도를 안 바꿨으면 카메라 기본 속도로
                 vm.IsPtzLoading = false;
             }).ConfigureAwait(false);
@@ -2367,7 +2368,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
     /// <summary>호스트 요청 한 건(카메라 id · 제공자 정보 포함).</summary>
     private static CameraRequest NewCameraRequest(CameraStreamPopupViewModel vm, CameraRequestKind kind,
-        string? presetToken = null, string? presetName = null, string? irCutFilter = null, bool autoFocus = false) => new()
+        string? presetToken = null, string? presetName = null, string? irCutFilter = null, bool autoFocus = false, string? irLamp = null) => new()
     {
         Kind = kind,
         CameraId = vm.CameraId.ToString(),
@@ -2376,6 +2377,7 @@ public partial class MapViewModel : BasePanelViewModel,
         PresetName = presetName,
         IrCutFilter = irCutFilter,
         AutoFocus = autoFocus,
+        IrLamp = irLamp,
     };
 
     /// <summary>순간 PTZ(보내고 잊기) — 호스트가 없으면 false.</summary>
@@ -2742,6 +2744,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 vm.IsImagingCapable = r.Success && r.ImagingCapable;
                 if (r.Success) vm.SetImagingState(r.IrCutFilter ?? "AUTO", r.AutoFocus);
+                if (r.Success) vm.SetIrLampState(r.IrLampModes, r.IrLamp);   // 실패면 준비 때 받은 IR 조명 정보를 그대로 둔다
             }).ConfigureAwait(false);
         }
         catch (Exception ex) { _log?.Warning($"[CameraPopup] 영상 옵션 로드 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
@@ -2760,6 +2763,32 @@ public partial class MapViewModel : BasePanelViewModel,
                 await LoadImagingAsync(vm).ConfigureAwait(false);
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] 주야간 설정 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    private void OnCameraPopupIrLamp(object? sender, string mode)
+    {
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandleIrLampAsync(vm, mode);   // 주야간과 같은 권한(cam:control)
+    }
+
+    /// <summary>IR 조명 켜기 · 끄기 · 자동(호스트 → ONVIF 보조 명령). 실패는 팝업의 알림 한 줄 — 던지지 않는다.</summary>
+    private async Task HandleIrLampAsync(CameraStreamPopupViewModel vm, string mode)
+    {
+        try
+        {
+            var control = ResolveCameraControl();
+            if (control == null) return;
+            await OnUiAsync(() => vm.IrLampStatusText = null).ConfigureAwait(false);
+            var r = await control.RequestAsync(NewCameraRequest(vm, CameraRequestKind.SetIrLamp, irLamp: mode)).ConfigureAwait(false);
+            if (!r.Success) _log?.Warning($"[CameraPopup] IR 조명 실패 {r}");
+            await OnUiAsync(() =>
+            {
+                if (r.Success) vm.IrLampSent = r.IrLamp ?? mode;
+                else vm.IrLampStatusText = r.ErrorCode == CameraErrorCodes.NotSupported
+                    ? "이 카메라는 이 IR 조명 명령을 받지 않습니다"
+                    : "IR 조명을 바꾸지 못했습니다 — 카메라 연결을 확인하세요";
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] IR 조명 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     private void OnCameraPopupAutoFocus(object? sender, bool auto)
@@ -2919,6 +2948,7 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.PresetHomeGotoRequested += OnCameraPopupPresetHomeGoto; // [Home 이동] = ONVIF GotoHomePosition
             vm.OptionsReloadRequested += OnCameraPopupOptionsReload;  // 옵션 탭 주야간/포커스
             vm.IrCutFilterRequested += OnCameraPopupIrCutFilter;
+            vm.IrLampRequested += OnCameraPopupIrLamp;                // IR 조명(보조 명령)
             vm.AutoFocusRequested += OnCameraPopupAutoFocus;
             CameraPopups.Add(vm);
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
@@ -2987,6 +3017,7 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.PresetHomeGotoRequested -= OnCameraPopupPresetHomeGoto;
             vm.OptionsReloadRequested -= OnCameraPopupOptionsReload;
             vm.IrCutFilterRequested -= OnCameraPopupIrCutFilter;
+            vm.IrLampRequested -= OnCameraPopupIrLamp;
             vm.AutoFocusRequested -= OnCameraPopupAutoFocus;
             if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
             // 인스턴스 유지: 팝업 닫기 시 호스트의 ONVIF 인스턴스는 워밍 유지(재오픈 즉시). 이동만 정지(보내고 잊기).

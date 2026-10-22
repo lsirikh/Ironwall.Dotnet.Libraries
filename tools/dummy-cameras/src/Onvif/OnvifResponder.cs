@@ -17,7 +17,7 @@ public sealed class OnvifResponder : IAsyncDisposable
     private static readonly HashSet<string> PtzOps = new(StringComparer.Ordinal)
     {
         "ContinuousMove", "Stop", "GotoPreset", "GotoHomePosition", "SetHomePosition", "SetPreset", "RemovePreset",
-        "AbsoluteMove", "RelativeMove", "GetStatus", "GetPresets",
+        "AbsoluteMove", "RelativeMove", "GetStatus", "GetPresets", "SendAuxiliaryCommand",
     };
 
     private readonly CameraSpec _cam;
@@ -223,6 +223,11 @@ public sealed class OnvifResponder : IAsyncDisposable
     private bool _autoFocus = true;
     private double? _focusSpeed;
 
+    private string? _lastAuxiliary;
+
+    /// <summary>Last accepted SendAuxiliaryCommand string (e.g. "tt:IRLamp|On"); null = none yet.</summary>
+    public string? LastAuxiliaryCommand { get { lock (_imagingGate) return _lastAuxiliary; } }
+
     /// <summary>Current imaging state: IrCutFilter ("ON" · "OFF" · "AUTO") · auto focus · continuous focus speed (null = stopped).</summary>
     public (string IrCutFilter, bool AutoFocus, double? FocusSpeed) ImagingState
     {
@@ -330,10 +335,10 @@ public sealed class OnvifResponder : IAsyncDisposable
         {
             case "GetConfigurations": reply = Ok(OnvifXml.Configurations()); break;
             case "GetConfiguration": reply = Ok(OnvifXml.Configuration()); break;
-            case "GetNodes": reply = Ok("<tptz:GetNodesResponse>" + OnvifXml.Node("tptz:PTZNode", 32) + "</tptz:GetNodesResponse>"); break;
+            case "GetNodes": reply = Ok("<tptz:GetNodesResponse>" + OnvifXml.Node("tptz:PTZNode", 32, _cam.AuxiliaryCommands) + "</tptz:GetNodesResponse>"); break;
             case "GetNode":
                 reply = Child(body, "NodeToken") == OnvifXml.PtzNodeToken
-                    ? Ok("<tptz:GetNodeResponse>" + OnvifXml.Node("tptz:PTZNode", 32) + "</tptz:GetNodeResponse>")
+                    ? Ok("<tptz:GetNodeResponse>" + OnvifXml.Node("tptz:PTZNode", 32, _cam.AuxiliaryCommands) + "</tptz:GetNodeResponse>")
                     : SoapFault(400, "Sender", "ter:InvalidArgVal", "ter:NoEntity", "No such PTZ node");
                 if (reply.Status != 200) result = "fault:NoEntity";
                 break;
@@ -383,6 +388,22 @@ public sealed class OnvifResponder : IAsyncDisposable
                 var cur = ptz.Status(now).Position;
                 ptz.AbsoluteMove(new PtzVector(v.Pan ?? cur.Pan, v.Tilt ?? cur.Tilt, v.Zoom ?? cur.Zoom), now);
                 reply = Ok("<tptz:AbsoluteMoveResponse/>");
+                break;
+            }
+            case "SendAuxiliaryCommand":
+            {
+                var aux = Child(body, "AuxiliaryData") ?? string.Empty;
+                if (_cam.AuxiliaryCommands.Contains(aux, StringComparer.Ordinal))
+                {
+                    lock (_imagingGate) _lastAuxiliary = aux;
+                    reply = Ok($"<tptz:SendAuxiliaryCommandResponse><tptz:AuxiliaryResponse>{OnvifXml.Esc(aux)}</tptz:AuxiliaryResponse></tptz:SendAuxiliaryCommandResponse>");
+                    result = $"ok aux={aux}";
+                }
+                else
+                {
+                    reply = SoapFault(400, "Sender", "ter:InvalidArgVal", "ter:NoAuxiliaryCommand", "Auxiliary command not announced by this node");
+                    result = "fault:NoAuxiliaryCommand";
+                }
                 break;
             }
             case "RelativeMove":
@@ -461,6 +482,7 @@ public sealed class OnvifResponder : IAsyncDisposable
             ["preset"] = Child(body, "PresetToken"),
             ["stopPanTilt"] = op == "Stop" ? Child(body, "PanTilt") : null,
             ["stopZoom"] = op == "Stop" ? Child(body, "Zoom") : null,
+            ["aux"] = op == "SendAuxiliaryCommand" ? Child(body, "AuxiliaryData") : null,
             ["result"] = result,
             ["position"] = snap is null ? null : new[] { Math.Round(snap.Position.Pan, 4), Math.Round(snap.Position.Tilt, 4), Math.Round(snap.Position.Zoom, 4) },
             ["motion"] = snap?.Motion,

@@ -76,6 +76,18 @@ public interface ICameraPtzProvider
     Task<CameraVideoResolution?> GetVideoResolutionAsync(string cameraId, CancellationToken ct)
         => Task.FromResult<CameraVideoResolution?>(null);
 
+    /// <summary>
+    /// 카메라가 직접 제어를 알린 IR 조명 값(<c>IrLampMode</c> "On" · "Off" · "Auto" 중) — 준비 뒤에만 의미. 빈 목록 = 지원 안 함.
+    /// 기본 구현은 빈 목록(지원 안 하는 제공자 · 시험용 가짜).
+    /// </summary>
+    IReadOnlyList<string> GetIrLampModes(string cameraId) => Array.Empty<string>();
+
+    /// <summary>마지막으로 보낸 IR 조명 값(카메라는 지금 상태를 알려주지 않는다). 보낸 적 없으면 null.</summary>
+    string? GetLastIrLamp(string cameraId) => null;
+
+    /// <summary>IR 조명 켜기 · 끄기 · 자동(<see cref="GetIrLampModes"/> 에 있는 값만). 기본 구현은 false.</summary>
+    Task<bool> SetIrLampAsync(string cameraId, string mode, CancellationToken ct) => Task.FromResult(false);
+
     /// <summary>캐시 버리기(멱등).</summary>
     void Release(string cameraId);
 }

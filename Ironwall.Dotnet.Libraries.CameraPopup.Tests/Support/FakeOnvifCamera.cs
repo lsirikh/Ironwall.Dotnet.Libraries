@@ -38,6 +38,12 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
     /// <summary>PTZ 구성(PTZConfiguration)을 싣는 프로파일 토큰. null 이면 어느 프로파일에도 없다(이전 모양).</summary>
     public string? PtzProfileToken { get; set; }
 
+    /// <summary>GetNode 가 알리는 보조 명령(AuxiliaryCommands, 예: tt:IRLamp|On). 비면 싣지 않는다.</summary>
+    public string[] AuxiliaryCommands { get; set; } = Array.Empty<string>();
+
+    /// <summary>SendAuxiliaryCommand 에 SOAP 오류(기대한 모양이 아닌 응답)로 답한다.</summary>
+    public bool FailAuxiliary { get; set; }
+
     /// <summary>GetProfiles 가 광고하는 프로파일(토큰 · 해상도). 기본 = 1920×1080 P0, 640×360 P1.</summary>
     public IReadOnlyList<(string Token, int Width, int Height)> Profiles { get; set; } = new[] { ("P0", 1920, 1080), ("P1", 640, 360) };
 
@@ -126,6 +132,7 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
                    (HasContinuous ? Space("ContinuousPanTiltVelocitySpace", "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace", true) : string.Empty) +
                    (HasContinuous ? Space("ContinuousZoomVelocitySpace", "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace", false) : string.Empty) +
                    "</tt:SupportedPTZSpaces><tt:MaximumNumberOfPresets>8</tt:MaximumNumberOfPresets><tt:HomeSupported>true</tt:HomeSupported>" +
+                   string.Concat(AuxiliaryCommands.Select(a => $"<tt:AuxiliaryCommands>{System.Security.SecurityElement.Escape(a)}</tt:AuxiliaryCommands>")) +
                    "</tptz:PTZNode></tptz:GetNodeResponse>";
         if (body.Contains("GetPresets"))
             return "<tptz:GetPresetsResponse><tptz:Preset token=\"1\"><tt:Name>정문</tt:Name></tptz:Preset>" +
@@ -144,8 +151,15 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
         }
         if (body.Contains("ContinuousMove")) return "<tptz:ContinuousMoveResponse/>";
         if (body.Contains("<Stop") || body.Contains(":Stop")) return "<tptz:StopResponse/>";
+        if (body.Contains("SendAuxiliaryCommand"))
+            return FailAuxiliary ? AuxFault : "<tptz:SendAuxiliaryCommandResponse><tptz:AuxiliaryResponse>ok</tptz:AuxiliaryResponse></tptz:SendAuxiliaryCommandResponse>";
         return null;
     }
+
+    // SOAP 1.2 오류(HTTP 500) — 카메라가 보조 명령을 거부했다.
+    private const string AuxFault =
+        "<s:Fault><s:Code><s:Value>s:Receiver</s:Value></s:Code>" +
+        "<s:Reason><s:Text xml:lang=\"en\">Auxiliary command refused</s:Text></s:Reason></s:Fault>";
 
     private static string Profile(string token, int w, int h, bool ptz) =>
         $"<trt:Profiles token=\"{token}\" fixed=\"true\"><tt:Name>{token}</tt:Name>" +
@@ -205,8 +219,10 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
                 var body = len > 0 ? await ReadExactAsync(stream, len).ConfigureAwait(false) : string.Empty;
                 Requests.Enqueue(new Request(first.Length > 1 ? first[1] : "/", headers, body));
                 if (Delay > TimeSpan.Zero) await Task.Delay(Delay, _cts.Token).ConfigureAwait(false);
-                var soap = Encoding.UTF8.GetBytes(Envelope(Respond(body) ?? TimeBody));
-                var headBytes = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/soap+xml; charset=utf-8\r\n" +
+                var inner = Respond(body) ?? TimeBody;
+                var soap = Encoding.UTF8.GetBytes(Envelope(inner));
+                var status = inner.StartsWith("<s:Fault>", StringComparison.Ordinal) ? "500 Internal Server Error" : "200 OK";
+                var headBytes = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: application/soap+xml; charset=utf-8\r\n" +
                                                         $"Content-Length: {soap.Length}\r\n\r\n");
                 await stream.WriteAsync(headBytes, _cts.Token).ConfigureAwait(false);
                 await stream.WriteAsync(soap, _cts.Token).ConfigureAwait(false);

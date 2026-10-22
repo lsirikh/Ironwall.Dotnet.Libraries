@@ -384,6 +384,7 @@ internal sealed class HostCameraServices
                     RequestId = prepared.RequestId, Kind = prepared.Kind, CameraId = prepared.CameraId, Success = prepared.Success,
                     ErrorCode = prepared.ErrorCode, PtzCapable = prepared.PtzCapable, ImagingCapable = prepared.ImagingCapable,
                     DefaultPanTiltSpeed = ptSpeed, DefaultZoomSpeed = zSpeed,
+                    IrLampModes = IrLampModes(p, cam), IrLamp = p.GetLastIrLamp(cam),
                 };
             }
             if (!readiness.Connected) return CameraResponse.Fail(r, CameraErrorCodes.Failed, "not connected");
@@ -422,10 +423,22 @@ internal sealed class HostCameraServices
                     {
                         RequestId = r.RequestId, Kind = r.Kind, CameraId = cam, Success = true, ImagingCapable = true,
                         IrCutFilter = state.IrCutFilter, AutoFocus = state.AutoFocus,
+                        IrLampModes = IrLampModes(p, cam), IrLamp = p.GetLastIrLamp(cam),
                     };
             case CameraRequestKind.SetIrCutFilter:
                 if (string.IsNullOrWhiteSpace(r.IrCutFilter)) return CameraResponse.Fail(r, CameraErrorCodes.BadRequest, "no mode");
                 return Result(r, await p.SetIrCutFilterAsync(cam, r.IrCutFilter!, ct).ConfigureAwait(false));
+            case CameraRequestKind.SetIrLamp:
+                // 카메라가 알린 값만 보낸다 — 모르는 값 · 지원 안 하는 카메라는 카메라에 보내지 않고 지원 안 함으로 답한다.
+                if (string.IsNullOrWhiteSpace(r.IrLamp)) return CameraResponse.Fail(r, CameraErrorCodes.BadRequest, "no ir lamp mode");
+                if (!p.GetIrLampModes(cam).Contains(r.IrLamp!, StringComparer.OrdinalIgnoreCase))
+                    return CameraResponse.Fail(r, CameraErrorCodes.NotSupported, "ir lamp");
+                var lampOk = await p.SetIrLampAsync(cam, r.IrLamp!, ct).ConfigureAwait(false);
+                return new CameraResponse
+                {
+                    RequestId = r.RequestId, Kind = r.Kind, CameraId = cam, Success = lampOk, ErrorCode = lampOk ? null : CameraErrorCodes.Failed,
+                    IrLampModes = IrLampModes(p, cam), IrLamp = p.GetLastIrLamp(cam),
+                };
             case CameraRequestKind.SetAutoFocus:
                 return Result(r, await p.SetAutoFocusAsync(cam, r.AutoFocus, ct).ConfigureAwait(false));
             case CameraRequestKind.GetVideoResolution:
@@ -447,6 +460,10 @@ internal sealed class HostCameraServices
                 return CameraResponse.Fail(r, CameraErrorCodes.BadRequest, $"unknown kind {r.Kind}");
         }
     }
+
+    /// <summary>IR 조명 직접 제어 값(없으면 null — 응답 JSON 을 늘리지 않는다).</summary>
+    private static List<string>? IrLampModes(ICameraPtzProvider p, string cam)
+        => p.GetIrLampModes(cam) is { Count: > 0 } modes ? modes.ToList() : null;
 
     private static CameraResponse Result(CameraRequest r, bool ok, string? errorCode = CameraErrorCodes.Failed, bool ptzCapable = false, bool imagingCapable = false) => new()
     {

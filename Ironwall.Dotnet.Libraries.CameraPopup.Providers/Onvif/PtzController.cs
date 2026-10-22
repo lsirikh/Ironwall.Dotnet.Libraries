@@ -95,6 +95,11 @@ public sealed class PtzController : IPtzController
         /// <summary>카메라 기본 속도(프로파일 PTZConfiguration.DefaultPTZSpeed ÷ 속도 공간 → 0.1..1). null = 카메라가 안 알려줬다.</summary>
         public double? DefaultPanTiltSpeed;
         public double? DefaultZoomSpeed;
+
+        /// <summary>IR 조명 값("On" · "Off" · "Auto") → 카메라가 알린 보조 명령 글자 그대로(GetNode AuxiliaryCommands). null = 아직 못 읽음.</summary>
+        public volatile System.Collections.Generic.IReadOnlyDictionary<string, string>? IrLampCommands;
+        /// <summary>마지막으로 보낸 IR 조명 값(카메라가 상태를 알려주지 않는다).</summary>
+        public volatile string? LastIrLamp;
     }
 
     /// <summary>GetNode로 읽은 카메라 좌표 space(변환/클램프 진실원). URI는 직렬화에 동봉.</summary>
@@ -204,7 +209,7 @@ public sealed class PtzController : IPtzController
         ctx.VsToken = model.Profiles?.FirstOrDefault()?.VideoSourceConfiguration?.SourceToken;
         ctx.ImagingPossible = model.IsImagingPossible && model.ImagingClient != null && !string.IsNullOrEmpty(ctx.VsToken);
         if (model.PtzClient == null)
-            _log?.Info($"[PTZ] cam={cameraId} 비PTZ(고정) — PtzClient 없음. 인스턴스 워밍 유지(Imaging={ctx.ImagingPossible}). 재오픈 시 즉시.");
+            _log?.Info($"[PTZ] cam={cameraId} 비PTZ(고정) — PtzClient 없음. 인스턴스 워밍 유지(Imaging={ctx.ImagingPossible}). 재오픈 시 즉시. IR 조명 직접 제어 없음(보조 명령은 PTZ 서비스에만 있다).");
         ctx.Conn = conn;
         ctx.HadPtz = model.PtzClient != null;
         return true;
@@ -1281,6 +1286,10 @@ public sealed class PtzController : IPtzController
                 if (string.IsNullOrEmpty(nodeToken)) return null;
                 node = await ptz.GetNodeAsync(nodeToken).ConfigureAwait(false);
             }
+            var irLamp = ParseIrLampCommands(node?.AuxiliaryCommands);
+            ctx.IrLampCommands = irLamp;
+            _log?.Info($"[PTZ] IR 조명 판정 — 노드 보조 명령=[{string.Join(", ", node?.AuxiliaryCommands ?? Array.Empty<string>())}] → "
+                       + (irLamp.Count == 0 ? "직접 제어 지원 안 함(tt:IRLamp|On/Off/Auto 없음)" : $"지원 {string.Join("·", irLamp.Keys)}"));
             var sp = node?.SupportedPTZSpaces;
             if (sp == null) return null;
 
@@ -1330,6 +1339,66 @@ public sealed class PtzController : IPtzController
             _log?.Error($"[PTZ] GetNode space 로드 실패: {Mask(ex.Message)}");
             return null;
         }
+    }
+
+    /*──────────────── IR 조명(보조 명령) ────────────────*/
+
+    // ONVIF PTZ 규격 "Auxiliary operations": IR 조명 = tt:IRLamp|On · tt:IRLamp|Off · tt:IRLamp|Auto. 대소문자 · tt: 접두가 다른
+    // 카메라가 있어(예: "irlamp|on") 둘은 받아 준다. IRLight 같은 다른 이름은 근거가 없어 받지 않는다(추측 구현 금지).
+    private static readonly Regex IrLampAux = new(@"^\s*(?:tt:)?IRLamp\|(On|Off|Auto)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>보조 명령 목록 → IR 조명 값별 카메라 글자(처음 나온 것). 없으면 빈 사전.</summary>
+    internal static System.Collections.Generic.IReadOnlyDictionary<string, string> ParseIrLampCommands(System.Collections.Generic.IEnumerable<string>? aux)
+    {
+        var map = new System.Collections.Generic.Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var raw in aux ?? Array.Empty<string>())
+        {
+            if (raw is null) continue;
+            var m = IrLampAux.Match(raw);
+            if (m.Success) map.TryAdd(CanonicalIrLamp(m.Groups[1].Value)!, raw.Trim());
+        }
+        return map;
+    }
+
+    private static string? CanonicalIrLamp(string? mode) => mode?.Trim().ToLowerInvariant() switch
+    {
+        "on" => Contracts.Protocol.IrLampMode.On,
+        "off" => Contracts.Protocol.IrLampMode.Off,
+        "auto" => Contracts.Protocol.IrLampMode.Auto,
+        _ => null,
+    };
+
+    public System.Collections.Generic.IReadOnlyList<string> GetIrLampModes(string cameraId)
+        => _ctx.TryGetValue(cameraId, out var c) && c.IrLampCommands is { Count: > 0 } cmds
+            ? new[] { Contracts.Protocol.IrLampMode.On, Contracts.Protocol.IrLampMode.Off, Contracts.Protocol.IrLampMode.Auto }.Where(cmds.ContainsKey).ToArray()
+            : Array.Empty<string>();
+
+    public string? GetLastIrLamp(string cameraId) => _ctx.TryGetValue(cameraId, out var c) ? c.LastIrLamp : null;
+
+    public async Task<bool> SetIrLampAsync(string cameraId, string mode, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || !HasPtz(ctx)) return false;
+        var key = CanonicalIrLamp(mode);
+        if (key == null || ctx.IrLampCommands is not { } cmds || !cmds.TryGetValue(key, out var aux))
+        {
+            _log?.Warning($"[PTZ] IR 조명 {mode} 안 보냄 cam={cameraId} — 카메라가 이 보조 명령을 알리지 않았다.");
+            return false;
+        }
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if ((await LiveModelAsync(cameraId, ctx, ct).ConfigureAwait(false))?.PtzClient is not { } client) return false;
+                var reply = await CallAsync(cameraId, ctx, client.SendAuxiliaryCommandAsync(ctx.ProfileToken, aux), ct).ConfigureAwait(false);
+                ctx.LastIrLamp = key;
+                _log?.Info($"[PTZ] IR 조명 cam={cameraId} {aux} → 응답 '{reply}'");
+                return true;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] IR 조명 실패 cam={cameraId} {aux}: {Mask(ex.Message)}"); return false; }
     }
 
     /// <summary>ONVIF 화각 상대 공간(<c>…/PanTiltSpaces/TranslationSpaceFov</c>)인가.</summary>

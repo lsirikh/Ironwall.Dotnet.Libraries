@@ -212,7 +212,7 @@ internal static class OnvifXml
     private static string Space1D(string el, string uri, double min, double max) =>
         $"<tt:{el}><tt:URI>{uri}</tt:URI>{Range("XRange", min, max)}</tt:{el}>";
 
-    public static string Node(string element, int maxPresets) =>
+    public static string Node(string element, int maxPresets, IEnumerable<string>? auxiliary = null) =>
         $"<{element} token=\"{PtzNodeToken}\" FixedHomePosition=\"false\"><tt:Name>PTZNode</tt:Name><tt:SupportedPTZSpaces>" +
         Space2D("AbsolutePanTiltPositionSpace", SpaceAbsPt, -1, 1) +
         Space1D("AbsoluteZoomPositionSpace", SpaceAbsZ, 0, 1) +
@@ -223,6 +223,7 @@ internal static class OnvifXml
         Space1D("PanTiltSpeedSpace", SpaceSpeedPt, 0, 1) +
         Space1D("ZoomSpeedSpace", SpaceSpeedZ, 0, 1) +
         $"</tt:SupportedPTZSpaces><tt:MaximumNumberOfPresets>{maxPresets}</tt:MaximumNumberOfPresets><tt:HomeSupported>true</tt:HomeSupported>" +
+        string.Concat((auxiliary ?? Array.Empty<string>()).Select(a => $"<tt:AuxiliaryCommands>{Esc(a)}</tt:AuxiliaryCommands>")) +
         $"</{element}>";
 
     public static string Position(PtzVector p) =>

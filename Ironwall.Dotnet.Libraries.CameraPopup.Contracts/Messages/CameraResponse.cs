@@ -36,6 +36,12 @@ public sealed class CameraResponse : IIpcMessage
     /// <summary>GetImaging — 오토포커스 여부.</summary>
     public bool AutoFocus { get; init; }
 
+    /// <summary>PreparePtz · GetImaging — 카메라가 직접 제어를 알린 IR 조명 값(<see cref="IrLampMode"/>). 비었거나 null = 지원 안 함.</summary>
+    public List<string>? IrLampModes { get; init; }
+
+    /// <summary>PreparePtz · GetImaging — 마지막으로 보낸 IR 조명 값(카메라가 지금 상태를 알려주지 않는다). 보낸 적 없으면 null.</summary>
+    public string? IrLamp { get; init; }
+
     /// <summary>GetVideoResolution — 메인 스트림 가로(px).</summary>
     public int VideoWidth { get; init; }
 

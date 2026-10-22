@@ -727,6 +727,12 @@
                                             </Style>
                                         </StackPanel.Style>
 
+                                        <!--  머리: 영상 옵션 설명("?") — IR 조명 미지원 안내도 여기  -->
+                                        <StackPanel Margin="0,0,0,4" Orientation="Horizontal">
+                                            <TextBlock VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="영상 옵션" />
+                                            <fb:HelpTip Margin="6,0,0,0" HelpKey="Map.CameraPopup.Options" />
+                                        </StackPanel>
+
                                         <!--  미지원 안내  -->
                                         <TextBlock Margin="0,10" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="{DynamicResource TextSecondaryBrush}" Text="이 카메라는 영상 옵션을 지원하지 않습니다">
                                             <TextBlock.Style>
@@ -734,6 +740,9 @@
                                                     <Setter Property="Visibility" Value="Visible" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsImagingCapable}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsIrLampSupported}" Value="True">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
@@ -817,6 +826,63 @@
                                                     </Button.Style>
                                                 </Button>
                                             </UniformGrid>
+                                        </StackPanel>
+                                        <!--  IR 조명(적외선 LED) 직접 제어 — 카메라가 ONVIF 보조 명령(tt:IRLamp)을 알릴 때만. 주야간(IR Cut)과 별개.
+                                              카메라는 지금 상태를 알려주지 않아 마지막으로 보낸 값을 강조한다. 미지원 설명은 위 "?" 말풍선.  -->
+                                        <StackPanel Margin="0,8,0,0" Visibility="{Binding IsIrLampSupported, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding IrLampCaption}" />
+                                            <UniformGrid Margin="0,2" Rows="1">
+                                            <Button Command="{Binding SetIrLampCommand}" CommandParameter="On" Content="켜기" Visibility="{Binding IsIrLampOnAvailable, Converter={StaticResource BoolToVis}}">
+                                                <Button.Style>
+                                                    <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IrLampSent}" Value="On">
+                                                                <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Command="{Binding SetIrLampCommand}" CommandParameter="Off" Content="끄기" Visibility="{Binding IsIrLampOffAvailable, Converter={StaticResource BoolToVis}}">
+                                                <Button.Style>
+                                                    <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IrLampSent}" Value="Off">
+                                                                <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Command="{Binding SetIrLampCommand}" CommandParameter="Auto" Content="자동" Visibility="{Binding IsIrLampAutoAvailable, Converter={StaticResource BoolToVis}}">
+                                                <Button.Style>
+                                                    <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IrLampSent}" Value="Auto">
+                                                                <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            </UniformGrid>
+                                            <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding IrLampStatusText}" TextWrapping="Wrap">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IrLampStatusText}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>

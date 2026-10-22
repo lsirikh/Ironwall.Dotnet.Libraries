@@ -10,7 +10,7 @@ namespace DummyCameras.Tests;
 /// <summary>
 /// 카메라 팝업이 쓰는 ONVIF 기능 전수 시나리오(2026-10-22 "팝업 ONVIF 철저 확인").
 /// cam1·cam2 PTZ · cam3 PTZ 시계 +3시간 · cam4 PTZ 무응답↔복구 전환용 · cam5 PTZ 계정 거부↔복구 전환용 ·
-/// cam6 PTZ 첫 프로파일에 PTZ 구성 없음 · cam7 고정.
+/// cam6 PTZ 첫 프로파일에 PTZ 구성 없음 · cam7 고정. IR 조명 보조 명령(tt:IRLamp|On/Off/Auto)은 cam5 만 없다.
 /// 모두 실제 클라이언트 경로(CameraProviderRegistry → OnvifPtzProvider · OnvifVideoProvider → PtzController → OnvifSolution)로 돈다.
 /// </summary>
 public sealed class PopupOnvifFarmFixture : IAsyncLifetime
@@ -34,6 +34,7 @@ public sealed class PopupOnvifFarmFixture : IAsyncLifetime
         o.FaultSetters[3] = f => f.ClockSkewSec = 3 * 3600;
         Farm = await Farm.StartAsync(o, TextWriter.Null, CancellationToken.None);
         Farm.Find(6)!.Spec.FirstProfileWithoutPtz = true;
+        Farm.Find(5)!.Spec.AuxiliaryCommands = new[] { "tt:Wiper|On" };   // IR 조명 직접 제어 없는 PTZ 카메라
         Farm.OnvifLog.Written += e => Requests.Enqueue(e);
         Farm.PtzLog.Written += e => Ptz.Enqueue(e);
     }
@@ -522,5 +523,84 @@ public class PopupOnvifScenarioTests : IClassFixture<PopupOnvifFarmFixture>
         Assert.True(arrived);
         Assert.True(Wait.Near(sim.FindPreset("4")!.Position, sim.Status(DateTime.UtcNow).Position), $"{sim.Status(DateTime.UtcNow).Position}");
         Assert.Equal(1, _fx.RequestsOf("cam2").Count(e => (string?)e["op"] == "GetProfiles") - profilesBefore);   // 연결(초기화)은 한 번만
+    }
+
+    // ── IR 조명(보조 명령 tt:IRLamp) ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task should_announce_and_switch_ir_lamp_with_the_standard_auxiliary_command_when_ptz_node_lists_it()
+    {
+        var ptz = NewPtz(out _);
+        var onvif = _fx.Farm.Find(1)!.Onvif;
+        await ptz.PrepareAsync("ir1", _fx.Info(1), Within(10_000));
+        int before = _fx.PtzOf("cam1").Count;
+
+        var modes = ptz.GetIrLampModes("ir1");
+        var results = new List<(string Mode, bool Ok, string? CameraGot)>();
+        foreach (var mode in new[] { "On", "Off", "Auto" })
+        {
+            var ok = await ptz.SetIrLampAsync("ir1", mode, Within(5_000));
+            results.Add((mode, ok, onvif.LastAuxiliaryCommand));
+        }
+        var last = ptz.GetLastIrLamp("ir1");
+        ptz.Release("ir1");
+
+        Assert.Equal(new[] { "On", "Off", "Auto" }, modes);   // 와이퍼(tt:Wiper|On)는 빼고 IR 조명만
+        Assert.All(results, r => Assert.True(r.Ok, r.Mode));
+        Assert.Equal(new[] { "tt:IRLamp|On", "tt:IRLamp|Off", "tt:IRLamp|Auto" }, results.Select(r => r.CameraGot));
+        var sent = _fx.PtzOf("cam1").Skip(before).Where(e => (string?)e["op"] == "SendAuxiliaryCommand").ToList();
+        Assert.Equal(3, sent.Count);
+        Assert.All(sent, e => Assert.True(Ok(e) && (string?)e["profile"] == "Profile_1", $"{e["result"]} profile={e["profile"]}"));
+        Assert.Equal("Auto", last);   // 카메라는 상태를 알려주지 않는다 — 마지막으로 보낸 값
+    }
+
+    [Fact]
+    public async Task should_hide_ir_lamp_and_send_nothing_when_ptz_node_has_no_ir_lamp_command_or_camera_is_fixed()
+    {
+        var ptz = NewPtz(out _);
+        await ptz.PrepareAsync("ir5", _fx.Info(5), Within(10_000));
+        await ptz.PrepareAsync("ir7", _fx.Info(7), Within(10_000));
+        int before5 = _fx.PtzOf("cam5").Count, before7 = _fx.PtzOf("cam7").Count;
+
+        var modes5 = ptz.GetIrLampModes("ir5");
+        var modes7 = ptz.GetIrLampModes("ir7");
+        var sent5 = await ptz.SetIrLampAsync("ir5", "On", Within(5_000));
+        var sent7 = await ptz.SetIrLampAsync("ir7", "On", Within(5_000));
+        ptz.Release("ir5");
+        ptz.Release("ir7");
+
+        Assert.Empty(modes5);
+        Assert.Empty(modes7);
+        Assert.False(sent5);
+        Assert.False(sent7);
+        Assert.DoesNotContain(_fx.PtzOf("cam5").Skip(before5), e => (string?)e["op"] == "SendAuxiliaryCommand");
+        Assert.DoesNotContain(_fx.PtzOf("cam7").Skip(before7), e => (string?)e["op"] == "SendAuxiliaryCommand");
+        Assert.Contains(_log.Lines, l => l.Contains("IR 조명 판정") && l.Contains("지원 안 함"));   // 판정 근거가 로그에 남는다
+    }
+
+    [Fact]
+    public async Task should_fail_within_limit_and_keep_last_value_when_camera_refuses_ir_lamp_command()
+    {
+        var ptz = NewPtz(out _);
+        var faults = _fx.Farm.Find(2)!.Spec.Faults;
+        await ptz.PrepareAsync("ir2", _fx.Info(2), Within(10_000));
+        Assert.True(await ptz.SetIrLampAsync("ir2", "Off", Within(5_000)));
+        try
+        {
+            faults.AuthFail = true;
+            var sw = Stopwatch.StartNew();
+            var refused = await ptz.SetIrLampAsync("ir2", "On", Within(3_000));
+            var refusedMs = sw.ElapsedMilliseconds;
+
+            Assert.False(refused);
+            Assert.True(refusedMs < 3_500, $"refusal took {refusedMs} ms");
+            Assert.Equal("Off", ptz.GetLastIrLamp("ir2"));
+            Assert.Contains(_fx.PtzOf("cam2"), e => (string?)e["op"] == "SendAuxiliaryCommand" && ((string?)e["result"] ?? "").StartsWith("fault:NotAuthorized", StringComparison.Ordinal));
+        }
+        finally
+        {
+            faults.AuthFail = false;
+            ptz.Release("ir2");
+        }
     }
 }

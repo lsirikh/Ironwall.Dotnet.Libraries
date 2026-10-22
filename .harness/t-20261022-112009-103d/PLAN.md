@@ -50,6 +50,21 @@
 - 고친 뒤: dummy `PopupOnvifScenarioTests|OnvifClientTests|OnvifAuthTests|DragPtzHostTests` 46/46 · dummy 전체 115 통과 · 2 건너뜀(옵트인 부하) · `IRONWALL_CAMHOST_LOAD=1` EventWindowLoadTests 통과(60/60 재생 3075 ms · CPU 평균 6.9% · 최대 18.7% · 재시작 0) · `CameraPopup.Tests --filter Unit` 299/299
 - .sln: `dotnet test Ironwall.Dotnet.Libraries.sln` → (아래 "최종 결과"에 기록)
 
+## 추가 지시(턴 2) — IR 조명 켜기 · 끄기
+(사용자 질문 원문) "카메라 onvif에서 ir조명을 켜고 끌 수 있나?" — 조사: 옵션 탭 「주야간 (IR Cut)」은 IrCutFilter 만 바꾸고 IR 조명 자체 제어는 없었다(AuxiliaryCommand 사용 0건).
+- [x] 판정: `PtzController.LoadSpacesAsync` 가 노드(초기화 때 미리 읽은 `PtzNode` 또는 GetNode)의 `AuxiliaryCommands` 를 `ParseIrLampCommands` 로 읽는다 — `^(tt:)?IRLamp\|(On|Off|Auto)$`(대소문자 무시). 근거 로그: `[PTZ] IR 조명 판정 — 노드 보조 명령=[…] → 지원 On·Off·Auto / 직접 제어 지원 안 함`. 고정 카메라는 "IR 조명 직접 제어 없음(보조 명령은 PTZ 서비스에만 있다)".
+- [x] 보내기: `SetIrLampAsync` → 게이트 · `CallAsync`(무응답 끊기 규칙 그대로) → `PTZClient.SendAuxiliaryCommandAsync(프로파일, 카메라 글자 그대로)`. 성공하면 `LastIrLamp` 기억.
+- [x] 계약 · 호스트: `CameraRequestKind.SetIrLamp=12` · `IrLampMode` · `CameraRequest.IrLamp` · `CameraResponse.IrLampModes/IrLamp`. `HostCameraServices.ExecuteCoreAsync` — PreparePtz · GetImaging 응답에 지원 값 · 마지막 값, SetIrLamp 는 알린 값만 제공자로(아니면 not-supported, 카메라에 안 보냄), 실패 = failed 응답(호스트 · GIS 생존).
+- [x] GIS 팝업(GMaps.Ui): `CameraStreamPopupViewModel` IsIrLampSupported · 단추별 가능 · IrLampSent · IrLampCaption · IrLampStatusText · SetIrLampCommand(알린 값만), `MapViewModel.HandleIrLampAsync`(권한 = 주야간과 같은 cam:control, 실패는 알림 한 줄), `CameraStreamPopupStyle.xaml` 옵션 탭에 「IR 조명: 켜기 · 끄기 · 자동」(지원할 때만) + 머리 "영상 옵션 ?" (`Map.CameraPopup.Options`, `Help/MapsHelp.cs`). 주야간 단추는 그대로.
+- [x] 가짜 카메라: 팜 노드 AuxiliaryCommands(기본 IR 3종 + 와이퍼, cam5 는 와이퍼만) · SendAuxiliaryCommand · `/status.auxiliary`; `FakeOnvifCamera.AuxiliaryCommands` · `FailAuxiliary`.
+- 검증(이 턴):
+  - `dotnet test Ironwall.Dotnet.Libraries.CameraPopup.Tests --filter "IrLampProviderTests|ContractTests"` → 66/66
+  - `dotnet test Ironwall.Dotnet.Libraries.CameraPopup.Host.Tests --filter HostCameraServices` → 17/17(IR 7 포함)
+  - `dotnet test tools/dummy-cameras/tests --filter PopupOnvifScenarioTests` → 31/31(IR 3 포함: 보낸 본문 tt:IRLamp|On/Off/Auto · 프로파일 Profile_1 · 와이퍼 제외 · 미지원/고정은 SOAP 0건 · 거부 시 false + 마지막 값 유지)
+  - `dotnet test tests/GMaps.MapAux.Tests --filter CameraPopupIrLampTests` → 8/8(실제 옵션 탭 템플릿, 창 없음) · `tests/GMaps.PropertyPanel.Tests --filter MapsHelpTests` → 43/43("?" 키 계약)
+  - 전체 회귀(최종 결과 턴 2): `dotnet test Ironwall.Dotnet.Libraries.sln` 종료 0 · 실패 0(CameraPopup.Tests 346 · Host.Tests 204 · Utils.Tests 886 · 나머지 턴 1 과 같음) · `dotnet test tools/dummy-cameras/tests/DummyCameras.Tests.csproj`(MediaMTX 를 메인 체크아웃에서 잠시 복사) 118 통과 · 2 건너뜀(옵트인 부하) · 실패 0 · `dotnet test tests/GMaps.MapAux.Tests` 130/130. 시험 뒤 MediaMTX 복사본 · `%TEMP%\dummycam-tests` 삭제, 남은 프로세스 없음 확인.
+  - 남은 한계: 이벤트 창 타일(호스트 화면)에는 IR 조명 단추가 없다(지시 범위 = 지도 팝업 옵션 탭). 실제 카메라에는 보내지 않았다 — 실기 판정은 호스트 로그의 "IR 조명 판정" 줄로 본다.
+
 ## 헤디드 확인 목록(사용자 PC 가 빌 때 대화 세션에서 — 가짜 카메라 팜 `DummyCameras run` + 실앱)
 1. 지도에서 PTZ 카메라 더블클릭 → 팝업 영상 재생 · PTZ 패드 8방향 누름 동안 움직이고 떼면 바로 멈춤(1초 끊김 없음) · 휠 줌 인/아웃.
 2. 프리셋 탭: 목록(P1~P5) → 하나 눌러 이동 · "현재 위치 저장"(이름 입력) → 목록에 생김 → 삭제 → 사라짐 · 홈 저장 → 다른 데로 → 홈 이동.
@@ -60,6 +75,7 @@
 7. 탐지 이벤트(매핑 프리셋 3) → 이벤트 창 타일이 P3 로 이동 · "P3 로 이동 중 · N초" → 창 닫기(복귀 켬) → 복귀 프리셋/홈으로.
 8. 같은 카메라 이벤트 두 개 연속 → 두 창 모두 재생 · 마지막 이벤트 프리셋으로 · 한 창 닫아도 다른 창 계속 재생.
 9. `fault?skew=10800`(카메라 시계 +3시간) → 팝업 PTZ · 프리셋 정상.
+11. PTZ 가짜 카메라 팝업 → 옵션 탭: 「IR 조명」 켜기 · 끄기 · 자동이 보이고, 누르면 `/status` 의 `auxiliary.last` 가 `tt:IRLamp|On` 등으로 바뀌며 누른 단추가 강조(제목 "IR 조명 (마지막으로 보낸 값)"). cam5(와이퍼만) · 고정 카메라: 칸이 없고 "영상 옵션 ?" 말풍선에 안내. `fault?authfail=1` 중 누르면 "IR 조명을 바꾸지 못했습니다" 한 줄, GIS 정상.
 10. 호스트 강제 종료(작업 관리자) → GIS 살아 있음 · 팝업 다시 열면 호스트 재시작 후 재생.
 
 ## 남은 한계

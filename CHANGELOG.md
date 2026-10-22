@@ -11,6 +11,10 @@
 - **첫 프로파일에 PTZ 구성이 없는 카메라에서 PTZ 전부 실패** — PTZ 명령이 무조건 첫 프로파일로 갔다(ter:NoPTZProfile). 이제 PTZ 구성이 붙은 프로파일을 쓴다(기본 속도 읽기와 같은 규칙).
 
 ### Added
+- **카메라 팝업 IR 조명(적외선 LED) 켜기 · 끄기 · 자동** — (사용자 질문 "카메라 onvif에서 ir조명을 켜고 끌 수 있나?") 지금까지 옵션 탭 「주야간 (IR Cut)」은 필터만 바꿨다. 이제 카메라가 PTZ 노드 보조 명령(GetNode `AuxiliaryCommands`)에 ONVIF 표준 `tt:IRLamp|On` · `|Off` · `|Auto` 를 알리면(대소문자 · `tt:` 없는 변형 허용, `IRLight` 등 근거 없는 이름은 받지 않음) 옵션 탭에 「IR 조명」 칸이 보이고 `SendAuxiliaryCommand` 로 카메라 글자 그대로 보낸다. 카메라가 상태를 알려주지 않아 마지막으로 보낸 값을 강조. 지원하지 않으면 칸을 감추고 "?"(`Map.CameraPopup.Options`)에 쉬운 말 안내. 판정 근거(노드 보조 명령 목록)는 호스트 로그에. 고정 카메라(PTZ 서비스 없음)는 지원 안 함 — RelayOutputs 같은 추측 구현은 하지 않았다.
+- 계약: `CameraRequestKind.SetIrLamp`(12) · `IrLampMode` · `CameraRequest.IrLamp` · `CameraResponse.IrLampModes/IrLamp`(PreparePtz · GetImaging · SetIrLamp 응답). `ICameraPtzProvider` · `IPtzController` 의 `GetIrLampModes` · `GetLastIrLamp` · `SetIrLampAsync`(기본 구현 — 가짜 · 목 무영향). 알리지 않은 값은 호스트가 카메라에 보내지 않고 not-supported 로 답한다.
+- 가짜 카메라: 팜 PTZ 노드 `AuxiliaryCommands`(기본 IR 조명 3종 + 와이퍼, `CameraSpec.AuxiliaryCommands` 로 바꿈) · `SendAuxiliaryCommand`(알린 글자만, 아니면 ter:NoAuxiliaryCommand) · `/status` 의 `auxiliary`. 단위 시험용 `FakeOnvifCamera.AuxiliaryCommands` · `FailAuxiliary`(SOAP 500).
+- 시험: `CameraPopup.Tests/Unit/IrLampProviderTests` 9 · `CameraPopup.Host.Tests/HostCameraServicesIrLampTests` 7 · `PopupOnvifScenarioTests` +3(지원 · 미지원/고정 · 거부) · `tests/GMaps.MapAux.Tests/CameraPopupIrLampTests` 8(실제 옵션 탭 템플릿 표시/숨김 포함).
 - 가짜 카메라 팜(`tools/dummy-cameras`): 이미징 서비스(GetImagingSettings · SetImagingSettings · GetMoveOptions · Move · Stop — 주야간 · 자동 초점 · 수동 초점), 카메라 시계 차이 장애(`ClockSkewSec`, 제어 `fault?skew=초`), 첫 프로파일 PTZ 없음(`FirstProfileWithoutPtz`).
 - 시험: 가짜 카메라 팜 `PopupOnvifScenarioTests` 28(이미징 · 초점 · 고정 카메라 · 8방향+줌 · 정지 경합 · 프리셋 저장/이동/삭제 · 홈 · 시계 +3시간 · 끊김 뒤 재연결 2 · 계정 2 · 메인/서브 4 · 프로파일 · 설정 변경 · 같은 카메라 두 팝업), `EventWindowFarmTests` +3(닫을 때 복귀 프리셋 · Home · 같은 카메라 두 이벤트 창 — 실제 호스트 exe 헤드리스), .sln 안 `CameraPopup.Tests/Unit/OnvifRecoveryTests` 4. 고치기 전 코드로 각각 6건 · 4건 실패 → 고친 뒤 전부 통과.
 

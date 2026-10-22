@@ -88,6 +88,12 @@ public sealed class CameraSpec
     /// PTZ operations naming it fail with ter:NoPTZProfile - a client must pick a profile that carries PTZ.
     /// </summary>
     public bool FirstProfileWithoutPtz { get; set; }
+
+    /// <summary>
+    /// PTZ node AuxiliaryCommands (GetNode/GetNodes). Default = the ONVIF IR lamp commands (tt:IRLamp|On · Off · Auto) plus a wiper
+    /// so a client must pick the IR ones; empty = a camera without IR lamp control. SendAuxiliaryCommand accepts only these strings.
+    /// </summary>
+    public string[] AuxiliaryCommands { get; set; } = { "tt:Wiper|On", "tt:IRLamp|On", "tt:IRLamp|Off", "tt:IRLamp|Auto" };
     public int SubWidth { get; set; } = 640;
     public int SubHeight { get; set; } = 360;
     public int Fps { get; set; } = 15;

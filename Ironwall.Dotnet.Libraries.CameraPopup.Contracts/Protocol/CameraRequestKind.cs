@@ -26,6 +26,17 @@ public enum CameraRequestKind
     GetVideoResolution = 10,
     /// <summary>지금 움직이는 중인가(ONVIF GetStatus MoveStatus) — 영상 위 "이동 중 · 이동 완료" 표시. 이동 중에만 짧게 묻는다.</summary>
     GetPtzMoveStatus = 11,
+    /// <summary>IR 조명(적외선 LED) 켜기 · 끄기 · 자동 — ONVIF PTZ 보조 명령(<c>tt:IRLamp|On</c> 등). 값은 <see cref="IrLampMode"/>.
+    /// 카메라가 보조 명령 목록(GetNode AuxiliaryCommands)에 그 값을 알릴 때만 보낸다.</summary>
+    SetIrLamp = 12,
+}
+
+/// <summary>IR 조명 값(<see cref="Messages.CameraRequest.IrLamp"/> · <see cref="Messages.CameraResponse.IrLampModes"/>). JSON 문자열 — 바꾸면 계약 파손.</summary>
+public static class IrLampMode
+{
+    public const string On = "On";
+    public const string Off = "Off";
+    public const string Auto = "Auto";
 }
 
 /// <summary>호스트 응답의 실패 사유 코드(기계 판독용 — 화면 문구는 GIS 가 고른다).</summary>

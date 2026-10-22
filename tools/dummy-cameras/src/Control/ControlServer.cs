@@ -92,6 +92,7 @@ public sealed class ControlServer : IAsyncDisposable
                 onvifRequests = c.Onvif.RequestCount,
                 stream = c.Publisher is null ? null : new { running = c.Publisher.IsRunning, killed = c.Publisher.IsKilled, starts = c.Publisher.Starts },
                 imaging = new { irCutFilter = c.Onvif.ImagingState.IrCutFilter, autoFocus = c.Onvif.ImagingState.AutoFocus, focusSpeed = c.Onvif.ImagingState.FocusSpeed },
+                auxiliary = new { announced = c.Spec.IsPtz ? c.Spec.AuxiliaryCommands : Array.Empty<string>(), last = c.Onvif.LastAuxiliaryCommand },
                 ptz = s is null ? null : new
                 {
                     pan = Math.Round(s.Position.Pan, 4),
