@@ -72,6 +72,12 @@ public sealed record Map3DMessage(string Type, string? Reason, string? Job, Map3
 
     /// <summary>edit.commit 일 때 3D 손잡이로 고친 도형(edit3d-contract 3단계).</summary>
     public Map3DEditCommit? EditCommit { get; init; }
+
+    /// <summary>edit.commit(target kind "overlay") 일 때 3D 손잡이로 고친 지도 심볼(2026-10-22 — 3D 심볼 고르기 · 고치기).</summary>
+    public Map3DOverlayEdit? OverlayEdit { get; init; }
+
+    /// <summary>overlay.box 일 때 3D 에서 {Shift}+끌기 상자 안 심볼(2026-10-22).</summary>
+    public Map3DOverlayBox? OverlayBox { get; init; }
 }
 
 /// <summary>
@@ -83,6 +89,10 @@ public sealed record Map3DPick(string Action, string? Kind, int? Id, double? Scr
 {
     /// <summary>kind = "track" 일 때 추적 id(track.upsert 의 id).</summary>
     public string? TrackId { get; init; }
+
+    /// <summary>누를 때 {Ctrl} · {Shift} 를 함께 눌렀는가(2026-10-22 덧붙임 — 옛 엔진은 보내지 않아 false).</summary>
+    public bool Ctrl { get; init; }
+    public bool Shift { get; init; }
 }
 
 public static class Map3DMath
@@ -411,7 +421,7 @@ public static class Map3DMath
                      : type == "model.pick" ? new Map3DMessage(type, null, null, null) { ModelUid = uid }
                                             : new Map3DMessage(type, null, null, null) { DecorationUid = uid };
             }
-            if (type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end") return Map3DEdit.Parse(type, o);   // 3D 안에서 편집(2026-10-21)
+            if (type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end" or "overlay.box") return Map3DEdit.Parse(type, o);   // 3D 안에서 편집(2026-10-21)
             if (type != "camera") return null;
             double? lon = Finite(o["lon"]), lat = Finite(o["lat"]), zoom = Finite(o["zoom"]);
             if (lon == null || lat == null || zoom == null) return null;
@@ -444,7 +454,8 @@ public static class Map3DMath
         if (string.IsNullOrEmpty(kind) || id == null) { kind = null; id = null; }
         return new Map3DMessage("pick", null, null, null)
         {
-            Pick = new Map3DPick(action, kind, id, Finite(screen?["x"]), Finite(screen?["y"])),
+            Pick = new Map3DPick(action, kind, id, Finite(screen?["x"]), Finite(screen?["y"]))
+                { Ctrl = o["ctrl"]?.Type == JTokenType.Boolean && o.Value<bool>("ctrl"), Shift = o["shift"]?.Type == JTokenType.Boolean && o.Value<bool>("shift") },
         };
     }
 

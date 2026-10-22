@@ -182,6 +182,7 @@ public partial class MapViewModel
     /// <summary>draw.point · draw.done · draw.end · edit.commit · edit.end.</summary>
     private void OnMap3DEditMessage(Map3DMessage msg)
     {
+        if (msg.OverlayEdit is { } oc) { CommitOverlayEdit3D(oc); return; }   // 지도 심볼 손잡이(MapViewModel.Overlay3D)
         if (msg.EditCommit is { } c)
         {
             _log?.Info($"[Edit3D] edit.commit {c.Kind} uid={c.Uid} {c.Geometry} 점={c.Points.Count} 방향={c.HeadingDeg?.ToString() ?? "-"}");
@@ -192,6 +193,13 @@ public partial class MapViewModel
         {
             // 바뀐 것 없이 3D 에서 Esc 로 편집이 끝났다 — 3D 가 이미 손잡이를 내렸다(edit.stop 을 되보내지 않는다). 판의 고름도 푼다
             _log?.Info($"[Edit3D] 3D 에서 편집 끝 reason={msg.Reason ?? "-"}");
+            if (_edit3DTarget == null && _overlayEdit3D != null)
+            {
+                // 지도 심볼 손잡이를 3D 의 Esc 로 끝냈다 — 2D Esc 처럼 고름을 푼다(edit.stop 은 되보내지 않는다)
+                _overlayEdit3D = null;
+                ClearAllSelections();
+                return;
+            }
             if (_edit3DTarget == null) return;
             _edit3DTarget = null;
             if (_decoIn3D && IsDecorating) { if (_modelSelectedUid != null) SelectModel(null); else SelectDecoration(null); }
