@@ -186,6 +186,7 @@
 						<Grid>
 							<Grid.RowDefinitions>
 								<RowDefinition Height="38" />
+								<RowDefinition Height="*" />
 								<RowDefinition Height="Auto" />
 							</Grid.RowDefinitions>
 
@@ -230,8 +231,15 @@
 								</Grid>
 							</Border>
 
-							<!--  바디 (DataContext = MapViewModel)  -->
-							<StackPanel Grid.Row="1" Margin="14,12,14,14">
+							<!--  바디 (DataContext = MapViewModel) — 머리 띠 · 행동 줄 사이만 세로 스크롤(2026-10-22 "너무 길어 높이 줄이고 스크롤").
+							      판 높이는 HeightPanelControlBase 가 지도 높이의 70% · 판 자리 아래 남은 높이로 자른다  -->
+							<ScrollViewer
+								Grid.Row="1"
+								Padding="0,0,2,0"
+								AutomationProperties.AutomationId="Map.UserBuilding.Scroll"
+								HorizontalScrollBarVisibility="Disabled"
+								VerticalScrollBarVisibility="Auto">
+							<StackPanel Margin="14,12,14,4">
 								<!--  형상 도구 줄 — 사각형(R) · 삼각형(T) · 원(C) · 타원(E) · 다각형(P). 쓰는 법은 단추 풍선과 판 "?"  -->
 								<UniformGrid Margin="0,0,0,8" Columns="5">
 									<Button
@@ -610,9 +618,15 @@
 									TextWrapping="Wrap"
 									Visibility="{Binding HasUserBuildingError, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+								<ContentControl Margin="0,10,0,0" Template="{StaticResource Edit3DSectionTemplate}" />
+							</StackPanel>
+							</ScrollViewer>
+
+							<!--  행동 줄(2026-10-22) — 스크롤 밖이라 판이 작아도 늘 보인다. 적용할 내용 한 줄 + 주 행동  -->
+							<StackPanel Grid.Row="2" Margin="14,0,14,14">
 								<Border
 									Height="1"
-									Margin="0,12,0,10"
+									Margin="0,8,0,10"
 									Background="{DynamicResource DividerBrush}" />
 								<TextBlock
 									Margin="0,0,0,12"
@@ -622,8 +636,6 @@
 									Foreground="{DynamicResource TextPrimaryBrush}"
 									Text="{Binding UserBuildingSummary}"
 									TextWrapping="Wrap" />
-
-								<ContentControl Margin="0,0,0,10" Template="{StaticResource Edit3DSectionTemplate}" />
 
 								<Grid>
 									<Grid.ColumnDefinitions>
