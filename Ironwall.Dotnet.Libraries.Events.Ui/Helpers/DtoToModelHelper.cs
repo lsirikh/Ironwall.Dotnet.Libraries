@@ -424,9 +424,13 @@ public static class DtoToModelHelper
             Status = ToActionReported(dto.ActionReported),
             Reason = dto.Reason ?? string.Empty,
             Severity = dto.Severity,
-            DetailText = OperationEventText.DetailText(dto.Detail),
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
+        // 부품 이름은 캐시 장비의 부품 선언에서(없으면 key) — 상태는 detail 값이라 SYNC_DEVICE 전에 와도 바로 보인다.
+        var components = model.Device?.Axes?.HardwareSpec?.Components;
+        var catalog = ComponentTypeLabels();
+        model.DetailText = OperationEventText.DetailText(dto.Detail, components, catalog);
+        model.ComponentChange = OperationEventText.ComponentChange(dto.Detail, components, catalog);
         // 사유 글자의 장비 종류(G19) — 서버 참조 {id, category_device} 가 먼저, 없으면 캐시 장비의 카테고리.
         model.CategoryDevice = !string.IsNullOrWhiteSpace(dto.Device?.CategoryDevice)
             ? dto.Device!.CategoryDevice
@@ -740,6 +744,13 @@ public static class DtoToModelHelper
     // ═══════════════════════════════════════════════════════════════════════════════
     // DateTime 파싱 헬퍼
     // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>부품 유형 한글의 서버 카탈로그(장비 콘솔 캐시) — 없거나 컨테이너가 없으면(시험) null, 공용 사전의 내장 이름으로 간다.</summary>
+    private static Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels? ComponentTypeLabels()
+    {
+        try { return IoC.GetAllInstances(typeof(Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels))?.OfType<Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels>().FirstOrDefault(); }
+        catch { return null; }
+    }
 
     private static DateTime ParseDateTime(string? dateTimeString)
     {

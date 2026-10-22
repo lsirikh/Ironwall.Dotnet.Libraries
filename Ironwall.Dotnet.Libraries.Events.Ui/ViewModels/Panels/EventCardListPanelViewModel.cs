@@ -1336,7 +1336,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public Task HandleAsync(OperationEventCardMessage message, CancellationToken cancellationToken)
         {
             if (message?.Model is { Id: > 0 } model)
-                EnqueueCard(new OperationEventCardViewModel(model));
+            {
+                var card = new OperationEventCardViewModel(model);
+                // 같은 장비 30초 안의 부품 전이는 나중 카드에 흐름으로 — 카드는 합치지 않는다(중복 · 조치 · 상한 규칙 그대로).
+                if (model is { ComponentChange: { } change, Device: { Id: > 0 } device })
+                    card.FlowText = LazyInitializer.EnsureInitialized(ref _componentFlow).Add(device.Id, model.Id, model.DateTime, change.StepText);
+                EnqueueCard(card);
+            }
             return Task.CompletedTask;
         }
         #endregion
@@ -1367,6 +1373,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private string GetActorName() => ActionReportRules.FormatActor(_userModel);
         private EventProviderService _providerService;
         private IAccountModel _userModel;
+        // 장비별 최근 부품 전이(운영 카드 흐름 줄). 생성자 없이 만든 시나리오 시험 VM 에서도 살게 지연 초기화.
+        private OperationComponentFlow? _componentFlow;
         private IEventApiService _apiService;
         private ISymbolEventManager _symbolEventManager;
         private IEventQueueManager _eventQueueManager;
