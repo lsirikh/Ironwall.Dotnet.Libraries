@@ -285,11 +285,13 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         _log?.Info($"[UserBuilding] 3D 에서 고름 uid={uid} job={job}");
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         CloseBuildingHeightPanel(clearUndo: false);
-        PostUserBuilding3D(job, Map3DUserBuilding.SelectMessageJson(uid));
         bool in3D = ShouldEditIn3D;
         bool same = in3D && _ubIn3D && _ubArea?.Id == job;   // 이미 3D 위 판 — 그 건물만 연다
-        // Ctrl+클릭(엔진 키 · 옛 엔진은 호스트 키) = 고름에 넣기 · 빼기 — 2D 판의 Ctrl+클릭과 같다(고치던 건물부터 고름에 넣는다, 여러 개 함께 고치기)
-        if (same && (ctrl || (Map3DModifiers() & System.Windows.Input.ModifierKeys.Control) != 0) && UserBuildingItems.Any(i => i.Uid == uid))
+        // Ctrl+클릭(엔진 키 · 옛 엔진은 호스트 키) = 고름에 넣기 · 빼기 — 2D 판의 Ctrl+클릭과 같다(고치던 건물부터 고름에 넣는다, 여러 개 함께 고치기).
+        // Shift 만 눌린 클릭도 넣기(「건물 높이」 판과 같게 — 고름을 잃지 않게). 강조는 고른 것 모두(userbuilding.select uids) — 예전엔 누른 상자 하나만
+        // 강조를 보내 3D 에서는 하나만 골라진 것처럼 보였다(2026-10-22 "건물 복수 선택이 안 되고").
+        if (same && (ctrl || (Map3DModifiers() & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)
+            && UserBuildingItems.Any(i => i.Uid == uid))
         {
             var seed = _ubEditing?.Uid;
             var keep = UbSelected.ToList();
@@ -299,10 +301,12 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             if (seed != null && !UbSelected.Contains(seed)) UbSelected.Add(seed);
             if (uid != seed && !UbSelected.Remove(uid)) UbSelected.Add(uid);
             _log?.Info($"[UserBuilding] 3D 에서 고름 {UbSelected.Count}개");
+            PostUserBuildingSelection3D();
             LoadUserBuildingGroupFields();
             RefreshUserBuildingPanel();
             return;
         }
+        PostUserBuilding3D(job, Map3DUserBuilding.SelectMessageJson(uid));
         if (!same) StartUserBuildingDraw(area, in3D);
         _ubPendingEditUid = uid;
         if (_ubArea?.Id != job) { _ubPendingEditUid = null; return; }   // 시작하지 못함(만드는 중 등)
@@ -483,7 +487,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
              wall = c.WallColor != b.WallColor, roofColor = c.RoofColor != b.RoofColor, taper = c.TaperDeg != b.TaperDeg;
         if (!(height || roof || use || facade || wall || roofColor || taper)) { SetAimStatus("바꾼 칸이 없습니다", autoHide: true); return; }
         int floors = Map3DBuilding.FloorsFromHeight(c.Height, UbFloorHeight);
-        var commands = new List<Services.Undo.IUndoableCommand>();
+        var batch = new List<(string Uid, UserBuildingState? Before, UserBuildingState After)>();
         foreach (var uid in UbSelected.ToList())
         {
             if (UserBuildingItems.FirstOrDefault(i => i.Uid == uid) is not { } item) continue;
@@ -495,18 +499,31 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                 Look = before.Look with { Facade = facade ? c.Facade : before.Look.Facade, WallColor = wall ? c.WallColor : before.Look.WallColor,
                                           RoofColor = roofColor ? c.RoofColor : before.Look.RoofColor },
             };
-            if (after == before) continue;
-            if (!await SaveUserBuildingAsync(area.Id, uid, after)) break;   // 이유는 판 오류 줄 — 그때까지 바꾼 것만 기록
-            commands.Add(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} 고치기", area.Id, uid, before, after, ApplyUserBuildingStateAsync, ResolveUserBuildingJob));
+            if (after != before) batch.Add((uid, before, after));
         }
-        if (commands.Count > 0)
-        {
-            _undoService?.Push(new Services.Undo.Commands.MacroCommand($"{Map3DUserBuilding.UndoPrefix} {commands.Count}개 함께 고치기", commands, _log));
-            SetAimStatus($"건물 {commands.Count}개를 함께 고쳤습니다", autoHide: true);
-        }
-        _log?.Info($"[UserBuilding] 함께 고치기 {commands.Count}/{UbSelected.Count}");
+        int n = await SaveUserBuildingBatchAsync(area.Id, batch, k => $"{Map3DUserBuilding.UndoPrefix} {k}개 함께 고치기");
+        if (n > 0) SetAimStatus($"건물 {n}개를 함께 고쳤습니다", autoHide: true);
+        _log?.Info($"[UserBuilding] 함께 고치기 {n}/{UbSelected.Count}");
         LoadUserBuildingGroupFields();
         RefreshUserBuildingPanel();
+    }
+
+    /// <summary>
+    /// 여러 건물을 차례로 저장(Before null = 새로 넣기) → GIS 편집 기록 1단위(MacroCommand, 설명 = description(저장한 수)).
+    /// 하나라도 실패하면 거기서 멈추고(이유는 판 오류 줄) 그때까지 저장한 것만 기록한다. 저장한 수.
+    /// </summary>
+    private async Task<int> SaveUserBuildingBatchAsync(string job, IReadOnlyList<(string Uid, UserBuildingState? Before, UserBuildingState After)> batch,
+                                                       Func<int, string> description)
+    {
+        var commands = new List<Services.Undo.IUndoableCommand>();
+        foreach (var (uid, before, after) in batch)
+        {
+            if (!await SaveUserBuildingAsync(job, uid, after)) break;
+            commands.Add(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} {(before == null ? "넣기" : "고치기")}", job, uid, before, after,
+                                                 ApplyUserBuildingStateAsync, ResolveUserBuildingJob));
+        }
+        if (commands.Count > 0) _undoService?.Push(new Services.Undo.Commands.MacroCommand(description(commands.Count), commands, _log));
+        return commands.Count;
     }
 
     /// <summary>[합치기] 보임 — 2개 이상 골랐을 때만.</summary>
@@ -527,10 +544,17 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (UbSelected.Count == 0) return false;
         UbSelected.Clear();
+        PostUserBuildingSelection3D();
         LoadUserBuildingGroupFields();
         _ubAdorner?.InvalidateVisual();
         RefreshUserBuildingPanel();
         return true;
+    }
+
+    /// <summary>3D 위 판 — 고른 건물 모두 3D 에 강조(없으면 지움). 2D 판은 지도 표면이 그린다.</summary>
+    private void PostUserBuildingSelection3D()
+    {
+        if (_ubIn3D && _ubArea is { } area) PostUserBuilding3D(area.Id, Map3DUserBuilding.SelectMessageJson(UbSelected.LastOrDefault(), UbSelected));
     }
 
     /// <summary>
@@ -622,7 +646,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         _ubDraft.CircleSides = UbCircleSides;
         if (edit == null) _ubDraft.SetTool(_ubTool);
         _ubDraft.Changed += OnUserBuildingDraftChanged;
-        if (edit?.Uid != _ubEditing?.Uid) PostUserBuilding3D(area.Id, Map3DUserBuilding.SelectMessageJson(edit?.Uid));   // 3D 상자 고름 표시
+        // 3D 상자 고름 표시 — 여러 개 고른 강조도 이것 하나로 바꾼다(3D 위 판)
+        if (edit?.Uid != _ubEditing?.Uid || (_ubIn3D && UbSelected.Count > 0)) PostUserBuilding3D(area.Id, Map3DUserBuilding.SelectMessageJson(edit?.Uid));
         _ubEditing = edit;
         if (_ubIn3D) { if (edit != null) StartEdit3D(Map3DEdit.TargetUserBuilding, edit.Uid); else StopEdit3D(); }   // 3D 손잡이
         UbSelected.Clear();   // 새 윤곽 · 고치기 = 여러 개 고름은 끝
@@ -642,6 +667,10 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             _ubDraft.Load(edit.Outline);
             _ubHeight = Map3DBuilding.ClampHeight(edit.Height);
             _ubName = edit.Name ?? "";
+            // 층고 = 저장된 높이 ÷ 층수 — 늘 3.0 으로 열면 「건물 높이」 판에서 층고 4 m 로 넣은 20 m · 5층이 7층으로 보이고,
+            // 이름만 고쳐 저장해도 층수가 바뀌었다(2026-10-22 "높이를 수정하면 다른 속성이 변경"). 판 범위(2~10 m) 밖이면 기본값.
+            double fh = edit.Floors is int f && f > 0 ? edit.Height / f : 0;
+            _ubFloorHeightValue = fh is >= Map3DBuilding.MinFloorHeight and <= Map3DBuilding.MaxFloorHeight ? fh : Map3DBuilding.DefaultFloorHeight;
         }
         else
         {
@@ -800,6 +829,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             return true;
         }
         if (inTextBox) return false;
+        if (HandleUserBuildingClipboardKey(key, modifiers)) return true;   // Ctrl+C/V 건물 · Ctrl+Shift+C/V 속성(MapViewModel.UserBuildingClipboard)
         if (modifiers == ModifierKeys.Control && key == Key.Z) { _ = UndoUserBuildingAsync(); return true; }
         if (modifiers == ModifierKeys.Control && key == Key.Y) { _ = RedoUserBuildingAsync(); return true; }
         if (modifiers != ModifierKeys.None) return false;
@@ -872,6 +902,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         MergeUserBuildingsCommand.RaiseCanExecuteChanged();
         ClearUserBuildingSelectionCommand.RaiseCanExecuteChanged();
         ResetUserBuildingTaperCommand.RaiseCanExecuteChanged();
+        foreach (var c in new[] { CopyUserBuildingsCommand, PasteUserBuildingsCommand, CopyUserBuildingStyleCommand, PasteUserBuildingStyleCommand })
+            c.RaiseCanExecuteChanged();
         PreviewUserBuildingDraft();
     }
 
