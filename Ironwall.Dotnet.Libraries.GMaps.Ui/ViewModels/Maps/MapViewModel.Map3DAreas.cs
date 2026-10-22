@@ -22,6 +22,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Note         : 영역 마커는 편집 심볼이 아니다(DB 저장 없음). 판정 · 글은 순수 함수 Map3DGuide(헤드리스 시험).
                   갱신은 3D 게이트 큐(QueueMap3DGate — 줌 · 위치 · 회전 변경을 프레임당 1회로 모은다)에서 함께 한다.
                   ⑤ 지움 · 다시 만들기 · 목록에서 빠짐 · 3D 화면 scene-missing → RetireMap3DJob 이 그 job 을 모든 상태에서 뺀다(2026-10-19).
+                  ⑥ 「이 영역 내보내기…」(.iw3d, 2026-10-22) · 지도 메뉴 「3D 영역 가져오기…」 → MapViewModel.Map3DPackage.
    Created On   : 2026-10-17 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageModel>
@@ -60,6 +61,9 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
                 _map3DAreasAppliedSeq = seq;
                 ApplyMap3DAreas(scenes);
             }).ConfigureAwait(false);
+            // 엔진이 살아 있을 때 한 번 — 판의 외벽 무늬 목록(MapViewModel.BuildingLook). 기다리지 않는다: 기다리면 이 함수를 await 하는 호출자
+            // (다시 연결 등)의 뒷부분이 그 HTTP 응답 스레드에서 이어져 UI 스레드를 벗어났다
+            _ = LoadMap3DFacadesAsync();
         }
         catch (Map3DServerUnavailableException ex)
         {
@@ -100,7 +104,9 @@ public partial class MapViewModel : IHandle<CallDeleteMap3DAreaProcessMessageMod
                                          // 이 영역을 다시 만드는 중이면 「만들기 취소」(진행 판 단추와 같은 동작)
                                          _isMap3DBaking && _map3DBakeJob != null && scene.Id == _map3DBakeSourceId ? area => _ = CancelMap3DBakeAsync() : null,
                                          // 직접 그린 건물(MapViewModel.UserBuilding) — 「건물 그리기」 · 「직접 그린 건물 n개 — 모두 지우기…」
-                                         area => StartUserBuildingDraw(area), area => _ = RequestClearUserBuildingsAsync(area));
+                                         area => StartUserBuildingDraw(area), area => _ = RequestClearUserBuildingsAsync(area),
+                                         // .iw3d 내보내기(MapViewModel.Map3DPackage) — 지도 편집 권한이 있을 때만(권한이 바뀌면 다시 짠다)
+                                         CanEditMap() ? area => _ = ExportMap3DAreaAsync(area) : null);
             int index = Map3DAreas.ToList().FindIndex(a => a.Id == scene.Id);
             if (index >= 0) Map3DAreas[index] = item; else Map3DAreas.Add(item);
 
