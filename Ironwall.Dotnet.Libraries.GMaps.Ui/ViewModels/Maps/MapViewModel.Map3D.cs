@@ -1105,6 +1105,12 @@ public partial class MapViewModel
             catch (Exception ex) { _log?.Error($"[Map3D] 꾸미기 항목 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
+        if (msg.Type == "model.pick")
+        {
+            try { if (msg.ModelUid is { } uid) OnMap3DModelPicked(uid); }   // 「꾸미기」 판의 넣은 모델(MapViewModel.Model3D)
+            catch (Exception ex) { _log?.Error($"[Map3D] 넣은 모델 고르기 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
         if (msg.Type is "draw.point" or "draw.done" or "draw.end" or "edit.commit" or "edit.end")
         {
             try { OnMap3DEditMessage(msg); }   // 3D 안에서 놓기 · 그리기 · 손잡이(MapViewModel.Edit3D)

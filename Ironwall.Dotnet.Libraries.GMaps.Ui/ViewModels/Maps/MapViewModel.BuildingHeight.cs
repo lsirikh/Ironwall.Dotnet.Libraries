@@ -22,12 +22,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Created On   : 2026-10-19 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetMap3DHeightsProcessMessageModel>,
-                                    IHandle<CallHideMap3DBuildingProcessMessageModel>, IHandle<CallRestoreMap3DLooksProcessMessageModel>
+                                    IHandle<CallHideMap3DBuildingProcessMessageModel>, IHandle<CallRestoreMap3DLooksProcessMessageModel>,
+                                    IHandle<CallHideMap3DBuildingsProcessMessageModel>
 {
     /// <summary>판 안 되돌리기 한 칸 — 그 장면 · 건물을 Before 높이로(null = 자동). Look 이 있으면 외관 칸 — 그 모양(숨김 · 색 · 무늬)으로 다시 저장.</summary>
     private sealed record BuildingHeightUndoStep(string Job, int Id, double? Before, int? BeforeFloors)
     {
         public Map3DLookState? Look { get; init; }
+        /// <summary>여러 건물을 한꺼번에 지운 한 칸(고른 n개 · 영역 모두) — 되돌리기 = 그 건물들을 지우기 전 모양으로 모두 되살림.</summary>
+        public IReadOnlyList<(int Id, Map3DLookState Look)>? Group { get; init; }
     }
 
     private Map3DBuildingPick? _bhBuilding;   // 고른 건물(저장된 값 = 취소하면 돌아갈 값)
@@ -171,7 +174,14 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     // ── 3D 에서 고르기 ──
 
     /// <summary>3D 에서 건물을 눌렀다(building 메시지) — 판을 그 건물로 연다. 다른 건물을 보던 중이면 그 미리보기를 먼저 원래대로.</summary>
-    private void OnMap3DBuildingPicked(Map3DBuildingPick pick)
+    private void OnMap3DBuildingPicked(Map3DBuildingPick pick) => OnMap3DBuildingPicked(pick, Map3DModifiers().HasFlag(System.Windows.Input.ModifierKeys.Control));
+
+    /// <summary>3D 고름 때 보조키(시험은 가짜로 바꾼다 — 기본은 이 스레드의 Win32 키 상태, 시험 중 사용자가 누른 Ctrl 이 끼어들지 않게).</summary>
+    private Func<System.Windows.Input.ModifierKeys>? _map3DModifiers;
+    private System.Windows.Input.ModifierKeys Map3DModifiers() => (_map3DModifiers ?? (() => System.Windows.Input.Keyboard.Modifiers))();
+
+    /// <summary>ctrl = Ctrl+클릭(여러 개 고르기에 넣기 · 빼기).</summary>
+    private void OnMap3DBuildingPicked(Map3DBuildingPick pick, bool ctrl)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
         if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid); return; }
@@ -183,6 +193,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 윤곽 지우기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
             return;
         }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
+        if (OnMap3DBuildingPickedOverEdit3D(pick)) return;
         if (Map3DHost.HostMode == "hwnd")
         {
             // 네이티브 창 3D 는 WPF 판을 덮는다 — 안 보이는 판이 첫 Esc 를 가로채 3D 를 못 나가게 되므로 열지 않고 알린다(3D 가 그린 윤곽은 지운다)
@@ -192,13 +203,14 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
             SetAimStatus("네이티브 창 3D 에서는 건물 높이 판을 쓸 수 없습니다", autoHide: true);
             return;
         }
+        if (ToggleBuildingMultiSelect(pick, ctrl) && _bhBuilding?.Id == pick.Id) return;   // 여러 개 고르기 — 넣거나 뺐다(같은 건물이면 판은 그대로)
         if (_bhBuilding is { } old)
         {
             if (old.Id == pick.Id && _bhJob == _map3DJob) return;   // 같은 건물 — 넣던 값 그대로
             if (IsBuildingHeightChanged) PostBuilding3D(Map3DBuilding.PreviewMessageJson(old.Id, null));
         }
         _bhDragStart = null;
-        _bhBuilding = pick;
+        _bhBuilding = _bhJob == _map3DJob ? WithSavedLook(pick) : pick;   // 받아 둔 목록이 이 장면 것이면 저장된 외관을 바로(목록을 다시 받으면 또 맞춘다)
         _bhJob = _map3DJob;
         _bhPreview = pick.Height;
         _bhLookEdit = null;
@@ -210,11 +222,45 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _ = LoadBuildingLooksAsync(_map3DJob);   // 「숨긴 건물」 목록 · 옛 엔진 판정
     }
 
+    /// <summary>
+    /// 3D 고르기는 서로 배타(2026-10-22 사용자 — 직접 그린 굴뚝을 누르자 같은 자리의 엔진이 만든 굴뚝도 골라져 두 판 · 두 강조가 함께 떴다).
+    /// 3D 위 「건물 그리기」 판이 열려 있을 때 구운 건물 고름이 오면:
+    /// ① 3D 그리기 중(draw.start)이면 그 클릭은 점 찍기 몫 — 무시하고 엔진이 그린 윤곽만 지운다.
+    /// ② 고른 자리가 아직 안 구운 직접 그린 건물 안이면 직접 그린 건물이 우선(다시 만들면 겹친 자동 건물은 빠진다) — 구운 건물 윤곽은 지우고
+    ///    그 직접 그린 건물 고름 · 강조를 그대로 둔다(다른 것이면 그것을 연다).
+    /// ③ 아니면 직접 그린 건물 · 꾸미기 판(손잡이 · 강조 포함)을 닫고 「건물 높이」 판으로 간다(false).
+    /// 처리를 끝냈으면 true.
+    /// </summary>
+    private bool OnMap3DBuildingPickedOverEdit3D(Map3DBuildingPick pick)
+    {
+        bool ub3D = _ubIn3D && IsUserBuildingDrawing && _ubArea?.Id == _map3DJob;
+        if (ub3D && _draw3DMode != null || _decoIn3D && IsDecorating && _draw3DMode != null)
+        {
+            _log?.Info($"[Map3D] 건물 고름 — 3D 그리기 중(무시) id={pick.Id}");
+            PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+            return true;
+        }
+        if (ub3D && pick.Lon is double lon && pick.Lat is double lat
+            && UserBuildingItems.LastOrDefault(i => i.BakedId == null && Map3DUserBuilding.Contains(i.Outline, new UbPoint(lon, lat))) is { } drawn)
+        {
+            _log?.Info($"[Map3D] 건물 고름 id={pick.Id} — 같은 자리의 직접 그린 건물 우선 uid={drawn.Uid}");
+            PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
+            if (_ubEditing?.Uid == drawn.Uid) PostUserBuilding3D(_ubArea!.Id, Map3DUserBuilding.SelectMessageJson(drawn.Uid));   // 엔진이 구운 건물로 옮긴 강조를 되돌린다
+            else OnMap3DUserBuildingPicked(drawn.Uid);
+            return true;
+        }
+        if (IsUserBuildingDrawing) ExitUserBuildingDraw("building-pick");   // 고름 · 손잡이 · 판을 내린다(userbuilding.select null · edit.stop)
+        if (IsDecorating) ExitDecoration("building-pick");                   // decoration.select null · edit.stop
+        return false;
+    }
+
     /// <summary>판 닫기 — 미리보기 원래대로 · 강조 지움. clearUndo = 3D 를 나갈 때(판 안 되돌리기 비움).</summary>
     private void CloseBuildingHeightPanel(bool clearUndo)
     {
         if (clearUndo) { BhUndo.Clear(); _bhSession++; }   // 3D 세션이 바뀐다 — 그 뒤 도착한 저장 응답은 칸에 쌓지 않는다
         if (_bhBuilding is not { } b) return;
+        _bhMultiOn = false;
+        BhMulti.Clear();
         // 3D 로 보내기(WebView2)가 실패해도 판은 닫는다 — 3D 나가기 도중 예외로 나머지 복귀가 끊기지 않게
         try
         {
@@ -275,8 +321,14 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
                      nameof(BuildingColors), nameof(BuildingFacade), nameof(BuildingWallColor), nameof(BuildingRoofColor), nameof(IsBuildingLookChanged),
                      nameof(IsBuildingLookAvailable), nameof(IsBuildingLookUnsupported), nameof(BuildingHideButtonText), nameof(IsBuildingHidden),
                      nameof(BuildingHiddenItems), nameof(BuildingHiddenCountText), nameof(HasBuildingHidden), nameof(BuildingLookNotice), nameof(HasBuildingLookNotice),
+                     nameof(IsBuildingMultiSelect), nameof(BuildingMultiCount), nameof(BuildingMultiSelectText), nameof(BuildingMultiButtonText),
+                     nameof(BuildingMultiDeleteText),
                  })
             NotifyOfPropertyChange(name);
+        ToggleBuildingMultiSelectCommand.RaiseCanExecuteChanged();
+        HideSelectedBuildingsCommand.RaiseCanExecuteChanged();
+        HideAndRedrawBuildingCommand.RaiseCanExecuteChanged();
+        HideAllAutoBuildingsCommand.RaiseCanExecuteChanged();
         StepBuildingFloorCommand.RaiseCanExecuteChanged();
         ApplyBuildingHeightCommand.RaiseCanExecuteChanged();
         ResetBuildingHeightCommand.RaiseCanExecuteChanged();
@@ -326,7 +378,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         var step = BhUndo[index];
         BhUndo.RemoveAt(index);
         int session = _bhSession;
-        bool ok = step.Look is { } look
+        bool ok = step.Group is { } group
+            ? await RestoreBuildingsAsync(step.Job, group)
+            : step.Look is { } look
             ? await SaveBuildingLookAsync(step.Job, step.Id, look.Hidden, look, null, "되돌렸습니다")
             : await SaveBuildingHeightAsync(step.Job, step.Id, step.Before, step.BeforeFloors, null, () => "되돌렸습니다");
         if (!ok && session == _bhSession) BhUndo.Insert(Math.Min(index, BhUndo.Count), step);   // 실패면 다시 할 수 있게 남긴다(그 사이 3D 를 나갔으면 비운 채로)

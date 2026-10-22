@@ -50,6 +50,10 @@ public class CallClearUserBuildingsProcessMessageModel : IMessageModel { }
 /// 대기 대상(_pendingBuildingHide)을 숨기거나(PUT …/buildings/{bid}/look hidden=true) 직접 그린 건물이면 지운다(DELETE …/user-buildings/{uid}).</summary>
 public class CallHideMap3DBuildingProcessMessageModel : IMessageModel { }
 
+/// <summary>3D 「건물 높이」 판 [고른 n개 지우기] · [이 영역 자동 건물 모두 지우기…] 확인 콜백(2026-10-22). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
+/// 대기 대상(_pendingBuildingsHide)을 모두 숨긴다(건물마다 PUT …/buildings/{bid}/look hidden=true, 되돌리기 1단위).</summary>
+public class CallHideMap3DBuildingsProcessMessageModel : IMessageModel { }
+
 /// <summary>3D 「건물 높이」 판 [모두 되살리기] 확인 콜백(2026-10-21). "확인" 시 <c>MapViewModel.HandleAsync</c> 가
 /// 그 장면 영역의 건물 모양 덮어쓰기(숨김 · 색 · 무늬)를 모두 지운다(DELETE /api/jobs/{id}/looks).</summary>
 public class CallRestoreMap3DLooksProcessMessageModel : IMessageModel { }

@@ -17,6 +17,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
                     다시 불러오지 않고 바로 보이게 한다. ★ 판 안 되돌리기 칸(BhUndo)에 외관 칸도 쌓는다(되돌리기 = 숨긴 것 되살리기 · 앞 색으로).
                   ★ 직접 그린 건물(origin user)은 숨기지 않고 [이 건물 지우기] = user-buildings DELETE(uid 를 아는 경우).
                   ★ 엔진이 옛 판(GET …/looks 404)이면 외관 칸 · 숨기기를 끄고 이유 한 줄.
+                  ★ 외벽 무늬 목록(2026-10-22, facade-package-contract A) = 엔진 GET /api/facades(영역 목록을 받을 때 한 번 — 옛 엔진 · 실패면 내장 22개),
+                    「건물 높이」 · 「건물 만들기」 판 콤보에 분류 머리글(공장 · 발전소 · 군사 · 일반)로 묶어 보인다.
    Created On   : 2026-10-21 · Sensorway Co., Ltd.
  ****************************************************************************/
 public partial class MapViewModel
@@ -31,11 +33,11 @@ public partial class MapViewModel
     private (string Job, Map3DBuildingPick Building)? _pendingBuildingHide;
     private string? _pendingLooksReset;
 
-    public IReadOnlyList<KeyValuePair<string, string>> BuildingFacades => Map3DLook.Facades;
+    public System.ComponentModel.ICollectionView BuildingFacades => _bhFacadeView ??= NewFacadeView();
     public IReadOnlyList<KeyValuePair<string, string>> BuildingColors => Map3DLook.ColorsWith(_bhBuilding?.Look.WallColor, _bhBuilding?.Look.RoofColor);
     private Map3DLookState BhLook => _bhLookEdit ?? _bhBuilding?.Look ?? Map3DLookState.Auto;
 
-    /// <summary>외벽 무늬(auto · residential · commercial · industrial · glass · brick · concrete).</summary>
+    /// <summary>외벽 무늬(Map3DLook.FacadeCatalog · 엔진 목록의 키).</summary>
     public string BuildingFacade
     {
         get => BhLook.Facade;
@@ -65,8 +67,11 @@ public partial class MapViewModel
     /// <summary>고른 건물이 숨겨져 있는가(숨긴 뒤 · 되돌리기 전).</summary>
     public bool IsBuildingHidden => _bhBuilding?.Look.Hidden == true;
     private bool IsBuildingUserDrawn => _bhBuilding?.Origin == "user";
-    /// <summary>직접 그린 건물은 숨기지 않고 지운다.</summary>
-    public string BuildingHideButtonText => IsBuildingUserDrawn ? "이 건물 지우기" : "이 건물 숨기기";
+    /// <summary>
+    /// 사용자가 찾는 말로 [이 건물 지우기](2026-10-22 사용자 "삭제가 안 되는데?") — 지도 건물은 실제로는 숨김(되살리기 가능, "?" 말풍선),
+    /// 직접 그린 건물은 user-buildings DELETE.
+    /// </summary>
+    public string BuildingHideButtonText => "이 건물 지우기";
 
     public IReadOnlyList<Map3DLookItem> BuildingHiddenItems => (_bhLooks ?? Array.Empty<Map3DLookItem>()).Where(l => l.State.Hidden).ToList();
     public string BuildingHiddenCountText => Map3DLook.HiddenCountText(BuildingHiddenItems.Count);
@@ -94,6 +99,58 @@ public partial class MapViewModel
     public RelayCommand RestoreAllHiddenBuildingsCommand => _restoreAllHiddenBuildingsCommand ??= new RelayCommand(
         _ => _ = RequestRestoreAllLooksAsync(), _ => IsBuildingHeightEditable && IsBuildingLookAvailable && _bhLooks is { Count: > 0 });
 
+    // ── 외벽 무늬 목록(GET /api/facades) ──
+
+    private IReadOnlyList<Map3DFacade>? _map3DFacadeList;   // 엔진에서 받은 목록(옛 엔진이면 내장) — null = 아직 못 받음(다음 영역 목록 때 다시)
+    private bool _map3DFacadeLoading;
+    private System.ComponentModel.ICollectionView? _bhFacadeView, _ubFacadeView;
+
+    /// <summary>
+    /// 판 콤보의 외벽 무늬 항목(값, 쉬운 말) — 분류 머리글로 묶는다. 판마다 따로 만든다: 한 보기를 두 콤보가 같이 쓰면
+    /// 보기의 "지금 항목"을 서로 끌어당긴다(콤보는 IsSynchronizedWithCurrentItem=False 로도 막는다).
+    /// </summary>
+    private System.ComponentModel.ICollectionView NewFacadeView()
+    {
+        var list = _map3DFacadeList ?? Map3DLook.FacadeCatalog;
+        var view = new System.Windows.Data.ListCollectionView(Map3DLook.Choices(list).ToList());
+        view.GroupDescriptions.Add(new FacadeGroupDescription(list.GroupBy(f => f.Key).ToDictionary(g => g.Key, g => Map3DLook.GroupText(g.First().Group))));
+        return view;
+    }
+
+    /// <summary>항목(값, 쉬운 말) → 분류 머리글(자동은 "" — 머리글 없이 맨 위).</summary>
+    private sealed class FacadeGroupDescription : System.ComponentModel.GroupDescription
+    {
+        private readonly IReadOnlyDictionary<string, string> _groups;
+        public FacadeGroupDescription(IReadOnlyDictionary<string, string> groups) => _groups = groups;
+        public override object GroupNameFromItem(object item, int level, System.Globalization.CultureInfo culture)
+            => item is KeyValuePair<string, string> p && _groups.TryGetValue(p.Key, out var g) ? g : "";
+    }
+
+    /// <summary>
+    /// 엔진의 외벽 무늬 목록을 한 번 받는다(영역 목록을 받은 뒤). 옛 엔진(404) · 형식 틀림 = 내장 목록으로 확정, 닿지 않음 = 다음에 다시.
+    /// 받으면 두 판 콤보 항목을 새로 만들고 지금 값을 다시 알린다(항목을 갈 때 콤보가 비운 값은 세터가 무시한다).
+    /// </summary>
+    private async Task LoadMap3DFacadesAsync()
+    {
+        if (_map3DClient == null || _map3DFacadeList != null || _map3DFacadeLoading) return;
+        _map3DFacadeLoading = true;
+        try
+        {
+            var list = await _map3DClient.ListFacadesAsync().ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                if (list != null) Map3DLook.UseEngineFacades(list);
+                _map3DFacadeList = list ?? Map3DLook.FacadeCatalog;
+                _bhFacadeView = _ubFacadeView = null;
+                foreach (var name in new[] { nameof(BuildingFacades), nameof(UserBuildingFacades), nameof(BuildingFacade), nameof(UserBuildingFacade) })
+                    NotifyOfPropertyChange(name);
+                _log?.Info($"[Map3D] 외벽 무늬 목록 {(list == null ? "내장(엔진이 모름)" : "엔진")} {_map3DFacadeList.Count}개");
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Warning($"[Map3D] 외벽 무늬 목록 실패(내장 목록 그대로): {ex.Message}"); }
+        finally { _map3DFacadeLoading = false; }
+    }
+
     private void SetBuildingLookEdit(Map3DLookState look, string? raw)
     {
         if (raw == null) return;   // 콤보가 목록에 없는 값(엔진이 넣은 색)을 비우며 되쓴 null — 저장된 값을 지우지 않는다("" = 자동)
@@ -101,6 +158,13 @@ public partial class MapViewModel
         _bhLookEdit = look;
         RefreshBuildingHeightPanel();
     }
+
+    /// <summary>
+    /// 저장된 외관(GET …/looks 의 그 건물 줄)을 고른 건물에 — 뷰어의 building 메시지에는 외관 키가 없다(buildingedit.js buildingMessage).
+    /// 이게 없으면 외관을 저장한 건물을 다시 고를 때 판이 「자동」으로 보이고, 지붕 색만 바꿔 [외관 적용]하면 저장한 외벽 무늬 · 색까지 자동으로 지워졌다(2026-10-22).
+    /// </summary>
+    private Map3DBuildingPick WithSavedLook(Map3DBuildingPick b)
+        => _bhLooks?.FirstOrDefault(l => l.Id == b.Id) is { } saved ? b with { Look = saved.State } : b;
 
     /// <summary>지금 장면의 덮어쓰기 목록 — 옛 엔진(404)이면 외관 칸을 끈다. 닿지 않음 · 그 밖의 실패는 기록만(목록을 비운 채로).</summary>
     private async Task LoadBuildingLooksAsync(string job)
@@ -112,6 +176,7 @@ public partial class MapViewModel
             if (_bhJob != job) return;
             _bhLooksUnsupported = list == null;
             _bhLooks = list;
+            if (_bhBuilding is { } b && _bhLookEdit == null) _bhBuilding = WithSavedLook(b);
             RefreshBuildingHeightPanel();
         }
         catch (Exception ex) { _log?.Warning($"[Map3D] 건물 외관 목록 실패 job={job}: {ex.Message}"); }
@@ -188,10 +253,10 @@ public partial class MapViewModel
             _pendingBuildingHide = (job, b);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
             {
-                Title = IsBuildingUserDrawn ? "직접 그린 건물 지우기" : "건물 숨기기",
+                Title = IsBuildingUserDrawn ? "직접 그린 건물 지우기" : "건물 지우기",
                 Explain = IsBuildingUserDrawn
                     ? "직접 그린 이 건물을 지우시겠습니까?\n다시 만들면 그 자리는 자동으로 찾은 건물로 돌아갑니다."
-                    : "이 건물을 3D 에서 숨기시겠습니까?\n다시 만들어도 숨긴 채로 남고, 「숨긴 건물」 목록의 [되살리기] 로 되돌릴 수 있습니다.",
+                    : "이 건물을 3D 에서 지우시겠습니까?\n다시 만들어도 지운 채로 남고, 「숨긴 건물」 목록의 [되살리기] 로 되돌릴 수 있습니다.",
                 MessageModel = new CallHideMap3DBuildingProcessMessageModel(),
             });
         }
@@ -217,7 +282,7 @@ public partial class MapViewModel
                 else SetBuildingHeightError(_ubError ?? "지우지 못했습니다.");
                 return;
             }
-            await SaveBuildingLookAsync(p.Job, p.Building.Id, true, null, p.Building.Look, "건물을 숨겼습니다 — 「숨긴 건물」 목록에서 되살릴 수 있습니다");
+            await SaveBuildingLookAsync(p.Job, p.Building.Id, true, null, p.Building.Look, "건물을 지웠습니다 — 「숨긴 건물」 목록에서 되살릴 수 있습니다");
         }
         finally
         {
@@ -256,7 +321,7 @@ public partial class MapViewModel
             int n = await _map3DClient.ResetAllLooksAsync(job, cancellationToken);
             foreach (var it in known)
                 if (it.Id is int id) PostBuilding3D(Map3DLook.LookMessageJson(id, Map3DLookState.Auto));
-            BhUndo.RemoveAll(u => u.Job == job && u.Look != null);   // 지운 값으로 되돌리지 않게
+            BhUndo.RemoveAll(u => u.Job == job && (u.Look != null || u.Group != null));   // 지운 값으로 되돌리지 않게
             if (_bhJob == job && _bhBuilding is { } b) { _bhBuilding = b with { Look = Map3DLookState.Auto }; _bhLookEdit = null; }
             _log?.Info($"[Map3D] 건물 외관 모두 되돌림 job={job} n={n}");
             SetAimStatus($"건물 {n}개를 되살리고 외관을 자동으로 되돌렸습니다", autoHide: true);

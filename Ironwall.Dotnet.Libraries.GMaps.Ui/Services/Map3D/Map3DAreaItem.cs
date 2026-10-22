@@ -49,6 +49,13 @@ public sealed class Map3DAreaItem
     public Map3DAreaItem(Map3DSceneInfo scene, double enterZoom, Action<Map3DAreaItem> view, Action<Map3DAreaItem>? changeZoom,
                          Action<Map3DAreaItem>? resetHeights, Action<Map3DAreaItem> rebake, Action<Map3DAreaItem> delete,
                          Action<Map3DAreaItem>? cancelBake, Action<Map3DAreaItem>? drawBuilding, Action<Map3DAreaItem>? clearBuildings)
+        : this(scene, enterZoom, view, changeZoom, resetHeights, rebake, delete, cancelBake, drawBuilding, clearBuildings, null) { }
+
+    /// <param name="export">「이 영역 내보내기…」(.iw3d 한 파일 — 다른 PC 의 GIS 로 옮기기). null 이면 넣지 않는다(지도 편집 권한이 없을 때).</param>
+    public Map3DAreaItem(Map3DSceneInfo scene, double enterZoom, Action<Map3DAreaItem> view, Action<Map3DAreaItem>? changeZoom,
+                         Action<Map3DAreaItem>? resetHeights, Action<Map3DAreaItem> rebake, Action<Map3DAreaItem> delete,
+                         Action<Map3DAreaItem>? cancelBake, Action<Map3DAreaItem>? drawBuilding, Action<Map3DAreaItem>? clearBuildings,
+                         Action<Map3DAreaItem>? export)
     {
         Scene = scene;
         EnterZoom = enterZoom;
@@ -64,6 +71,7 @@ public sealed class Map3DAreaItem
         if (clearBuildings != null && scene.UserBuildings > 0)
             actions.Add(new($"{Map3DUserBuilding.CountText(scene.UserBuildings)} — 모두 지우기…", new RelayCommand(() => clearBuildings(this)))
                         { AutomationId = $"Map.UserBuilding.ClearAll.{scene.Id}" });
+        if (export != null) actions.Add(new(ExportHeader, new RelayCommand(() => export(this))) { AutomationId = $"GMaps.Map3D.Export.{scene.Id}" });
         if (cancelBake == null) actions.Add(new("다시 만들기", new RelayCommand(() => rebake(this))));
         // 다시 만드는 중엔 지우기도 뺀다 — 지운 뒤 굽기가 끝나면 새 장면으로 영역이 되살아났다(2026-10-19 D1). 「만들기 취소」 뒤 지운다
         if (cancelBake == null) actions.Add(new("지우기…", new RelayCommand(() => delete(this))));
@@ -72,6 +80,8 @@ public sealed class Map3DAreaItem
 
     /// <summary>「만들기 취소」 글 · 자동화 식별자(진행 판 단추와 같은 id).</summary>
     public const string CancelBakeHeader = "만들기 취소", CancelBakeAutomationId = "GMaps.Map3D.CancelBake";
+    /// <summary>「이 영역 내보내기…」 글.</summary>
+    public const string ExportHeader = "이 영역 내보내기…";
 
     /// <summary>이 영역을 다시 만드는 중인가(메뉴 맨 위 「만들기 취소」 · 목록 줄 "만드는 중").</summary>
     public bool IsBaking { get; }

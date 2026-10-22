@@ -335,13 +335,14 @@ public sealed class Map3DClient : IDisposable
     /// <summary>넣기 · 고치기 — 지붕 모양(flat · gable · cone · dome) · 외벽 성격(auto · commercial · industrial · residential)까지.</summary>
     public Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
                                                             string? name, string roof, string use, CancellationToken ct = default)
-        => PutUserBuildingAsync(job, uid, outline, height, floors, name, roof, use, null, ct);
+        => PutUserBuildingAsync(job, uid, outline, height, floors, name, roof, use, look: null, ct: ct);
 
     /// <summary>넣기 · 고치기 — 외벽 색 · 지붕 색 · 외벽 무늬까지(twin-contract B, null = 그 키를 보내지 않음).</summary>
     public async Task<Map3DUserBuildingItem> PutUserBuildingAsync(string job, string uid, IReadOnlyList<UbPoint> outline, double height, int? floors,
-                                                                  string? name, string roof, string use, Map3DLookState? look, CancellationToken ct = default)
+                                                                  string? name, string roof, string use, Map3DLookState? look, double? taperDeg = null,
+                                                                  CancellationToken ct = default)
     {
-        var body = Map3DUserBuilding.PutBody(outline, height, floors, name, roof, use, look).ToString(Formatting.None);
+        var body = Map3DUserBuilding.PutBody(outline, height, floors, name, roof, use, look, taperDeg).ToString(Formatting.None);
         var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{UserBuildingsUrl(job)}/{Uri.EscapeDataString(uid)}")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -413,6 +414,162 @@ public sealed class Map3DClient : IDisposable
         return o["reset"]?.Type == JTokenType.Integer ? o.Value<int>("reset") : 0;
     }
 
+    /// <summary>
+    /// 외벽 무늬 목록(GET /api/facades, facade-package-contract A) — 그 주소가 없는 옛 엔진(404)이거나 형식이 틀리면 null(호출자가 내장 목록).
+    /// 닿지 않으면 Map3DServerUnavailableException.
+    /// </summary>
+    public async Task<IReadOnlyList<Map3DFacade>?> ListFacadesAsync(CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"{_server}/api/facades"), allowNotFound: true, ct).ConfigureAwait(false);
+        return json == null ? null : Map3DLook.ParseFacades(json);
+    }
+
+    // ── 3D 영역 패키지(.iw3d, facade-package-contract B) ──
+
+    /// <summary>패키지 내보내기 · 가져오기의 시간 제한 — 영역 하나가 수백 MB ~ 2 GB 라 보통 요청(10 초)으로는 끊긴다.</summary>
+    public TimeSpan PackageTimeout { get; init; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// 영역 내보내기(GET /api/jobs/{id}/package) — 받은 .iw3d 를 destination 에 그대로 쓴다. progress = (받은 바이트, 전체 바이트 · 모르면 null).
+    /// 옛 엔진(그 주소 없음)은 Map3DRequestException("Not Found"), 닿지 않으면 Map3DServerUnavailableException.
+    /// </summary>
+    public async Task DownloadPackageAsync(string job, System.IO.Stream destination, IProgress<(long Done, long? Total)>? progress = null,
+                                           CancellationToken ct = default)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(PackageTimeout);
+        try
+        {
+            using var response = await _http.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"{Map3DMath.JobUrl(_server, job)}/package"),
+                                                       HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                string text = await response.Content.ReadAsStringAsync(limit.Token).ConfigureAwait(false);
+                throw new Map3DRequestException(response.StatusCode, ReadDetail(text) ?? $"HTTP {(int)response.StatusCode}");
+            }
+            long? total = response.Content.Headers.ContentLength;
+            using var body = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
+            var buffer = new byte[81920];
+            long done = 0;
+            int n;
+            while ((n = await body.ReadAsync(buffer, limit.Token).ConfigureAwait(false)) > 0)
+            {
+                await destination.WriteAsync(buffer.AsMemory(0, n), limit.Token).ConfigureAwait(false);
+                done += n;
+                progress?.Report((done, total));
+            }
+        }
+        catch (HttpRequestException ex) { throw new Map3DServerUnavailableException(ex.Message, ex); }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested) { throw new Map3DServerUnavailableException("응답 시간 초과", ex, isTimeout: true); }
+    }
+
+    /// <summary>
+    /// 영역 가져오기(POST /api/jobs/import, multipart file) — 엔진이 manifest · 해시를 검사해 들인다. progress = (올린 바이트, 전체 바이트).
+    /// 거절(형식 · 크기 · 해시)은 Map3DRequestException(엔진 문구), 옛 엔진은 Map3DRequestException("Not Found" · "Method Not Allowed").
+    /// </summary>
+    public async Task<Map3DImportResult> ImportPackageAsync(System.IO.Stream source, string fileName, IProgress<(long Done, long? Total)>? progress = null,
+                                                            CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new ProgressStreamContent(source, progress);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+        form.Add(file, "file", fileName);
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"{Map3DMath.JobsUrl(_server)}/import") { Content = form },
+                                   allowNotFound: false, ct, PackageTimeout).ConfigureAwait(false);
+        return Map3DPackage.ParseImport(json!) ?? throw new Map3DRequestException(HttpStatusCode.OK, "가져오기 응답 형식이 올바르지 않습니다");
+    }
+
+    // ── 넣은 모델(map-3d models.py — 외부 3D 모델 주입) ──
+
+    /// <summary>모델 올리기 시간 제한 — OBJ · FBX 는 엔진이 Blender 로 바꾸느라(엔진 상한 180 초) 보통 요청보다 길다.</summary>
+    public TimeSpan ModelUploadTimeout { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>그 장면 범위의 넣은 모델(GET /api/jobs/{id}/models) — 옛 엔진(404)이면 null.</summary>
+    public async Task<IReadOnlyList<Map3DModelItem>?> ListModelsAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, ModelsUrl(job)), allowNotFound: true, ct).ConfigureAwait(false);
+        return json == null ? null : Map3DModels.ParseList(json);
+    }
+
+    /// <summary>
+    /// 넣기(POST /api/jobs/{id}/models, multipart file + 자리 · 방향 · 크기 · 이름 — null 인 칸은 보내지 않아 엔진이 영역 가운데 · 지형 · 0° · 1배로).
+    /// 형식 · 크기 · 삼각형 · 개수 상한 · 영역 밖은 Map3DRequestException(엔진 문구).
+    /// </summary>
+    public async Task<Map3DModelItem> UploadModelAsync(string job, byte[] data, string fileName, double? lon = null, double? lat = null, double? altM = null,
+                                                       double? headingDeg = null, double? scale = null, string? name = null, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(data), "file", fileName);
+        foreach (var (key, value) in new[] { ("lon", lon), ("lat", lat), ("alt_m", altM), ("heading_deg", headingDeg), ("scale", scale) })
+            if (value is double v) form.Add(new StringContent(v.ToString("R", CultureInfo.InvariantCulture)), key);
+        if (!string.IsNullOrWhiteSpace(name)) form.Add(new StringContent(name), "name");
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Post, ModelsUrl(job)) { Content = form }, allowNotFound: false, ct, ModelUploadTimeout)
+                       .ConfigureAwait(false);
+        return Map3DModels.ParseItem(JObject.Parse(json!)["item"] as JObject) ?? throw new Map3DRequestException(HttpStatusCode.OK, "모델 응답 형식이 올바르지 않습니다");
+    }
+
+    /// <summary>자리 · 방향 · 크기 · 이름 고치기(PUT …/models/{uid}) — 엔진이 저장한 항목. 없는 모델은 Map3DRequestException(404).</summary>
+    public async Task<Map3DModelItem> PutModelAsync(string job, Map3DModelItem item, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Put, $"{ModelsUrl(job)}/{Uri.EscapeDataString(item.Uid)}")
+        {
+            Content = new StringContent(Map3DModels.PlaceBody(item).ToString(Formatting.None), Encoding.UTF8, "application/json"),
+        }, allowNotFound: false, ct).ConfigureAwait(false);
+        return Map3DModels.ParseItem(JObject.Parse(json!)["item"] as JObject) ?? throw new Map3DRequestException(HttpStatusCode.OK, "모델 응답 형식이 올바르지 않습니다");
+    }
+
+    /// <summary>원본 파일(GET …/models/{uid}/file, GLB) — 지운 모델을 되돌리기로 되살리려고 지우기 전에 받아 둔다. 없으면(404) null.</summary>
+    public async Task<byte[]?> GetModelFileAsync(string job, string uid, CancellationToken ct = default)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(ModelUploadTimeout);
+        try
+        {
+            using var response = await _http.GetAsync($"{ModelsUrl(job)}/{Uri.EscapeDataString(uid)}/file", limit.Token).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotFound) return null;
+            if (!response.IsSuccessStatusCode)
+                throw new Map3DRequestException(response.StatusCode, ReadDetail(await response.Content.ReadAsStringAsync(limit.Token).ConfigureAwait(false)) ?? $"HTTP {(int)response.StatusCode}");
+            return await response.Content.ReadAsByteArrayAsync(limit.Token).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex) { throw new Map3DServerUnavailableException(ex.Message, ex); }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested) { throw new Map3DServerUnavailableException("응답 시간 초과", ex, isTimeout: true); }
+    }
+
+    /// <summary>지우기(DELETE …/models/{uid}) — 지웠으면 true, 이미 없으면(404) false.</summary>
+    public async Task<bool> DeleteModelAsync(string job, string uid, CancellationToken ct = default)
+        => await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{ModelsUrl(job)}/{Uri.EscapeDataString(uid)}"), allowNotFound: true, ct)
+               .ConfigureAwait(false) != null;
+
+    private string ModelsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/models";
+
+    /// <summary>올린 만큼 알려 주는 파일 본문(MultipartFormDataContent 안 — 큰 파일 올리기 진행 표시).</summary>
+    private sealed class ProgressStreamContent : HttpContent
+    {
+        private readonly System.IO.Stream _source;
+        private readonly IProgress<(long, long?)>? _progress;
+        public ProgressStreamContent(System.IO.Stream source, IProgress<(long, long?)>? progress) { _source = source; _progress = progress; }
+
+        protected override async Task SerializeToStreamAsync(System.IO.Stream stream, TransportContext? context)
+        {
+            var buffer = new byte[81920];
+            long done = 0;
+            long? total = _source.CanSeek ? _source.Length : null;
+            int n;
+            while ((n = await _source.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+            {
+                await stream.WriteAsync(buffer.AsMemory(0, n)).ConfigureAwait(false);
+                done += n;
+                _progress?.Report((done, total));
+            }
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _source.CanSeek ? _source.Length - _source.Position : -1;
+            return _source.CanSeek;
+        }
+    }
+
     // ── 꾸미기 항목(map-3d decorations, twin-contract C) ──
 
     /// <summary>그 장면 범위의 꾸미기 항목(GET /api/jobs/{id}/decorations) — 옛 엔진(404)이면 null.</summary>
@@ -441,6 +598,16 @@ public sealed class Map3DClient : IDisposable
     /// <summary>「모두 지우기」(DELETE …/decorations).</summary>
     public Task DeleteAllDecorationsAsync(string job, CancellationToken ct = default)
         => SendAsync(new HttpRequestMessage(HttpMethod.Delete, DecorationsUrl(job)), allowNotFound: false, ct);
+
+    /// <summary>
+    /// 장면 건물 줄(GET …/files/scene.json — 뷰어가 장면을 불러올 때 받는 그 파일)의 id · 출처 · 바닥 윤곽. 파일이 없으면(404) null.
+    /// 고름 메시지(building)에는 바닥 윤곽이 없어 「지우고 이 자리에 새로 그리기」 · 「이 영역 자동 건물 모두 지우기」 가 쓴다.
+    /// </summary>
+    public async Task<IReadOnlyList<Map3DSceneBuilding>?> GetSceneBuildingsAsync(string job, CancellationToken ct = default)
+    {
+        var json = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"{Map3DMath.JobUrl(_server, job)}/files/scene.json"), allowNotFound: true, ct).ConfigureAwait(false);
+        return json == null ? null : Map3DBuilding.ParseSceneBuildings(json);
+    }
 
     private string DecorationsUrl(string job) => $"{Map3DMath.JobUrl(_server, job)}/decorations";
 

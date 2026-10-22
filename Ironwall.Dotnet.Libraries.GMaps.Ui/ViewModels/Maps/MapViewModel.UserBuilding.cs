@@ -46,6 +46,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     private string? _ubError;
     private bool _ubInputError;
     private bool _ubBusy;
+    /// <summary>마지막 저장을 서버가 400(값 · 모양 거절 문구)으로 거절했는가.</summary>
+    private bool _ubLastSaveRejected;
     private double? _ubDragStart;
     private UserBuildingAdorner? _ubAdorner;
     private System.Windows.Window? _ubKeyWindow;
@@ -127,6 +129,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(UserBuildingRoofStatus));
             NotifyOfPropertyChange(nameof(HasUserBuildingRoofStatus));
+            PreviewUserBuildingDraft();
         }
     }
 
@@ -142,37 +145,123 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     public string UserBuildingUse
     {
         get => _ubUse ?? Map3DUserBuilding.UseAuto;
-        set { _ubUse = value ?? Map3DUserBuilding.UseAuto; NotifyOfPropertyChange(); }
+        set { _ubUse = value ?? Map3DUserBuilding.UseAuto; NotifyOfPropertyChange(); PreviewUserBuildingDraft(); }
     }
 
     // ── 외관(외벽 색 · 지붕 색 · 외벽 무늬, twin-contract B) ──
 
     private string? _ubWallColor, _ubRoofColor, _ubFacade;
-    public IReadOnlyList<KeyValuePair<string, string>> UserBuildingFacades => Map3DLook.Facades;
+    public System.ComponentModel.ICollectionView UserBuildingFacades => _ubFacadeView ??= NewFacadeView();   // 분류 머리글로 묶음(MapViewModel.BuildingLook)
     public IReadOnlyList<KeyValuePair<string, string>> UserBuildingColors => Map3DLook.ColorsWith(_ubWallColor, _ubRoofColor);
 
-    /// <summary>외벽 무늬(auto · residential · commercial · industrial · glass · brick · concrete).</summary>
+    /// <summary>외벽 무늬(Map3DLook.FacadeCatalog · 엔진 목록의 키 — null 은 콤보가 항목을 갈며 비운 것이라 무시).</summary>
     public string UserBuildingFacade
     {
         get => _ubFacade ?? Map3DLook.FacadeAuto;
-        set { _ubFacade = Map3DLook.NormalizeFacade(value); NotifyOfPropertyChange(); }
+        set { if (value == null) return; _ubFacade = Map3DLook.NormalizeFacade(value); NotifyOfPropertyChange(); PreviewUserBuildingDraft(); }
     }
 
     /// <summary>외벽 색("#rrggbb", "" = 자동 — null 은 콤보가 목록에 없는 값을 비우며 되쓴 것이라 무시).</summary>
     public string UserBuildingWallColor
     {
         get => _ubWallColor ?? "";
-        set { if (value == null) return; _ubWallColor = Map3DLook.NormalizeColor(value); NotifyOfPropertyChange(); }
+        set { if (value == null) return; _ubWallColor = Map3DLook.NormalizeColor(value); NotifyOfPropertyChange(); PreviewUserBuildingDraft(); }
     }
 
     /// <summary>지붕 색("#rrggbb", "" = 자동).</summary>
     public string UserBuildingRoofColor
     {
         get => _ubRoofColor ?? "";
-        set { if (value == null) return; _ubRoofColor = Map3DLook.NormalizeColor(value); NotifyOfPropertyChange(); }
+        set { if (value == null) return; _ubRoofColor = Map3DLook.NormalizeColor(value); NotifyOfPropertyChange(); PreviewUserBuildingDraft(); }
     }
 
     private Map3DLookState UserBuildingLook => new(false, _ubWallColor, _ubRoofColor, UserBuildingFacade);
+
+    // ── 위로 갈수록 좁게 · 넓게(taper_deg, 2026-10-22 사용자 — Fusion 360 Extrude 의 기울기처럼) ──
+
+    private double _ubTaper;
+    private string _ubTaperText = "0";
+
+    /// <summary>기울기 막대(−30~+30°, 1° 단위) — + = 위로 갈수록 좁게, − = 넓게, 0 = 수직.</summary>
+    public double UserBuildingTaperDeg
+    {
+        get => _ubTaper;
+        set => SetUserBuildingTaper(value);
+    }
+
+    /// <summary>기울기 숫자 칸(정수 °, 앞의 + 허용).</summary>
+    public string UserBuildingTaperText
+    {
+        get => _ubTaperText;
+        set
+        {
+            _ubTaperText = value ?? "";
+            if (!Map3DUserBuilding.TryParseTaper(value, out var deg, out var err)) { SetUserBuildingInputError(err); NotifyOfPropertyChange(); return; }
+            SetUserBuildingTaper(deg);
+        }
+    }
+
+    /// <summary>"수직" · "위로 갈수록 좁게 10°" 같은 쉬운 말 한 줄.</summary>
+    public string UserBuildingTaperStatus => Map3DUserBuilding.TaperText(_ubTaper);
+
+    private RelayCommand? _resetUserBuildingTaperCommand;
+    /// <summary>[0] — 수직으로 되돌리기.</summary>
+    public RelayCommand ResetUserBuildingTaperCommand => _resetUserBuildingTaperCommand ??= new RelayCommand(
+        _ => SetUserBuildingTaper(0), _ => IsUserBuildingDrawing && !_ubBusy && _ubTaper != 0);
+
+    private void SetUserBuildingTaper(double deg)
+    {
+        if (!IsUserBuildingDrawing) return;
+        _ubTaper = Map3DUserBuilding.ClampTaper(deg);
+        _ubError = null;
+        _ubInputError = false;
+        RefreshUserBuildingPanel();
+    }
+
+    // ── 3D 위 판 — 값을 바꾸는 즉시 3D 상자 미리보기(2026-10-22 사용자 "6층으로 했는데 그대로 3층") ──
+
+    /// <summary>마지막으로 3D 에 보낸 이 판의 상자(userbuilding.preview) — 같은 내용은 다시 보내지 않는다.</summary>
+    private string? _ubPreviewJson;
+    /// <summary>저장하지 않은 판 값이 3D 상자에 보이는 중 — 취소 · 다른 건물 · 끝내기에서 저장된 모양으로 되돌린다.</summary>
+    private bool _ubPreviewDirty;
+    /// <summary>새 윤곽의 미리보기 uid — [저장] 때 그대로 쓴다(3D 에 미리 그린 상자가 그 건물이 되게).</summary>
+    private string? _ubNewUid;
+
+    private string UserBuildingDraftUid => _ubEditing?.Uid ?? (_ubNewUid ??= Map3DUserBuilding.NewUid());
+
+    /// <summary>판 값 그대로의 건물(미리보기용).</summary>
+    private Map3DUserBuildingItem UserBuildingDraftItem(Map3DUserBuildingDraft d)
+        => new(UserBuildingDraftUid, d.Points.ToList(), _ubHeight, Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight),
+               string.IsNullOrWhiteSpace(_ubName) ? null : _ubName, null)
+           {
+               Roof = UserBuildingRoof, Use = UserBuildingUse, WallColor = _ubWallColor, RoofColor = _ubRoofColor, Facade = UserBuildingFacade, TaperDeg = _ubTaper,
+           };
+
+    /// <summary>
+    /// 3D 위 판이고 윤곽이 닫혀 있으면 판 값(높이 · 층수 · 지붕 · 외관 · 기울기)으로 3D 상자를 바로 그린다. 저장은 [저장] 에서만.
+    /// 2D 그리기는 3D 를 접어 두므로 보내지 않는다(저장 뒤 미리보기만 — 예전대로).
+    /// </summary>
+    private void PreviewUserBuildingDraft()
+    {
+        if (!_ubIn3D || _ubArea is not { } area || _ubDraft is not { IsClosed: true } d || _ubInputError || _ubBusy || d.Validate() != null) return;
+        var json = Map3DUserBuilding.PreviewMessageJson(UserBuildingDraftItem(d));
+        if (json == _ubPreviewJson) return;
+        _ubPreviewJson = json;
+        _ubPreviewDirty = true;
+        PostUserBuilding3D(area.Id, json);
+    }
+
+    /// <summary>저장하지 않은 미리보기를 걷는다 — 저장된 건물이면 그 모양, 새 윤곽이면 상자 지움.</summary>
+    private void RevertUserBuildingPreview()
+    {
+        bool dirty = _ubPreviewDirty;
+        _ubPreviewDirty = false;
+        _ubPreviewJson = null;
+        if (!dirty || _ubArea is not { } area) return;
+        string uid = UserBuildingDraftUid;
+        PostUserBuilding3D(area.Id, UserBuildingItems.FirstOrDefault(i => i.Uid == uid) is { } saved
+            ? Map3DUserBuilding.PreviewMessageJson(saved) : Map3DUserBuilding.PreviewMessageJson(uid, null, null));
+    }
 
     // ── 3D 에서 고르기 → 2D 고치기 판 ──
 
@@ -228,6 +317,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     public double UserBuildingHeight => _ubHeight;
     public string UserBuildingSummary
         => _ubDraft is not { IsClosed: true } ? "윤곽을 닫으면 저장할 수 있습니다"
+         : _ubIn3D ? $"3D 에 {Map3DBuilding.FormatMeters(_ubHeight)} m({Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight)}층)로 바로 보입니다 — [저장] 해야 남습니다"
          : $"저장하면 {Map3DBuilding.FormatMeters(_ubHeight)} m({Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight)}층) 건물로 들어올립니다";
 
     public string UserBuildingName
@@ -416,6 +506,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (_ubArea == null) return;
         _log?.Info($"[UserBuilding] 그리기 끝 area={_ubArea.Id} cause={cause}");
+        RevertUserBuildingPreview();
+        _ubNewUid = null;
         if (_ubEditing != null) PostUserBuilding3D(_ubArea.Id, Map3DUserBuilding.SelectMessageJson(null));
         if (_ubIn3D) EndEdit3D();   // 3D 그리기 · 손잡이 내림
         _ubArea = null;
@@ -436,6 +528,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     {
         if (_ubArea is not { } area || MainMap == null) return;
         if (_ubDraft != null) _ubDraft.Changed -= OnUserBuildingDraftChanged;
+        RevertUserBuildingPreview();
+        _ubNewUid = null;
         var map = MainMap;
         _ubDraft = new Map3DUserBuildingDraft(
             geo => { var l = map.FromLatLngToLocal(new PointLatLng(geo.Y, geo.X)); return new UbPoint(l.X, l.Y); },
@@ -453,6 +547,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         _ubWallColor = edit?.WallColor;
         _ubRoofColor = edit?.RoofColor;
         _ubFacade = edit?.Facade ?? Map3DLook.FacadeAuto;
+        _ubTaper = edit?.TaperDeg ?? 0;
+        _ubPreviewJson = edit != null ? Map3DUserBuilding.PreviewMessageJson(edit) : null;   // 3D 에 이미 보이는 저장된 모양
         _ubRoofChosen = edit != null;
         _ubDragStart = null;
         _ubError = null;
@@ -666,6 +762,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         {
             _ubHeightText = IsUserBuildingDrawing ? Map3DBuilding.FormatMeters(_ubHeight) : "";
             _ubFloorsText = IsUserBuildingDrawing ? Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight).ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+            _ubTaperText = _ubTaper.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
         }
         _ubFloorHeightText = Map3DBuilding.FormatMeters(UbFloorHeight);
         foreach (var name in new[]
@@ -679,6 +776,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
                      nameof(UserBuildingRoofStatus), nameof(HasUserBuildingRoofStatus), nameof(IsUserBuildingToolTriangle),
                      nameof(UserBuildingSelectedUids), nameof(HasUserBuildingSelection), nameof(UserBuildingSelectionText), nameof(IsUserBuildingMergeVisible),
                      nameof(UserBuildingColors), nameof(UserBuildingFacade), nameof(UserBuildingWallColor), nameof(UserBuildingRoofColor),
+                     nameof(UserBuildingTaperDeg), nameof(UserBuildingTaperText), nameof(UserBuildingTaperStatus),
                  })
             NotifyOfPropertyChange(name);
         ApplyUserBuildingCommand.RaiseCanExecuteChanged();
@@ -688,6 +786,8 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         RefreshEdit3D();
         MergeUserBuildingsCommand.RaiseCanExecuteChanged();
         ClearUserBuildingSelectionCommand.RaiseCanExecuteChanged();
+        ResetUserBuildingTaperCommand.RaiseCanExecuteChanged();
+        PreviewUserBuildingDraft();
     }
 
     /// <summary>판 손잡이 · 키(IBuildingHeightPanelHost 규약) — 「건물 높이」 판과 같은 수식(10 px = 1 m · ↑/↓ = ±1층 · Shift = 0.1 m).</summary>
@@ -723,12 +823,24 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (_ubArea is not { } area || _ubDraft is not { } d || _ubBusy || _ubInputError) return;
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         if (d.Validate() is { } why) { SetUserBuildingError(why); return; }
-        string uid = _ubEditing?.Uid ?? Map3DUserBuilding.NewUid();
+        string uid = UserBuildingDraftUid;
         var before = _ubEditing is { } e ? StateOf(e) : null;
         int floors = Map3DBuilding.FloorsFromHeight(_ubHeight, UbFloorHeight);
         var after = new UserBuildingState(d.Points.ToList(), _ubHeight, floors, string.IsNullOrWhiteSpace(_ubName) ? null : _ubName)
-                    { Roof = UserBuildingRoof, Use = UserBuildingUse, Look = UserBuildingLook };
-        if (await SaveUserBuildingAsync(area.Id, uid, after))
+                    { Roof = UserBuildingRoof, Use = UserBuildingUse, Look = UserBuildingLook, TaperDeg = _ubTaper };
+        if (!await SaveUserBuildingAsync(area.Id, uid, after))
+        {
+            // 서버가 기울기를 거절했다(너무 좁아져 윤곽이 뒤집힘 · 400 문구) — 문구는 판에 두고 기울기는 저장된 값으로 되돌린다(3D 상자도)
+            double savedTaper = before?.TaperDeg ?? 0;
+            if (_ubLastSaveRejected && _ubArea?.Id == area.Id && after.TaperDeg != savedTaper)
+            {
+                var rejected = _ubError;
+                _ubTaper = savedTaper;
+                RefreshUserBuildingPanel();
+                SetUserBuildingError(rejected);
+            }
+        }
+        else
         {
             _undoService?.Push(new UserBuildingCommand($"{Map3DUserBuilding.UndoPrefix} {(before == null ? "넣기" : "고치기")}", area.Id, uid, before, after,
                                                        ApplyUserBuildingStateAsync, ResolveUserBuildingJob));
@@ -751,7 +863,7 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
     }
 
     private static UserBuildingState StateOf(Map3DUserBuildingItem e)
-        => new(e.Outline, e.Height, e.Floors, e.Name) { Roof = e.Roof, Use = e.Use, Look = Map3DUserBuilding.LookOf(e) };
+        => new(e.Outline, e.Height, e.Floors, e.Name) { Roof = e.Roof, Use = e.Use, Look = Map3DUserBuilding.LookOf(e), TaperDeg = e.TaperDeg };
 
     /// <summary>[합치기] — 고른 건물들(고른 순서)을 map-3d 가 하나로 → 목록 다시 받기 · 합친 건물 고치기로 열기 · 상태 글 · 편집 기록 1단위.</summary>
     private async Task MergeUserBuildingsAsync()
@@ -903,13 +1015,21 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
         if (_map3DClient == null) return false;
         _ubBusy = true;
         _ubError = null;
+        _ubLastSaveRejected = false;
         RefreshUserBuildingPanel();
         try
         {
             if (state != null)
             {
-                var saved = await _map3DClient.PutUserBuildingAsync(job, uid, state.Outline, state.Height, state.Floors, state.Name, state.Roof, state.Use, state.Look);
+                var saved = await _map3DClient.PutUserBuildingAsync(job, uid, state.Outline, state.Height, state.Floors, state.Name, state.Roof, state.Use, state.Look,
+                                                                    state.TaperDeg);
                 PostUserBuilding3D(job, Map3DUserBuilding.PreviewMessageJson(saved with { Uid = uid }));   // 층 띠 · 창 칸 · 색을 입힌 상자
+                if (_ubArea?.Id == job && uid == UserBuildingDraftUid)
+                {
+                    // 3D 상자 = 저장된 모양 — 판 값 그대로 다시 보내지 않고, 끝낼 때 걷지도 않는다
+                    _ubPreviewDirty = false;
+                    _ubPreviewJson = _ubDraft is { IsClosed: true } d ? Map3DUserBuilding.PreviewMessageJson(UserBuildingDraftItem(d)) : null;
+                }
                 _log?.Info($"[UserBuilding] 저장 uid={uid} 점={saved.Outline.Count} 높이={saved.Height} job={job}");
             }
             else
@@ -933,7 +1053,11 @@ public partial class MapViewModel : IUserBuildingDrawHost, IHandle<CallClearUser
             _log?.Warning($"[UserBuilding] 저장 — 옛 서버({(int)ex.StatusCode} {ex.Message})");
             SetUserBuildingError(Map3DUserBuilding.OldServerText);
         }
-        catch (Map3DRequestException ex) { SetUserBuildingError($"저장하지 못했습니다: {ex.Message}"); }
+        catch (Map3DRequestException ex)
+        {
+            _ubLastSaveRejected = ex.StatusCode == System.Net.HttpStatusCode.BadRequest;
+            SetUserBuildingError($"저장하지 못했습니다: {ex.Message}");
+        }
         catch (Exception ex)
         {
             _log?.Error($"[UserBuilding] 저장 실패: {ex.Message}");

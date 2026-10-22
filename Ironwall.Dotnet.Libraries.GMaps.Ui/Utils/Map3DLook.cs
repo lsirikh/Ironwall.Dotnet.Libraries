@@ -39,16 +39,77 @@ public sealed record Map3DLookItem(int? Id, IReadOnlyList<UbPoint> Outline, Map3
                           + (Outline.Count >= 3 ? $" · 바닥 {Map3DUserBuilding.AreaSquareMeters(Outline):0} m²" : "");
 }
 
+/// <summary>외벽 무늬 하나(GET /api/facades 의 {key, label, group}) — Group = auto · factory · plant · military · general.</summary>
+public sealed record Map3DFacade(string Key, string Label, string Group);
+
 public static class Map3DLook
 {
     public const string FacadeAuto = "auto";
+    public const string GroupAuto = "auto", GroupFactory = "factory", GroupPlant = "plant", GroupMilitary = "military", GroupGeneral = "general";
 
-    /// <summary>판의 외벽 무늬 고르기(값, 쉬운 말).</summary>
-    public static readonly IReadOnlyList<KeyValuePair<string, string>> Facades = new[]
+    /// <summary>
+    /// 내장 외벽 무늬 목록(facade-package-contract A — 옛 7개 + 새 15개, 엔진 facades.CATALOG 와 같은 차례 · 이름 · 분류).
+    /// 엔진이 GET /api/facades 를 모르거나(옛 판) 닿지 않으면 이것을 쓴다. 차례 = 자동 → 공장 → 발전소 → 군사 → 일반(옛 무늬 포함).
+    /// </summary>
+    public static readonly IReadOnlyList<Map3DFacade> FacadeCatalog = new Map3DFacade[]
     {
-        new KeyValuePair<string, string>(FacadeAuto, "자동"), new("residential", "주거"), new("commercial", "사무"), new("industrial", "공장"),
-        new("glass", "유리"), new("brick", "벽돌"), new("concrete", "콘크리트"),
+        new(FacadeAuto, "자동", GroupAuto),
+        new("corrugated_metal", "공장 · 골판", GroupFactory), new("sandwich_panel", "공장 · 샌드위치 패널", GroupFactory),
+        new("warehouse_shutter", "창고 · 셔터문", GroupFactory), new("factory_clerestory", "공장 · 높은 창띠", GroupFactory),
+        new("industrial", "공장 · 창고", GroupFactory),
+        new("plant_concrete", "발전소 · 콘크리트", GroupPlant), new("turbine_hall", "발전소 · 터빈동", GroupPlant),
+        new("chimney_banded", "굴뚝 · 적백 띠", GroupPlant), new("chimney_concrete", "굴뚝 · 콘크리트", GroupPlant),
+        new("tank_steel", "탱크 · 강철", GroupPlant),
+        new("military_bunker", "군 · 벙커", GroupMilitary), new("military_barracks", "군 · 막사", GroupMilitary),
+        new("camouflage", "군 · 위장 무늬", GroupMilitary),
+        new("plain_wall", "민무늬 벽", GroupGeneral), new("office_ribbon", "사무실 · 띠창", GroupGeneral), new("retail_store", "마트 · 1층 유리", GroupGeneral),
+        new("residential", "주거", GroupGeneral), new("commercial", "상가 · 사무", GroupGeneral), new("glass", "유리 커튼월", GroupGeneral),
+        new("brick", "벽돌", GroupGeneral), new("concrete", "노출 콘크리트", GroupGeneral),
     };
+
+    /// <summary>판의 외벽 무늬 고르기(값, 쉬운 말) — 내장 목록.</summary>
+    public static readonly IReadOnlyList<KeyValuePair<string, string>> Facades = Choices(FacadeCatalog);
+
+    /// <summary>고르기 목록(값, 쉬운 말) — 판 콤보의 항목.</summary>
+    public static IReadOnlyList<KeyValuePair<string, string>> Choices(IEnumerable<Map3DFacade> list)
+        => list.Select(f => new KeyValuePair<string, string>(f.Key, f.Label)).ToList();
+
+    /// <summary>분류 머리글(쉬운 말) — 자동 · 모르는 분류는 머리글 없음("").</summary>
+    public static string GroupText(string? group) => group switch
+    {
+        GroupFactory => "공장", GroupPlant => "발전소", GroupMilitary => "군사", GroupGeneral => "일반", _ => "",
+    };
+
+    /// <summary>엔진이 알려 준 무늬 키(GET /api/facades) — 내장 목록에 없는 새 키도 정규화에서 살린다. 받기 전 = 빈 집합.</summary>
+    private static volatile HashSet<string> _engineFacadeKeys = new();
+
+    /// <summary>엔진 목록을 받았다 — 그 키들을 알려진 무늬로 둔다(콤보에서 고른 값이 auto 로 바뀌지 않게).</summary>
+    public static void UseEngineFacades(IEnumerable<Map3DFacade> list) => _engineFacadeKeys = new HashSet<string>(list.Select(f => f.Key));
+
+    /// <summary>
+    /// GET /api/facades 응답 [{key, label, group}] — 형식이 틀린 항목 · 겹친 키는 뺀다. auto 가 없으면 맨 앞에 넣는다.
+    /// 배열이 아니거나 쓸 항목이 없으면 null(호출자가 내장 목록을 쓴다).
+    /// </summary>
+    public static IReadOnlyList<Map3DFacade>? ParseFacades(string json)
+    {
+        JToken root;
+        try { root = JToken.Parse(json); }
+        catch (JsonException) { return null; }
+        if ((root as JArray ?? (root as JObject)?["items"] as JArray) is not { } arr) return null;
+        var list = new List<Map3DFacade>();
+        foreach (var o in arr.OfType<JObject>())
+        {
+            if (Str(o["key"]) is not { } key || !IsFacadeKey(key) || list.Any(f => f.Key == key)) continue;
+            list.Add(new Map3DFacade(key, Str(o["label"]) ?? FacadeCatalog.FirstOrDefault(f => f.Key == key)?.Label ?? key, Str(o["group"]) ?? GroupGeneral));
+        }
+        if (list.Count == 0) return null;
+        if (list.All(f => f.Key != FacadeAuto)) list.Insert(0, FacadeCatalog[0]);
+        return list;
+    }
+
+    /// <summary>무늬 키 모양(소문자 · 숫자 · 밑줄, 40자까지) — 엔진이 보낸 엉뚱한 값을 본문에 싣지 않게.</summary>
+    private static bool IsFacadeKey(string key)
+        => key.Length is > 0 and <= 40 && key[0] is >= 'a' and <= 'z' && key.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '_');
 
     /// <summary>판의 색 고르기(값 "" = 자동, 쉬운 말).</summary>
     public static readonly IReadOnlyList<KeyValuePair<string, string>> Colors = new[]
@@ -84,8 +145,9 @@ public static class Map3DLook
         return s.Length == 6 && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f') ? "#" + s : null;
     }
 
-    /// <summary>모르는 외벽 무늬는 auto.</summary>
-    public static string NormalizeFacade(string? facade) => Facades.Any(f => f.Key == facade) ? facade! : FacadeAuto;
+    /// <summary>모르는 외벽 무늬는 auto — 내장 목록 또는 엔진이 알려 준 키만 그대로.</summary>
+    public static string NormalizeFacade(string? facade)
+        => facade != null && (FacadeCatalog.Any(f => f.Key == facade) || _engineFacadeKeys.Contains(facade)) ? facade : FacadeAuto;
 
     /// <summary>
     /// PUT …/look 본문 — hidden 이 null 이면 그 키를 빼고(그대로), look 이 null 이면 색 · 무늬 키를 뺀다(부분 갱신).
