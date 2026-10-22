@@ -14,7 +14,8 @@ public sealed class MapImageConverter: IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        DirectoryInfo di = new DirectoryInfo(Environment.CurrentDirectory);
+        // 실행 파일 폴더 기준(작업 폴더는 띄운 방식마다 달라 system32 일 수 있다)
+        DirectoryInfo di = new DirectoryInfo(AppContext.BaseDirectory);
         string uri = null;
         if (value != null)
         {
