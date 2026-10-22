@@ -59,3 +59,57 @@
 - chosen: (a)
 - why: 심볼 위치가 바뀌면 오버레이 다리가 patch 를 보내고(50 ms 모음), edit.start 를 먼저 보내면 엔진이 옛 자리로 손잡이를 세울 수 있다. 계약에 다시 세우기 규칙이 없다.
 - effect: 되돌리기(Ctrl+Z) 뒤 엔진 손잡이 자리는 엔진이 patch 를 받아 맞춰야 한다 — 엔진 세션에 확인할 일(PLAN 남은 일).
+
+## 11. 도형 투명도(opacity)를 아이콘 PNG 에 굽는지, 숫자로 따로 보내는지 (추가 지시 7)
+- options: (a) 지금처럼 PNG 에 굽고 opacity 는 안 보냄 / (b) PNG 에도 굽고 opacity 도 보냄 / (c) PNG 는 바깥 투명도 없이 굽고 opacity 숫자로 보냄
+- chosen: (c)
+- why: 실측(`Map3DOverlayPixelTests.should_bake_root_opacity_by_default_but_not_when_opacity_goes_separately`) — VisualBrush 는 루트 Opacity 를 굽는다(0.5 → 알파 128). 엔진이 opacity 를 반영한다고 알려 왔으니 (b) 는 두 번 옅어진다. (c) 는 투명도만 바뀌면 아이콘을 다시 그리지 않아도 된다(IconSignature 에서 opacity 제외). (pattern: verify)
+- effect: `RenderIconPng(..., withoutRootOpacity: marker is GMapGeometricMarker)` — 그리는 동안만 SetCurrentValue(1). 도형 심볼만 `opacity` 를 싣는다(다른 점 심볼은 투명도 값이 없다).
+
+## 12. 새 이름표 · 모양 필드를 값이 기본일 때도 늘 실을지
+- options: (a) 기본값이면 빼기 / (b) 늘 싣기(showShape true · italic false · font null · maxWidth · offset 0,0 포함)
+- chosen: (b)
+- why: 다리의 Diff 는 사라진 키를 보내지 못한다 — 빼는 방식이면 끔 → 켬 같은 변경이 patch 로 가지 않는다. 옛 엔진은 모르는 키를 무시한다. 단, 선 · 이미지의 label 은 DTO 에 Label 이 있을 때만(옛 호출 · 지도 CustomImages 는 예전 모양 그대로).
+- effect: `Map3DOverlay.LabelJson`, 점 `showShape`. 도형 `opacity` 는 도형만이라 종류별로 늘 같다.
+
+## 13. 선 · 구역 이름표의 지리 자리(label.lon/lat) 계산
+- options: (a) 엔진이 anchor 로 계산 / (b) GIS 가 2D 규칙으로 계산해 함께 보냄
+- chosen: (b) — 추가 지시대로. 기준점 = 마커 Position(2D LabelAdorner.IconCenter), 반폭 · 반높이 = 점 상자 절반(경도 · 위도), 자리 = (U · 반폭, 아래로 (1+V) · 반높이)
+- why: 2D LabelAdorner.ComputeLabelCenterRel 과 같은 식. 2D 의 아이콘 간격 8 px 은 줌마다 거리가 달라 지리 좌표로 고정할 수 없어 뺐다(이름표 높이 정도 차이). 좁은 구역에서 경위도를 선형으로 본다(메르카토르 차이 무시).
+- effect: `Map3DOverlay.LineLabelAt`. anchor{u,v} 도 함께 보내므로 엔진이 원하면 자기 방식으로 다시 셀 수 있다.
+
+## 14. label.maxWidth 값
+- options: (a) 저장값 그대로(0 = 미설정) / (b) 2D 가 실제로 쓰는 유효값(0 이하 → 200, 40~800 로 자름)
+- chosen: (b)
+- why: 3D 가 2D 와 같은 폭에서 말줄임해야 한다 — 2D 규칙(`LabelAdorner.EffectiveMaxWidth`)을 그대로 재사용. (pattern: reuse)
+- effect: `Map3DOverlayBridge.StyleOfLabel`.
+
+## 15. 오버레이 이미지 이름표 자리
+- options: (a) label 만 / (b) label + anchor{u,v}(2D LabelOffsetU/V) / (c) + lon/lat 도
+- chosen: (b)
+- why: 지시는 label 싣기. 2D 이미지 이름표도 U/V 비율이라 같은 꼴로 실어 두면 엔진이 쓸 수 있다. 이미지는 회전 · 경계로 자리가 정해져 지리 좌표 계산은 범위 밖으로 남겼다. 지도 CustomImages(TIF 등)는 이름표가 없어 label 을 싣지 않는다.
+- effect: `Map3DOverlayBridge.Build` 의 GMapImageMarker 갈래.
+
+## 16. Shift+끌기 한 번에 building.box 와 overlay.box 가 함께 올 때(심볼 · 건물 고름이 섞일 때)
+- options: (a) 각자 자기 고름에만 반영(서로 풀지 않음) / (b) 하나가 오면 다른 쪽 고름을 푼다
+- chosen: (a)
+- why: 2D 에서도 심볼 고름과 건물 판(「건물 높이」 · 여러 개 고르기)은 따로 산다. 한 번 끌어 둘 다 고르는 것이 사용자의 뜻이다. overlay.box 는 이 작업(심볼 고름), building.box 는 건물 작업(t-20261022-154533-1fef)의 처리기가 받는다. (pattern: follow-recommended)
+- effect: `OnMap3DOverlayBox` 는 심볼 고름만 바꾼다. 건물 고름은 건드리지 않는다.
+
+## 17. 엔진 알림의 building.select ids(Ctrl+클릭 확정) · building.none(하늘 클릭)
+- options: (a) 이 작업에서 고침 / (b) 건물 작업 몫으로 둠
+- chosen: (b)
+- why: 목표가 이 작업은 심볼 쪽만이고 건물 작업의 파일(MapViewModel.BuildingHeight.cs · BuildingErase.cs)은 고치지 않는다고 정했다. 이 작업의 빈 곳 처리(pick 빈 곳 → 심볼 고름 풀기)는 building.none 과 무관하다.
+- effect: 건물 작업이 엔진 알림대로 고름이 바뀔 때마다 building.select ids 를 돌려줘야 한다(PLAN 남은 일).
+
+## 18. 3D 손잡이 저장 뒤 보내는 overlay.patch 의 내용
+- options: (a) 바뀐 필드만(직전 기록과 비교) / (b) 지금 값 전체
+- chosen: (b)
+- why: 엔진 계약이 「저장 후 반드시 보낸다」 — 3D 가 끈 값과 같으면 비교 방식은 아무것도 보내지 않는다. 전체를 보내도 엔진은 합친다. 보낸 뒤 기록을 갱신해 곧 올 PropertyChanged 의 patch 는 중복되지 않는다.
+- effect: `Map3DOverlayBridge.PatchNow` ← `MapViewModel.CommitOverlayEdit3D`.
+
+## 19. 2D 에서 선 꼭짓점을 고쳤을 때 3D 에 다시 가는지 (추가 지시 8)
+- options: (a) 고침 / (b) 이미 됨 — 시험만 더함
+- chosen: (b)
+- why: `UpdatePoint` → `NotifyPointsChanged`(PropertyChanged) → 다리 MarkDirty → Flush → pts patch. 고치기 전 코드로도 새 시험(`should_send_new_points_to_3d_when_line_vertex_is_edited_in_2d`)이 통과했다.
+- effect: 코드 변경 없음.

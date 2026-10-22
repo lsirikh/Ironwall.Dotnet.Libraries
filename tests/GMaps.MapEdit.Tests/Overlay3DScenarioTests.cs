@@ -299,6 +299,8 @@ public class Overlay3DScenarioTests
     [Fact]
     public void should_save_point_move_and_rotation_like_2d_adorner_and_undo_it() => RunAsync(async (rig, posts) =>
     {
+        // 오버레이 다리도 같은 목록으로 받는다(엔진 계약 2026-10-22: 저장 뒤 새 값을 overlay.patch 로 반드시)
+        Scenario.SetField(rig.Vm, "_map3DOverlay", new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Map3D.Map3DOverlayBridge(json => posts.Add(JObject.Parse(json)), null));
         EditOn3D(rig);
         var saves = RecordSaves(rig);
         var s = Symbol(rig, 9271);
@@ -307,7 +309,10 @@ public class Overlay3DScenarioTests
         var before = s.Position;
         double lon = Math.Round(rig.Center.Lng + 0.0003, 7), lat = Math.Round(rig.Center.Lat + 0.0001, 7);
 
+        posts.Clear();
         X.From3D(rig, PointCommit("geometric", 9271, lon, lat, heading: 30));
+        var patch = Of(posts, "overlay.patch").First(p => p.Value<string>("kind") == "geometric" && p.Value<int>("id") == 9271);   // 저장 직후 바로
+        Assert.Equal((lat, lon, 30d), (patch["set"]!.Value<double>("lat"), patch["set"]!.Value<double>("lon"), patch["set"]!.Value<double>("bearing")));
         await Task.Delay(50);
 
         Assert.Equal((lat, lon), (s.Position.Lat, s.Position.Lng));

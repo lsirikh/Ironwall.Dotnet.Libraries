@@ -58,7 +58,7 @@ public class Map3DOverlayV2Tests
 
     [Theory]
     [InlineData("#212121", "#CD212121")]
-    [InlineData("#00000000", null)]   // EnumColorType.Transparent
+    [InlineData("#00000000", "transparent")]   // EnumColorType.Transparent — null 이면 3D 가 기본 칩으로 그렸다(2026-10-22 계약 변경)
     [InlineData("#80FF0000", "#CDFF0000")]
     [InlineData(null, null)]
     [InlineData("red", null)]

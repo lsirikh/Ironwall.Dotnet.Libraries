@@ -171,5 +171,8 @@ public partial class MapViewModel
         }
         _log?.Info($"[Map3D] 심볼 edit.commit kind={c.OverlayKind} id={c.Id} 점={c.Points?.Count.ToString() ?? "-"} 방향={c.HeadingDeg?.ToString() ?? "-"}");
         OnMarkerEditCompleted(this, new MarkerEditCompletedEventArgs(marker, pos, w, h, bearing) { OriginalLinePoints = beforePoints });
+        // 엔진 계약(2026-10-22): 저장 뒤 새 값을 overlay.patch 로 반드시 — 엔진이 고치는 중 모양을 그 값으로 맞춘다
+        try { _map3DOverlay?.PatchNow(gm); }
+        catch (Exception ex) { _log?.Error($"[Map3D] 심볼 patch 보내기 실패(격리): {ex.Message}"); }
     }
 }

@@ -42,6 +42,28 @@
 - **고치기 전 실패 → 고친 뒤 통과**: 바꾼 원본 7개를 `git show HEAD:<경로>` 판으로 잠시 바꾸고 새 파일 MapViewModel.Overlay3D.cs 를 빼서(백업 $TEMP/after-backup) `dotnet test tests/GMaps.MapEdit.Tests --filter FullyQualifiedName~Overlay3DScenarioTests` → **실패 13 / 통과 0**(시나리오 시험은 새 API 없이 JSON · VM 처리기만 써서 옛 코드로도 컴파일된다). 백업으로 되돌린 뒤 같은 명령 → **통과 13 / 실패 0**. `git diff --stat` 로 복원 확인(7 파일, +115/−12).
 - 정리: 이 worktree 의 testhost · dotnet 프로세스 없음 확인. 남아 있던 testhost(PID 206404)는 다른 작업(t-20261022-154533-1fef) 것이라 건드리지 않았다. 임시 파일은 $TEMP 안에만.
 
+## 추가 범위(2026-10-22 사용자 추가 지시) — 3D 이름표가 2D 와 어긋나는 다리 결함
+사용자 보고: "구역이나 영역 잠금 처리한게 Label이 3D에서 안보이는거 같아. 이런버그가 또 있는지 분석해줘". 대화 세션 분석: 잠금은 원인이 아님(설치본 엔진이 이름표 수정 전 판).
+그러나 GIS → 3D 다리가 2D 와 어긋나 함께 고쳤다. 엔진(map-3d)은 다른 세션이 같은 계약으로 고쳤다(f45f073 · e83ce39 · 4dec227).
+- [x] 1 선 · 구역 label(show = ShowTitle) — `Map3DOverlayLine.Label/ShowLabel`, `Map3DOverlayBridge.LineLabelOf`
+- [x] 2 이름표 자리: 점 `label.offset{x,y}`(LabelOffsetX/Y DIP), 선/구역 `label.anchor{u,v}` + `label.lon/lat`(`Map3DOverlay.LineLabelAt`, 2D LabelAdorner 규칙 — DECISIONS 13)
+- [x] 3 `showShape`(점, 늘 실음 — DECISIONS 12)
+- [x] 4 투명 배경 `bg:"transparent"`(`Map3DOverlay.ChipBackground`, 기존 시험 한 줄 계약에 맞춰 바꿈: `Map3DOverlayV2Tests` InlineData · `Map3DOverlayPixelTests` 단정)
+- [x] 5 `label.font` · `label.italic` · `label.maxWidth`(2D 유효값 — DECISIONS 14)
+- [x] 6 오버레이 이미지 label(+ anchor U/V — DECISIONS 15)
+- [x] 7 도형 `opacity` — 실측: PNG 가 루트 투명도를 굽는다(0.5 → 알파 128) → 도형 아이콘은 투명도 없이 굽고 숫자로 보냄(DECISIONS 11)
+- [x] 8 2D 꼭짓점 → 3D pts patch — 이미 동작(시험만 추가, DECISIONS 19)
+- [x] 엔진 알림 반영: 3D 손잡이 저장 뒤 `overlay.patch`(지금 값 전체)를 반드시 — `Map3DOverlayBridge.PatchNow` ← `CommitOverlayEdit3D`(DECISIONS 18). 상자 고름 섞임 정책 = 각자(DECISIONS 16). building.select ids · building.none = 건물 작업 몫(DECISIONS 17)
+- 시험: `tests/GMaps.Ui.Tests/Map3DOverlayLabelTests.cs`(순수 6) · `tests/GMaps.Housing.Tests/Map3DOverlayLabelBridgeTests.cs`(다리 JSON 4) · `Map3DOverlayPatchNowTests.cs`(1) · `Map3DOverlayPixelTests` 투명도 실측 1 · `Overlay3DScenarioTests` 저장 직후 patch 단정
+- **고치기 전 실패 → 고친 뒤 통과**: Map3DOverlay.cs · Map3DOverlayBridge.cs 를 `git show HEAD:` 판으로, Overlay3D 의 PatchNow 호출을 빼고, 새 API 를 쓰는 Housing 시험 2파일을 잠시 빼서(백업 $TEMP/after2) `dotnet test tests/GMaps.Housing.Tests --filter FullyQualifiedName~Map3DOverlayLabelBridgeTests` → 실패 3 / 통과 1(통과 1 = 꼭짓점 시험 — 이미 되던 것). 되돌린 뒤 `--filter FullyQualifiedName~Map3DOverlay` → 통과 17 / 실패 0. `git status` 로 복원 확인.
+- 고친 뒤: `dotnet test tests/GMaps.Ui.Tests --filter FullyQualifiedName~Map3DOverlay` → 77/0, `dotnet test tests/GMaps.MapEdit.Tests --filter FullyQualifiedName~Overlay3DScenarioTests` → 13/0
+- 추가 범위 뒤 전체 회귀(창 띄우는 2클래스 뺌): GMaps.Ui.Tests 1872/0 · MapEdit 929/0 · MapLayer 102/0 · MapNav 70/0 · MapAux 130/0.
+  PropertyPanel · Housing 은 렌더 시험(RenderTargetBitmap — 카메라 상자 모서리 · 문 깜빡임 · 펜스 거울 · 아이콘 PNG 등)이 무더기로 실패했다 —
+  이 회차 도중 사용자 세션이 끊김 상태였다(`query user` → 상태 「디스크」(Disc), 유휴 8분). 끊긴 세션에서는 WPF 렌더 시험이 실패하는 것이 알려진 현상이고,
+  이번에 손대지 않은 `FenceMirrorTests` 도 다시 돌리니 실패했으며, 같은 코드의 `Map3DOverlayPixelTests` 는 몇 분 전(세션 연결 중) 17/0 으로 통과했다 → 환경 탓으로 판단.
+  재접속 뒤 `dotnet test tests/GMaps.PropertyPanel.Tests --filter "FullyQualifiedName!~ComponentCardScreenSizeTests"` · `dotnet test tests/GMaps.Housing.Tests --filter "FullyQualifiedName!~MapLocateFitTests"` 를 다시 돌려 확인할 것(이전 회차에는 430/0 · 361/0).
+- `dotnet build Ironwall.Dotnet.Libraries.sln` → 오류 0. CameraPopup.Tests 는 이전 회차 346/0(이번 추가 범위는 다리 · Utils 만 — 다시 돌리지 않음, 끊긴 세션이라 렌더 시험이 섞이면 거짓 실패가 난다).
+
 ## 새로 온 사람을 위한 맥락
 - 3D 메시지 해석: `Utils/Map3DMath.cs` `ParseMessage` → 편집 계열은 `Utils/Map3DEdit.cs` `Parse`. VM 분기: `MapViewModel.Map3D.cs` `OnMap3DMessage`.
 - 3D 로 보내기: 지도 심볼 메시지는 장면(job)에 매이지 않아 `PostBuilding3D`(시험은 `_map3DBuildingPost` 로 가로챈다)로 바로. 꾸미기 · 직접 그린 건물은 job 이 맞을 때만(`PostUserBuilding3D`).
@@ -50,4 +72,7 @@
 
 ## 남은 일 · 이유
 - 엔진(map-3d) 쪽 구현은 다른 세션 몫: overlay.select 표시, edit.start overlay 손잡이, pick 의 ctrl/shift, edit.commit overlay, overlay.box. 실기(실제 3D 화면) 확인은 엔진이 이 계약으로 고친 뒤 헤디드 1회로.
-- 되돌리기(Ctrl+Z) 뒤 심볼이 옛 자리로 가면 오버레이 patch 가 엔진에 간다 — 엔진이 그때 손잡이 자리도 맞추는지 엔진 세션이 확인해야 한다(DECISIONS 9).
+- 되돌리기(Ctrl+Z) 뒤 심볼이 옛 자리로 가면 오버레이 patch 가 엔진에 간다 — 엔진 알림(저장 뒤 patch 로 고치는 중 모양을 맞춘다)대로면 같은 patch 로 맞춰진다. 실기 확인은 헤디드 몫(DECISIONS 9).
+- 건물 작업(t-20261022-154533-1fef) 몫: building.select ids 를 고름이 바뀔 때마다 돌려주기(Ctrl+클릭 확정), building.none(하늘 클릭 포함), building.box(DECISIONS 16 · 17).
+- 선 이름표 지리 자리는 2D 의 8 px 간격을 넣지 않는다(DECISIONS 13) — 실기에서 어긋남이 크면 엔진이 anchor 로 다시 세면 된다.
+- 설치본 엔진이 이름표 수정 전 판(5cd00ec)이라는 분석 — 현장 엔진 판 교체는 우리 일이 아니다(배포 쪽).
