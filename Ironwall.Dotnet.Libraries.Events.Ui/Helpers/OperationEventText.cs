@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Ironwall.Dotnet.Monitoring.Models.Components;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -100,15 +102,36 @@ public static class OperationEventText
     }
 
     /// <summary>
+    /// 문 위치 부품 전이(<c>detail.component</c> · <c>previous</c> · <c>state</c>, 브로커 연동설계 §6.7)를 사람이 읽는 말로 —
+    /// 「도어 센서 닫힘 → 열림」 · 「문 구동부 구동 중 → 열림」. <c>component</c> 나 상태가 없으면 null.
+    /// <para>부품 이름은 그 장비의 부품 선언(<paramref name="components"/>, 장비 캐시의 <c>hardware_spec.components[]</c>)에서 key 로 찾아
+    /// 등록 이름 → 유형 한글(서버 카탈로그 → 내장 사전) → key 순(<see cref="ComponentDisplay.ComponentName"/> — 지도 · 장비 콘솔과 같은 이름).
+    /// 장비가 캐시에 없거나 부품 선언이 아직 안 왔으면(SYNC_DEVICE 전) key 그대로 — 상태는 detail 값이라 그래도 바로 보인다.</para>
+    /// </summary>
+    public static OperationComponentChange? ComponentChange(JObject? detail, IEnumerable<ComponentDefinitionModel>? components = null,
+                                                            IComponentTypeLabels? catalog = null)
+    {
+        var key = Str(detail, "component");
+        var state = Str(detail, "state");
+        if (key is null || state is null) return null;
+
+        var definition = components?.FirstOrDefault(c => string.Equals(c.Key, key, StringComparison.OrdinalIgnoreCase));
+        var name = ComponentDisplay.ComponentName(definition?.Label, definition?.Type, key, catalog);
+        var previous = Str(detail, "previous");
+        return new OperationComponentChange(name, previous is null ? null : DoorStateText(previous), DoorStateText(state));
+    }
+
+    /// <summary>
     /// 상세(JSONB)를 사람이 읽는 한 줄로 편다. 비었으면 null.
     /// <para>아는 키(브로커 연동설계 §6.7 「detail — 발생 경로별 키」)는 말로 바꾼다:
-    /// 문 · 통문 = <c>previous</c> → <c>state</c>(옛 행은 <c>door_status</c> · <c>gate_status</c>) · <c>device_status</c>(점검 중 · 장비 장애만) /
+    /// 문 위치 부품 = <c>component</c> · <c>previous</c> → <c>state</c> → 「도어 센서 닫힘 → 열림」(<see cref="ComponentChange"/>) /
+    /// 옛 행 = <c>previous</c> → <c>door_status</c> · <c>gate_status</c> / <c>device_status</c>(점검 중 · 장비 장애만) /
     /// 함체 환경 = <c>field</c> · <c>value</c> · <c>threshold</c> · <c>direction</c> → "온도 65℃ — 기준 60℃ 초과" /
     /// <c>suppressed_schedule_id</c> → "억제 시간 중 발생" / 매니저 문구 <c>display.title</c> · <c>display.message[]</c>(파싱 · 분기하지 않고 보이기만).
-    /// 식별용 키(<c>component</c> · <c>metric_id</c>)는 화면에 내지 않는다.</para>
+    /// 식별용 키 <c>metric_id</c> 는 화면에 내지 않는다.</para>
     /// <para>모르는 키는 지우지 않고 "키=값" 으로 뒤에 붙인다 — 서버가 키를 늘려도 정보가 사라지지 않게.</para>
     /// </summary>
-    public static string? DetailText(JObject? detail)
+    public static string? DetailText(JObject? detail, IEnumerable<ComponentDefinitionModel>? components = null, IComponentTypeLabels? catalog = null)
     {
         if (detail is null || !detail.HasValues) return null;
         var parts = new List<string>();
@@ -125,13 +148,14 @@ public static class OperationEventText
                                        .Where(m => !string.IsNullOrWhiteSpace(m))!);
         }
 
-        // 문 · 통문 — 지금 상태(이전 상태).
+        // 문 · 통문 — 어느 부품이(있으면) 지금 상태(이전 상태).
         var state = Str(detail, "state") ?? Str(detail, "door_status") ?? Str(detail, "gate_status");
         if (state is not null)
         {
             used.UnionWith(new[] { "state", "door_status", "gate_status", "previous" });
             var previous = Str(detail, "previous");
-            parts.Add(previous is null ? DoorStateText(state) : $"{DoorStateText(previous)} → {DoorStateText(state)}");
+            parts.Add(ComponentChange(detail, components, catalog)?.Text
+                      ?? (previous is null ? DoorStateText(state) : $"{DoorStateText(previous)} → {DoorStateText(state)}"));
         }
         var deviceStatus = Str(detail, "device_status");
         if (deviceStatus is not null)
@@ -168,9 +192,6 @@ public static class OperationEventText
                              .Select(p => $"{p.Name}={ValueText(p.Value)}"));
         return parts.Count == 0 ? null : string.Join(" · ", parts);
 
-        static string? Str(JObject o, string key)
-            => o[key] is JToken t && t.Type == JTokenType.String && !string.IsNullOrWhiteSpace(t.Value<string>()) ? t.Value<string>()!.Trim() : null;
-
         static string Number(JToken t) => t.Type == JTokenType.Integer
             ? t.Value<long>().ToString(System.Globalization.CultureInfo.InvariantCulture)
             : t.Value<double>().ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -183,13 +204,18 @@ public static class OperationEventText
         };
     }
 
-    /// <summary>문 위치 상태 글자 — 모르는 값은 원문.</summary>
+    private static string? Str(JObject? o, string key)
+        => o?[key] is JToken t && t.Type == JTokenType.String && !string.IsNullOrWhiteSpace(t.Value<string>()) ? t.Value<string>()!.Trim() : null;
+
+    /// <summary>
+    /// 문 위치 상태 글자 — 부품 상태 어휘는 공용 사전(<see cref="ComponentDisplay.StateName"/>)과 같은 말(RUNNING = "구동 중" — 지도 · 장비 콘솔과 같게).
+    /// 옛 별칭(OPENED · CLOSE)도 받고, 모르는 값은 원문.
+    /// </summary>
     private static string DoorStateText(string state) => state.ToUpperInvariant() switch
     {
-        "OPEN" or "OPENED" => "열림",
-        "CLOSED" or "CLOSE" => "닫힘",
-        "RUNNING" => "움직이는 중",
-        _ => state,
+        "OPENED" => "열림",
+        "CLOSE" => "닫힘",
+        _ => ComponentDisplay.IsKnownState(state) ? ComponentDisplay.StateName(state)! : state,
     };
 
     /// <summary>함체 계측 이름 · 단위(서버 <c>device_config.thresholds</c> 의 7개 경계). 모르는 이름은 원문 · 단위 없음.</summary>
@@ -203,4 +229,14 @@ public static class OperationEventText
         "ups_battery_level" => ("UPS 배터리", "%"),
         _ => (field, ""),
     };
+}
+
+/// <summary>문 위치 부품 전이 한 건 — 이름 · 이전 상태(첫 보고는 null) · 지금 상태. 상태는 이미 화면 글자다.</summary>
+public sealed record OperationComponentChange(string Name, string? Previous, string State)
+{
+    /// <summary>「도어 센서 닫힘 → 열림」 · 첫 보고면 「도어 센서 열림」.</summary>
+    public string Text => Previous is null ? $"{Name} {State}" : $"{Name} {Previous} → {State}";
+
+    /// <summary>흐름 한 칸 — 「도어 센서 열림」(<see cref="OperationComponentFlow"/>).</summary>
+    public string StepText => $"{Name} {State}";
 }

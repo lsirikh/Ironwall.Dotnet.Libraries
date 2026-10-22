@@ -66,7 +66,7 @@
 					</StackPanel>
 				</md:ColorZone>
 
-				<!--  본문: ① 구역 · 장비 ② 사유 ③ 심각도(경고 이상) ④ 상세  -->
+				<!--  본문: ① 구역 · 장비 ② 사유 ③ 어느 부품이 어떻게(부품 전이만 — 30초 안 앞선 전이가 있으면 흐름) ④ 심각도(경고 이상)  -->
 				<StackPanel Grid.Row="1" Margin="10,6,10,4">
 					<TextBlock
 						FontFamily="{StaticResource NotoSansCJKkRMedium}"
@@ -81,6 +81,28 @@
 						Text="{Binding ReasonText, Mode=OneWay, FallbackValue=—}"
 						TextTrimming="CharacterEllipsis"
 						TextWrapping="NoWrap" />
+					<!--  부품 줄 — 흐름이 있으면 흐름(시계 아이콘), 없으면 이 전이. 카드 높이(200)에 한 줄만 더 들어가 둘을 한 줄로 쓴다.
+					      DockPanel — 가로 StackPanel 은 폭이 무한이라 말줄임이 안 된다.  -->
+					<DockPanel
+						Margin="0,3,0,0"
+						ToolTip="{Binding ComponentToolTip, Mode=OneWay}"
+						Visibility="{Binding HasComponentText, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Margin="0,0,4,0"
+							VerticalAlignment="Center"
+							DockPanel.Dock="Left"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Kind="History"
+							Visibility="{Binding HasFlowText, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+						<TextBlock
+							VerticalAlignment="Center"
+							FontSize="14"
+							Text="{Binding ComponentLineText, Mode=OneWay}"
+							TextTrimming="CharacterEllipsis"
+							TextWrapping="NoWrap" />
+					</DockPanel>
 					<StackPanel
 						Margin="0,3,0,0"
 						Orientation="Horizontal"
