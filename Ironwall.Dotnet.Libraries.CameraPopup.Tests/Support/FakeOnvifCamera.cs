@@ -32,6 +32,12 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
     public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
     public bool FailStreamUri { get; set; }
 
+    /// <summary>GetProfiles 에 기대한 모양이 아닌 응답(계정을 거부하는 카메라 흉내 — 시계 · GetCapabilities 는 계정 없이 답한다).</summary>
+    public bool FailProfiles { get; set; }
+
+    /// <summary>PTZ 구성(PTZConfiguration)을 싣는 프로파일 토큰. null 이면 어느 프로파일에도 없다(이전 모양).</summary>
+    public string? PtzProfileToken { get; set; }
+
     /// <summary>GetProfiles 가 광고하는 프로파일(토큰 · 해상도). 기본 = 1920×1080 P0, 640×360 P1.</summary>
     public IReadOnlyList<(string Token, int Width, int Height)> Profiles { get; set; } = new[] { ("P0", 1920, 1080), ("P1", 640, 360) };
 
@@ -106,7 +112,8 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
                    "</trt:MediaUri></trt:GetStreamUriResponse>";
         }
         if (body.Contains("GetProfiles"))
-            return "<trt:GetProfilesResponse>" + string.Concat(Profiles.Select(p => Profile(p.Token, p.Width, p.Height))) + "</trt:GetProfilesResponse>";
+            return FailProfiles ? null
+                : "<trt:GetProfilesResponse>" + string.Concat(Profiles.Select(p => Profile(p.Token, p.Width, p.Height, p.Token == PtzProfileToken))) + "</trt:GetProfilesResponse>";
         if (body.Contains("GetConfigurations"))
             return "<tptz:GetConfigurationsResponse><tptz:PTZConfiguration token=\"C0\"><tt:Name>c</tt:Name><tt:UseCount>1</tt:UseCount>" +
                    "<tt:NodeToken>N0</tt:NodeToken></tptz:PTZConfiguration></tptz:GetConfigurationsResponse>";
@@ -140,11 +147,13 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
         return null;
     }
 
-    private static string Profile(string token, int w, int h) =>
+    private static string Profile(string token, int w, int h, bool ptz) =>
         $"<trt:Profiles token=\"{token}\" fixed=\"true\"><tt:Name>{token}</tt:Name>" +
         $"<tt:VideoEncoderConfiguration token=\"E{token}\"><tt:Name>e</tt:Name><tt:UseCount>1</tt:UseCount><tt:Encoding>H264</tt:Encoding>" +
         $"<tt:Resolution><tt:Width>{w}</tt:Width><tt:Height>{h}</tt:Height></tt:Resolution><tt:Quality>5</tt:Quality>" +
-        "</tt:VideoEncoderConfiguration></trt:Profiles>";
+        "</tt:VideoEncoderConfiguration>" +
+        (ptz ? "<tt:PTZConfiguration token=\"C0\"><tt:Name>c</tt:Name><tt:UseCount>1</tt:UseCount><tt:NodeToken>N0</tt:NodeToken></tt:PTZConfiguration>" : string.Empty) +
+        "</trt:Profiles>";
 
     private static string Space(string element, string uri, bool twoAxes) =>
         $"<tt:{element}><tt:URI>{uri}</tt:URI><tt:XRange><tt:Min>-1</tt:Min><tt:Max>1</tt:Max></tt:XRange>" +

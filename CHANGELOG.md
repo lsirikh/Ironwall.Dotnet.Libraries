@@ -2,6 +2,18 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - 카메라 팝업 ONVIF 전수 확인 · 연결 회복 결함 4건 (2026-10-22)
+
+### Fixed
+- **틀린 비밀번호 · 잠긴 계정이 "연결됨"으로 굳음** — 클라이언트는 계정 없이 답하는(PRE_AUTH) 시계 · GetCapabilities 만으로 만들어져, GetProfiles 가 NotAuthorized 여도 모델이 캐시됐다. 팝업은 연결됨으로 보고, PTZ 명령은 빈 프로파일 토큰으로 나가(fault:NoProfile), 비밀번호를 고치거나 잠금이 풀려도 호스트를 다시 띄울 때까지 다시 붙지 않았다. 이제 프로파일을 못 읽으면 연결 실패(캐시 안 함 · 다음 준비에서 재시도). `PtzController.InitCoreAsync`.
+- **무응답 카메라의 버려진 호출이 카메라별 줄을 8초 막음** — 호출 쪽 제한 시간(FR-26)으로 결과는 버려도 WCF 호출은 송신 제한(8초)까지 게이트를 쥐어, 카메라가 돌아온 뒤 첫 명령 · 팝업 다시 열기가 6.5~7초 늦었다(준비 직후 배경 위치 읽기도 같은 식으로 걸렸다). 이제 초기화는 포기 즉시 게이트를 풀고, 게이트 안 호출은 부른 쪽이 포기한 뒤 1초(`PtzMotionPolicy.StallThreshold`) 넘게 답이 없으면 연결을 끊는다(배경 호출은 `BackgroundCallTimeout` 2초). 다음 명령이 게이트 안에서 기억한 접속 정보로 다시 붙는다(`LiveModelAsync`).
+- **장비 설정에서 주소 · 계정을 바꿔도 옛 연결을 계속 씀** — 캐시가 카메라 id 만으로 묶여 있었다. 이제 접속 정보(주소 · 포트 · 계정)가 바뀌면 캐시를 버리고 새로 붙는다(`CtxFor`). 영상 주소 캐시도 같은 조건.
+- **첫 프로파일에 PTZ 구성이 없는 카메라에서 PTZ 전부 실패** — PTZ 명령이 무조건 첫 프로파일로 갔다(ter:NoPTZProfile). 이제 PTZ 구성이 붙은 프로파일을 쓴다(기본 속도 읽기와 같은 규칙).
+
+### Added
+- 가짜 카메라 팜(`tools/dummy-cameras`): 이미징 서비스(GetImagingSettings · SetImagingSettings · GetMoveOptions · Move · Stop — 주야간 · 자동 초점 · 수동 초점), 카메라 시계 차이 장애(`ClockSkewSec`, 제어 `fault?skew=초`), 첫 프로파일 PTZ 없음(`FirstProfileWithoutPtz`).
+- 시험: 가짜 카메라 팜 `PopupOnvifScenarioTests` 28(이미징 · 초점 · 고정 카메라 · 8방향+줌 · 정지 경합 · 프리셋 저장/이동/삭제 · 홈 · 시계 +3시간 · 끊김 뒤 재연결 2 · 계정 2 · 메인/서브 4 · 프로파일 · 설정 변경 · 같은 카메라 두 팝업), `EventWindowFarmTests` +3(닫을 때 복귀 프리셋 · Home · 같은 카메라 두 이벤트 창 — 실제 호스트 exe 헤드리스), .sln 안 `CameraPopup.Tests/Unit/OnvifRecoveryTests` 4. 고치기 전 코드로 각각 6건 · 4건 실패 → 고친 뒤 전부 통과.
+
 ## [Unreleased] - ROI 창 영상 띠 제거 (EVT-R26-12 · 2026-10-07)
 
 ### Fixed
