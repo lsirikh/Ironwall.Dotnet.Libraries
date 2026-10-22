@@ -8149,7 +8149,8 @@ public partial class MapViewModel : BasePanelViewModel,
             try
             {
                 Thread.Sleep(3000);
-                DirectoryInfo di = new DirectoryInfo(System.Environment.CurrentDirectory);
+                // 실행 파일 폴더 기준(작업 폴더는 띄운 방식마다 달라 system32 일 수 있다)
+                DirectoryInfo di = new DirectoryInfo(System.AppContext.BaseDirectory);
                 var dirs = di.GetDirectories();
                 foreach (var folder in dirs)
                 {
