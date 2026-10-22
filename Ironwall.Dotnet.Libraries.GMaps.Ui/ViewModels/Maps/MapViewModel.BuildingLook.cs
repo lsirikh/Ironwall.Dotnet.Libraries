@@ -212,7 +212,12 @@ public partial class MapViewModel
             if (_bhLookNotice != null) done = _bhLookNotice;
             if (_bhBuilding?.Id == id && _bhJob == job)
             {
-                if (saved.State.Hidden && !_bhBuilding.Look.Hidden) PostBuilding3D(Map3DBuilding.SelectMessageJson(null));   // 사라진 건물의 강조 윤곽도 지운다
+                if (saved.State.Hidden && !_bhBuilding.Look.Hidden)
+                {
+                    // 사라진 건물의 강조 윤곽도 지운다 — 함께 고른 다른 건물의 강조 · 고름은 그대로
+                    BhSelection.RemoveAll(s => s.Id == id);
+                    PostBuilding3D(Map3DBuilding.SelectMessageJson(null, BhSelection.Count > 0 ? BhSelection.Select(s => s.Id) : null));
+                }
                 _bhBuilding = _bhBuilding with { Look = saved.State };
                 _bhLookEdit = null;
             }

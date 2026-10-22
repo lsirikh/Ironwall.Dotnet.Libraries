@@ -80,6 +80,48 @@ public class Map3DBuildingTests
         Assert.Equal(30.0, commit["building"]!.Value<double>("height"));
     }
 
+    // ── 2D 마커처럼 여러 개 고르기(2026-10-22) — 클릭 키 · Shift+끌기 상자 · 모두 강조 ──
+
+    [Fact]
+    public void should_read_ctrl_and_shift_of_click_and_default_to_false_for_old_engine()
+    {
+        var m = Map3DMath.ParseMessage(Building.Replace("\"manual\":false", "\"manual\":false,\"ctrl\":true,\"shift\":false"))!;
+        Assert.Equal((true, false), (m.Ctrl, m.Shift));
+        m = Map3DMath.ParseMessage(Building.Replace("\"manual\":false", "\"manual\":false,\"shift\":true"))!;
+        Assert.Equal((false, true), (m.Ctrl, m.Shift));
+        m = Map3DMath.ParseMessage(Building)!;                                                 // 옛 엔진 — 키 필드 없음
+        Assert.Equal((false, false), (m.Ctrl, m.Shift));
+        m = Map3DMath.ParseMessage(Building.Replace("\"manual\":false", "\"manual\":false,\"ctrl\":\"yes\",\"shift\":1"))!;
+        Assert.Equal((false, false), (m.Ctrl, m.Shift));                                      // bool 이 아니면 안 눌림
+    }
+
+    [Fact]
+    public void should_read_box_items_and_add_and_drop_bad_items_up_to_500()
+    {
+        var m = Map3DMath.ParseMessage("{\"type\":\"building.box\",\"add\":true,\"items\":[" + Building + ",{\"id\":\"x\",\"height\":5},{\"id\":-3,\"height\":5},"
+                                       + "{\"id\":9,\"height\":0},7,{\"id\":11,\"height\":6,\"origin\":\"map\"}]}")!;
+        Assert.Equal("building.box", m.Type);
+        Assert.True(m.BoxAdd);
+        Assert.Equal(new[] { 7, 11 }, m.BuildingBox!.Select(b => b.Id));                     // 모르는 id · 높이 없는 줄은 버린다
+        m = Map3DMath.ParseMessage("{\"type\":\"building.box\",\"items\":[]}")!;              // 빈 상자 = 바른 메시지(고름 풀기), add 없음 = false
+        Assert.Equal((0, false), (m.BuildingBox!.Count, m.BoxAdd));
+        Assert.Null(Map3DMath.ParseMessage("{\"type\":\"building.box\",\"add\":true}"));       // items 가 없으면 버린다(풀지 않는다)
+        Assert.Null(Map3DMath.ParseMessage("{\"type\":\"building.box\",\"items\":{}}"));
+        var many = new JArray(Enumerable.Range(1, 700).Select(i => (object)new JObject { ["id"] = i, ["height"] = 10.0 }).ToArray());
+        m = Map3DMath.ParseMessage(new JObject { ["type"] = "building.box", ["items"] = many }.ToString())!;
+        Assert.Equal(Map3DBuilding.MaxBoxItems, m.BuildingBox!.Count);
+        Assert.Equal(500, Map3DBuilding.MaxBoxItems);
+    }
+
+    [Fact]
+    public void should_send_all_selected_ids_as_strings_with_panel_id_in_select_message()
+    {
+        Assert.Equal("{\"type\":\"building.select\",\"id\":9,\"ids\":[\"8\",\"9\"]}", Map3DBuilding.SelectMessageJson(9, new[] { 8, 9 }));
+        Assert.Equal("{\"type\":\"building.select\",\"id\":null,\"ids\":[\"8\"]}", Map3DBuilding.SelectMessageJson(null, new[] { 8 }));
+        Assert.Equal("{\"type\":\"building.select\",\"id\":3,\"ids\":[]}", Map3DBuilding.SelectMessageJson(3, Array.Empty<int>()));
+        Assert.Equal("{\"type\":\"building.select\",\"id\":2}", Map3DBuilding.SelectMessageJson(2, null));   // ids 없으면 옛 모양 그대로
+    }
+
     // ── 층수 ↔ 높이 · 한 칸 · 키 · 끌기 ──
 
     [Theory]

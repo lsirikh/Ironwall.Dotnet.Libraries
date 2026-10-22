@@ -565,7 +565,7 @@ public partial class TwinContractScenarioTests
                        "Map.Decoration.Redo", "Map.Decoration.List", "Map.Decoration.Close");
         AssertRendered(rig.Vm.BuildingHeightPanel, "BuildingHeightPanelStyle.xaml", "Map.BuildingHeight.Facade", "Map.BuildingHeight.WallColor",
                        "Map.BuildingHeight.RoofColor", "Map.BuildingHeight.ApplyLook", "Map.BuildingHeight.Hide", "Map.BuildingHeight.HiddenCount",
-                       "Map.BuildingHeight.RestoreAll", "Map.BuildingHeight.HiddenList", "Map.BuildingHeight.HideAndRedraw", "Map.BuildingHeight.MultiSelect",
+                       "Map.BuildingHeight.RestoreAll", "Map.BuildingHeight.HiddenList", "Map.BuildingHeight.HideAndRedraw",
                        "Map.BuildingHeight.HideSelected", "Map.BuildingHeight.HideAllAuto", "Map.BuildingHeight.MultiSelectText");
         AssertRendered(rig.Vm.UserBuildingPanel, "UserBuildingPanelStyle.xaml", "Map.UserBuilding.Facade", "Map.UserBuilding.WallColor", "Map.UserBuilding.RoofColor",
                        "Map.UserBuilding.Taper", "Map.UserBuilding.TaperDeg", "Map.UserBuilding.TaperReset", "Map.UserBuilding.TaperStatus");

@@ -1080,13 +1080,19 @@ public partial class MapViewModel
         }
         if (msg.Type == "building")
         {
-            try { if (msg.Building is { } building) OnMap3DBuildingPicked(building); }   // 「건물 높이」 판(MapViewModel.BuildingHeight)
+            try { if (msg.Building is { } building) OnMap3DBuildingPicked(building, msg.Ctrl, msg.Shift); }   // 「건물 높이」 판(MapViewModel.BuildingHeight)
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 고르기 처리 실패(격리): {ex.Message}"); }
+            return;
+        }
+        if (msg.Type == "building.box")
+        {
+            try { if (msg.BuildingBox is { } items) OnMap3DBuildingBox(items, msg.BoxAdd); }   // Shift+끌기 상자(MapViewModel.BuildingErase)
+            catch (Exception ex) { _log?.Error($"[Map3D] 건물 상자 고르기 처리 실패(격리): {ex.Message}"); }
             return;
         }
         if (msg.Type == "building.none")
         {
-            // 3D 빈 땅(건물 · 마커 아님) 클릭 — 3D 는 윤곽을 지웠다. 판도 닫는다(미리보기 중이면 원래 높이로 = 취소, 2026-10-19 사용자 결정)
+            // 3D 빈 땅(건물 · 마커 아님) 클릭 — 3D 는 윤곽을 지웠다. 판도 닫는다(미리보기 중이면 원래 높이로 = 취소, 2026-10-19 사용자 결정) = 고름 풀기(2D 빈 곳 클릭과 같다)
             if (_map3DState != Map3DState.Shown || !IsBuildingHeightPanelOpen) return;
             _log?.Info("[Map3D] 빈 땅 클릭 → 「건물 높이」 판 닫기");
             try { CloseBuildingHeightPanel(clearUndo: false); }
