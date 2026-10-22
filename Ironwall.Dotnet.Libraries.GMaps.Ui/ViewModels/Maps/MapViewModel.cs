@@ -1278,6 +1278,15 @@ public partial class MapViewModel : BasePanelViewModel,
         //   (두 수정이 같은 자리를 다르게 고친 것을 하나로 — 2026-10-20 병합 뒤 시험 2건 실패로 확인)
         if (IsUserBuildingKey(e) || IsDecorationKey(e)) return;   // 「꾸미기」도 같은 몫(Delete = 고른 항목 · Ctrl+Z/Y = 꾸미기 기록)
 
+        // 3D 위 「건물 만들기」 판 — 3D 화면에서 누른 Ctrl+C/V · Ctrl+Shift+C/V 도 건물 · 속성 복사 · 붙여넣기(3D 화면 키는 판 키가 아니라 위에서 걸러지지 않는다,
+        //   2026-10-22). 복사할 건물이 없으면 넘겨 아래 심볼 복사 · 붙여넣기가 받는다. 보조키는 3D 고름과 같은 읽기(시험이 바꿔 넣는다).
+        if (_ubIn3D && IsUserBuildingDrawing && e.Key is System.Windows.Input.Key.C or System.Windows.Input.Key.V
+            && HandleUserBuildingClipboardKey(e.Key, Map3DModifiers()))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // 레이어 패널에 초점이 있으면 선택 키(↑/↓ · Space · Ctrl+A · Esc)는 패널 몫 — 지도 방향키 이동 · 전체 선택으로 새지 않게.
         if (LayerPanel is { IsKeyboardFocusWithin: true } && LayerPanelControl.IsSelectionKey(e.Key, System.Windows.Input.Keyboard.Modifiers)) return;
 
@@ -8831,6 +8840,7 @@ public partial class MapViewModel : BasePanelViewModel,
             NotifyOfPropertyChange(nameof(HasSelectedItem));
             NotifyOfPropertyChange(nameof(IsEditModeEnabled));
             SyncLayerSelectionFromMap(reveal: true);   // 단일 선택 → 레이어 패널 잎 선택(편집 모드, MapViewModel.LayerSelection)
+            QueueMap3DSelectionSync();                 // 3D 표시 중이면 고름 표시 · 손잡이도(MapViewModel.Overlay3D — 2D 어도너는 3D 밑에 가린다)
         }
     }
     /// <summary>

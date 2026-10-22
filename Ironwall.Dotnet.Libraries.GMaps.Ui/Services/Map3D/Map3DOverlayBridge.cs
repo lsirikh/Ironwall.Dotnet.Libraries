@@ -259,34 +259,39 @@ internal sealed class Map3DOverlayBridge
                     m.ShowTitle, m.Visible, p.IsLayerEnabled, m.Zoom) with
                 {
                     Label = LabelOf(m),
+                    ShowShape = m.ShowShape,
                     Fov = m.DeviceType == EnumDeviceType.IpCamera   // 2D 도 카메라만 부채꼴을 그린다
                         ? Map3DOverlay.Fov(m.ShowFOV, m.DetectionRange, m.DetectionAngle, m.DetectionBearing, m.FOVColor.ToHexString(), m.FOVOpacity)
                         : null,
                 };
             }
-            case GMapGeometricMarker g: return PlainPoint(Map3DOverlay.KindGeometric, g.Id, g.Model, g.IsLayerEnabled);
+            case GMapGeometricMarker g: return PlainPoint(Map3DOverlay.KindGeometric, g.Id, g.Model, g.IsLayerEnabled) with { Opacity = Math.Clamp(g.Model.Opacity, 0d, 1d) };
             case GMapMilitarySymbolMarker ms: return PlainPoint(Map3DOverlay.KindMilitary, ms.Id, ms.Model, ms.IsLayerEnabled);
             case GMapInfraMarker i: return PlainPoint(Map3DOverlay.KindInfra, i.Id, i.Model, i.IsLayerEnabled);
             case GMapCustomMarker c: return PlainPoint(Map3DOverlay.KindSymbol, c.Id, c.Model, c.IsLayerEnabled);
             case GMapPidsGroupMarker g:
             {
                 var m = g.Model;
-                return Map3DOverlay.Line(Map3DOverlay.KindPidsGroup, g.Id, m.Title,
+                var zone = Map3DOverlay.Line(Map3DOverlay.KindPidsGroup, g.Id, m.Title,
                     m.LinePoints?.Select(pt => (pt.Latitude, pt.Longitude)), m.IsClosedPath,
                     m.StrokeColor.ToHexString(), m.StrokeThickness,
                     hasFence: true, m.FenceHeightM ?? Utils.Symbol3DFeature.FenceHeightM, m.PostSpacingM, m.Render3D,   // 그룹 값이 없으면 설정(Symbol3D.FenceHeightM) — 2D 와 같은 높이
                     m.CompositeStatus, m.Visible, g.IsLayerEnabled, m.Zoom);
+                return zone with { Label = LineLabelOf(m, zone.Points), ShowLabel = m.ShowTitle };
             }
             case GMapLineMarker l:
             {
                 var m = l.Model;
-                return Map3DOverlay.Line(KindOf(l)!, l.Id, m.Title,
+                var line = Map3DOverlay.Line(KindOf(l)!, l.Id, m.Title,
                     m.LinePoints?.Select(pt => (pt.Latitude, pt.Longitude)), m.IsClosedPath,
                     m.StrokeColor.ToHexString(), m.StrokeThickness,
                     hasFence: false, null, null, false,
-                    null, m.Visible, l.IsLayerEnabled, m.Zoom) with
+                    null, m.Visible, l.IsLayerEnabled, m.Zoom);
+                return line with
                 {
                     Style = Map3DOverlay.LineStyle(m.FillColor.ToHexString(), m.LineOpacity, m.LinePattern, m.ShowArrowHead),
+                    Label = LineLabelOf(m, line.Points),
+                    ShowLabel = m.ShowTitle,
                 };
             }
             default:
@@ -298,10 +303,25 @@ internal sealed class Map3DOverlayBridge
     private static Map3DOverlayPoint PlainPoint(string kind, int id, ISymbolModel m, bool layerEnabled)
         => Map3DOverlay.Point(kind, id, m.Title, m.Latitude, m.Longitude, m.Altitude, m.Bearing,
                null, null, null, m.OperationState, null,
-               m.ShowTitle, m.Visible, layerEnabled, m.Zoom) with { Label = LabelOf(m) };
+               m.ShowTitle, m.Visible, layerEnabled, m.Zoom) with { Label = LabelOf(m), ShowShape = m.ShowShape };
 
+    /// <summary>점 심볼 이름표 — 글꼴 · 기울임 · 최대 폭(2D 와 같은 유효값) · 옮긴 만큼(DIP).</summary>
     private static Map3DOverlayLabelStyle LabelOf(ISymbolModel m)
-        => Map3DOverlay.Label(m.Title, m.TitleSize, m.TitleColor.ToHexString(), m.TitleBackground.ToHexString(), m.TitleBold);
+        => StyleOfLabel(m.Title, m.TitleSize, m.TitleColor, m.TitleBackground, m.TitleBold, m.TitleFontFamily, m.TitleItalic, m.TitleMaxWidth)
+           with { Offset = (m.LabelOffsetX, m.LabelOffsetY) };
+
+    /// <summary>선 · 구역 이름표 — 선은 LabelOffsetX/Y 를 비율(U/V)로 쓴다(LabelAdorner.IsNormalizedOffset). 2D 가 놓는 지리 자리도 함께.</summary>
+    private static Map3DOverlayLabelStyle LineLabelOf(ISymbolModel m, IReadOnlyList<(double Lat, double Lon)> points)
+        => StyleOfLabel(m.Title, m.TitleSize, m.TitleColor, m.TitleBackground, m.TitleBold, m.TitleFontFamily, m.TitleItalic, m.TitleMaxWidth)
+           with { Anchor = (m.LabelOffsetX, m.LabelOffsetY), At = Map3DOverlay.LineLabelAt(points, m.Latitude, m.Longitude, m.LabelOffsetX, m.LabelOffsetY) };
+
+    private static Map3DOverlayLabelStyle StyleOfLabel(string? title, double size, EnumColorType color, EnumColorType bg, bool bold, string? font, bool italic, double maxWidth)
+        => Map3DOverlay.Label(title, size, color.ToHexString(), bg.ToHexString(), bold) with
+        {
+            Font = string.IsNullOrWhiteSpace(font) ? null : font,
+            Italic = italic,
+            MaxWidth = Adorners.LabelAdorner.EffectiveMaxWidth(maxWidth),
+        };
 
     /// <summary>아이콘 서명에 넣을 마커 스타일(항목 JSON 에 없는 시각 값).</summary>
     private static string StyleOf(GMapMarker marker)
@@ -325,10 +345,23 @@ internal sealed class Map3DOverlayBridge
     /// VisualBrush 는 부모 오프셋은 빼지만 루트 변환(표시 회전 · 클릭 펄스)은 그대로 그린다 — 그 역변환을 걸어 회전 없는 모양으로 그린다
     /// (회전은 bearing 으로 따로 간다).
     /// </summary>
-    internal static byte[]? RenderIconPng(UIElement element, double scale = IconScale)
+    /// <remarks>
+    /// 루트 Opacity 는 VisualBrush 가 그대로 굽는다(2026-10-22 실측: 0.5 → 알파 128). withoutRootOpacity 면 그리는 동안만 1 로 둔다 —
+    /// 도형 투명도는 3D 가 opacity 로 거므로 두 번 옅어지지 않게(SetCurrentValue — 바인딩 · 로컬 값은 그대로).
+    /// </remarks>
+    internal static byte[]? RenderIconPng(UIElement element, double scale = IconScale, bool withoutRootOpacity = false)
     {
         var size = element.RenderSize;
         if (element.Visibility != Visibility.Visible || size.Width < 1 || size.Height < 1) return null;
+        double rootOpacity = element.Opacity;
+        if (!withoutRootOpacity || rootOpacity >= 1d) return RenderIconPngCore(element, size, scale);
+        element.SetCurrentValue(UIElement.OpacityProperty, 1d);
+        try { return RenderIconPngCore(element, size, scale); }
+        finally { element.SetCurrentValue(UIElement.OpacityProperty, rootOpacity); }
+    }
+
+    private static byte[]? RenderIconPngCore(UIElement element, Size size, double scale)
+    {
         var box = new Rect(size);
         var rootTransform = VisualTreeHelper.GetTransform(element);
         var matrix = rootTransform?.Value ?? Matrix.Identity;
@@ -415,7 +448,13 @@ internal sealed class Map3DOverlayBridge
             {
                 if (im.IsDisposed || BlobOf(im.ImageSource) is not { } blob) return null;
                 return Map3DOverlay.ToJson(Map3DOverlay.Image(im.Id, im.Title, im.Left, im.Top, im.Right, im.Bottom, im.Bearing, im.Opacity,
-                    ((IEditableMarker)im).ZOrder, im.Visible, im.IsLayerEnabled, im.Zoom, mask: true, blob.Key));
+                    ((IEditableMarker)im).ZOrder, im.Visible, im.IsLayerEnabled, im.Zoom, mask: true, blob.Key) with
+                {
+                    // 오버레이 이미지 이름표(2026-10-22) — 자리는 2D 와 같은 U/V 비율
+                    Label = StyleOfLabel(im.Title, im.TitleSize, im.TitleColor, im.TitleBackground, im.TitleBold, im.TitleFontFamily, im.TitleItalic, im.TitleMaxWidth)
+                            with { Anchor = (im.LabelOffsetU, im.LabelOffsetV) },
+                    ShowLabel = im.ShowTitle,
+                });
             }
             case GMapCustomImage ci:
             {
@@ -447,7 +486,7 @@ internal sealed class Map3DOverlayBridge
         if (!_icons.TryGetValue(signature, out var entry))
         {
             byte[]? png = null;
-            try { png = RenderIconPng(element); }
+            try { png = RenderIconPng(element, withoutRootOpacity: marker is GMapGeometricMarker); }   // 도형 투명도는 opacity 로 따로 간다
             catch (Exception ex) { _log?.Warning($"[Map3D] 아이콘 그리기 실패(원 표식): {ex.Message}"); }
             entry = png == null
                 ? new IconEntry(null, null)
@@ -594,6 +633,20 @@ internal sealed class Map3DOverlayBridge
             }
             catch (Exception ex) { _log?.Warning($"[Map3D] 오버레이 patch 실패(건너뜀): {ex.Message}"); }
         }
+    }
+
+    /// <summary>
+    /// 3D 손잡이로 고친 심볼 저장 뒤 — 지금 값 전체를 바로 overlay.patch 로(2026-10-22 엔진 계약: 엔진은 이 patch 로 고치는 중 모양을 맞춘다).
+    /// 값이 3D 가 끈 그대로여도 보낸다(직전 기록과 비교하지 않는다). 3D 를 보고 있지 않거나 대상이 아니면 아무것도 하지 않는다.
+    /// </summary>
+    public void PatchNow(GMapMarker marker)
+    {
+        if (_map == null || Build(marker) is not { } item) return;
+        string kind = item.Value<string>("kind")!;
+        int id = item.Value<int>("id");
+        var set = new JObject(item.Properties().Where(p => p.Name is not ("kind" or "id")).Select(p => new JProperty(p.Name, p.Value.DeepClone())));
+        _sent[Map3DOverlay.Key(kind, id)] = item;   // 곧 올 PropertyChanged 의 patch 는 바뀐 것이 없어 다시 보내지 않는다
+        _post(Map3DOverlay.PatchJson(++_rev, kind, id, set));
     }
 
     /// <summary>처음이면 add, 직전에 보낸 것과 다르면 바뀐 필드만 patch. 항목 키를 돌려준다.</summary>

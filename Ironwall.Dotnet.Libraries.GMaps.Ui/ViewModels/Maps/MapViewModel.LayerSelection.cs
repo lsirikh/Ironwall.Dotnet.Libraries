@@ -71,7 +71,11 @@ public partial class MapViewModel
         LayerPanel?.BringNodeIntoView(newly[0]);
     }
 
-    private void OnGroupSelectionChanged() => SyncLayerSelectionFromMap(reveal: true);
+    private void OnGroupSelectionChanged()
+    {
+        SyncLayerSelectionFromMap(reveal: true);
+        QueueMap3DSelectionSync();   // 3D 표시 중이면 묶음 고름 표시도(MapViewModel.Overlay3D)
+    }
 
     /// <summary>잎의 지도 마커 — 심볼 잎 = 같은 Id 의 심볼 마커, 오버레이 이미지 잎 = 같은 파일의 이미지 마커. 없으면 null.</summary>
     private IEditableMarker? FindMarkerForLayerLeaf(LayerTreeNode leaf)

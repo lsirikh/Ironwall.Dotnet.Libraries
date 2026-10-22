@@ -162,6 +162,7 @@
 						<Grid>
 							<Grid.RowDefinitions>
 								<RowDefinition Height="38" />
+								<RowDefinition Height="*" />
 								<RowDefinition Height="Auto" />
 							</Grid.RowDefinitions>
 
@@ -206,8 +207,15 @@
 								</Grid>
 							</Border>
 
-							<!--  바디 (DataContext = MapViewModel)  -->
-							<StackPanel Grid.Row="1" Margin="14,12,14,14">
+							<!--  바디 (DataContext = MapViewModel) — 머리 띠 · 행동 줄 사이만 세로 스크롤(2026-10-22 "너무 길어 높이 줄이고 스크롤").
+							      판 높이는 HeightPanelControlBase 가 지도 높이의 70% · 판 자리 아래 남은 높이로 자른다  -->
+							<ScrollViewer
+								Grid.Row="1"
+								Padding="0,0,2,0"
+								AutomationProperties.AutomationId="Map.BuildingHeight.Scroll"
+								HorizontalScrollBarVisibility="Disabled"
+								VerticalScrollBarVisibility="Auto">
+							<StackPanel Margin="14,12,14,4">
 								<TextBlock
 									AutomationProperties.AutomationId="Map.BuildingHeight.Current"
 									FontSize="13"
@@ -319,15 +327,19 @@
 									Text="{Binding BuildingLookUnsupportedText}"
 									TextWrapping="Wrap"
 									Visibility="{Binding IsBuildingLookUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
+								<!--  외벽 무늬는 이름이 길어(「공장 · 샌드위치 패널」) 한 줄 전체 폭, 색 둘은 그 아래 두 칸(2026-10-22 — 세 칸이면 글자가 잘렸다)  -->
 								<Grid IsEnabled="{Binding IsBuildingLookAvailable}">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="8" />
 										<ColumnDefinition Width="*" />
-										<ColumnDefinition Width="8" />
-										<ColumnDefinition Width="*" />
 									</Grid.ColumnDefinitions>
-									<StackPanel Grid.Column="0">
+									<Grid.RowDefinitions>
+										<RowDefinition Height="Auto" />
+										<RowDefinition Height="6" />
+										<RowDefinition Height="Auto" />
+									</Grid.RowDefinitions>
+									<StackPanel Grid.Row="0" Grid.ColumnSpan="3">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 무늬" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.BuildingHeight.Facade"
@@ -343,7 +355,7 @@
 											</ComboBox.GroupStyle>
 										</ComboBox>
 									</StackPanel>
-									<StackPanel Grid.Column="2">
+									<StackPanel Grid.Row="2" Grid.Column="0">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="외벽 색" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.BuildingHeight.WallColor"
@@ -354,7 +366,7 @@
 											SelectedValue="{Binding BuildingWallColor, Mode=TwoWay}"
 											SelectedValuePath="Key" />
 									</StackPanel>
-									<StackPanel Grid.Column="4">
+									<StackPanel Grid.Row="2" Grid.Column="2">
 										<TextBlock Style="{StaticResource BuildingHeightSectionLabel}" Text="지붕 색" />
 										<ComboBox
 											AutomationProperties.AutomationId="Map.BuildingHeight.RoofColor"
@@ -400,75 +412,9 @@
 									TextWrapping="Wrap"
 									Visibility="{Binding HasBuildingHeightError, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-								<!--  적용할 내용 한 줄(늘 보임 — 적용 단추가 곧 확인)  -->
-								<Border
-									Height="1"
-									Margin="0,12,0,10"
-									Background="{DynamicResource DividerBrush}" />
-								<TextBlock
-									Margin="0,0,0,12"
-									AutomationProperties.AutomationId="Map.BuildingHeight.Summary"
-									FontSize="12"
-									FontWeight="SemiBold"
-									Foreground="{DynamicResource TextPrimaryBrush}"
-									Text="{Binding BuildingHeightSummary}"
-									TextWrapping="Wrap" />
-
-								<Grid>
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*" />
-										<ColumnDefinition Width="7" />
-										<ColumnDefinition Width="*" />
-									</Grid.ColumnDefinitions>
-									<Grid.RowDefinitions>
-										<RowDefinition Height="Auto" />
-										<RowDefinition Height="7" />
-										<RowDefinition Height="Auto" />
-									</Grid.RowDefinitions>
-									<Button
-										Grid.Row="0"
-										Grid.Column="0"
-										AutomationProperties.AutomationId="Map.BuildingHeight.Apply"
-										Command="{Binding ApplyBuildingHeightCommand}"
-										Content="✓ 적용"
-										Style="{StaticResource PanelPrimaryButtonStyle}"
-										ToolTip="저장 — 다시 만들어도 유지됩니다" />
-									<Button
-										Grid.Row="0"
-										Grid.Column="2"
-										AutomationProperties.AutomationId="Map.BuildingHeight.Cancel"
-										Command="{Binding CancelBuildingHeightCommand}"
-										Content="취소"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="원래 높이로 (Esc)" />
-									<Button
-										Grid.Row="2"
-										Grid.Column="0"
-										AutomationProperties.AutomationId="Map.BuildingHeight.Reset"
-										Command="{Binding ResetBuildingHeightCommand}"
-										Content="자동으로 되돌리기"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="직접 넣은 값을 지우고 자동으로 잰 높이로" />
-									<Button
-										Grid.Row="2"
-										Grid.Column="2"
-										AutomationProperties.AutomationId="Map.BuildingHeight.Undo"
-										Command="{Binding UndoBuildingHeightCommand}"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="방금 저장한 것을 거꾸로 (Ctrl+Z)">
-										<StackPanel Orientation="Horizontal">
-											<md:PackIcon
-												Width="14"
-												Height="14"
-												VerticalAlignment="Center"
-												Kind="Undo" />
-											<TextBlock Margin="5,0,0,0" Text="되돌리기" />
-										</StackPanel>
-									</Button>
-								</Grid>
-
-								<!--  지우기 · 다시 만들기(2026-10-22) — [이 건물 지우기](확인) · [지우고 이 자리에 새로 그리기] · [여러 개 고르기] → [고른 n개 지우기](확인) ·
-								      [이 영역 자동 건물 모두 지우기…](확인). 지도 건물은 실제로는 숨김(되살리기 가능) — 쓰는 법은 판 "?"  -->
+								<!--  지우기 · 다시 만들기(2026-10-22) — [이 건물 지우기](확인) · [고른 n개 지우기](2개 이상 고르면 · 확인) · [지우고 이 자리에 새로 그리기] ·
+								      [이 영역 자동 건물 모두 지우기…](확인). 여러 개 고르기는 2D 마커와 같다(Ctrl+클릭 · Shift+끌기 — 모드 단추 없음).
+								      긴 단추는 한 줄 전체 폭(두 칸이면 글자가 잘렸다). 지도 건물은 실제로는 숨김(되살리기 가능) — 쓰는 법은 판 "?"  -->
 								<Border
 									Height="1"
 									Margin="0,12,0,8"
@@ -498,28 +444,21 @@
 									<Button
 										Grid.Row="0"
 										Grid.Column="2"
-										AutomationProperties.AutomationId="Map.BuildingHeight.HideAndRedraw"
-										Command="{Binding HideAndRedrawBuildingCommand}"
-										Content="지우고 이 자리에 새로 그리기"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="이 건물을 지우고 같은 바닥 모양으로 직접 그린 건물을 엽니다" />
-									<Button
-										Grid.Row="2"
-										Grid.Column="0"
-										AutomationProperties.AutomationId="Map.BuildingHeight.MultiSelect"
-										Command="{Binding ToggleBuildingMultiSelectCommand}"
-										Content="{Binding BuildingMultiButtonText}"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="3D 에서 차례로 눌러 여러 건물을 고릅니다 (Ctrl+클릭도 됩니다)" />
-									<Button
-										Grid.Row="2"
-										Grid.Column="2"
 										AutomationProperties.AutomationId="Map.BuildingHeight.HideSelected"
 										Command="{Binding HideSelectedBuildingsCommand}"
 										Content="{Binding BuildingMultiDeleteText}"
 										Style="{StaticResource PanelSecondaryButtonStyle}"
 										ToolTip="고른 건물을 한꺼번에 지웁니다(확인 뒤 · 되돌리기 한 번에)"
 										Visibility="{Binding IsBuildingMultiSelect, Converter={StaticResource BooleanToVisibilityConverter}}" />
+									<Button
+										Grid.Row="2"
+										Grid.Column="0"
+										Grid.ColumnSpan="3"
+										AutomationProperties.AutomationId="Map.BuildingHeight.HideAndRedraw"
+										Command="{Binding HideAndRedrawBuildingCommand}"
+										Content="지우고 이 자리에 새로 그리기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="이 건물을 지우고 같은 바닥 모양으로 직접 그린 건물을 엽니다" />
 									<Button
 										Grid.Row="4"
 										Grid.Column="0"
@@ -598,6 +537,76 @@
 										</DataTemplate>
 									</ItemsControl.ItemTemplate>
 								</ItemsControl>
+							</StackPanel>
+							</ScrollViewer>
+
+							<!--  행동 줄(2026-10-22) — 스크롤 밖이라 판이 작아도 늘 보인다. 적용할 내용 한 줄(늘 보임 — 적용 단추가 곧 확인) + 주 행동  -->
+							<StackPanel Grid.Row="2" Margin="14,0,14,14">
+								<Border
+									Height="1"
+									Margin="0,8,0,10"
+									Background="{DynamicResource DividerBrush}" />
+								<TextBlock
+									Margin="0,0,0,12"
+									AutomationProperties.AutomationId="Map.BuildingHeight.Summary"
+									FontSize="12"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding BuildingHeightSummary}"
+									TextWrapping="Wrap" />
+
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Grid.RowDefinitions>
+										<RowDefinition Height="Auto" />
+										<RowDefinition Height="7" />
+										<RowDefinition Height="Auto" />
+									</Grid.RowDefinitions>
+									<Button
+										Grid.Row="0"
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.BuildingHeight.Apply"
+										Command="{Binding ApplyBuildingHeightCommand}"
+										Content="✓ 적용"
+										Style="{StaticResource PanelPrimaryButtonStyle}"
+										ToolTip="저장 — 다시 만들어도 유지됩니다" />
+									<Button
+										Grid.Row="0"
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.BuildingHeight.Cancel"
+										Command="{Binding CancelBuildingHeightCommand}"
+										Content="취소"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="원래 높이로 (Esc)" />
+									<Button
+										Grid.Row="2"
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.BuildingHeight.Reset"
+										Command="{Binding ResetBuildingHeightCommand}"
+										Content="자동으로 되돌리기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="직접 넣은 값을 지우고 자동으로 잰 높이로" />
+									<Button
+										Grid.Row="2"
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.BuildingHeight.Undo"
+										Command="{Binding UndoBuildingHeightCommand}"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="방금 저장한 것을 거꾸로 (Ctrl+Z)">
+										<StackPanel Orientation="Horizontal">
+											<md:PackIcon
+												Width="14"
+												Height="14"
+												VerticalAlignment="Center"
+												Kind="Undo" />
+											<TextBlock Margin="5,0,0,0" Text="되돌리기" />
+										</StackPanel>
+									</Button>
+								</Grid>
 							</StackPanel>
 						</Grid>
 					</fb:FrameBorder>

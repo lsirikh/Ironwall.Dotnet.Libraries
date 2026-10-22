@@ -29,8 +29,10 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     private sealed record BuildingHeightUndoStep(string Job, int Id, double? Before, int? BeforeFloors)
     {
         public Map3DLookState? Look { get; init; }
-        /// <summary>여러 건물을 한꺼번에 지운 한 칸(고른 n개 · 영역 모두) — 되돌리기 = 그 건물들을 지우기 전 모양으로 모두 되살림.</summary>
+        /// <summary>여러 건물을 한꺼번에 지운 · 외관을 바꾼 한 칸(고른 n개 · 영역 모두) — 되돌리기 = 그 건물들을 앞 모양으로 모두 다시 저장.</summary>
         public IReadOnlyList<(int Id, Map3DLookState Look)>? Group { get; init; }
+        /// <summary>고른 여러 건물의 높이를 함께 바꾼 한 칸 — 되돌리기 = 건물마다 앞 높이(null = 자동)로.</summary>
+        public IReadOnlyList<(int Id, double? Before, int? BeforeFloors)>? Heights { get; init; }
     }
 
     private Map3DBuildingPick? _bhBuilding;   // 고른 건물(저장된 값 = 취소하면 돌아갈 값)
@@ -81,14 +83,23 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     public string BuildingHeightReadOnlyText => Map3DBuilding.ReadOnlyReason;
     /// <summary>입력 · 손잡이를 쓸 수 있는가 — 권한이 있고 저장 중이 아닐 때.</summary>
     public bool IsBuildingHeightEditable => IsBuildingHeightPanelOpen && CanEditMap() && !_bhBusy;
-    /// <summary>미리보기가 저장된 높이와 다른가.</summary>
-    public bool IsBuildingHeightChanged => _bhBuilding is { } b && Math.Abs(_bhPreview - b.Height) > 1e-9;
+    /// <summary>
+    /// 미리보기가 저장된 높이와 다른가. 여러 개 골랐으면 2D 마커 여러 개 속성창처럼 칸 단위 — 높이 칸을 손댔고 고른 것 중 하나라도 다를 때만
+    /// (손대지 않은 "여러 값" 은 적용하지 않는다).
+    /// </summary>
+    public bool IsBuildingHeightChanged => _bhBuilding is { } b
+        && (IsBuildingMultiSelect ? _bhHeightTouched && BhSelection.Any(s => Math.Abs(_bhPreview - s.Height) > 1e-9) : Math.Abs(_bhPreview - b.Height) > 1e-9);
+    /// <summary>높이 칸을 손댔나(판을 연 뒤 · 여러 개 함께 적용 뒤 처음으로).</summary>
+    private bool _bhHeightTouched;
     /// <summary>판 안 되돌리기 칸 수(이 3D 동안).</summary>
     public int BuildingHeightUndoCount => BhUndo.Count;
 
     /// <summary>적용할 내용 한 줄 — "적용하면 12.0 m → 30.0 m(10층)" · 바꾸지 않았으면 그렇게.</summary>
     public string BuildingHeightSummary => _bhBuilding is not { } b ? ""
         : _bhBusy ? "저장하는 중… 끝날 때까지 닫을 수 없습니다"
+        : IsBuildingMultiSelect
+            ? IsBuildingHeightChanged ? $"적용하면 고른 {BhSelection.Count}개 모두 {Map3DBuilding.FormatMeters(_bhPreview)} m({Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight)}층)"
+                                      : "아직 바꾸지 않았습니다"
         : IsBuildingHeightChanged
             ? $"적용하면 {Map3DBuilding.FormatMeters(b.Height)} m → {Map3DBuilding.FormatMeters(_bhPreview)} m({Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight)}층)"
             : b.Manual ? "직접 입력한 높이입니다 — 바꾸려면 층수나 높이를 넣으세요" : "아직 바꾸지 않았습니다";
@@ -173,37 +184,61 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
 
     // ── 3D 에서 고르기 ──
 
-    /// <summary>3D 에서 건물을 눌렀다(building 메시지) — 판을 그 건물로 연다. 다른 건물을 보던 중이면 그 미리보기를 먼저 원래대로.</summary>
-    private void OnMap3DBuildingPicked(Map3DBuildingPick pick) => OnMap3DBuildingPicked(pick, Map3DModifiers().HasFlag(System.Windows.Input.ModifierKeys.Control));
-
     /// <summary>3D 고름 때 보조키(시험은 가짜로 바꾼다 — 기본은 이 스레드의 Win32 키 상태, 시험 중 사용자가 누른 Ctrl 이 끼어들지 않게).</summary>
     private Func<System.Windows.Input.ModifierKeys>? _map3DModifiers;
     private System.Windows.Input.ModifierKeys Map3DModifiers() => (_map3DModifiers ?? (() => System.Windows.Input.Keyboard.Modifiers))();
 
-    /// <summary>ctrl = Ctrl+클릭(여러 개 고르기에 넣기 · 빼기).</summary>
-    private void OnMap3DBuildingPicked(Map3DBuildingPick pick, bool ctrl)
+    /// <summary>
+    /// 3D 에서 건물을 눌렀다(building 메시지) — 2D 마커 고르기와 같은 규칙(2026-10-22 사용자 — "2D 에서 Marker 수정하고 선택할 때와 같은 방식으로"):
+    /// 클릭 = 그 건물 하나만 고르고 판을 그 건물로(다른 건물을 보던 중이면 그 미리보기를 먼저 원래대로) · Ctrl+클릭 = 고름에 넣기 · 빼기(BuildingErase).
+    /// ctrl · shift = 엔진이 보낸 키 — 옛 엔진은 키가 없어 호스트 키 상태와 함께 본다. Shift 만 눌린 클릭도 넣기 · 빼기(고름을 잃지 않게 — DECISIONS 2).
+    /// </summary>
+    private void OnMap3DBuildingPicked(Map3DBuildingPick pick, bool ctrl = false, bool shift = false)
     {
         if (_map3DState != Map3DState.Shown || _map3DJob == null) return;
-        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid); return; }
+        if (pick.UserUid is { } uid) { OnMap3DUserBuildingPicked(uid, ctrl || shift); return; }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
+        if (!CanPickMap3DBuildings(pick)) return;
+        var mods = Map3DModifiers();
+        if ((ctrl || shift || (mods & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)
+            && ToggleBuildingSelection(pick)) return;
+        bool wasMany = BhSelection.Count > 1;
+        BhSelection.Clear();
+        OpenBuildingHeightPanel(pick);
+        if (IsSelectableMapBuilding(_bhBuilding!)) BhSelection.Add(_bhBuilding!);
+        if (wasMany) PostBuildingSelection();   // 여러 개 강조를 하나로(하나 → 하나는 엔진이 스스로 옮긴다 — DECISIONS 5)
+        RefreshBuildingHeightPanel();
+    }
+
+    /// <summary>
+    /// 건물 고름(클릭 · 상자)을 받아도 되나 — 지도 편집 모드(꺼짐 = 보기 전용, 엔진이 그린 윤곽은 지운다) · 3D 그리기와 배타 · 네이티브 창 3D 는 판을 못 띄운다.
+    /// 받으면 true. pick = 클릭한 건물(상자는 null — 같은 자리 직접 그린 건물 우선 판정을 건너뛴다).
+    /// </summary>
+    private bool CanPickMap3DBuildings(Map3DBuildingPick? pick)
+    {
         if (!RequireMapEditMode(notify: false))
         {
             // 보기 전용 — 「건물 높이」 판(숨기기 · 외관 · 높이)을 열지 않고, 3D 가 그린 윤곽은 지운다(엔진에 고르기를 끄는 메시지는 없다)
-            _log?.Info($"[Map3D] 건물 고름 — 편집 모드 아님(무시) id={pick.Id}");
+            _log?.Info($"[Map3D] 건물 고름 — 편집 모드 아님(무시) id={pick?.Id.ToString() ?? "상자"}");
             try { PostBuilding3D(Map3DBuilding.SelectMessageJson(null)); }
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 윤곽 지우기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
-            return;
-        }   // 다시 만든 직접 그린 건물 — 2D 고치기 판(twin-contract B)
-        if (OnMap3DBuildingPickedOverEdit3D(pick)) return;
+            return false;
+        }
+        if (OnMap3DBuildingPickedOverEdit3D(pick)) return false;
         if (Map3DHost.HostMode == "hwnd")
         {
             // 네이티브 창 3D 는 WPF 판을 덮는다 — 안 보이는 판이 첫 Esc 를 가로채 3D 를 못 나가게 되므로 열지 않고 알린다(3D 가 그린 윤곽은 지운다)
-            _log?.Info($"[Map3D] 건물 고름 — 네이티브 창 3D 라 「건물 높이」 판을 열지 않음 id={pick.Id} job={_map3DJob}");
+            _log?.Info($"[Map3D] 건물 고름 — 네이티브 창 3D 라 「건물 높이」 판을 열지 않음 id={pick?.Id.ToString() ?? "상자"} job={_map3DJob}");
             try { PostBuilding3D(Map3DBuilding.SelectMessageJson(null)); }
             catch (Exception ex) { _log?.Error($"[Map3D] 건물 윤곽 지우기 — 3D 로 보내기 실패(격리): {ex.Message}"); }
             SetAimStatus("네이티브 창 3D 에서는 건물 높이 판을 쓸 수 없습니다", autoHide: true);
-            return;
+            return false;
         }
-        if (ToggleBuildingMultiSelect(pick, ctrl) && _bhBuilding?.Id == pick.Id) return;   // 여러 개 고르기 — 넣거나 뺐다(같은 건물이면 판은 그대로)
+        return true;
+    }
+
+    /// <summary>판을 그 건물로 연다(같은 건물이면 넣던 값 그대로) — 다른 건물을 보던 중이면 그 미리보기를 먼저 원래대로.</summary>
+    private void OpenBuildingHeightPanel(Map3DBuildingPick pick)
+    {
         if (_bhBuilding is { } old)
         {
             if (old.Id == pick.Id && _bhJob == _map3DJob) return;   // 같은 건물 — 넣던 값 그대로
@@ -217,6 +252,8 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         _bhLookNotice = null;
         _bhError = null;
         _bhInputError = false;
+        _bhHeightTouched = false;
+        BhLookTouched.Clear();
         _log?.Info($"[Map3D] 건물 고름 id={pick.Id} 높이={pick.Height} 출처={pick.HeightFrom ?? "-"} job={_map3DJob}");
         RefreshBuildingHeightPanel();
         _ = LoadBuildingLooksAsync(_map3DJob);   // 「숨긴 건물」 목록 · 옛 엔진 판정
@@ -231,16 +268,16 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     /// ③ 아니면 직접 그린 건물 · 꾸미기 판(손잡이 · 강조 포함)을 닫고 「건물 높이」 판으로 간다(false).
     /// 처리를 끝냈으면 true.
     /// </summary>
-    private bool OnMap3DBuildingPickedOverEdit3D(Map3DBuildingPick pick)
+    private bool OnMap3DBuildingPickedOverEdit3D(Map3DBuildingPick? pick)
     {
         bool ub3D = _ubIn3D && IsUserBuildingDrawing && _ubArea?.Id == _map3DJob;
         if (ub3D && _draw3DMode != null || _decoIn3D && IsDecorating && _draw3DMode != null)
         {
-            _log?.Info($"[Map3D] 건물 고름 — 3D 그리기 중(무시) id={pick.Id}");
+            _log?.Info($"[Map3D] 건물 고름 — 3D 그리기 중(무시) id={pick?.Id.ToString() ?? "상자"}");
             PostBuilding3D(Map3DBuilding.SelectMessageJson(null));
             return true;
         }
-        if (ub3D && pick.Lon is double lon && pick.Lat is double lat
+        if (ub3D && pick?.Lon is double lon && pick.Lat is double lat
             && UserBuildingItems.LastOrDefault(i => i.BakedId == null && Map3DUserBuilding.Contains(i.Outline, new UbPoint(lon, lat))) is { } drawn)
         {
             _log?.Info($"[Map3D] 건물 고름 id={pick.Id} — 같은 자리의 직접 그린 건물 우선 uid={drawn.Uid}");
@@ -259,8 +296,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     {
         if (clearUndo) { BhUndo.Clear(); _bhSession++; }   // 3D 세션이 바뀐다 — 그 뒤 도착한 저장 응답은 칸에 쌓지 않는다
         if (_bhBuilding is not { } b) return;
-        _bhMultiOn = false;
-        BhMulti.Clear();
+        BhSelection.Clear();   // 판을 닫으면 고름도 풀린다(빈 곳 클릭 · Esc · 취소 — 2D 와 같다)
         // 3D 로 보내기(WebView2)가 실패해도 판은 닫는다 — 3D 나가기 도중 예외로 나머지 복귀가 끊기지 않게
         try
         {
@@ -283,6 +319,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         double h = Map3DBuilding.ClampHeight(height);
         _bhError = null;
         _bhInputError = false;
+        _bhHeightTouched = true;
         if (Math.Abs(h - _bhPreview) > 1e-9)
         {
             _bhPreview = h;
@@ -311,6 +348,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
     {
         _bhHeightText = _bhBuilding == null ? "" : Map3DBuilding.FormatMeters(_bhPreview);
         _bhFloorsText = _bhBuilding == null ? "" : Map3DBuilding.FloorsFromHeight(_bhPreview, BhFloorHeight).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (IsBuildingHeightMixed) _bhHeightText = _bhFloorsText = Map3DBuilding.MixedText;   // 고른 건물 높이가 서로 다르고 손대지 않았다(2D 여러 개 속성창과 같다)
         _bhFloorHeightText = Map3DBuilding.FormatMeters(BhFloorHeight);
         foreach (var name in new[]
                  {
@@ -321,11 +359,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
                      nameof(BuildingColors), nameof(BuildingFacade), nameof(BuildingWallColor), nameof(BuildingRoofColor), nameof(IsBuildingLookChanged),
                      nameof(IsBuildingLookAvailable), nameof(IsBuildingLookUnsupported), nameof(BuildingHideButtonText), nameof(IsBuildingHidden),
                      nameof(BuildingHiddenItems), nameof(BuildingHiddenCountText), nameof(HasBuildingHidden), nameof(BuildingLookNotice), nameof(HasBuildingLookNotice),
-                     nameof(IsBuildingMultiSelect), nameof(BuildingMultiCount), nameof(BuildingMultiSelectText), nameof(BuildingMultiButtonText),
-                     nameof(BuildingMultiDeleteText),
+                     nameof(IsBuildingMultiSelect), nameof(BuildingMultiCount), nameof(BuildingMultiSelectText), nameof(BuildingMultiDeleteText),
                  })
             NotifyOfPropertyChange(name);
-        ToggleBuildingMultiSelectCommand.RaiseCanExecuteChanged();
         HideSelectedBuildingsCommand.RaiseCanExecuteChanged();
         HideAndRedrawBuildingCommand.RaiseCanExecuteChanged();
         HideAllAutoBuildingsCommand.RaiseCanExecuteChanged();
@@ -355,6 +391,7 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         double target = _bhPreview;
         int floors = Map3DBuilding.FloorsFromHeight(target, BhFloorHeight);
+        if (IsBuildingMultiSelect) { await ApplyBuildingHeightGroupAsync(job, target, floors); return; }
         // 직접 그린 건물(origin user)은 자동 높이가 없다 — 되돌리기는 "자동으로"가 아니라 앞 높이로 다시 저장
         bool keep = b.Manual || b.Origin == "user";
         await SaveBuildingHeightAsync(job, b.Id, target, floors, new BuildingHeightUndoStep(job, b.Id, keep ? b.Height : null, keep ? b.Levels : null),
@@ -378,7 +415,9 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
         var step = BhUndo[index];
         BhUndo.RemoveAt(index);
         int session = _bhSession;
-        bool ok = step.Group is { } group
+        bool ok = step.Heights is { } heights
+            ? await RestoreBuildingHeightsAsync(step.Job, heights)
+            : step.Group is { } group
             ? await RestoreBuildingsAsync(step.Job, group)
             : step.Look is { } look
             ? await SaveBuildingLookAsync(step.Job, step.Id, look.Hidden, look, null, "되돌렸습니다")
@@ -437,6 +476,8 @@ public partial class MapViewModel : IBuildingHeightPanelHost, IHandle<CallResetM
             _bhBuilding = saved.Pick;
             _bhPreview = saved.Pick.Height;
         }
+        int at = _bhJob == job ? BhSelection.FindIndex(s => s.Id == saved.Pick.Id) : -1;
+        if (at >= 0) BhSelection[at] = BhSelection[at] with { Height = saved.Pick.Height, Levels = saved.Pick.Levels, Manual = saved.Pick.Manual, HeightFrom = saved.Pick.HeightFrom };
         RefreshBuildingHeightPanel();
     }
 

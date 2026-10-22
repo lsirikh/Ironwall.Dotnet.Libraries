@@ -1,9 +1,11 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 
@@ -26,6 +28,51 @@ public abstract class HeightPanelControlBase : Control
         AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnHandleDragStarted));
         AddHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnHandleDragDelta));
         AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnHandleDragCompleted));
+        // Tab 으로 스크롤 안 칸에 들어가면 그 칸이 보이게 — 기본 BringIntoView 는 논리 포커스(GotFocus) 길이라 콤보 안쪽 등에서 빠질 수 있다
+        AddHandler(Keyboard.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler((_, e) => (e.OriginalSource as FrameworkElement)?.BringIntoView()));
+    }
+
+    /// <summary>판 높이 상한 = 지도(Canvas) 높이의 이 비율(2026-10-22 사용자 "너무 길어 높이 줄이고 스크롤" — 1920×1032 에서 약 640 px, 1366×768 에서 약 450 px).</summary>
+    public const double FitMaxRatio = 0.7;
+    /// <summary>판 끝과 지도 아래 가장자리 사이 여백(px) — 판을 아래로 끌어 놓아도 행동 줄이 지도 안에 남는다.</summary>
+    public const double FitBottomMargin = 8;
+    /// <summary>판이 줄어드는 가장 작은 높이(px) — 머리줄 · 행동 줄 · 내용 몇 줄은 보인다.</summary>
+    public const double FitMinHeight = 200;
+    private Canvas? _fitCanvas;
+
+    /// <summary>
+    /// 판 높이를 <see cref="FitHeight"/> 로 자른다 — 머리줄 · 행동 줄은 템플릿에서 고정이고 그 사이 내용만 ScrollViewer 가 스크롤한다.
+    /// Canvas 는 자식을 끝없는 높이로 재므로 그대로 두면 판이 화면 밖까지 길어졌다(2026-10-22 헤디드 실측 — 1920×1032 에서 아래 단추가 화면 밖).
+    /// </summary>
+    protected override Size MeasureOverride(Size constraint)
+    {
+        if (FitHeight() is double h && h < constraint.Height) constraint = new Size(constraint.Width, h);
+        return base.MeasureOverride(constraint);
+    }
+
+    /// <summary>지도 Canvas 안에서 판이 쓸 높이 = min(지도 × 0.7, 판 자리 아래 남은 높이 − 8), 최소 200 — Canvas 안이 아니거나 지도 크기를 아직 모르면 null(자르지 않는다).</summary>
+    internal double? FitHeight()
+    {
+        if (VisualTreeHelper.GetParent(this) is not ContentPresenter cp || VisualTreeHelper.GetParent(cp) is not Canvas canvas) return null;
+        if (!ReferenceEquals(canvas, _fitCanvas))
+        {
+            if (_fitCanvas != null) _fitCanvas.SizeChanged -= OnFitCanvasSizeChanged;
+            _fitCanvas = canvas;
+            canvas.SizeChanged += OnFitCanvasSizeChanged;   // 창 크기가 바뀌면 다시 잰다(Canvas 는 같은 끝없는 높이로 자식을 다시 재지 않는다)
+        }
+        if (canvas.ActualHeight <= 0) return null;
+        double top = Canvas.GetTop(cp);
+        if (double.IsNaN(top)) top = 0;
+        return Math.Max(FitMinHeight, Math.Min(canvas.ActualHeight * FitMaxRatio, canvas.ActualHeight - top - FitBottomMargin));
+    }
+
+    private void OnFitCanvasSizeChanged(object sender, SizeChangedEventArgs e) => InvalidateMeasure();
+
+    /// <summary>판 위 휠은 판 스크롤만 — 스크롤 밖(머리줄 · 행동 줄) 휠도 여기서 끝내 지도 줌 · 3D 로 올라가지 않게(ImageCropPanelControl 과 같은 관례).</summary>
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        e.Handled = true;
     }
 
     /// <summary>높이 손잡이(Thumb)의 AutomationId.</summary>

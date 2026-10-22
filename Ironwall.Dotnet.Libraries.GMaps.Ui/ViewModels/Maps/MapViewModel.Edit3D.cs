@@ -92,7 +92,20 @@ public partial class MapViewModel
     {
         if (Edit3DTarget == null || Map3DEdit.EditKeyJson(p?.ToString(), Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) is not { } json) return;
         PostEdit3D(json);
+        // 판 단추로 옮기기 · 돌리기 · 크기 = 누를 때마다 바로 저장(2D 마커를 화살표로 옮기면 바로 반영 · 되돌리기 가능한 것과 같다, 2026-10-22 사용자
+        // "확정은 뭐고" — [✓ 확정] 단추를 없앴다). 꼭짓점 고르기(Tab)는 모양을 바꾸지 않아 확정하지 않는다.
+        if (p?.ToString() is "ArrowUp" or "ArrowDown" or "ArrowLeft" or "ArrowRight" or "[" or "]" or "+" or "-")
+            PostEdit3D(Map3DEdit.EditKeyJson("Enter", false)!);
     }, _ => IsEdit3DTargetActive && !Edit3DBusy);
+
+    /// <summary>
+    /// [✓ 적용] 앞 — 3D 손잡이를 마우스로 끌어 고친 것이 남았으면 뷰어가 확정하게(Enter → edit.commit → 모양 저장) 한다.
+    /// 판 값 저장은 저장된 윤곽(손잡이 확정이 먼저 오면 새 윤곽)을 쓰므로 둘이 어느 순서로 와도 윤곽 · 판 값이 모두 남는다.
+    /// </summary>
+    private void CommitPendingEdit3D()
+    {
+        if (Edit3DTarget != null) PostEdit3D(Map3DEdit.EditKeyJson("Enter", false)!);
+    }
 
     private RelayCommand? _editIn2DCommand;
     /// <summary>[2D 에서 윤곽 고치기] — 같은 판 · 같은 고름 그대로 2D 지도로 옮긴다(3D 를 나가고, 곧바로 다시 들어가지 않는다).</summary>
@@ -119,6 +132,60 @@ public partial class MapViewModel
         MainMap.Focus();
         SyncMap3DWithInputModes();   // 이제 2D 입력 모드 — 3D 를 접는다(진입 보류)
     }, _ => IsEdit3DMode);
+
+    /// <summary>2D 로 옮겨 고치던 「건물 만들기」 판을 3D 로 들어가며 3D 위 판으로 되돌리는 중(펼치면 손잡이 · 고름을 다시 세운다).</summary>
+    private bool _ubCarry3D;
+
+    /// <summary>
+    /// 3D 들어가기 — 2D 로 옮겨 고치던(또는 2D 에서 연) 「건물 만들기」 판이 그 영역이면 판을 닫지 않고 3D 위 판으로 되돌린다([2D 에서 윤곽 고치기] 의 반대).
+    /// 2026-10-22 사용자 — "2D 윤곽에서 고치기 후에 3D 로 들어올 때 버그": 설치본 로그 15:54:24 「편집 · 그리기 중에는 3D 로 들어가지 않습니다」 →
+    /// 판을 닫고(15:54:28) 들어가 같은 건물을 다시 골라야 했다(IsMap3DBlockedByInputMode 가 2D 판을 막고, 3D 로 되돌리는 길이 없었다).
+    /// 닫지 않은 2D 윤곽(찍던 점)은 3D 로 이어 그릴 수 없어 예전대로 막는다. 되돌렸으면 true.
+    /// </summary>
+    private bool CarryUserBuildingPanelTo3D(string job)
+    {
+        if (!IsUserBuildingDrawing || _ubIn3D || _ubArea?.Id != job || Map3DGuide.EditModeLeaves3D(Map3DHost.HostMode)) return false;
+        if (_ubDraft is { IsClosed: false } d && d.Points.Count > 0) return false;
+        _ubIn3D = true;
+        DetachUserBuildingSurface();
+        AttachUserBuildingSurface(adorner: false);
+        if (IsMap3DBlockedByInputMode()) { MoveUserBuildingPanelTo2D(); return false; }   // 다른 2D 도구(측정 · 선 그리기 등)도 막는다
+        _ubCarry3D = true;
+        _log?.Info($"[Edit3D] 2D 판을 3D 위 판으로 되돌려 들어감 uid={_ubEditing?.Uid ?? "-"} job={job}");
+        RefreshUserBuildingPanel();
+        return true;
+    }
+
+    /// <summary>3D 를 펼쳤다 — 되돌린 판이면 고치던 건물의 고름 · 손잡이 · 저장 안 한 값의 상자를 3D 에 다시 보낸다.</summary>
+    private void ResumeUserBuildingIn3D()
+    {
+        if (!_ubCarry3D) return;
+        _ubCarry3D = false;
+        if (!_ubIn3D || !IsUserBuildingDrawing || _ubArea is not { } area || area.Id != _map3DJob) return;
+        if (_ubEditing is { } e)
+        {
+            PostUserBuilding3D(area.Id, Map3DUserBuilding.SelectMessageJson(e.Uid));
+            StartEdit3D(Map3DEdit.TargetUserBuilding, e.Uid);
+        }
+        PreviewUserBuildingDraft();
+        RefreshUserBuildingPanel();
+    }
+
+    /// <summary>3D 를 펼치지 못했다(준비 취소 · 불러오기 실패) — 되돌리던 판은 2D 판 그대로.</summary>
+    private void CancelUserBuildingCarry3D()
+    {
+        if (!_ubCarry3D) return;
+        _ubCarry3D = false;
+        if (_ubIn3D && IsUserBuildingDrawing) MoveUserBuildingPanelTo2D();
+    }
+
+    private void MoveUserBuildingPanelTo2D()
+    {
+        _ubIn3D = false;
+        DetachUserBuildingSurface();
+        AttachUserBuildingSurface();
+        RefreshUserBuildingPanel();
+    }
 
     // ── GIS → 3D ──
 
@@ -182,6 +249,7 @@ public partial class MapViewModel
     /// <summary>draw.point · draw.done · draw.end · edit.commit · edit.end.</summary>
     private void OnMap3DEditMessage(Map3DMessage msg)
     {
+        if (msg.OverlayEdit is { } oc) { CommitOverlayEdit3D(oc); return; }   // 지도 심볼 손잡이(MapViewModel.Overlay3D)
         if (msg.EditCommit is { } c)
         {
             _log?.Info($"[Edit3D] edit.commit {c.Kind} uid={c.Uid} {c.Geometry} 점={c.Points.Count} 방향={c.HeadingDeg?.ToString() ?? "-"}");
@@ -192,6 +260,13 @@ public partial class MapViewModel
         {
             // 바뀐 것 없이 3D 에서 Esc 로 편집이 끝났다 — 3D 가 이미 손잡이를 내렸다(edit.stop 을 되보내지 않는다). 판의 고름도 푼다
             _log?.Info($"[Edit3D] 3D 에서 편집 끝 reason={msg.Reason ?? "-"}");
+            if (_edit3DTarget == null && _overlayEdit3D != null)
+            {
+                // 지도 심볼 손잡이를 3D 의 Esc 로 끝냈다 — 2D Esc 처럼 고름을 푼다(edit.stop 은 되보내지 않는다)
+                _overlayEdit3D = null;
+                ClearAllSelections();
+                return;
+            }
             if (_edit3DTarget == null) return;
             _edit3DTarget = null;
             if (_decoIn3D && IsDecorating) { if (_modelSelectedUid != null) SelectModel(null); else SelectDecoration(null); }

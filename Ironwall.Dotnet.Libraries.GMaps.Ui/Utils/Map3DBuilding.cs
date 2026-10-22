@@ -54,6 +54,9 @@ public static class Map3DBuilding
     /// <summary>손잡이 끌기 데드존(px) — 이만큼 안 움직였으면 끌기가 아니다(클릭 · 손떨림).</summary>
     public const double DragDeadZonePx = 4.0;
 
+    /// <summary>여러 개 골랐는데 값이 서로 다른 칸(2D 여러 개 속성창과 같은 말).</summary>
+    public const string MixedText = "여러 값";
+
     /// <summary>판 머리 띠 제목.</summary>
     public const string Title = "건물 높이";
     /// <summary>지도 편집 권한이 없을 때 판에 보이는 이유 한 줄.</summary>
@@ -79,9 +82,11 @@ public static class Map3DBuilding
         int? levels = o["levels"]?.Type == JTokenType.Integer && o.Value<long>("levels") is long lv && lv > 0 && lv <= 10_000 ? (int)lv : null;
         double? area = Finite(o["area_m2"]) is double a && a > 0 ? a : null;
         string? uid = Str(o["user_uid"]);
+        // 서버 건물 줄(높이 저장 응답 · scene.json)은 외관을 look:{hidden, wall_color, roof_color, facade} 안에 둔다(map-3d looks._set_row_look) —
+        // 바깥 키만 읽으면 높이 [적용] 뒤 판의 외관이 「자동」으로 바뀌어, 다음 [외관 적용]이 저장한 무늬 · 색을 지웠다(2026-10-22 "높이를 수정하면 다른 속성이 변경").
         return new Map3DBuildingPick((int)id, Str(o["origin"]), h, Str(o["height_source"]), Str(o["height_from"]) ?? Str(o["height_source"]),
                                      levels, area, lon, lat, isManual)
-               { Look = Map3DLook.StateOf(o), UserUid = uid != null && Map3DUserBuilding.IsUid(uid) ? uid : null };
+               { Look = Map3DLook.StateOf(o["look"] as JObject ?? o), UserUid = uid != null && Map3DUserBuilding.IsUid(uid) ? uid : null };
     }
 
     /// <summary>
@@ -111,9 +116,34 @@ public static class Map3DBuilding
     public static string PreviewMessageJson(int id, double? height)
         => new JObject { ["type"] = "building.preview", ["id"] = id, ["height"] = height is double h ? h : JValue.CreateNull() }.ToString(Formatting.None);
 
-    /// <summary>윤곽 강조(null = 지움).</summary>
-    public static string SelectMessageJson(int? id)
-        => new JObject { ["type"] = "building.select", ["id"] = id is int i ? i : JValue.CreateNull() }.ToString(Formatting.None);
+    /// <summary>
+    /// 윤곽 강조(null = 지움). ids = 고른 건물 모두(2026-10-22 — 2D 마커처럼 여러 개 고르기, 계약: 문자열 배열) — 판에 열린 건물은 id.
+    /// ids 를 모르는 옛 엔진은 id 만 강조한다.
+    /// </summary>
+    public static string SelectMessageJson(int? id, IEnumerable<int>? ids = null)
+    {
+        var o = new JObject { ["type"] = "building.select", ["id"] = id is int i ? i : JValue.CreateNull() };
+        if (ids != null) o["ids"] = new JArray(ids.Select(x => x.ToString(CultureInfo.InvariantCulture)).ToArray<object>());
+        return o.ToString(Formatting.None);
+    }
+
+    /// <summary>building.box 한 번에 받는 건물 수 상한(엔진도 이만큼만 보낸다).</summary>
+    public const int MaxBoxItems = 500;
+
+    /// <summary>
+    /// 3D Shift+끌기 상자(building.box) — items(building 메시지와 같은 모양) 중 바른 것만(최대 500), add = Ctrl 도 눌림(지금 고름에 더함).
+    /// items 가 배열이 아니면 null(빈 배열은 바른 메시지 — 고름 풀기).
+    /// </summary>
+    public static (IReadOnlyList<Map3DBuildingPick> Items, bool Add)? ParseBox(JObject o)
+    {
+        if (o["items"] is not JArray rows) return null;
+        var items = rows.OfType<JObject>().Select(Parse).OfType<Map3DBuildingPick>().Take(MaxBoxItems).ToList();
+        return (items, o["add"]?.Type == JTokenType.Boolean && o.Value<bool>("add"));
+    }
+
+    /// <summary>클릭 때 누른 보조키(building 메시지 ctrl · shift — 옛 엔진은 키가 없어 false).</summary>
+    public static (bool Ctrl, bool Shift) ParseModifiers(JObject o)
+        => (o["ctrl"]?.Type == JTokenType.Boolean && o.Value<bool>("ctrl"), o["shift"]?.Type == JTokenType.Boolean && o.Value<bool>("shift"));
 
     /// <summary>서버가 저장한 건물 줄 — 3D 가 그 높이를 새 원래 모양으로 삼는다.</summary>
     public static string CommitMessageJson(JObject building)
