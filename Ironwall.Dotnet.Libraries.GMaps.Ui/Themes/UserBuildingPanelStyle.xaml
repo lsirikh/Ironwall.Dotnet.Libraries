@@ -187,6 +187,7 @@
 							<Grid.RowDefinitions>
 								<RowDefinition Height="38" />
 								<RowDefinition Height="*" />
+								<RowDefinition Height="Auto" />
 							</Grid.RowDefinitions>
 
 							<!--  머리 띠(끌기)  -->
@@ -230,14 +231,15 @@
 								</Grid>
 							</Border>
 
-							<!--  바디 (DataContext = MapViewModel) — 판이 지도 아래로 넘치면 스크롤(높이는 HeightPanelControlBase 가 판 자리 아래 남은 높이로 줄인다, 2026-10-22)  -->
+							<!--  바디 (DataContext = MapViewModel) — 머리 띠 · 행동 줄 사이만 세로 스크롤(2026-10-22 "너무 길어 높이 줄이고 스크롤").
+							      판 높이는 HeightPanelControlBase 가 지도 높이의 70% · 판 자리 아래 남은 높이로 자른다  -->
 							<ScrollViewer
 								Grid.Row="1"
 								Padding="0,0,2,0"
 								AutomationProperties.AutomationId="Map.UserBuilding.Scroll"
 								HorizontalScrollBarVisibility="Disabled"
 								VerticalScrollBarVisibility="Auto">
-							<StackPanel Margin="14,12,14,14">
+							<StackPanel Margin="14,12,14,4">
 								<!--  형상 도구 줄 — 사각형(R) · 삼각형(T) · 원(C) · 타원(E) · 다각형(P). 쓰는 법은 단추 풍선과 판 "?"  -->
 								<UniformGrid Margin="0,0,0,8" Columns="5">
 									<Button
@@ -616,9 +618,52 @@
 									TextWrapping="Wrap"
 									Visibility="{Binding HasUserBuildingError, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+								<ContentControl Margin="0,10,0,0" Template="{StaticResource Edit3DSectionTemplate}" />
+
+								<!--  복사 · 붙여넣기(2026-10-22) — 건물 = 고친 · 고른 건물을 옆에 새로(Ctrl+C/V), 속성 = 높이 · 지붕 · 외관 · 기울기를 다른 건물에(Ctrl+Shift+C/V).
+								      주 행동이 아니라 스크롤 내용 맨 아래(행동 줄 바로 위). 쓰는 법은 판 "?"  -->
 								<Border
 									Height="1"
-									Margin="0,12,0,10"
+									Margin="0,10,0,8"
+									Background="{DynamicResource DividerBrush}" />
+								<UniformGrid AutomationProperties.AutomationId="Map.UserBuilding.Clipboard" Columns="2">
+									<Button
+										Margin="0,0,4,4"
+										AutomationProperties.AutomationId="Map.UserBuilding.Copy"
+										Command="{Binding CopyUserBuildingsCommand}"
+										Content="건물 복사"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="고친 · 고른 건물 복사 (Ctrl+C)" />
+									<Button
+										Margin="4,0,0,4"
+										AutomationProperties.AutomationId="Map.UserBuilding.Paste"
+										Command="{Binding PasteUserBuildingsCommand}"
+										Content="건물 붙여넣기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="복사한 건물을 겹치지 않게 옆에 새로 (Ctrl+V)" />
+									<Button
+										Margin="0,4,4,0"
+										AutomationProperties.AutomationId="Map.UserBuilding.CopyStyle"
+										Command="{Binding CopyUserBuildingStyleCommand}"
+										Content="속성 복사"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="이 판의 높이 · 지붕 · 외관 · 기울기 복사 (Ctrl+Shift+C)" />
+									<Button
+										Margin="4,4,0,0"
+										AutomationProperties.AutomationId="Map.UserBuilding.PasteStyle"
+										Command="{Binding PasteUserBuildingStyleCommand}"
+										Content="속성 붙여넣기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="복사한 속성을 고친 · 고른 건물에 (Ctrl+Shift+V)" />
+								</UniformGrid>
+							</StackPanel>
+							</ScrollViewer>
+
+							<!--  행동 줄(2026-10-22) — 스크롤 밖이라 판이 작아도 늘 보인다. 적용할 내용 한 줄 + 주 행동  -->
+							<StackPanel Grid.Row="2" Margin="14,0,14,14">
+								<Border
+									Height="1"
+									Margin="0,8,0,10"
 									Background="{DynamicResource DividerBrush}" />
 								<TextBlock
 									Margin="0,0,0,12"
@@ -628,8 +673,6 @@
 									Foreground="{DynamicResource TextPrimaryBrush}"
 									Text="{Binding UserBuildingSummary}"
 									TextWrapping="Wrap" />
-
-								<ContentControl Margin="0,0,0,10" Template="{StaticResource Edit3DSectionTemplate}" />
 
 								<Grid>
 									<Grid.ColumnDefinitions>
@@ -703,44 +746,7 @@
 										</StackPanel>
 									</Button>
 								</Grid>
-
-								<!--  복사 · 붙여넣기(2026-10-22) — 건물 = 고친 · 고른 건물을 옆에 새로(Ctrl+C/V), 속성 = 높이 · 지붕 · 외관 · 기울기를 다른 건물에(Ctrl+Shift+C/V). 쓰는 법은 판 "?"  -->
-								<Border
-									Height="1"
-									Margin="0,10,0,8"
-									Background="{DynamicResource DividerBrush}" />
-								<UniformGrid AutomationProperties.AutomationId="Map.UserBuilding.Clipboard" Columns="2">
-									<Button
-										Margin="0,0,4,4"
-										AutomationProperties.AutomationId="Map.UserBuilding.Copy"
-										Command="{Binding CopyUserBuildingsCommand}"
-										Content="건물 복사"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="고친 · 고른 건물 복사 (Ctrl+C)" />
-									<Button
-										Margin="4,0,0,4"
-										AutomationProperties.AutomationId="Map.UserBuilding.Paste"
-										Command="{Binding PasteUserBuildingsCommand}"
-										Content="건물 붙여넣기"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="복사한 건물을 겹치지 않게 옆에 새로 (Ctrl+V)" />
-									<Button
-										Margin="0,4,4,0"
-										AutomationProperties.AutomationId="Map.UserBuilding.CopyStyle"
-										Command="{Binding CopyUserBuildingStyleCommand}"
-										Content="속성 복사"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="이 판의 높이 · 지붕 · 외관 · 기울기 복사 (Ctrl+Shift+C)" />
-									<Button
-										Margin="4,4,0,0"
-										AutomationProperties.AutomationId="Map.UserBuilding.PasteStyle"
-										Command="{Binding PasteUserBuildingStyleCommand}"
-										Content="속성 붙여넣기"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="복사한 속성을 고친 · 고른 건물에 (Ctrl+Shift+V)" />
-								</UniformGrid>
 							</StackPanel>
-							</ScrollViewer>
 						</Grid>
 					</fb:FrameBorder>
 				</ControlTemplate>

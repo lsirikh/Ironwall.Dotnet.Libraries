@@ -82,7 +82,10 @@ public partial class TwinContractScenarioTests
         return map;
     }
 
-    /// <summary>판이 지도 안(판 자리 아래)에 들어가고, 단추마다 판 안 스크롤로 보이는 자리까지 닿는다. mustOverflow = 이 크기에서 내용이 넘쳐 스크롤이 생겨야 한다.</summary>
+    /// <summary>
+    /// 판이 지도 안(판 자리 아래)에 들어가고, 단추마다 보이는 자리까지 닿는다 — 스크롤 안 단추는 판 안 스크롤로, 스크롤 밖 행동 줄([✓ 적용] 등,
+    /// 2026-10-22 "높이 줄이고 스크롤" 뒤 늘 보임)은 판 안에 그대로. mustOverflow = 이 크기에서 내용이 넘쳐 스크롤이 생겨야 한다.
+    /// </summary>
     private static void AssertReachableByScroll(Canvas map, Control panel, string scrollId, bool mustOverflow, params string[] buttonIds)
     {
         Assert.True(90 + panel.ActualHeight <= map.ActualHeight + 0.5, $"판 아래 끝 {90 + panel.ActualHeight:0} > 지도 {map.ActualHeight:0}");
@@ -93,6 +96,12 @@ public partial class TwinContractScenarioTests
         {
             var b = Find<Button>(panel, id);
             Assert.Equal(Visibility.Visible, b.Visibility);
+            if (!b.IsDescendantOf(scroll))
+            {
+                var p = b.TransformToAncestor(panel).TransformBounds(new Rect(b.RenderSize));
+                Assert.True(p.Top >= -0.5 && p.Bottom <= panel.ActualHeight + 0.5, $"{id} {p} 가 판(0~{panel.ActualHeight:0}) 밖");
+                continue;
+            }
             b.BringIntoView();   // 키보드 Tab · 마우스 휠과 같은 길(ScrollViewer 가 받는다)
             map.UpdateLayout();
             var r = b.TransformToAncestor(scroll).TransformBounds(new Rect(b.RenderSize));

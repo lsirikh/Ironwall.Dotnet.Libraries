@@ -57,7 +57,7 @@ internal sealed class OverlayHeaderDrag
         var (newLeft, newTop) = OverlayHeaderClamp.Clamp(left + cur.X - _lastMousePosition.X, top + cur.Y - _lastMousePosition.Y, _panel, canvas, _headerHeight);
         Canvas.SetLeft(cp, newLeft);
         Canvas.SetTop(cp, newTop);
-        _panel.InvalidateMeasure();   // 자리 아래 남은 높이로 판을 줄이는 겹창(HeightPanelControlBase)이 다시 재게 — Canvas.Top 은 자식을 다시 재지 않는다
+        _panel.InvalidateMeasure();   // 자리 아래 남은 높이로 판을 자르는 겹창(HeightPanelControlBase)이 다시 재게 — Canvas.Top 은 자식을 다시 재지 않는다
         _lastMousePosition = cur;
     }
 

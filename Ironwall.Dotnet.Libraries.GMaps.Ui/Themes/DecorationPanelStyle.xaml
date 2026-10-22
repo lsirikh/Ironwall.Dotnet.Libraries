@@ -37,6 +37,7 @@
 							<Grid.RowDefinitions>
 								<RowDefinition Height="38" />
 								<RowDefinition Height="*" />
+								<RowDefinition Height="Auto" />
 							</Grid.RowDefinitions>
 
 							<!--  머리 띠(끌기)  -->
@@ -81,14 +82,15 @@
 								</Grid>
 							</Border>
 
-							<!--  바디 (DataContext = MapViewModel) — 판이 지도 아래로 넘치면 스크롤(높이는 HeightPanelControlBase 가 판 자리 아래 남은 높이로 줄인다, 2026-10-22)  -->
+							<!--  바디 (DataContext = MapViewModel) — 머리 띠 · 행동 줄 사이만 세로 스크롤(2026-10-22 "너무 길어 높이 줄이고 스크롤").
+							      판 높이는 HeightPanelControlBase 가 지도 높이의 70% · 판 자리 아래 남은 높이로 자른다  -->
 							<ScrollViewer
 								Grid.Row="1"
 								Padding="0,0,2,0"
 								AutomationProperties.AutomationId="Map.Decoration.Scroll"
 								HorizontalScrollBarVisibility="Disabled"
 								VerticalScrollBarVisibility="Auto">
-							<StackPanel Margin="14,12,14,14">
+							<StackPanel Margin="14,12,14,4">
 								<!--  옛 엔진 — 도구를 끄고 이유 한 줄  -->
 								<TextBlock
 									Margin="0,0,0,8"
@@ -385,85 +387,6 @@
 
 								<ContentControl Template="{StaticResource Edit3DSectionTemplate}" />
 
-								<Grid Margin="0,10,0,0">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*" />
-										<ColumnDefinition Width="7" />
-										<ColumnDefinition Width="*" />
-									</Grid.ColumnDefinitions>
-									<Grid.RowDefinitions>
-										<RowDefinition Height="Auto" />
-										<RowDefinition Height="7" />
-										<RowDefinition Height="Auto" />
-										<RowDefinition Height="7" />
-										<RowDefinition Height="Auto" />
-									</Grid.RowDefinitions>
-									<Button
-										Grid.Row="0"
-										Grid.Column="0"
-										AutomationProperties.AutomationId="Map.Decoration.Apply"
-										Command="{Binding ApplyDecorationCommand}"
-										Content="✓ 적용"
-										Style="{StaticResource PanelPrimaryButtonStyle}"
-										ToolTip="고른 항목의 값 · 이름 저장 — 3D 에 바로 보입니다" />
-									<Button
-										Grid.Row="0"
-										Grid.Column="2"
-										AutomationProperties.AutomationId="Map.Decoration.Replace"
-										Command="{Binding ReplaceDecorationCommand}"
-										Content="다시 놓기"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="고른 항목을 지도에 새로 찍은 자리로 옮기기" />
-									<Button
-										Grid.Row="2"
-										Grid.Column="0"
-										AutomationProperties.AutomationId="Map.Decoration.Delete"
-										Command="{Binding DeleteDecorationCommand}"
-										Content="지우기"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="고른 항목 지우기 (Delete · 되돌리기 가능)" />
-									<Button
-										Grid.Row="2"
-										Grid.Column="2"
-										AutomationProperties.AutomationId="Map.Decoration.ClearAll"
-										Command="{Binding ClearDecorationsCommand}"
-										Content="모두 지우기…"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="이 영역의 꾸미기 항목을 모두 지웁니다(확인 뒤)" />
-									<Button
-										Grid.Row="4"
-										Grid.Column="0"
-										AutomationProperties.AutomationId="Map.Decoration.Undo"
-										Command="{Binding UndoDecorationCommand}"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="방금 한 것을 거꾸로 (Ctrl+Z)">
-										<StackPanel Orientation="Horizontal">
-											<md:PackIcon
-												Width="14"
-												Height="14"
-												VerticalAlignment="Center"
-												Kind="Undo" />
-											<TextBlock Margin="5,0,0,0" Text="되돌리기" />
-										</StackPanel>
-									</Button>
-									<Button
-										Grid.Row="4"
-										Grid.Column="2"
-										AutomationProperties.AutomationId="Map.Decoration.Redo"
-										Command="{Binding RedoDecorationCommand}"
-										Style="{StaticResource PanelSecondaryButtonStyle}"
-										ToolTip="되돌린 것을 다시 (Ctrl+Y)">
-										<StackPanel Orientation="Horizontal">
-											<md:PackIcon
-												Width="14"
-												Height="14"
-												VerticalAlignment="Center"
-												Kind="Redo" />
-											<TextBlock Margin="5,0,0,0" Text="다시 하기" />
-										</StackPanel>
-									</Button>
-								</Grid>
-
 								<!--  목록 — 누르면 고르기(값 칸이 그 항목으로)  -->
 								<Border
 									Height="1"
@@ -577,6 +500,92 @@
 								</Grid>
 							</StackPanel>
 							</ScrollViewer>
+
+							<!--  행동 줄(2026-10-22) — 스크롤 밖이라 판이 작아도 늘 보인다(목록 · 넣은 모델은 그 위 스크롤 안)  -->
+							<StackPanel Grid.Row="2" Margin="14,0,14,14">
+								<Border
+									Height="1"
+									Margin="0,8,0,10"
+									Background="{DynamicResource DividerBrush}" />
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Grid.RowDefinitions>
+										<RowDefinition Height="Auto" />
+										<RowDefinition Height="7" />
+										<RowDefinition Height="Auto" />
+										<RowDefinition Height="7" />
+										<RowDefinition Height="Auto" />
+									</Grid.RowDefinitions>
+									<Button
+										Grid.Row="0"
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.Decoration.Apply"
+										Command="{Binding ApplyDecorationCommand}"
+										Content="✓ 적용"
+										Style="{StaticResource PanelPrimaryButtonStyle}"
+										ToolTip="고른 항목의 값 · 이름 저장 — 3D 에 바로 보입니다" />
+									<Button
+										Grid.Row="0"
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.Decoration.Replace"
+										Command="{Binding ReplaceDecorationCommand}"
+										Content="다시 놓기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="고른 항목을 지도에 새로 찍은 자리로 옮기기" />
+									<Button
+										Grid.Row="2"
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.Decoration.Delete"
+										Command="{Binding DeleteDecorationCommand}"
+										Content="지우기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="고른 항목 지우기 (Delete · 되돌리기 가능)" />
+									<Button
+										Grid.Row="2"
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.Decoration.ClearAll"
+										Command="{Binding ClearDecorationsCommand}"
+										Content="모두 지우기…"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="이 영역의 꾸미기 항목을 모두 지웁니다(확인 뒤)" />
+									<Button
+										Grid.Row="4"
+										Grid.Column="0"
+										AutomationProperties.AutomationId="Map.Decoration.Undo"
+										Command="{Binding UndoDecorationCommand}"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="방금 한 것을 거꾸로 (Ctrl+Z)">
+										<StackPanel Orientation="Horizontal">
+											<md:PackIcon
+												Width="14"
+												Height="14"
+												VerticalAlignment="Center"
+												Kind="Undo" />
+											<TextBlock Margin="5,0,0,0" Text="되돌리기" />
+										</StackPanel>
+									</Button>
+									<Button
+										Grid.Row="4"
+										Grid.Column="2"
+										AutomationProperties.AutomationId="Map.Decoration.Redo"
+										Command="{Binding RedoDecorationCommand}"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="되돌린 것을 다시 (Ctrl+Y)">
+										<StackPanel Orientation="Horizontal">
+											<md:PackIcon
+												Width="14"
+												Height="14"
+												VerticalAlignment="Center"
+												Kind="Redo" />
+											<TextBlock Margin="5,0,0,0" Text="다시 하기" />
+										</StackPanel>
+									</Button>
+								</Grid>
+							</StackPanel>
 						</Grid>
 					</fb:FrameBorder>
 				</ControlTemplate>
